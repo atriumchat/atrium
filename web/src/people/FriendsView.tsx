@@ -63,19 +63,22 @@ export function FriendsView() {
           </div>
         </header>
       ) : (
-        <header className="mx-2 mt-2 flex h-14 shrink-0 items-center gap-2 rounded-full bg-default pl-5 pr-2">
-          <h1 className="mr-3 text-[16px] font-medium">Друзья</h1>
-          <div className="flex items-center gap-2">
+        // A narrow window turns "Добавить в друзья" into a round icon; narrower still, the tabs scroll sideways.
+        <header className="@container mx-2 mt-2 flex h-14 shrink-0 items-center gap-2 rounded-full bg-default pl-5 pr-2">
+          <h1 className="mr-3 shrink-0 text-[16px] font-medium">Друзья</h1>
+          <div className="no-scrollbar flex min-w-0 items-center gap-2 overflow-x-auto">
             {tabButton('online', 'В сети')}
             {tabButton('all', 'Все')}
             {tabButton('pending', pendingLabel)}
             <button
               onClick={() => setTab('add')}
-              className={`ml-1 h-9 shrink-0 rounded-full px-4 text-[14px] font-medium transition-colors ${
+              aria-label="Добавить в друзья"
+              className={`ml-1 flex h-9 shrink-0 items-center justify-center rounded-full text-[14px] font-medium transition-colors @max-[38rem]:w-9 @min-[38rem]:px-4 ${
                 tab === 'add' ? 'bg-white/10 text-foreground' : 'bg-accent text-accent-foreground hover:opacity-90'
               }`}
             >
-              Добавить в друзья
+              <UserPlusIcon size={18} className="@min-[38rem]:hidden" />
+              <span className="@max-[38rem]:hidden">Добавить в друзья</span>
             </button>
           </div>
           <span className="flex-1" />
