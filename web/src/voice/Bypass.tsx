@@ -56,9 +56,9 @@ export function BypassSwitch() {
     >
       <Switch.Content className="flex w-full items-start justify-between gap-3">
         <span className="min-w-0">
-          <Label className="text-[14px] font-medium">Обход блокировок</Label>
+          <Label className="text-[14px] font-medium">Антилаг</Label>
           <span className="block text-[12px] leading-snug text-muted">
-            {forced ? 'Включён на сервере' : 'Маскирует звонок под обычный сайт'}
+            {forced ? 'Включён на сервере' : 'Звонок через сервер, меньше обрывов'}
           </span>
         </span>
         <Switch.Control className="mt-0.5 shrink-0">
@@ -70,7 +70,7 @@ export function BypassSwitch() {
 }
 
 /**
- * Offered when the call has stayed bad for a few seconds and the bypass is off: one tap to switch it on.
+ * Offered when the call has stayed bad for a few seconds and anti-lag is off: one tap to switch it on.
  * Closing it hides it until the next call.
  */
 export function BypassHint({ stats }: { stats: CallStats | null }) {
@@ -93,7 +93,7 @@ export function BypassHint({ stats }: { stats: CallStats | null }) {
         }}
         className="h-8 shrink-0 rounded-full px-3 text-[13px] [--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]"
       >
-        Включить обход
+        Включить антилаг
       </Button>
       <button onClick={() => setDismissedFor(joinedAt)} aria-label="Не сейчас" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted hover:text-foreground">
         <XIcon size={14} />

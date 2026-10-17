@@ -35,5 +35,5 @@ export async function firstRunNetCheck() {
   // Don't swap paths under a call that's already going.
   if (useStore.getState().voiceStatus !== 'idle') return;
   await setVoicePrefs({ relayOnly: true });
-  toast.success('Включён обход блокировок');
+  toast.success('Антилаг включён');
 }

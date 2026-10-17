@@ -13,9 +13,9 @@ export const PATH_LABEL: Record<CallPath, string> = {
   direct: 'напрямую',
   udp: 'по UDP',
   tcp: 'по TCP',
-  'relay-udp': 'через ретранслятор, UDP',
-  'relay-tcp': 'через ретранслятор, TCP',
-  'relay-tls': 'через ретранслятор, TLS 443',
+  'relay-udp': 'через сервер, UDP',
+  'relay-tcp': 'через сервер, TCP',
+  'relay-tls': 'через сервер, TLS 443',
 };
 
 export type CallStats = {

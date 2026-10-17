@@ -71,15 +71,15 @@ export function ConnectionCheck({ onDone }: { onDone?: (ok: boolean) => void }) 
   return (
     <div className="flex flex-col gap-2">
       <Row title="Звонок" hint="как браузер найдёт сам" result={normal} />
-      <Row title="Запасной путь" hint="только через ретранслятор на 443 — то, что пробивается, когда остальное режут" result={relay} />
+      <Row title="Антилаг" hint="только через сервер, на порту 443" result={relay} />
       {finished && (
         <p className="px-1 pt-1 text-[13px] leading-snug text-muted">
           {normal.state === 'ok' && relay.state === 'ok'
-            ? 'Связь в порядке, запасной путь тоже работает.'
+            ? 'Связь в порядке, антилаг тоже работает.'
             : normal.state === 'ok'
-              ? 'Звонки идут, запасной путь не работает: при блокировках связь может пропадать. Нужна проверка TURN на сервере.'
+              ? 'Звонки идут, но антилаг не работает: в слабых сетях связь может пропадать. Нужна проверка TURN на сервере.'
               : relay.state === 'ok'
-                ? 'Напрямую не пробивается, но через ретранслятор звонки пойдут.'
+                ? 'Напрямую не проходит, но с антилагом звонки пойдут.'
                 : 'Звонки не проходят: LiveKit не запущен или закрыты порты 443 TCP/UDP.'}{' '}
           <button onClick={() => setRun((n) => n + 1)} className="text-foreground hover:underline">
             Проверить ещё раз

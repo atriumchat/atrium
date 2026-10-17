@@ -122,7 +122,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
         )}
 
         {step === 3 && (
-          <Step title="Проверим связь" text="Пробуем позвонить на свой же сервер: как получится сам и через запасной путь на 443.">
+          <Step title="Проверим связь" text="Пробуем позвонить на свой же сервер: напрямую и через антилаг на 443.">
             <ConnectionCheck onDone={() => setChecked(true)} />
             <Button onPress={next} className={`${primary} mt-3`}>
               {checked ? 'Дальше' : 'Пропустить'}
