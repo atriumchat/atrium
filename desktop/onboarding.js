@@ -542,6 +542,7 @@ function startInstall() {
   renderTasks();
   $('e-install').textContent = '';
   $('retry').hidden = true;
+  $('go-install').hidden = false;
   $('go-install').disabled = true;
   $('install-title').textContent = 'Ставим Gomex';
   $('install-sub').textContent = 'Пара минут, окно можно свернуть';
@@ -582,6 +583,8 @@ function startInstall() {
       clearInterval(clock);
       state.installing = false;
       $('e-install').textContent = event.why ?? 'Не получилось';
+      // A failed install has one way on, again: the server's button only gets in its way.
+      $('go-install').hidden = true;
       $('retry').hidden = false;
     }
     if (event.state === 'ready') {

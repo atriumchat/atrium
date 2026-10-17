@@ -140,17 +140,17 @@
 
         <!-- 4. The install itself, step by step; nothing to press. -->
         <section class="step" data-step="install" hidden>
-          <h1 id="install-title">Ставим Gomex</h1>
+          <div class="head">
+            <h1 id="install-title">Ставим Gomex</h1>
+            <span class="elapsed" id="elapsed">0:00</span>
+          </div>
           <p class="sub" id="install-sub">Пара минут, окно можно свернуть</p>
           <!-- The installer's steps on a drum: the one that is on in the middle, the one done above, the next below. -->
           <div class="wheel"><ol class="tasks" id="tasks"></ol></div>
           <p class="error" id="e-install" role="alert"></p>
-          <div class="actions">
-            <span class="elapsed" id="elapsed">0:00</span>
-            <span class="pair">
-              <button class="quiet" type="button" id="retry" hidden>Повторить</button>
-              <button class="primary" type="button" id="go-install" disabled>Открыть сервер</button>
-            </span>
+          <div class="actions start">
+            <button class="primary" type="button" id="go-install" disabled>Открыть сервер</button>
+            <button class="quiet" type="button" id="retry" hidden>Повторить</button>
           </div>
         </section>
       </main>

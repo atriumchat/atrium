@@ -536,6 +536,13 @@ h1 {
   background: var(--danger);
   box-shadow: none;
 }
+/* The install's title with its clock at the right, on one line. */
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
 .elapsed {
   color: var(--faint);
   font-size: 13px;
@@ -552,6 +559,13 @@ h1 {
 }
 .actions > :last-child {
   margin-left: auto;
+}
+/* The install's way on sits under the drum, at the left, where the eye already is. */
+.actions.start {
+  justify-content: flex-start;
+}
+.actions.start > :last-child {
+  margin-left: 0;
 }
 .pair {
   display: flex;
