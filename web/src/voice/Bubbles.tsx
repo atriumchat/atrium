@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { Popover } from '@heroui/react';
 import { useStore } from '../store';
 import type { User } from '../types';
@@ -14,6 +14,9 @@ import { HeadphonesSlashIcon, MicSlashIcon } from '../ui/icons';
  *   right lobe; when someone else takes over, the left lobe deflates into the right and inflates again.
  * Positions are written straight to the DOM every frame, so React only renders when the people change. The
  * frame loop sleeps once everything has settled and wakes when the people, who's talking or the size change.
+ * A circle never changes its width or height while it moves: it is drawn once at its biggest size and each frame
+ * only moves and scales it with a transform. Resizing the box every frame made the browser lay it out and
+ * repaint it, and it left the old edge pixels behind when the circle shrank.
  */
 
 export type BubblePerson = {
@@ -83,10 +86,27 @@ function asSet(list: readonly string[]) {
   return set;
 }
 
-function place(el: HTMLElement | null | undefined, x: number, y: number, r: number) {
+/**
+ * Puts a bubble's wrapper at the centre (x, y) and hands the parts inside its radius: the disc scales by
+ * --bubble-s, the badge and the nick tag follow --bubble-r and keep their own size. `max` is the radius the
+ * disc was drawn at (the biggest it gets).
+ */
+function place(el: HTMLElement | null | undefined, x: number, y: number, r: number, max: number) {
   if (!el) return;
-  el.style.transform = `translate(${(x - r).toFixed(1)}px, ${(y - r).toFixed(1)}px)`;
-  el.style.width = el.style.height = `${(r * 2).toFixed(1)}px`;
+  el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+  el.style.setProperty('--bubble-r', r.toFixed(1));
+  el.style.setProperty('--bubble-s', (r / max).toFixed(4));
+}
+
+/** A circle drawn with `fullSize(max)`, moved and scaled to (x, y, r). */
+function placeDisc(el: HTMLElement | null | undefined, x: number, y: number, r: number, max: number) {
+  if (!el) return;
+  el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${(r / max).toFixed(4)})`;
+}
+
+/** The box of a circle at its biggest, centred on the origin of whatever holds it. It never changes after that. */
+function fullSize(max: number): CSSProperties {
+  return { width: max * 2, height: max * 2, margin: -max };
 }
 
 /** Pushes overlapping circles apart. `weight(a)` is how much of the push `a` takes (0 = it stays put). */
@@ -114,56 +134,70 @@ function Face({ user }: { user: User | undefined }) {
   if (user?.avatarUrl) return <img src={user.avatarUrl} alt="" draggable={false} className="h-full w-full object-cover" />;
   const letter = (user?.name ?? '?').trim().charAt(0).toUpperCase() || '?';
   return (
-    <span className="flex h-full w-full items-center justify-center text-[clamp(14px,40cqw,64px)] font-medium text-white" style={{ background: user?.color ?? 'var(--default)' }}>
-      {letter}
+    <span className="flex h-full w-full items-center justify-center font-medium text-white" style={{ background: user?.color ?? 'var(--default)' }}>
+      <span className="bubble-letter">{letter}</span>
     </span>
   );
 }
 
 /**
- * A circle placed by the layout (it sets the transform and size). Shows the nick on hover; a click on
- * someone else, once connected, opens their volume.
+ * A circle placed by the layout, which moves the wrapper and sets --bubble-r / --bubble-s on it (see `place`).
+ * The disc inside is `max` pixels in radius for good and only scaled; the mute badge and the nick tag sit
+ * outside it so they keep their size. Shows the nick on hover; a click on someone else, once connected, opens
+ * their volume.
  */
-function Bubble(props: { person: BubblePerson; nodeRef: (el: HTMLDivElement | null) => void; live: boolean; tag?: boolean; badge?: boolean }) {
-  const { person, live, tag = true, badge = true } = props;
+function Bubble(props: { person: BubblePerson; nodeRef: (el: HTMLDivElement | null) => void; live: boolean; max: number; tag?: boolean; badge?: boolean }) {
+  const { person, live, max, tag = true, badge = true } = props;
   const user = useStore((s) => s.users[person.id]);
   const isMe = useStore((s) => s.me?.id === person.id);
   const name = user?.name ?? '…';
   const off = person.muted || person.deafened;
 
   const face = (
-    <span className={`block h-full w-full overflow-hidden rounded-full bg-default [container-type:inline-size] ${person.ringing ? 'opacity-40' : ''}`}>
+    <span className={`block h-full w-full overflow-hidden rounded-full bg-default ${person.ringing ? 'opacity-40' : ''}`}>
       <Face user={user} />
     </span>
   );
 
   return (
-    <div ref={props.nodeRef} className={`group absolute left-0 top-0 h-0 w-0 rounded-full ${person.ringing ? 'call-ringing' : ''}`}>
-      {live && !isMe && !person.ringing ? (
-        <Popover>
-          <Popover.Trigger aria-label={`Громкость: ${name}`} className="block h-full w-full cursor-pointer rounded-full outline-none data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-white">
+    <div ref={props.nodeRef} className="group absolute left-0 top-0 h-0 w-0 will-change-transform">
+      <div
+        className={`absolute left-0 top-0 rounded-full will-change-transform ${person.ringing ? 'call-ringing' : ''}`}
+        style={{ ...fullSize(max), transform: 'scale(var(--bubble-s, 0))' }}
+      >
+        {live && !isMe && !person.ringing ? (
+          <Popover>
+            <Popover.Trigger aria-label={`Громкость: ${name}`} className="block h-full w-full cursor-pointer rounded-full outline-none data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-white">
+              {face}
+            </Popover.Trigger>
+            <Popover.Content placement="bottom" className="w-64">
+              <Popover.Dialog className="p-5">
+                <VolumeSlider userId={person.id} name={name} />
+              </Popover.Dialog>
+            </Popover.Content>
+          </Popover>
+        ) : (
+          <span role="img" aria-label={person.ringing ? `${name} — вызываем` : isMe ? `${name} (вы)` : name} className="block h-full w-full">
             {face}
-          </Popover.Trigger>
-          <Popover.Content placement="bottom" className="w-64">
-            <Popover.Dialog className="p-5">
-              <VolumeSlider userId={person.id} name={name} />
-            </Popover.Dialog>
-          </Popover.Content>
-        </Popover>
-      ) : (
-        <span role="img" aria-label={person.ringing ? `${name} — вызываем` : isMe ? `${name} (вы)` : name} className="block h-full w-full">
-          {face}
-        </span>
-      )}
+          </span>
+        )}
+      </div>
       {badge && off && (
-        <span className="absolute bottom-[6%] right-[6%] flex h-7 w-7 items-center justify-center rounded-full bg-default text-white ring-4 ring-[var(--app-window)]">
+        // Its bottom right corner sits 6% in from the circle's, whatever the circle's size.
+        <span
+          className="absolute left-0 top-0 flex h-7 w-7 items-center justify-center rounded-full bg-default text-white ring-4 ring-[var(--app-window)] will-change-transform"
+          style={{ transform: 'translate(calc(var(--bubble-r) * 0.88px - 28px), calc(var(--bubble-r) * 0.88px - 28px))' }}
+        >
           {person.deafened ? <HeadphonesSlashIcon size={15} /> : <MicSlashIcon size={15} />}
         </span>
       )}
       {tag && (
-        <span className="pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-10 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-full bg-default px-3 py-2 text-[13px] font-medium leading-none text-white opacity-0 shadow-[0_2px_10px_rgba(0,0,0,.35)] transition-[opacity,transform] duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
-          {name}
-        </span>
+        // A point 10px above the top of the circle; the tag hangs from it, centred.
+        <div className="absolute left-0 top-0 z-10 h-0 w-0 will-change-transform" style={{ transform: 'translateY(calc(var(--bubble-r) * -1px - 10px))' }}>
+          <span className="pointer-events-none absolute bottom-0 left-0 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-full bg-default px-3 py-2 text-[13px] font-medium leading-none text-white opacity-0 shadow-[0_2px_10px_rgba(0,0,0,.35)] transition-[opacity,transform] duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+            {name}
+          </span>
+        </div>
       )}
     </div>
   );
@@ -227,20 +261,22 @@ export function BubbleCloud({ people, speaking, live }: Props) {
   const { w, h } = useBox(box);
   const { els, refFor } = useNodeRefs();
   const nodes = useRef(new Map<string, CloudNode>());
-  const latest = useRef({ people, speaking, w, h });
-  latest.current = { people, speaking, w, h };
+  const R = useMemo(() => cloudRadius(people.length, w, h), [people.length, w, h]);
+  // The biggest a circle gets, which is what each one is drawn at.
+  const max = R * (1 + GROW);
+  const latest = useRef({ people, speaking, w, h, R, max });
+  latest.current = { people, speaking, w, h, R, max };
   const layoutKey = useRef('');
   // The last people/size the layout was worked out for, so a frame with nothing new skips it.
-  const layoutOf = useRef<{ people: BubblePerson[] | null; w: number; h: number; R: number }>({ people: null, w: 0, h: 0, R: 0 });
+  const layoutOf = useRef<{ people: BubblePerson[] | null; w: number; h: number }>({ people: null, w: 0, h: 0 });
   const list = useRef<CloudNode[]>([]);
 
   useFrame(() => {
-    const { people, speaking, w, h } = latest.current;
+    const { people, speaking, w, h, R, max } = latest.current;
     if (!w || !h || people.length === 0) return false;
     const seen = layoutOf.current;
     const changed = seen.people !== people || seen.w !== w || seen.h !== h;
-    const R = changed ? cloudRadius(people.length, w, h) : seen.R;
-    if (changed) layoutOf.current = { people, w, h, R };
+    if (changed) layoutOf.current = { people, w, h };
     const key = changed ? `${people.map((p) => p.id).join(',')}|${Math.round(w)}x${Math.round(h)}` : layoutKey.current;
     if (key !== layoutKey.current) {
       // New head count or size: fresh places, in order of joining.
@@ -274,7 +310,7 @@ export function BubbleCloud({ people, speaking, live }: Props) {
     separate(list.current, (a, b) => (talking.has(a.id) && !talking.has(b.id) ? 0.1 : talking.has(b.id) && !talking.has(a.id) ? 0.9 : 0.5));
     let moved = changed ? Infinity : 0;
     for (const n of list.current) {
-      place(els.current.get(n.id), n.x, n.y, n.r);
+      place(els.current.get(n.id), n.x, n.y, n.r, max);
       moved = Math.max(moved, Math.abs(n.x - n.px), Math.abs(n.y - n.py), Math.abs(n.r - n.pr));
     }
     return moved > SETTLED;
@@ -283,7 +319,7 @@ export function BubbleCloud({ people, speaking, live }: Props) {
   return (
     <div ref={box} className="relative min-h-0 flex-1 overflow-hidden">
       {people.map((p) => (
-        <Bubble key={p.id} person={p} nodeRef={refFor(p.id)} live={live} />
+        <Bubble key={p.id} person={p} nodeRef={refFor(p.id)} live={live} max={max} />
       ))}
     </div>
   );
@@ -293,23 +329,32 @@ export function BubbleCloud({ people, speaking, live }: Props) {
 
 type PairNode = { id: string; x: number; y: number; r: number; grow: number; px: number; py: number; pr: number };
 
+// How much bigger than its resting size the one talking gets.
+const PAIR_GROW = 0.32;
+
+/** Big circles with room for the one talking to grow. */
+function pairRadius(n: number, w: number, h: number) {
+  return Math.max(32, Math.min(96, (h - 16) / 2 / (1 + PAIR_GROW), (w - 48) / (n * 2 + 0.7) - GAP));
+}
+
 export function BubblePair({ people, speaking, live }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const { w, h } = useBox(box);
   const { els, refFor } = useNodeRefs();
   const nodes = useRef(new Map<string, PairNode>());
-  const latest = useRef({ people, speaking, w, h });
-  latest.current = { people, speaking, w, h };
+  const R = pairRadius(people.length, w, h);
+  // The biggest a circle gets, which is what each one is drawn at.
+  const max = R * (1 + PAIR_GROW);
+  const latest = useRef({ people, speaking, w, h, R, max });
+  latest.current = { people, speaking, w, h, R, max };
 
   const list = useRef<PairNode[]>([]);
   const listFor = useRef<BubblePerson[] | null>(null);
 
   useFrame(() => {
-    const { people, speaking, w, h } = latest.current;
+    const { people, speaking, w, h, R, max } = latest.current;
     if (!w || !h || people.length === 0) return false;
     const n = people.length;
-    // Big circles with room for the one talking to grow by a third.
-    const R = Math.max(32, Math.min(96, (h - 16) / 2 / 1.32, (w - 48) / (n * 2 + 0.7) - GAP));
     const cx = w / 2, cy = h / 2;
     if (listFor.current !== people) {
       listFor.current = people;
@@ -328,7 +373,7 @@ export function BubblePair({ people, speaking, live }: Props) {
       node.px = node.x; node.py = node.y; node.pr = node.r;
       const on = talking.has(node.id);
       node.grow += ((on ? 1 : 0) - node.grow) * 0.06;
-      node.r = R * (1 + 0.32 * node.grow) * (anyone && !on ? 0.95 : 1);
+      node.r = R * (1 + PAIR_GROW * node.grow) * (anyone && !on ? 0.95 : 1);
       // Pulled to the middle in a row, never overlapping: side by side with one small gap.
       node.x += (cx + (i - (n - 1) / 2) * (R * 2 + GAP) - node.x) * 0.05;
       node.y += (cy - node.y) * 0.08;
@@ -336,7 +381,7 @@ export function BubblePair({ people, speaking, live }: Props) {
     separate(list.current, () => 0.5, 3);
     let moved = 0;
     for (const node of list.current) {
-      place(els.current.get(node.id), node.x, node.y, node.r);
+      place(els.current.get(node.id), node.x, node.y, node.r, max);
       moved = Math.max(moved, Math.abs(node.x - node.px), Math.abs(node.y - node.py), Math.abs(node.r - node.pr));
     }
     return moved > SETTLED;
@@ -345,7 +390,7 @@ export function BubblePair({ people, speaking, live }: Props) {
   return (
     <div ref={box} className="relative min-h-0 flex-1 overflow-hidden">
       {people.map((p) => (
-        <Bubble key={p.id} person={p} nodeRef={refFor(p.id)} live={live} />
+        <Bubble key={p.id} person={p} nodeRef={refFor(p.id)} live={live} max={max} />
       ))}
     </div>
   );
@@ -401,6 +446,11 @@ function bridge(r1: number, r2: number, c1: Pt, c2: Pt) {
 }
 
 type Swap = { out: string; inc: string; t0: number; up: number };
+
+/** Everything scales with the space we have, centred, with room for the nick under the left lobe. */
+function peanutScale(w: number, h: number) {
+  return Math.max(0.05, Math.min(1, (h - 8) / (P.R1 * 2 + P.NICK_GAP + P.NICK_H + 8), (w - 32) / (P.R1 + P.D + P.R2)));
+}
 
 /**
  * Who sits in the left lobe. A new speaker takes over only after talking for a moment while the current one
@@ -458,6 +508,11 @@ export function BubblePeanut({ people, speaking, live }: Props) {
   const places = Math.min(total, MAX_PLACES);
   const extra = total > MAX_PLACES ? total - (MAX_PLACES - 1) : 0;
   const shown = extra ? people.slice(0, MAX_PLACES - 1) : people;
+  // The radius each part is drawn at, its biggest: the photos, the white behind the ones on the move (photo
+  // plus ring), the right lobe, and the "+N" place (which never changes size).
+  const k = peanutScale(w, h);
+  const bigMax = (P.R1 - P.RING) * k, shapeMax = P.R1 * k, lobeMax = P.R2 * k;
+  const tipMax = extra ? (SLOTS[Math.max(3, places)][places - 1][2] * lobeMax) / 100 : 0;
 
   // Who's in sight and who's talking, worked out when those change rather than every frame.
   const derived = useRef<{ people: BubblePerson[] | null; speaking: string[] | null; ids: string[]; talking: Set<string> }>({
@@ -482,8 +537,7 @@ export function BubblePeanut({ people, speaking, live }: Props) {
     }
     const { ids, talking } = derived.current;
 
-    // Everything scales with the space we have; centred, with room for the nick under the left lobe.
-    const k = Math.min(1, (h - 8) / (P.R1 * 2 + P.NICK_GAP + P.NICK_H + 8), (w - 32) / (P.R1 + P.D + P.R2));
+    const k = peanutScale(w, h);
     const R1 = P.R1 * k, R2 = P.R2 * k, D = P.D * k, RING = P.RING * k;
     const cy = (h - (P.NICK_GAP + P.NICK_H) * k) / 2;
     const C1 = { x: (w - (R1 + D + R2)) / 2 + R1, y: cy };
@@ -520,11 +574,11 @@ export function BubblePeanut({ people, speaking, live }: Props) {
       return { ...slot, ring: 0, move: false };
     };
 
-    place(lobe.current, C2.x, C2.y, R2);
+    placeDisc(lobe.current, C2.x, C2.y, R2, R2);
     let shapeIndex = 0;
     for (const id of ids) {
       const q = pose(id);
-      place(els.current.get(id), q.x, q.y, q.r);
+      place(els.current.get(id), q.x, q.y, q.r, BIG);
       const el = els.current.get(id);
       if (el) el.style.zIndex = q.move ? '2' : '1';
       if (!q.move) continue;
@@ -533,7 +587,7 @@ export function BubblePeanut({ people, speaking, live }: Props) {
       const r = q.r + q.ring;
       if (shape) {
         shape.style.display = 'block';
-        place(shape, q.x, q.y, r);
+        placeDisc(shape, q.x, q.y, r, R1);
       }
       if (br) {
         const d = bridge(r, R2, q, C2);
@@ -547,7 +601,7 @@ export function BubblePeanut({ people, speaking, live }: Props) {
     }
     if (tipRef.current && extra) {
       const tip = slots[places - 1];
-      place(tipRef.current, tip.x, tip.y, tip.r);
+      placeDisc(tipRef.current, tip.x, tip.y, tip.r, tip.r);
     }
 
     // The speaker's nick under the left lobe: fades out as they leave, back in once the new one is in place.
@@ -570,9 +624,9 @@ export function BubblePeanut({ people, speaking, live }: Props) {
 
   return (
     <div ref={box} className="relative min-h-0 flex-1 overflow-hidden">
-      <div ref={lobe} className="absolute left-0 top-0 rounded-full bg-white" />
+      <div ref={lobe} className="absolute left-0 top-0 rounded-full bg-white will-change-transform" style={fullSize(lobeMax)} />
       {[0, 1].map((i) => (
-        <div key={i} ref={(el) => void (shapes.current[i] = el)} className="absolute left-0 top-0 hidden rounded-full bg-white" />
+        <div key={i} ref={(el) => void (shapes.current[i] = el)} className="absolute left-0 top-0 hidden rounded-full bg-white will-change-transform" style={fullSize(shapeMax)} />
       ))}
       {[0, 1].map((i) => (
         <div key={i} ref={(el) => void (bridges.current[i] = el)} className="absolute inset-0 hidden bg-white" />
@@ -581,10 +635,10 @@ export function BubblePeanut({ people, speaking, live }: Props) {
         <span ref={nickText} className="min-w-0 truncate" />
       </div>
       {shown.map((p) => (
-        <Bubble key={p.id} person={p} nodeRef={refFor(p.id)} live={live} badge={false} />
+        <Bubble key={p.id} person={p} nodeRef={refFor(p.id)} live={live} max={bigMax} badge={false} />
       ))}
       {extra > 0 && (
-        <div ref={tipRef} role="img" aria-label={`Ещё ${extra}`} className="absolute left-0 top-0 flex items-center justify-center rounded-full bg-[#e5e5ea] text-[13px] font-medium text-black">
+        <div ref={tipRef} role="img" aria-label={`Ещё ${extra}`} className="absolute left-0 top-0 flex items-center justify-center rounded-full bg-[#e5e5ea] text-[13px] font-medium text-black" style={fullSize(tipMax)}>
           +{extra}
         </div>
       )}

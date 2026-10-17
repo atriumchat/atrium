@@ -122,13 +122,16 @@ a,
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Someone being rung: a green ripple around their avatar. */
+/*
+ * Someone being rung: a green ripple around their avatar. In a bubble (voice/Bubbles.tsx) the avatar is
+ * scaled by --bubble-s, so the ripple's reach is divided by it to come out at 18px on screen.
+ */
 @keyframes call-ring {
   0% {
     box-shadow: 0 0 0 0 color-mix(in oklab, var(--success) 60%, transparent);
   }
   70% {
-    box-shadow: 0 0 0 18px transparent;
+    box-shadow: 0 0 0 calc(18px / var(--bubble-s, 1)) transparent;
   }
   100% {
     box-shadow: 0 0 0 0 transparent;
@@ -137,6 +140,17 @@ a,
 
 .call-ringing {
   animation: call-ring 1.6s ease-out infinite;
+}
+
+/*
+ * The letter of someone without a photo, inside a bubble. Drawn at 64px, the biggest it gets, and scaled down to
+ * what a bubble of radius --bubble-r wants (80% of the radius, between 14 and 64px). The bubble itself is
+ * scaled by --bubble-s, so that is divided out. Its own layer, so growing a bubble repaints nothing.
+ */
+.bubble-letter {
+  font-size: 64px;
+  will-change: transform;
+  transform: scale(calc(clamp(14, 0.8 * var(--bubble-r), 64) / 64 / var(--bubble-s)));
 }
 
 /*
