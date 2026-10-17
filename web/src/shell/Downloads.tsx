@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Modal, Tooltip } from '@heroui/react';
-import { useStore } from '../store';
+import { WhereToUse } from '../account/WhereToUse';
 import { DownloadIcon } from '../ui/icons';
 
 export function AppleLogo({ size = 22 }: { size?: number }) {
@@ -26,14 +26,7 @@ export const DOWNLOADS = [
   { id: 'windows', label: 'Windows', detail: '10 и 11', file: '/download/Gomex-windows.exe' },
 ] as const;
 
-/** Which installer fits this computer: Windows, or a Mac (Apple Silicon unless the browser says Intel). */
-function guess(): (typeof DOWNLOADS)[number]['id'] {
-  const ua = navigator.userAgent;
-  if (/Windows/i.test(ua)) return 'windows';
-  return 'mac-arm64';
-}
-
-/** At the foot of the server rail, as in Discord: get the app for the computer. Not shown inside the app. */
+/** At the foot of the server rail, as in Discord: get the app for the computer. Shown only where it makes sense (see whereToUseNeeded): not in the desktop app or from the Home Screen. */
 export function DownloadRailButton() {
   const [open, setOpen] = useState(false);
   return (
@@ -55,35 +48,15 @@ export function DownloadRailButton() {
   );
 }
 
+/** The same "where to use Gomex" screen as after sign-up, in a window; it brings its own title and buttons. */
 function DownloadDialog({ onClose }: { onClose: () => void }) {
-  const mine = guess();
-  const isMobile = useStore((s) => s.isMobile);
-  const ordered = [...DOWNLOADS].sort((a, b) => Number(b.id === mine) - Number(a.id === mine));
   return (
     <Modal.Backdrop isOpen onOpenChange={(o) => !o && onClose()}>
-      <Modal.Container size={isMobile ? 'full' : 'sm'} placement="center">
-        <Modal.Dialog aria-label="Gomex для компьютера" className="p-6">
+      <Modal.Container size="md" placement="center">
+        <Modal.Dialog aria-label="Где пользоваться Gomex" className="overflow-hidden p-0">
           <Modal.CloseTrigger />
-          <h2 className="pr-8 text-[20px] font-medium">Gomex для компьютера</h2>
-          <p className="mt-1 text-[14px] text-muted">Push-to-talk в фоне, уведомления, значок в доке</p>
-          <div className="mt-5 flex flex-col gap-2">
-            {ordered.map((d) => (
-              <a
-                key={d.id}
-                href={d.file}
-                onClick={onClose}
-                className={`flex h-14 items-center gap-3 rounded-full bg-default px-5 transition-colors hover:bg-[#28282d] ${
-                  d.id === mine ? 'ring-[1.5px] ring-white ring-inset' : ''
-                }`}
-              >
-                {d.id === 'windows' ? <WindowsLogo /> : <AppleLogo />}
-                <span className="flex-1 text-[16px] font-medium">
-                  {d.label} <span className="text-muted">{d.detail}</span>
-                </span>
-                {d.id === mine && <span className="rounded-full bg-white px-2.5 py-0.5 text-[12px] font-medium text-black">Рекомендуется</span>}
-                <DownloadIcon size={20} />
-              </a>
-            ))}
+          <div className="h-[min(640px,88vh)]">
+            <WhereToUse onDone={onClose} />
           </div>
         </Modal.Dialog>
       </Modal.Container>
