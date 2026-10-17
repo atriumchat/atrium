@@ -153,6 +153,40 @@ a,
   transform: scale(calc(clamp(14, 0.8 * var(--bubble-r), 64) / 64 / var(--bubble-s)));
 }
 
+/* The icon crop's zoom (ui/IconCropper.tsx), in the setup wizard and the settings: a thin line and a white dot. */
+.icon-zoom .slider__track {
+  height: 20px;
+  border-color: transparent !important;
+  background: transparent;
+}
+.icon-zoom .slider__track::before {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: 999px;
+  background: #ffffff1f;
+}
+.icon-zoom .slider__fill {
+  top: 50%;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: 999px;
+  background: #f2f2f4;
+}
+.icon-zoom .slider__thumb {
+  width: 20px;
+  background: transparent;
+}
+.icon-zoom .slider__thumb::after {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #f2f2f4;
+  box-shadow: none;
+}
+
 /*
  * The line drawings (ui/Illustrations.tsx), as on the landing: light lines on the dark surface, every face filled
  * with the surface it sits on (--plate, the window unless the drawing says otherwise).

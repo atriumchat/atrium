@@ -279,7 +279,7 @@ export function AvatarPicker() {
   );
 }
 
-export function BioEditor({ initial }: { initial: string }) {
+export function BioEditor({ initial, className }: { initial: string; className?: string }) {
   const [bio, setBio] = useState(initial);
   const [saving, setSaving] = useState(false);
   const changed = bio.trim() !== initial;
@@ -305,7 +305,7 @@ export function BioEditor({ initial }: { initial: string }) {
         rows={3}
         placeholder="О себе: игры, когда онлайн"
         aria-label="О себе"
-        className="w-full resize-none rounded-[18px] bg-surface-tertiary px-4 py-2.5 text-[14px] outline-none placeholder:text-faint focus:ring-2 focus:ring-focus"
+        className={className ?? 'w-full resize-none rounded-[18px] bg-surface-tertiary px-4 py-2.5 text-[14px] outline-none placeholder:text-faint focus:ring-2 focus:ring-focus'}
       />
       {changed && (
         <Button size="sm" isPending={saving} onPress={save} className="mt-1.5 rounded-full">

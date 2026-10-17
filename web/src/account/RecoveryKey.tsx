@@ -28,7 +28,8 @@ export function storeNewKey(value: NewKey | null) {
   }
 }
 
-function downloadKey({ key, name, serverName }: NewKey) {
+/** The key as a small text file, with the server and the nick it belongs to. */
+export function downloadKey({ key, name, serverName }: NewKey) {
   const title = serverName || 'Gomex';
   const lines = [title, ...(window.location.protocol.startsWith('http') ? [window.location.origin] : []), '', `Ник: ${name}`, `Ключ восстановления: ${key}`, ''];
   const url = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' }));

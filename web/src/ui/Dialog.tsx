@@ -6,7 +6,7 @@ import { showError } from '../store';
 /**
  * Every window in the app sits on HeroUI's Modal: it traps focus, locks the page's scroll, animates, and its
  * body leaves room for focus rings. Mount it while it should be open; Escape, the cross or a click outside call
- * `onClose`. `sheet` is for a long list (the group picker): it takes the whole screen on a phone.
+ * `onClose`; `footer` holds its buttons, if it has any. `sheet` is for a long list (the group picker): it takes the whole screen on a phone.
  */
 export function Dialog({
   title,
@@ -20,7 +20,7 @@ export function Dialog({
   subtitle?: string;
   onClose: () => void;
   children?: ReactNode;
-  footer: ReactNode;
+  footer?: ReactNode;
   sheet?: boolean;
 }) {
   const full = useIsMobile() && sheet;
@@ -36,7 +36,7 @@ export function Dialog({
             {subtitle && <p className="text-[14px] text-muted">{subtitle}</p>}
           </Modal.Header>
           {children && <Modal.Body className="text-[15px] text-foreground">{children}</Modal.Body>}
-          <Modal.Footer>{footer}</Modal.Footer>
+          {footer && <Modal.Footer>{footer}</Modal.Footer>}
         </Modal.Dialog>
       </Modal.Container>
     </Modal.Backdrop>

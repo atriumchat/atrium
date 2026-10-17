@@ -1,54 +1,48 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
-import { Button } from '@heroui/react';
+import { useEffect, useId, useState, type FormEvent } from 'react';
+import { toast } from '@heroui/react';
 import { api } from '../api';
 import { showError, useStore } from '../store';
 import { expectNewToken, switchToken } from '../socket';
 import { Avatar } from '../ui/Avatar';
 import { CheckIcon } from '../ui/icons';
+import { Primary, Row, Rows, Secondary, SubPage, field, fieldArea, fieldLabel, useSub } from '../ui/settings';
 import { AvatarPicker, BioEditor } from '../people/UserProfile';
+import { downloadKey } from './RecoveryKey';
 
-/** The "Аккаунт" page of the settings: photo and about, nick, password, the recovery key and who you blocked. */
+/**
+ * The "Аккаунт" page of the settings: photo and about, the nick, then a row each for the password, the recovery key
+ * and who's blocked; their forms open only from there. On the phone the photo and about are on the "Вы" tab already.
+ */
 export function AccountSettings() {
+  const isMobile = useStore((s) => s.isMobile);
   return (
     <>
-      <ProfileSection />
-      <NameSection />
-      <PasswordSection />
-      <RecoverySection />
-      <BlockedSection />
+      {!isMobile && <ProfileBlock />}
+      <NameField />
+      <Rows className="mt-8">
+        <PasswordRow />
+        <RecoveryRow />
+        <BlockedRow />
+      </Rows>
     </>
   );
 }
 
-function Section({ title, hint, children }: { title: string; hint?: ReactNode; children: ReactNode }) {
-  return (
-    <section className="mt-6">
-      <h3 className="text-[15px] font-medium">{title}</h3>
-      {hint && <p className="mt-0.5 text-[13px] leading-snug text-muted">{hint}</p>}
-      <div className="mt-3 flex flex-col gap-2">{children}</div>
-    </section>
-  );
-}
-
-const field = 'h-11 w-full rounded-full bg-surface-tertiary px-4 text-[15px] outline-none placeholder:text-faint focus:ring-2 focus:ring-focus';
-const white = 'h-11 rounded-full px-5 text-[15px] [--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]';
-
-function ProfileSection() {
+function ProfileBlock() {
   const bio = useStore((s) => s.me?.bio ?? '');
   return (
-    <Section title="Профиль">
-      <div className="flex items-start gap-4">
-        <AvatarPicker />
-        <div className="min-w-0 flex-1">
-          <BioEditor key={bio} initial={bio} />
-        </div>
+    <div className="mt-6 flex items-start gap-5">
+      <AvatarPicker />
+      <div className="min-w-0 flex-1">
+        <BioEditor key={bio} initial={bio} className={fieldArea} />
       </div>
-    </Section>
+    </div>
   );
 }
 
-function NameSection() {
+function NameField() {
   const me = useStore((s) => s.me);
+  const id = useId();
   const [name, setName] = useState(me?.name ?? '');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -69,28 +63,51 @@ function NameSection() {
   }
 
   return (
-    <Section title="Ник" hint="Упоминания и личка привязаны к аккаунту, а не к нику">
-      <form onSubmit={submit} className="flex flex-col gap-2">
-        <input value={name} maxLength={32} onChange={(e) => setName(e.target.value)} aria-label="Новый ник" className={field} />
-        {changed && (
-          <div className="flex gap-2">
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Пароль для подтверждения" aria-label="Пароль" className={field} autoComplete="current-password" />
-            <Button type="submit" isPending={busy} isDisabled={!password} className={white}>
-              Сменить
-            </Button>
-          </div>
-        )}
-      </form>
-    </Section>
+    <form onSubmit={submit} className="mt-6">
+      <label htmlFor={id} className={fieldLabel}>
+        Ник
+      </label>
+      <input id={id} value={name} maxLength={32} onChange={(e) => setName(e.target.value)} className={field} autoComplete="username" />
+      {/* A new nick is confirmed with the password, right under it. */}
+      {changed && (
+        <div className="mt-2 flex gap-2 max-md:flex-col">
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Пароль для подтверждения"
+            aria-label="Пароль"
+            className={field}
+            autoComplete="current-password"
+          />
+          <Primary type="submit" isPending={busy} isDisabled={!password} className="shrink-0">
+            Сохранить
+          </Primary>
+        </div>
+      )}
+    </form>
   );
 }
 
-function PasswordSection() {
+function PasswordRow() {
+  const sub = useSub();
+  return (
+    <>
+      <Row title="Пароль">
+        <Secondary onPress={sub.show}>Сменить</Secondary>
+      </Row>
+      <PasswordPage key={sub.key} open={sub.open} onClose={sub.hide} />
+    </>
+  );
+}
+
+function PasswordPage({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const isMobile = useStore((s) => s.isMobile);
+  const form = useId();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [repeat, setRepeat] = useState('');
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState(false);
   const mismatch = repeat !== '' && repeat !== next;
 
   async function submit(e: FormEvent) {
@@ -101,10 +118,8 @@ function PasswordSection() {
     try {
       const { token } = await api.changePassword(current, next);
       switchToken(token);
-      setCurrent('');
-      setNext('');
-      setRepeat('');
-      setDone(true);
+      toast('Пароль сменён');
+      onClose();
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Не удалось сменить пароль');
     } finally {
@@ -113,33 +128,80 @@ function PasswordSection() {
   }
 
   return (
-    <Section title="Пароль" hint="После смены остальные устройства выйдут из аккаунта">
-      <form onSubmit={submit} className="flex flex-col gap-2">
-        <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} placeholder="Текущий пароль" aria-label="Текущий пароль" className={field} autoComplete="current-password" />
-        <input type="password" value={next} onChange={(e) => setNext(e.target.value)} placeholder="Новый пароль, от 8 символов" aria-label="Новый пароль" className={field} autoComplete="new-password" />
-        <input type="password" value={repeat} onChange={(e) => setRepeat(e.target.value)} placeholder="Ещё раз" aria-label="Новый пароль ещё раз" className={field} autoComplete="new-password" />
-        {mismatch && <p className="px-1 text-[13px] text-danger">Пароли не совпадают</p>}
-        {done && (
-          <p className="flex items-center gap-1.5 px-1 text-[13px] text-success">
-            <CheckIcon size={14} /> Пароль сменён
-          </p>
-        )}
-        <Button type="submit" isPending={busy} isDisabled={!current || !next || next !== repeat} className={`${white} self-start`}>
+    <SubPage
+      open={open}
+      title="Смена пароля"
+      onClose={onClose}
+      footer={
+        <Primary type="submit" form={form} isPending={busy} isDisabled={!current || !next || next !== repeat}>
           Сменить пароль
-        </Button>
+        </Primary>
+      }
+    >
+      <form id={form} onSubmit={submit} className="flex flex-col gap-2 max-md:mt-2">
+        <input
+          type="password"
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+          placeholder="Текущий пароль"
+          aria-label="Текущий пароль"
+          className={field}
+          autoComplete="current-password"
+          autoFocus={!isMobile}
+        />
+        <input
+          type="password"
+          value={next}
+          onChange={(e) => setNext(e.target.value)}
+          placeholder="Новый пароль, от 8 символов"
+          aria-label="Новый пароль"
+          className={`${field} mt-2`}
+          autoComplete="new-password"
+        />
+        <input
+          type="password"
+          value={repeat}
+          onChange={(e) => setRepeat(e.target.value)}
+          placeholder="Ещё раз"
+          aria-label="Новый пароль ещё раз"
+          className={field}
+          autoComplete="new-password"
+        />
+        <p className={`px-0.5 pt-1 text-[13px] ${mismatch ? 'text-danger' : 'text-muted'}`}>
+          {mismatch ? 'Пароли не совпадают' : 'Остальные устройства выйдут из аккаунта'}
+        </p>
       </form>
-    </Section>
+    </SubPage>
   );
 }
 
-/** The key is shown once; only its hash stays on the server. With it and the nick you can set a new password. */
-function RecoverySection() {
+/** The key is shown once; only its hash stays on the server. With it and the nick a new password can be set. */
+function RecoveryRow() {
   const has = useStore((s) => s.hasRecoveryKey);
+  const sub = useSub();
+  return (
+    <>
+      <Row title="Ключ восстановления" value={has ? 'Создан' : 'Не создан'}>
+        <Secondary onPress={sub.show}>{has ? 'Новый ключ' : 'Создать'}</Secondary>
+      </Row>
+      <RecoveryPage key={sub.key} open={sub.open} onClose={sub.hide} />
+    </>
+  );
+}
+
+// Done: the word changes and turns green, with a tick before it (as in the setup wizard).
+const KEPT = 'text-here [--button-fg:var(--room-here)] [&_svg]:size-3.5';
+
+/** Asks for the password, then shows the new key to copy or download: the old one stops working at that moment. */
+function RecoveryPage({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const isMobile = useStore((s) => s.isMobile);
+  const name = useStore((s) => s.me?.name ?? '');
+  const serverName = useStore((s) => s.serverName);
+  const form = useId();
   const [password, setPassword] = useState('');
-  const [asking, setAsking] = useState(false);
-  const [key, setKey] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [key, setKey] = useState<string | null>(null);
+  const [kept, setKept] = useState<'copied' | 'downloaded' | null>(null);
 
   async function make(e: FormEvent) {
     e.preventDefault();
@@ -148,7 +210,6 @@ function RecoverySection() {
       const r = await api.makeRecoveryKey(password);
       setKey(r.key);
       setPassword('');
-      setAsking(false);
       useStore.setState({ hasRecoveryKey: true });
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Не удалось создать ключ');
@@ -157,63 +218,102 @@ function RecoverySection() {
     }
   }
 
+  async function copy(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setKept('copied');
+    } catch {
+      showError('Не получилось скопировать — ключ можно выделить вручную');
+    }
+  }
+
+  const done = <CheckIcon size={14} strokeWidth={2.5} />;
   return (
-    <Section
+    <SubPage
+      open={open}
       title="Ключ восстановления"
-      hint={
-        key
-          ? 'Показывается один раз: в менеджер паролей или на бумагу'
-          : has
-            ? 'Ключ есть. Новый заменит старый — старый перестанет работать.'
-            : 'Нужен, если забудется пароль'
+      onClose={onClose}
+      footer={
+        key ? (
+          <Primary onPress={onClose}>Готово</Primary>
+        ) : (
+          <Primary type="submit" form={form} isPending={busy} isDisabled={!password}>
+            Создать
+          </Primary>
+        )
       }
     >
       {key ? (
-        <div className="flex items-center gap-2 rounded-full bg-surface-tertiary py-1.5 pl-4 pr-1.5">
-          <span className="min-w-0 flex-1 select-all break-all font-mono text-[14px] tracking-wide">{key}</span>
-          <Button
-            onPress={async () => {
-              await navigator.clipboard.writeText(key).catch(() => undefined);
-              setCopied(true);
-            }}
-            className="h-9 shrink-0 rounded-full px-4 text-[14px] [--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]"
-          >
-            {copied ? 'Скопировано' : 'Скопировать'}
-          </Button>
+        <div className="max-md:mt-2">
+          <p className="select-all break-all rounded-[12px] border border-white/[0.07] bg-white/[0.03] px-4 py-3.5 text-center font-mono text-[17px] font-medium leading-[1.7] tracking-[0.04em]">
+            {key}
+          </p>
+          <div className="mt-3 flex gap-2">
+            <Secondary onPress={() => copy(key)} className={`max-md:h-11 max-md:flex-1 ${kept === 'copied' ? KEPT : ''}`}>
+              {kept === 'copied' && done}
+              {kept === 'copied' ? 'Скопирован' : 'Скопировать'}
+            </Secondary>
+            <Secondary
+              onPress={() => {
+                downloadKey({ key, name, serverName });
+                setKept('downloaded');
+              }}
+              className={`max-md:h-11 max-md:flex-1 ${kept === 'downloaded' ? KEPT : ''}`}
+            >
+              {kept === 'downloaded' && done}
+              {kept === 'downloaded' ? 'Скачан' : 'Скачать'}
+            </Secondary>
+          </div>
         </div>
-      ) : asking ? (
-        <form onSubmit={make} className="flex gap-2">
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Пароль для подтверждения" aria-label="Пароль" className={field} autoComplete="current-password" autoFocus />
-          <Button type="submit" isPending={busy} isDisabled={!password} className={white}>
-            Создать
-          </Button>
-        </form>
       ) : (
-        <Button onPress={() => setAsking(true)} className={`${white} self-start`}>
-          {has ? 'Создать новый ключ' : 'Создать ключ'}
-        </Button>
+        <form id={form} onSubmit={make} className="max-md:mt-2">
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Пароль"
+            aria-label="Пароль"
+            className={field}
+            autoComplete="current-password"
+            autoFocus={!isMobile}
+          />
+        </form>
       )}
-    </Section>
+    </SubPage>
   );
 }
 
-function BlockedSection() {
+/** Only while someone is blocked: the count on the row, the people inside. */
+function BlockedRow() {
   const blocked = useStore((s) => s.blocked);
   const users = useStore((s) => s.users);
+  const sub = useSub();
+  const { open, hide } = sub;
+  // The last one unblocked takes the row away, and the list with it.
+  useEffect(() => {
+    if (open && blocked.length === 0) hide();
+  }, [open, blocked.length, hide]);
+
   return (
-    <Section title="Заблокированные" hint={blocked.length ? undefined : 'Никого. Заблокировать можно в профиле человека.'}>
-      {blocked.map((id) => (
-        <div key={id} className="-mx-2 flex h-12 items-center gap-3 rounded-full px-2">
-          <Avatar user={users[id]} size={32} ringBg="var(--overlay)" />
-          <span className="min-w-0 flex-1 truncate text-[15px]">{users[id]?.name ?? '…'}</span>
-          <button
-            onClick={() => api.unblock(id).then((list) => useStore.setState({ blocked: list }), (e) => showError(e instanceof Error ? e.message : 'Не получилось'))}
-            className="rounded-full px-3 py-1.5 text-[13px] text-muted hover:bg-white/10 hover:text-foreground"
-          >
-            Разблокировать
-          </button>
-        </div>
-      ))}
-    </Section>
+    <>
+      {blocked.length > 0 && (
+        <Row title="Заблокированные" onPress={sub.show}>
+          <span className="shrink-0 text-[14px] tabular-nums text-muted">{blocked.length}</span>
+        </Row>
+      )}
+      <SubPage open={open} title="Заблокированные" onClose={hide}>
+        <Rows className="max-md:mt-2">
+          {blocked.map((id) => (
+            <Row key={id} icon={<Avatar user={users[id]} size={34} />} title={users[id]?.name ?? '…'}>
+              <Secondary
+                onPress={() => api.unblock(id).then((list) => useStore.setState({ blocked: list }), (e) => showError(e instanceof Error ? e.message : 'Не получилось'))}
+              >
+                Разблокировать
+              </Secondary>
+            </Row>
+          ))}
+        </Rows>
+      </SubPage>
+    </>
   );
 }
