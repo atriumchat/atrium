@@ -200,7 +200,7 @@ function applyMe(me: User) {
 }
 
 /** Your own avatar in the card: click to pick a picture, with a remove option once one is set. */
-export function AvatarPicker() {
+export function AvatarPicker({ size = 80 }: { size?: number }) {
   const me = useStore((s) => s.me);
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -238,7 +238,7 @@ export function AvatarPicker() {
         aria-label="Загрузить фото"
         className="group relative block rounded-full outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
-        <Avatar user={me ?? undefined} size={80} ringBg="var(--overlay)" />
+        <Avatar user={me ?? undefined} size={size} ringBg="var(--overlay)" />
         <span
           className={`absolute inset-0 flex items-center justify-center rounded-full bg-black/50 text-white transition-opacity ${
             busy ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'

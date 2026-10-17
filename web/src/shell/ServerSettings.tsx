@@ -3,16 +3,28 @@ import { api } from '../api';
 import { showError, useStore } from '../store';
 import { ServerMark } from '../ui/Logo';
 import { IconCropper, centred, cropToBlob, loadImage, type Crop } from '../ui/IconCropper';
-import { Primary, Quiet, Row, Rows, Secondary, SubPage, field, fieldLabel } from '../ui/settings';
+import { Primary, Quiet, Row, RowValue, Rows, Secondary, SubPage, field, fieldLabel, useSub } from '../ui/settings';
 
-/** The "Сервер" page of the settings, for the admin: the server's icon and name, as in the first-run setup. */
+/**
+ * The "Сервер" page of the settings, for the admin: the server's icon and name, as in the first-run setup. On the
+ * phone one group of the settings page, the name a row of its own.
+ */
 export function ServerSettings() {
+  const isMobile = useStore((s) => s.isMobile);
+  if (isMobile) {
+    return (
+      <Rows title="Сервер" className="mt-6">
+        <IconRow />
+        <NameRow />
+      </Rows>
+    );
+  }
   return (
     <>
       <Rows className="mt-6">
         <IconRow />
       </Rows>
-      <NameField />
+      <NameField className="mt-6" />
     </>
   );
 }
@@ -97,7 +109,22 @@ function IconRow() {
   );
 }
 
-function NameField() {
+function NameRow() {
+  const name = useStore((s) => s.serverName);
+  const sub = useSub();
+  return (
+    <>
+      <Row title="Название" onPress={sub.show}>
+        <RowValue>{name}</RowValue>
+      </Row>
+      <SubPage key={sub.key} open={sub.open} title="Название" onClose={sub.hide}>
+        <NameField onSaved={sub.hide} className="mt-2" />
+      </SubPage>
+    </>
+  );
+}
+
+function NameField({ onSaved, className = '' }: { onSaved?: () => void; className?: string }) {
   const saved = useStore((s) => s.serverName);
   const id = useId();
   const [name, setName] = useState(saved);
@@ -111,6 +138,7 @@ function NameField() {
       const info = await api.renameServer(name);
       apply(info);
       setName(info.serverName);
+      onSaved?.();
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Не удалось переименовать');
     } finally {
@@ -119,8 +147,9 @@ function NameField() {
   }
 
   return (
-    <form onSubmit={submit} className="mt-6">
-      <label htmlFor={id} className={fieldLabel}>
+    <form onSubmit={submit} className={className}>
+      {/* On the phone this is a page of its own, titled the same. */}
+      <label htmlFor={id} className={`${fieldLabel} max-md:sr-only`}>
         Название
       </label>
       <div className="flex gap-2 max-md:flex-col">

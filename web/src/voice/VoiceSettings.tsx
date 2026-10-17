@@ -5,67 +5,40 @@ import { keyLabel, type NoiseMode } from '../prefs';
 import { desktop } from '../desktop';
 import { BypassSwitch } from './Bypass';
 import { ConnectionCheck } from './ConnectionCheck';
-import { Row, RowFrame, Rows, Secondary } from '../ui/settings';
+import { ChoiceRow, Row, RowFrame, Rows, Secondary } from '../ui/settings';
 
 /** The "Голос" page of the settings, for this device: noise suppression, push-to-talk, the bypass, a check. */
 export function VoiceSettings() {
   const prefs = useStore((s) => s.voicePrefs);
 
   return (
-    <Rows className="mt-6">
-      <Row title="Шумоподавление" value={NOISE[prefs.noise]} wrap>
-        <Segmented<NoiseMode>
-          value={prefs.noise}
-          onChange={(noise) => setVoicePrefs({ noise })}
-          options={[
-            ['off', 'Выкл'],
-            ['browser', 'Обычное'],
-            ['rnnoise', 'Сильное'],
-          ]}
-        />
-      </Row>
+    <Rows title="Голос" className="mt-6">
+      <ChoiceRow<NoiseMode>
+        title="Шумоподавление"
+        value={prefs.noise}
+        onChange={(noise) => setVoicePrefs({ noise })}
+        options={[
+          ['off', 'Выкл', 'Звук как есть'],
+          ['browser', 'Обычное', 'Убирает ровный шум'],
+          ['rnnoise', 'Сильное', 'Убирает клавиатуру и улицу'],
+        ]}
+      />
       {/* In the browser the key only works while Gomex's window is open; the desktop app hears it from anywhere. */}
-      <Row title="Микрофон" value={prefs.ptt ? (desktop?.ptt ? 'Работает и в фоне' : 'Пока окно открыто') : undefined} wrap>
-        <Segmented<'voice' | 'ptt'>
-          value={prefs.ptt ? 'ptt' : 'voice'}
-          onChange={(mode) => setVoicePrefs({ ptt: mode === 'ptt' })}
-          options={[
-            ['voice', 'Всегда включён'],
-            ['ptt', 'По клавише'],
-          ]}
-        />
-      </Row>
+      <ChoiceRow<'voice' | 'ptt'>
+        title="Микрофон"
+        value={prefs.ptt ? 'ptt' : 'voice'}
+        onChange={(mode) => setVoicePrefs({ ptt: mode === 'ptt' })}
+        options={[
+          ['voice', 'Всегда включён'],
+          ['ptt', 'По клавише', desktop?.ptt ? 'Работает и в фоне' : 'Пока окно открыто'],
+        ]}
+      />
       {prefs.ptt && <KeyRow value={prefs.pttKey} onChange={(pttKey) => setVoicePrefs({ pttKey })} />}
       <RowFrame>
         <BypassSwitch />
       </RowFrame>
       <CheckRow />
     </Rows>
-  );
-}
-
-const NOISE: Record<NoiseMode, string> = {
-  off: 'Звук как есть',
-  browser: 'Убирает ровный шум',
-  rnnoise: 'Убирает клавиатуру и улицу',
-};
-
-function Segmented<T extends string>(props: { value: T; onChange: (v: T) => void; options: [T, string][] }) {
-  return (
-    <div className="flex shrink-0 gap-0.5 rounded-full border border-white/[0.07] bg-white/[0.03] p-[3px] max-md:w-full">
-      {props.options.map(([id, label]) => (
-        <button
-          key={id}
-          onClick={() => props.onChange(id)}
-          aria-pressed={props.value === id}
-          className={`h-7 rounded-full px-3 text-[13px] transition-colors max-md:h-9 max-md:flex-1 max-md:text-[14px] ${
-            props.value === id ? 'bg-white/[0.12] font-medium text-foreground' : 'text-muted hover:text-foreground'
-          }`}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
   );
 }
 

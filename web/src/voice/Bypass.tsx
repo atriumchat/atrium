@@ -57,12 +57,13 @@ export function BypassSwitch() {
     >
       <Switch.Content className="flex w-full items-center justify-between gap-3">
         <span className="min-w-0">
-          <Label className="text-[14px] font-medium">Антилаг</Label>
+          <Label className="text-[14px] font-medium max-md:text-[16px] max-md:font-normal">Антилаг</Label>
           <span className="block text-[13px] leading-snug text-muted">
             {forced ? 'Включён на сервере' : 'Звонок через сервер, меньше обрывов'}
           </span>
         </span>
-        <Switch.Control className="shrink-0">
+        {/* Off, the track is a white tint: graphite would vanish in the phone's graphite cards. */}
+        <Switch.Control className="shrink-0 [--switch-control-bg:rgb(255_255_255/0.16)]">
           <Switch.Thumb />
         </Switch.Control>
       </Switch.Content>

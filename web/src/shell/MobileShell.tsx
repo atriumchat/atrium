@@ -1,27 +1,22 @@
-import { useState, type ReactNode } from 'react';
-import { Button } from '@heroui/react';
+import type { ReactNode } from 'react';
 import { closeDetail, dmTitle, isDmId, openDm, openFriends, openPicker, openTab, selectChannel, useStore, voiceMembers, type MobileTab } from '../store';
 import { leaveVoice, toggleMute } from '../voice/voice';
-import { logout } from '../account/session';
 import { HomeContent, homeBadgeCount, serverBadgeCount, ServerContent } from './Content';
 import { Sidebar } from './Sidebar';
 import { Badge, FeedDm, useDmList } from './HomeSidebar';
 import { PeopleRow, RoomCircles } from '../people/WhoWhere';
 import { InboxButton } from '../people/Inbox';
-import { ProfileCard } from '../people/UserProfile';
 import { EmptyState } from '../ui/Illustrations';
-import { InviteCardButton } from '../people/Invites';
 import { Avatar } from '../ui/Avatar';
 import { CallDuration } from '../voice/CallDuration';
 import { ServerMark } from '../ui/Logo';
 import { RoundButton } from '../ui/ui';
 import { UpdateBanner } from './UpdateBanner';
-import { useSettingsPages, type SettingsPage } from './SettingsDialog';
-import { PushPage, usePush } from '../ui/PushPage';
-import { Row, RowIcon, Rows } from '../ui/settings';
+import { YouTab } from './YouTab';
+import { usePush } from '../ui/PushPage';
 import { BypassHint } from '../voice/Bypass';
 import { useCallStats } from '../voice/stats';
-import { ChevronRightIcon, HomeFilledIcon, HomeIcon, LogoutIcon, MicIcon, MicSlashIcon, PhoneDownIcon, PlusIcon, SignalIcon, UsersIcon } from '../ui/icons';
+import { ChevronRightIcon, HomeFilledIcon, HomeIcon, MicIcon, MicSlashIcon, PhoneDownIcon, PlusIcon, SignalIcon, UsersIcon } from '../ui/icons';
 
 /**
  * Phone layout: three tabs at the bottom (home, server, you) that switch instantly, and conversations that
@@ -233,47 +228,6 @@ function HomeTab() {
           {dms.length === 0 ? <EmptyState compact art="messages" title="Сообщений пока нет" text="Здесь будут лички и группы" /> : dms.map((dm) => <FeedDm key={dm.id} dm={dm} big />)}
         </section>
       </div>
-    </div>
-  );
-}
-
-/**
- * The settings on the phone, as in iOS: a row per section under the profile, each opening its page over the
- * app with the way back on top. Nothing to reach for at the top of the screen.
- */
-function SettingsRows() {
-  const pages = useSettingsPages();
-  const [open, setOpen] = useState<SettingsPage | null>(null);
-  return (
-    <>
-      <Rows className="mt-4">
-        {pages.map((page) => (
-          <Row key={page.id} icon={<RowIcon>{page.icon}</RowIcon>} title={page.label} onPress={() => setOpen(page.id)} />
-        ))}
-      </Rows>
-      {pages.map((page) => (
-        <PushPage key={page.id} open={open === page.id} title={page.label} onBack={() => setOpen(null)}>
-          {page.content}
-        </PushPage>
-      ))}
-    </>
-  );
-}
-
-function YouTab() {
-  const meId = useStore((s) => s.me?.id);
-  if (!meId) return null;
-  return (
-    <div className="flex-1 overflow-y-auto px-4 pb-6 pt-4">
-      <div className="overflow-hidden rounded-[20px] bg-overlay">
-        <ProfileCard userId={meId} onClose={() => {}} />
-      </div>
-      <SettingsRows />
-      <InviteCardButton />
-      <Button variant="danger-soft" fullWidth onPress={logout} className="mt-4 h-12 rounded-[14px] text-[16px] [&_svg]:size-5">
-        <LogoutIcon />
-        Выйти
-      </Button>
     </div>
   );
 }

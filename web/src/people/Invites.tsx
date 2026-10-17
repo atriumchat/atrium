@@ -7,6 +7,7 @@ import { inviteLink, prettyCode } from './invite';
 import type { MyInvite } from '../types';
 import { Avatar } from '../ui/Avatar';
 import { ConfirmDialog } from '../ui/Dialog';
+import { Row, RowIcon } from '../ui/settings';
 import { CheckIcon, UserPlusIcon, XIcon } from '../ui/icons';
 
 const BANNER_HIDDEN = 'gomex_invite_banner_hidden';
@@ -112,23 +113,20 @@ export function InviteBanner() {
   );
 }
 
-/** A full-width "invite friends" card, for the phone's You tab. */
-export function InviteCardButton() {
+/** "Пригласить друзей" as a row of the phone's "Вы" tab: opens the invite window. */
+export function InviteRow() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="mt-4 flex w-full items-center gap-4 overflow-hidden rounded-[24px] bg-default p-4 text-left active:bg-default/70"
-      >
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-black">
-          <UserPlusIcon size={22} />
-        </span>
-        <span className="min-w-0">
-          <span className="block text-[16px] font-medium">Пригласить друзей</span>
-          <span className="block text-[13px] text-muted">Gomex — только по приглашениям</span>
-        </span>
-      </button>
+      <Row
+        icon={
+          <RowIcon>
+            <UserPlusIcon />
+          </RowIcon>
+        }
+        title="Пригласить друзей"
+        onPress={() => setOpen(true)}
+      />
       {open && <InviteDialog onClose={() => setOpen(false)} />}
     </>
   );

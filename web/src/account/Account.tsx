@@ -5,20 +5,31 @@ import { showError, useStore } from '../store';
 import { expectNewToken, switchToken } from '../socket';
 import { Avatar } from '../ui/Avatar';
 import { CheckIcon } from '../ui/icons';
-import { Primary, Row, Rows, Secondary, SubPage, field, fieldArea, fieldLabel, useSub } from '../ui/settings';
+import { Primary, Row, RowValue, Rows, Secondary, SubPage, field, fieldArea, fieldLabel, useSub } from '../ui/settings';
 import { AvatarPicker, BioEditor } from '../people/UserProfile';
 import { downloadKey } from './RecoveryKey';
 
 /**
  * The "Аккаунт" page of the settings: photo and about, the nick, then a row each for the password, the recovery key
- * and who's blocked; their forms open only from there. On the phone the photo and about are on the "Вы" tab already.
+ * and who's blocked; their forms open only from there. On the phone it is one group of the settings page, the nick
+ * a row like the rest (the photo and about are on the "Вы" tab).
  */
 export function AccountSettings() {
   const isMobile = useStore((s) => s.isMobile);
+  if (isMobile) {
+    return (
+      <Rows title="Аккаунт" className="mt-6">
+        <NickRow />
+        <PasswordRow />
+        <RecoveryRow />
+        <BlockedRow />
+      </Rows>
+    );
+  }
   return (
     <>
-      {!isMobile && <ProfileBlock />}
-      <NameField />
+      <ProfileBlock />
+      <NameField className="mt-6" />
       <Rows className="mt-8">
         <PasswordRow />
         <RecoveryRow />
@@ -40,7 +51,22 @@ function ProfileBlock() {
   );
 }
 
-function NameField() {
+function NickRow() {
+  const name = useStore((s) => s.me?.name);
+  const sub = useSub();
+  return (
+    <>
+      <Row title="Ник" onPress={sub.show}>
+        <RowValue>{name}</RowValue>
+      </Row>
+      <SubPage key={sub.key} open={sub.open} title="Ник" onClose={sub.hide}>
+        <NameField onSaved={sub.hide} className="mt-2" />
+      </SubPage>
+    </>
+  );
+}
+
+function NameField({ onSaved, className = '' }: { onSaved?: () => void; className?: string }) {
   const me = useStore((s) => s.me);
   const id = useId();
   const [name, setName] = useState(me?.name ?? '');
@@ -55,6 +81,7 @@ function NameField() {
       const updated = await api.changeName(name, password);
       useStore.setState((s) => ({ me: updated, users: { ...s.users, [updated.id]: updated } }));
       setPassword('');
+      onSaved?.();
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Не удалось сменить ник');
     } finally {
@@ -63,8 +90,9 @@ function NameField() {
   }
 
   return (
-    <form onSubmit={submit} className="mt-6">
-      <label htmlFor={id} className={fieldLabel}>
+    <form onSubmit={submit} className={className}>
+      {/* On the phone this is a page of its own, titled the same. */}
+      <label htmlFor={id} className={`${fieldLabel} max-md:sr-only`}>
         Ник
       </label>
       <input id={id} value={name} maxLength={32} onChange={(e) => setName(e.target.value)} className={field} autoComplete="username" />
@@ -93,9 +121,7 @@ function PasswordRow() {
   const sub = useSub();
   return (
     <>
-      <Row title="Пароль">
-        <Secondary onPress={sub.show}>Сменить</Secondary>
-      </Row>
+      <Row title="Пароль" action="Сменить" onPress={sub.show} />
       <PasswordPage key={sub.key} open={sub.open} onClose={sub.hide} />
     </>
   );
@@ -181,9 +207,7 @@ function RecoveryRow() {
   const sub = useSub();
   return (
     <>
-      <Row title="Ключ восстановления" value={has ? 'Создан' : 'Не создан'}>
-        <Secondary onPress={sub.show}>{has ? 'Новый ключ' : 'Создать'}</Secondary>
-      </Row>
+      <Row title="Ключ восстановления" value={has ? 'Создан' : 'Не создан'} action={has ? 'Новый ключ' : 'Создать'} onPress={sub.show} />
       <RecoveryPage key={sub.key} open={sub.open} onClose={sub.hide} />
     </>
   );
@@ -298,7 +322,7 @@ function BlockedRow() {
     <>
       {blocked.length > 0 && (
         <Row title="Заблокированные" onPress={sub.show}>
-          <span className="shrink-0 text-[14px] tabular-nums text-muted">{blocked.length}</span>
+          <RowValue>{blocked.length}</RowValue>
         </Row>
       )}
       <SubPage open={open} title="Заблокированные" onClose={hide}>

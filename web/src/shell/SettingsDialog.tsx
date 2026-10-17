@@ -12,7 +12,10 @@ import { LogoutIcon, MicIcon, RefreshIcon, UserIcon } from '../ui/icons';
 
 export type SettingsPage = 'account' | 'voice' | 'server' | 'app';
 
-/** The settings' sections, the same on the computer (a list on the left) and the phone (rows on the "Вы" tab). */
+/**
+ * The settings' sections: on the computer a list on the left, each opening its page; on the phone one page of them
+ * all, each section a group of rows (the "Вы" tab's "Настройки").
+ */
 export function useSettingsPages() {
   const isAdmin = useStore((s) => s.isAdmin);
   const pages: { id: SettingsPage; label: string; icon: ReactNode; content: ReactNode }[] = [
@@ -42,7 +45,7 @@ async function checkForUpdate() {
 
 /**
  * Settings on the computer, as in Discord: the sections on the left, the open one on the right, and "Выйти" at
- * the foot of the list. In the window's tone, like the setup wizard. (The phone has rows on its "Вы" tab instead.)
+ * the foot of the list. In the window's tone, like the setup wizard. (The phone has one page of groups instead.)
  */
 export function SettingsDialog({ onClose, start = 'account' }: { onClose: () => void; start?: SettingsPage }) {
   const pages = useSettingsPages();
@@ -93,7 +96,7 @@ function AppSettings() {
   const update = useStore((s) => s.desktopUpdate);
   const busy = update?.status === 'checking' || update?.status === 'downloading';
   return (
-    <Rows className="mt-6">
+    <Rows title="Приложение" className="mt-6">
       <Row title="Gomex для компьютера" value={update?.current}>
         <Secondary
           isDisabled={busy}
