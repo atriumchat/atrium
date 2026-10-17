@@ -117,9 +117,12 @@ digest_of() {
 app_digest=$(digest_of gomex-app)
 caddy_digest=$(digest_of gomex-caddy)
 if [[ ! $app_digest =~ ^sha256:[0-9a-f]{64}$ || ! $caddy_digest =~ ^sha256:[0-9a-f]{64}$ ]]; then
+  # Package settings live under /orgs/ for an organization, /users/ for a person.
+  kind=users
+  [[ $(gh api "users/$owner" --jq .type 2>/dev/null) == Organization ]] && kind=orgs
   die "Servers can't pull the images anonymously. Make both packages public, once:
-  https://github.com/users/$owner/packages/container/gomex-app/settings
-  https://github.com/users/$owner/packages/container/gomex-caddy/settings
+  https://github.com/$kind/$owner/packages/container/gomex-app/settings
+  https://github.com/$kind/$owner/packages/container/gomex-caddy/settings
 then run deploy/release.sh $version again."
 fi
 say "gomex-app@$app_digest"

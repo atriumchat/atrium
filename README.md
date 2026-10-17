@@ -88,7 +88,7 @@ flowchart LR
 На сервере:
 
 ```bash
-curl -fsSL https://github.com/networkfreedom/gomex/releases/latest/download/install.sh | sh
+curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh
 ```
 
 Если GitHub недоступен, тот же релиз лежит в npm как пакет `@gomex.llc/install` (Node на сервере не нужен):
@@ -107,13 +107,13 @@ curl -fsSL https://cdn.jsdelivr.net/npm/@gomex.llc/install@latest/install.sh | s
 Без вопросов, для скриптов:
 
 ```bash
-curl -fsSL https://github.com/networkfreedom/gomex/releases/latest/download/install.sh | DOMAIN=chat.example.com GOMEX_YES=1 sh
+curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | DOMAIN=chat.example.com GOMEX_YES=1 sh
 ```
 
 Обновление: повторный запуск, или без вопросов:
 
 ```bash
-curl -fsSL https://github.com/networkfreedom/gomex/releases/latest/download/install.sh | sh -s update
+curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh -s update
 ```
 
 `.env` и данные при обновлении не трогаются. Дополнительные переменные установщика описаны в шапке
@@ -174,7 +174,7 @@ deploy/release.sh lint      # bash -n и shellcheck на всех скрипта
 2. Позовите друзей: у каждого своя ссылка-приглашение, по ней можно зарегистрировать 5 человек
    (`INVITE_LIMIT`), приглашённый сразу попадает в друзья. У администраторов лимита нет.
 3. Десктоп для Mac (Apple Silicon и Intel) и Windows — кнопка «Скачать приложение» в приложении или релиз
-   [desktop](https://github.com/networkfreedom/gomex/releases/tag/desktop). При первом запуске он спрашивает
+   [desktop](https://github.com/gomex-inc/gomex/releases/tag/desktop). При первом запуске он спрашивает
    адрес сервера: вставьте `app.ДОМЕН`. Сменить его потом можно из трея, «Адрес сервера…».
 
 Публичного API нет: HTTP и Socket.IO — внутренний протокол клиента, без версий и обещаний совместимости.
@@ -269,7 +269,7 @@ deploy/release-desktop.sh            # Mac (Apple Silicon и Intel) и Windows
 
 ## Сопровождение
 
-[@networkfreedom](https://github.com/networkfreedom).
+[@gomex-inc](https://github.com/gomex-inc).
 
 ## Участие
 

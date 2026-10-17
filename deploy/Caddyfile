@@ -82,7 +82,7 @@ http://app.{$DOMAIN} {
 # Releases (deploy/release-desktop.sh keeps the fixed names in the release "desktop"), not on any server.
 (downloads) {
 	handle_path /download/* {
-		redir https://github.com/networkfreedom/gomex/releases/download/desktop{path} 302
+		redir https://github.com/gomex-inc/gomex/releases/download/desktop{path} 302
 	}
 }
 

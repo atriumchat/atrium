@@ -1,6 +1,6 @@
 #!/bin/sh
 # Gomex installer, for a fresh VPS (Ubuntu or Debian), as root:
-#   curl -fsSL https://github.com/networkfreedom/gomex/releases/latest/download/install.sh | sh   # the wizard
+#   curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh   # the wizard
 #   curl -fsSL …/install.sh | sh -s update                                 # update, no questions
 #   curl -fsSL …/install.sh | DOMAIN=chat.example.com GOMEX_YES=1 sh       # no questions at all
 # Each installer takes its own release's tarball from that GitHub Release, checked against the SHA-256 pinned
@@ -36,10 +36,10 @@ umask 022
 # == The release this installer puts on the server. deploy/release.sh rewrites these lines.
 RELEASE_VERSION=0.0.0
 RELEASE_SHA256=
-RELEASE_REPO=networkfreedom/gomex
+RELEASE_REPO=gomex-inc/gomex
 # The npm package that mirrors each release's install.sh and tarball (deploy/release.sh publishes it).
 RELEASE_NPM=@gomex.llc/install
-RELEASE_REGISTRY=ghcr.io/networkfreedom
+RELEASE_REGISTRY=ghcr.io/gomex-inc
 RELEASE_APP_DIGEST=
 RELEASE_CADDY_DIGEST=
 

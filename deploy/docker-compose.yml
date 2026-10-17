@@ -13,7 +13,7 @@ x-logging: &logging
 
 services:
   app:
-    image: ${GOMEX_REGISTRY:-ghcr.io/networkfreedom}/gomex-app:${GOMEX_VERSION:-latest}${GOMEX_APP_DIGEST:+@}${GOMEX_APP_DIGEST:-}
+    image: ${GOMEX_REGISTRY:-ghcr.io/gomex-inc}/gomex-app:${GOMEX_VERSION:-latest}${GOMEX_APP_DIGEST:+@}${GOMEX_APP_DIGEST:-}
     restart: unless-stopped
     network_mode: host
     env_file: .env
@@ -54,7 +54,7 @@ services:
 
   caddy:
     # Caddy 2.11.7 + caddy-l4, to share port 443 between the site and TURN (see caddy/Dockerfile).
-    image: ${GOMEX_REGISTRY:-ghcr.io/networkfreedom}/gomex-caddy:${GOMEX_VERSION:-latest}${GOMEX_CADDY_DIGEST:+@}${GOMEX_CADDY_DIGEST:-}
+    image: ${GOMEX_REGISTRY:-ghcr.io/gomex-inc}/gomex-caddy:${GOMEX_VERSION:-latest}${GOMEX_CADDY_DIGEST:+@}${GOMEX_CADDY_DIGEST:-}
     restart: unless-stopped
     network_mode: host
     environment:

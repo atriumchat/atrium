@@ -336,7 +336,7 @@ app.on('before-quit', () => {
 app.on('activate', showWindow);
 
 app.whenReady().then(async () => {
-  app.setAppUserModelId('io.github.networkfreedom.gomex'); // Windows notifications need it
+  app.setAppUserModelId('io.github.gomex-inc.gomex'); // Windows notifications need it
   setUpPermissions();
   listenToPage();
   if (!APP_URL) {
