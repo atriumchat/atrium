@@ -726,3 +726,14 @@ if (jump) {
     }, 600);
   }
 }
+
+/* Enter presses the step's main button, unless the focus is somewhere that has its own use for the key: a button
+   presses itself, a form (the first step) submits itself. */
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || e.defaultPrevented || e.isComposing || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target.closest('button, a, textarea, select, form')) return;
+  const main = document.querySelector('.step:not([hidden]):not(.leaving) .primary');
+  if (!main || main.disabled || main.hidden || main.type === 'submit' || !main.offsetParent) return;
+  e.preventDefault();
+  main.click();
+});

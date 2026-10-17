@@ -361,7 +361,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             }}
           >
             <h1>Код установки</h1>
-            <p className="sub">Строка INVITE_CODE в .env на сервере</p>
+            <p className="sub">Код — в конце ссылки от установщика</p>
             <label className="field-label" htmlFor="setup-code">
               Код
             </label>
@@ -563,7 +563,12 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
 
       case 'key':
         return (
-          <div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              go('invite');
+            }}
+          >
             <h1>Ключ восстановления</h1>
             <p className="sub">Вернёт доступ, если пароль забыт</p>
             <p className="key">
@@ -600,17 +605,22 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
                     Сохранил
                   </button>
                 )}
-                <Primary disabled={!keyKept} onClick={() => go('invite')}>
+                <Primary type="submit" disabled={!keyKept}>
                   Дальше
                 </Primary>
               </span>
             </div>
-          </div>
+          </form>
         );
 
       case 'invite':
         return (
-          <div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              go('done');
+            }}
+          >
             <h1>Позвать друзей</h1>
             <p className="sub">По ссылке регистрация, и сразу в друзья</p>
             <label className="field-label" htmlFor="setup-link">
@@ -648,17 +658,22 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
                     Позже
                   </button>
                 )}
-                <Primary disabled={!linkSent} onClick={() => go('done')}>
+                <Primary type="submit" disabled={!linkSent}>
                   Дальше
                 </Primary>
               </span>
             </div>
-          </div>
+          </form>
         );
 
       case 'done':
         return (
-          <div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              onDone();
+            }}
+          >
             <h1>Всё готово</h1>
             <p className="sub">{host}</p>
             <div className="rows">
@@ -697,9 +712,9 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
               <button type="button" className="quiet" onClick={() => go('invite', true)}>
                 Назад
               </button>
-              <Primary onClick={onDone}>Начать использование</Primary>
+              <Primary type="submit">Начать использование</Primary>
             </div>
-          </div>
+          </form>
         );
     }
   }

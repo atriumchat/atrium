@@ -118,6 +118,12 @@ curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.s
 curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh -s update
 ```
 
+Ссылка для первой настройки (с кодом установки) ещё раз, пока настройка не закончена:
+
+```bash
+curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh -s link
+```
+
 Снять Gomex с сервера:
 
 ```bash

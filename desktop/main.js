@@ -9,6 +9,7 @@ const {
   Tray,
   ipcMain,
   nativeImage,
+  net,
   powerMonitor,
   safeStorage,
   session,
@@ -123,6 +124,7 @@ function createWindow() {
   win.webContents.on('context-menu', (_event, params) => showTextMenu(params));
   // A server that doesn't open (yet) shows a page that says so and retries, not a black window (reachable.js).
   reachable.open(win, START_URL);
+  setupLinkStart(win);
   win.once('ready-to-show', () => win?.show());
 
   // Closing the window only hides it: Gomex keeps running in the menu bar / tray so calls still come in.
@@ -453,12 +455,53 @@ setupCall('open-server', (value) => {
   }
   if (url.protocol !== 'https:') return { error: 'Нет адреса' };
   const rest = url.pathname + url.search;
+  keepSetupLink(url);
   fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true });
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(rest === '/' ? { url: url.origin } : { url: url.origin, open: rest }, null, 2));
   quitting = true;
   app.relaunch();
   app.exit(0);
 });
+
+// The link with the setup code (https://app.DOMAIN/?setup=CODE) is kept with the server's other secrets until the
+// server's first-run wizard is done: the address opened without it (or the wizard left half-way) would ask for a code.
+function keepSetupLink(url) {
+  if (!url.searchParams.has('setup')) return;
+  remember(url.hostname.replace(/^app\./, ''), { setup: seal(url.href) });
+}
+
+/** Sealed servers.json entries that hold a setup link: [[domain, link]]. */
+function setupLinks() {
+  try {
+    const all = JSON.parse(fs.readFileSync(SERVERS_FILE, 'utf8'));
+    return Object.entries(all).flatMap(([domain, one]) => {
+      if (!one.setup) return [];
+      const link = one.setup.sealed ? safeStorage.decryptString(Buffer.from(one.setup.sealed, 'base64')) : one.setup.plain;
+      return [[domain, link]];
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * On start: while the server still needs its setup, the main window opens on the setup link instead of the bare
+ * address; once it doesn't, the stored link goes. Asked with the network stack the window loads with (net.fetch).
+ */
+async function setupLinkStart(window) {
+  const found = setupLinks().find(([, link]) => ORIGIN && new URL(link).origin === ORIGIN);
+  if (!found) return;
+  const [domain, link] = found;
+  try {
+    const response = await net.fetch(`${ORIGIN}/api/setup`, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+    const { needed } = await response.json();
+    if (needed === false) return remember(domain, { setup: undefined });
+    if (needed !== true) return;
+  } catch {
+    return; // Not reachable now: the bare address is what reachable.js is already retrying.
+  }
+  if (!window.isDestroyed() && !window.webContents.getURL().includes('setup=')) window.loadURL(link);
+}
 
 /** IPC from the page; only the Gomex page itself may send these. */
 function listenToPage() {

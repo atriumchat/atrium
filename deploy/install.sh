@@ -3,6 +3,7 @@
 #   curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh   # the wizard
 #   curl -fsSL …/install.sh | sh -s update                                 # update, no questions
 #   curl -fsSL …/install.sh | sh -s uninstall                              # take Gomex off the server again
+#   curl -fsSL …/install.sh | sh -s link                                   # the setup link again, while setup is not done
 #   curl -fsSL …/install.sh | DOMAIN=chat.example.com GOMEX_YES=1 sh       # no questions at all
 # Each installer takes its own release's tarball from that GitHub Release, checked against the SHA-256 pinned
 # below. The npm package @gomex.llc/install mirrors both files, so the same works without GitHub:
@@ -10,6 +11,7 @@
 # Where Node is already installed, the same package runs with npx (its bin is gomex-install):
 #   npx @gomex.llc/install            # update: npx @gomex.llc/install update
 # Re-running is an update: .env (all the secrets) and the data stay.
+# link prints the link with the setup code (https://app.DOMAIN/?setup=CODE) again, or says that setup is already done.
 # uninstall asks first (GOMEX_YES=1 skips the question), then removes: the containers and their images, GOMEX_DIR
 # (/opt/gomex: .env, the data, the files), /root/gomex-backups, the nightly backup service and timer, this installer's
 # copy (/root/gomex-install.sh) and log (/var/log/gomex-install.log), and what it changed for SSH: its key-only
@@ -1163,6 +1165,23 @@ screen_done() {
   say
 }
 
+# ---------------------------------------------------------------------------------------------- link
+
+# `link`: the setup link again, for an owner who lost it or opened the address without it.
+show_link() {
+  (( EXISTING )) || die "Gomex здесь ещё не стоит"
+  [[ -n $DOMAIN ]] || die "В $ENV_FILE нет DOMAIN"
+  local needed code
+  needed=$(curl -fsS --max-time 5 http://127.0.0.1:8000/api/setup 2>/dev/null) || die "Сервер не отвечает"
+  if [[ $needed != *'"needed":true'* && $needed != *'"needed": true'* ]]; then
+    line "Настройка уже закончена: https://app.$DOMAIN"
+    return
+  fi
+  code=$(env_get "$ENV_FILE" INVITE_CODE)
+  [[ -n $code ]] || die "В $ENV_FILE нет INVITE_CODE"
+  printf '%s\n' "https://app.$DOMAIN/?setup=$code"
+}
+
 # ---------------------------------------------------------------------------------------------- uninstall
 
 # `uninstall`: Gomex off this server, back to what it was before the installer (Docker and ufw stay).
@@ -1238,6 +1257,7 @@ usage() {
 Gomex $RELEASE_VERSION — установка на этот сервер.
   sh install.sh            мастер установки (повторный запуск — обновление)
   sh install.sh update     обновить без вопросов
+  sh install.sh link       ссылка для первой настройки ещё раз (если настройка не закончена)
   sh install.sh uninstall  снять Gomex с сервера: контейнеры, данные, бэкапы (GOMEX_YES=1 — без вопроса)
   DOMAIN=chat.example.com GOMEX_YES=1 sh install.sh   без вопросов
 EOF
@@ -1342,6 +1362,7 @@ main() {
     '' | install) MODE=install ;;
     update) MODE=update ;;
     uninstall) MODE=uninstall ;;
+    link) MODE="link" ;;
     -h | --help | help) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;
   esac
@@ -1357,6 +1378,11 @@ main() {
   if ! { : >>"$LOG"; } 2>/dev/null; then LOG=$GOMEX_TMP/install.log; fi
   chmod 600 "$LOG" 2>/dev/null || true
   log "Gomex installer $RELEASE_VERSION, mode $MODE"
+  if [[ $MODE == link ]]; then
+    detect_install
+    show_link
+    return
+  fi
   if [[ $MODE == uninstall ]]; then
     detect_install
     uninstall_all
