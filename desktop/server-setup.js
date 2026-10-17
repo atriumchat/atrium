@@ -205,10 +205,13 @@ async function register({ name, email, captchaId, solution }) {
     return { ok: true };
   }
   const json = answer.json ?? {};
+  // deSEC's own words for the field it refused ({"domain": ["…"]}), so the person sees the real reason.
+  const said = (field) => [json[field]].flat(2).filter((x) => typeof x === 'string').join(' ');
+  console.log('deSEC sign-up refused:', answer.status, answer.text.slice(0, 400));
   if (answer.status === 429) return { error: 'Слишком часто, подождите минуту' };
   if (json.captcha) return { error: 'Символы не совпали, вот новая картинка', captcha: true };
-  if (json.email) return { error: 'Эта почта не подходит', captcha: true };
-  if (json.domain) return { error: 'Имя не подходит или занято', captcha: true };
+  if (json.email) return { error: `Почта не подходит. deSEC: ${said('email')}`, captcha: true };
+  if (json.domain) return { error: `Имя не подходит. deSEC: ${said('domain')}`, name: true };
   if (json.code === 'registration_denied') return { error: 'deSEC отказал в регистрации' };
   return { error: `deSEC: ${JSON.stringify(json).slice(0, 160)}`, captcha: true };
 }

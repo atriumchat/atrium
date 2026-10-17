@@ -386,6 +386,14 @@ $('go-captcha').addEventListener('click', async () => {
   const answer = await setup.register({ name: freeName(), email: freeEmail(), captchaId, solution: $('captcha-text').value.trim() });
   busy($('go-captcha'), false);
   if (answer.error) {
+    // The name refused: back to it, with deSEC's reason under the field (the next try gets a fresh picture).
+    if (answer.name) {
+      show('free-name', { back: true });
+      $('e-free-name').textContent = answer.error;
+      $('free-name').focus({ preventScroll: true });
+      $('free-name').select();
+      return;
+    }
     $('e-captcha').textContent = answer.error;
     if (answer.captcha) newCaptcha();
     return;
