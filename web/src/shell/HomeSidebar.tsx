@@ -6,6 +6,7 @@ import { DmAvatar } from '../ui/DmAvatar';
 import { ensureHistory } from '../chat/history';
 import { plainText } from '../ui/Markdown';
 import { RoundButton } from '../ui/ui';
+import { EmptyState } from '../ui/Illustrations';
 import { PhoneIcon, PlusIcon, UsersIcon } from '../ui/icons';
 
 /**
@@ -30,7 +31,7 @@ export function HomeSidebar() {
           </RoundButton>
         </div>
         {dms.length === 0 ? (
-          <p className="px-3 pt-2 text-[13px] text-muted">Пока пусто</p>
+          <EmptyState compact art="messages" title="Сообщений пока нет" text="Здесь будут лички и группы" />
         ) : (
           <div className="space-y-0.5">
             {dms.map((dm) => (

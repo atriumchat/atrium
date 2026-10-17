@@ -19,7 +19,7 @@ import { GroupPicker } from '../people/GroupPicker';
 import { GomexMark } from '../ui/Logo';
 import { UpdateBanner } from './UpdateBanner';
 import { InviteBanner, prefetchInvite } from '../people/Invites';
-import { Playground } from './Playground';
+import { ArtPlayground, Playground } from './Playground';
 
 // Desktop app: clicking a message notification opens that conversation.
 desktop?.onOpenConversation((id) => openDm(id));
@@ -117,18 +117,22 @@ function DesktopShell() {
         <UserPanel />
       </div>
       <main className={`${panel} flex min-w-0 flex-1 flex-col`}>
-        {playground ? <Playground /> : mode === 'home' ? <HomeContent /> : <ServerContent />}
+        {playground === 'art' ? <ArtPlayground /> : playground ? <Playground /> : mode === 'home' ? <HomeContent /> : <ServerContent />}
       </main>
     </div>
   );
 }
 
-/** Development only: #bubbles in the address shows the call layouts with made-up talking. */
+/**
+ * Development only: #bubbles in the address shows the call layouts with made-up talking, #art the line drawings
+ * and every empty state.
+ */
 function usePlayground() {
-  const [on, setOn] = useState(() => import.meta.env.DEV && location.hash === '#bubbles');
+  const which = () => (import.meta.env.DEV && (location.hash === '#bubbles' || location.hash === '#art') ? location.hash.slice(1) : null);
+  const [on, setOn] = useState(which);
   useEffect(() => {
     if (!import.meta.env.DEV) return;
-    const sync = () => setOn(location.hash === '#bubbles');
+    const sync = () => setOn(which());
     window.addEventListener('hashchange', sync);
     return () => window.removeEventListener('hashchange', sync);
   }, []);

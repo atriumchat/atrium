@@ -6,7 +6,7 @@ import type { Friend, User } from '../types';
 import { Avatar } from '../ui/Avatar';
 import { InboxButton } from './Inbox';
 import { BackButton } from '../shell/ChannelHeader';
-import { EmptyState } from '../ui/Illustrations';
+import { EmptyState, type ArtName } from '../ui/Illustrations';
 import { FriendButton, UserProfile } from './UserProfile';
 import { RoundButton } from '../ui/ui';
 import { BubbleIcon, CheckIcon, UserPlusIcon, XIcon } from '../ui/icons';
@@ -89,19 +89,24 @@ export function FriendsView() {
         {tab === 'add' ? (
           <AddFriend />
         ) : tab === 'pending' ? (
-          <FriendList title={`Заявки — ${pending.length}`} friends={pending} empty="Заявок нет" />
+          <FriendList title={`Заявки — ${pending.length}`} friends={pending} empty={['mailbox', 'Заявок нет', 'Новые заявки появятся здесь']} />
         ) : tab === 'all' ? (
-          <FriendList title={`Все друзья — ${accepted.length}`} friends={accepted} empty="Друзей пока нет" />
+          <FriendList title={`Все друзья — ${accepted.length}`} friends={accepted} empty={['couch', 'Друзей пока нет', 'Здесь появятся друзья с сервера']} />
         ) : (
-          <FriendList title={`В сети — ${onlineFriends.length}`} friends={onlineFriends} empty="Никого из друзей нет в сети" />
+          <FriendList
+            title={`В сети — ${onlineFriends.length}`}
+            friends={onlineFriends}
+            empty={accepted.length ? ['away', 'Никого нет в сети', 'Здесь появятся те, кто зайдёт'] : ['couch', 'Друзей пока нет', 'Здесь появятся друзья с сервера']}
+          />
         )}
       </div>
     </div>
   );
 }
 
-function FriendList({ title, friends, empty }: { title: string; friends: Friend[]; empty: string }) {
-  if (friends.length === 0) return <EmptyState title={empty} text="Ссылка-приглашение или заявка по нику" />;
+/** `empty`: the drawing, title and line for when there's nobody in the list. */
+function FriendList({ title, friends, empty }: { title: string; friends: Friend[]; empty: [ArtName, string, string] }) {
+  if (friends.length === 0) return <EmptyState art={empty[0]} title={empty[1]} text={empty[2]} />;
   return (
     <section>
       <h2 className="px-3 pb-1 text-[12px] text-faint">{title}</h2>

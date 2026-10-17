@@ -1,164 +1,270 @@
 import type { CSSProperties } from 'react';
-import { PlusIcon } from './icons';
+import { sketch, type Drawing, type Point, type Sketch } from './iso';
 
-/**
- * Fillings for the spheres: soft multi-colour light, opal, soap bubble. Each is plain CSS, so the
- * illustration costs no image downloads. The glass shell on top is the `.glass-sphere` class (index.css).
+/*
+ * Gomex's illustrations, in the landing's technique (gomex-site, the `step-art` drawings): white isometric line
+ * drawings, a 0.9 line in the current colour, every face filled with the surface it sits on so it hides what is
+ * behind it, secondary lines faint, dashes for whatever moves. The geometry is computed (iso.ts), not drawn by
+ * hand. Each empty place in the app has its own object.
  */
-const ART = {
-  aurora:
-    'radial-gradient(circle at 30% 25%, #ffe08a 0, transparent 45%), radial-gradient(circle at 75% 38%, #ff6ad5 0, transparent 50%), radial-gradient(circle at 45% 82%, #7b5cff 0, transparent 55%), linear-gradient(160deg, #3d2bff, #12063a)',
-  lagoon: 'radial-gradient(circle at 70% 30%, #a8fbff 0, transparent 42%), radial-gradient(circle at 25% 72%, #1e90ff 0, transparent 55%), linear-gradient(170deg, #0a3a8a, #04122e)',
-  peach: 'radial-gradient(circle at 35% 30%, #fff1c9 0, transparent 38%), radial-gradient(circle at 70% 66%, #ff7a59 0, transparent 55%), linear-gradient(150deg, #ff3d77, #7a0f3a)',
-  mint: 'radial-gradient(circle at 40% 28%, #eafff2 0, transparent 34%), radial-gradient(circle at 62% 72%, #23d18b 0, transparent 55%), linear-gradient(170deg, #0d7a55, #032a1d)',
-  dusk: 'radial-gradient(circle at 30% 72%, #ff9d6c 0, transparent 45%), radial-gradient(circle at 72% 30%, #a77bff 0, transparent 55%), linear-gradient(170deg, #2a1650, #0c0620)',
-  holo: 'radial-gradient(circle at 50% 50%, rgba(18,18,30,.55) 35%, transparent 68%), conic-gradient(from 200deg, #ff8ad8, #8ad1ff, #b2ff9e, #ffe58a, #ff9b6a, #ff8ad8)',
-  brand: 'radial-gradient(circle at 35% 30%, #a9c3ff 0, transparent 38%), radial-gradient(circle at 70% 75%, #3d7bff 0, transparent 50%), linear-gradient(165deg, #0052ff, #001a66)',
-  ember: 'radial-gradient(circle at 52% 62%, #ffcf5a 0, transparent 38%), radial-gradient(circle at 30% 30%, #ff5f3d 0, transparent 55%), linear-gradient(170deg, #5a0d0d, #1a0505)',
-  moss: 'radial-gradient(circle at 50% 42%, #ff66c4 0, transparent 26%), radial-gradient(ellipse 70% 40% at 50% 82%, #4fae4a 0, transparent 70%), linear-gradient(175deg, #10301a, #050d06)',
-  soap: 'radial-gradient(circle closest-side, rgba(255,255,255,.02) 55%, rgba(150,200,255,.18) 80%, rgba(255,150,220,.38) 95%, transparent 100%), conic-gradient(from 120deg, rgba(255,140,220,.25), rgba(140,210,255,.25), rgba(180,255,170,.22), rgba(255,230,140,.25), rgba(255,140,220,.25))',
-  opal: 'radial-gradient(circle at 42% 38%, rgba(255,255,255,.55), transparent 34%), conic-gradient(from 40deg at 46% 58%, #ff9ad5, #9ad7ff, #b9ffb0, #ffe29a, #ffb38a, #ff9ad5)',
-  marble: 'radial-gradient(ellipse 40% 28% at 30% 72%, rgba(255,255,255,.7), transparent 70%), radial-gradient(ellipse 80% 45% at 62% 38%, #6c63ff, transparent 70%), linear-gradient(135deg, #12c2e9, #c471ed 55%, #f64f59)',
-  sky: 'radial-gradient(circle at 50% 18%, #ffffff 0, transparent 40%), linear-gradient(175deg, #9fd4ff, #3b7dd8)',
-  candy: 'radial-gradient(circle at 25% 35%, #ffd1f0 0, transparent 40%), radial-gradient(circle at 75% 62%, #ff4fa3 0, transparent 50%), linear-gradient(160deg, #a2136b, #3a0526)',
-} as const;
 
-type Art = keyof typeof ART;
+const faint = { o: 0.45 };
+const fainter = { o: 0.3 };
+const dashed = { dash: '2 2.6', o: 0.3 };
 
-/** [x, y, diameter, filling] on the W x H canvas: a dense, slightly uneven band, the brand sphere in the middle. */
-const LAYOUT: [number, number, number, Art][] = [
-  [40, 112, 104, 'candy'], [150, 84, 122, 'soap'], [272, 104, 132, 'mint'], [398, 78, 126, 'moss'], [522, 92, 98, 'opal'],
-  [612, 70, 134, 'sky'], [738, 104, 120, 'soap'], [862, 82, 128, 'ember'], [978, 116, 112, 'marble'],
-  [18, 244, 168, 'lagoon'], [178, 214, 188, 'dusk'], [336, 232, 214, 'aurora'], [500, 206, 248, 'brand'],
-  [684, 224, 226, 'peach'], [856, 210, 192, 'candy'], [1004, 246, 172, 'opal'],
-  [92, 342, 96, 'ember'], [256, 344, 108, 'marble'], [404, 328, 88, 'soap'], [604, 340, 86, 'mint'], [772, 346, 104, 'holo'], [930, 332, 98, 'aurora'],
+/** A rectangle drawn flat on one of the object's faces: its four corners in order. */
+function outline(s: Sketch, corners: Point[], style = faint) {
+  s.line(corners, style, true);
+}
+
+/** An arrow coming straight down, its head in the plane that faces the viewer (as on the landing). */
+function arrowDown(s: Sketch, x: number, y: number, from: number, to: number, style?: { dash?: string; o?: number }) {
+  s.line([[x, y, from], [x, y, to]], style);
+  s.line([[x - 1.8, y + 1.8, to + 3.5], [x, y, to], [x + 1.8, y - 1.8, to + 3.5]]);
+}
+
+/** A laptop with its lid up: the keyboard and trackpad on the base, the screen on the lid's face. */
+function laptop(s: Sketch, x: number, y: number, w = 40, d = 26, lid = 24) {
+  s.slab(x, y, 0, w, d, 2, 2);
+  const keys = [x + w * 0.12, y + d * 0.22, x + w * 0.88, y + d * 0.58] as const;
+  const pad = [x + w * 0.38, y + d * 0.67, x + w * 0.62, y + d * 0.88] as const;
+  outline(s, [[keys[0], keys[1], 2], [keys[2], keys[1], 2], [keys[2], keys[3], 2], [keys[0], keys[3], 2]]);
+  outline(s, [[pad[0], pad[1], 2], [pad[2], pad[1], 2], [pad[2], pad[3], 2], [pad[0], pad[3], 2]], fainter);
+  s.slab(x + 1, y, 2, w - 2, 1.5, lid);
+  outline(s, [[x + 4, y + 1.5, 5], [x + w - 4, y + 1.5, 5], [x + w - 4, y + 1.5, lid - 1], [x + 4, y + 1.5, lid - 1]]);
+}
+
+/** A phone lying face up, its top towards the back: the screen, and the toolbar line near the bottom. */
+function phone(s: Sketch, x: number, y: number, w = 22, d = 40) {
+  s.slab(x, y, 0, w, d, 2.5, 4.5);
+  s.slab(x + 1.8, y + 1.8, 2.5, w - 3.6, d - 3.6, 0, 3, { plate: false, o: 0.45 });
+  s.line([[x + 1.8, y + d - 8, 2.5], [x + w - 1.8, y + d - 8, 2.5]], fainter);
+}
+
+/** The "#" of a text channel, lying flat (ground outline, then its hole). */
+const HASH: [number, number][] = [
+  [6, 0], [11, 0], [11, 6], [19, 6], [19, 0], [24, 0], [24, 6], [30, 6], [30, 11], [24, 11], [24, 19], [30, 19], [30, 24], [24, 24],
+  [24, 30], [19, 30], [19, 24], [11, 24], [11, 30], [6, 30], [6, 24], [0, 24], [0, 19], [6, 19], [6, 11], [0, 11], [0, 6], [6, 6],
 ];
+const HASH_HOLE: [number, number][] = [[11, 11], [19, 11], [19, 19], [11, 19]];
 
-// Where people's photos go first: the big spheres around the middle one (indices into LAYOUT).
-const PHOTO_SLOTS = [11, 13, 10, 14, 5, 2, 7, 3, 15, 9];
+const deg = (a: number) => (a * Math.PI) / 180;
+
+export const ART = {
+  /** A text channel with nothing in it yet: its "#" hovering over its shadow. */
+  channel: sketch((s) => {
+    s.circle(15, 15, 0, 19, dashed);
+    s.float(() => s.prism([HASH, HASH_HOLE], 9, 4));
+  }),
+
+  /** A conversation nobody has written in: the message card with its cursor, and the send button. */
+  chat: sketch((s) => {
+    s.slab(0, 0, 0, 48, 20, 3, 5);
+    s.line([[13, 10, 3], [30, 10, 3]], { dash: '1.5 2.5', o: 0.35 });
+    s.line([[8.5, 10, 3], [8.5, 10, 8.5]], { w: 1.1, cls: 'art-cursor' });
+    s.cylinder(40, 10, 3, 3.6, 2);
+    s.line([[40, 11.6, 5], [40, 8, 5]], faint);
+    s.line([[38.6, 9.4, 5], [40, 8, 5], [41.4, 9.4, 5]], faint);
+  }),
+
+  /** A group with nothing written yet: a round table and the stools around it. */
+  group: sketch((s) => {
+    const stool = (a: number) => s.cylinder(17 * Math.cos(deg(a)), 17 * Math.sin(deg(a)), 0, 4, 7);
+    stool(180);
+    stool(270);
+    s.cylinder(0, 0, 0, 5, 1);
+    s.cylinder(0, 0, 1, 1.3, 13);
+    s.cylinder(0, 0, 14, 10, 2);
+    stool(0);
+    stool(90);
+  }),
+
+  /** A voice room with nobody in it: the speakerphone in the middle, its sound rings on the floor. */
+  voice: sketch((s) => {
+    s.circle(0, 0, 0, 28, { dash: '2 3', o: 0.22 });
+    s.circle(0, 0, 0, 19.5, { dash: '2 3', o: 0.4 });
+    s.cylinder(0, 0, 0, 11, 4);
+    s.circle(0, 0, 4, 7.5, faint);
+    s.circle(0, 0, 4, 1.4, { o: 0.7 });
+  }),
+
+  /** No friends yet: an empty couch, two seats. */
+  couch: sketch((s) => {
+    s.slab(42, 0, 0, 2, 2, 2);
+    s.slab(0, 16, 0, 2, 2, 2);
+    s.slab(42, 16, 0, 2, 2, 2);
+    s.slab(0, 0, 2, 44, 18, 7);
+    s.line([[22, 5, 9], [22, 18, 9]], faint);
+    s.slab(0, 0, 9, 44, 5, 12);
+    s.line([[22, 5, 9], [22, 5, 21]], faint);
+    s.slab(0, 5, 9, 5, 13, 5);
+    s.slab(39, 5, 9, 5, 13, 5);
+  }),
+
+  /** Nobody online: a closed laptop and a glass of water beside it. */
+  away: sketch((s) => {
+    s.slab(0, 0, 0, 36, 24, 2, 2.5);
+    s.slab(0.6, 0.6, 2, 34.8, 22.8, 1.4, 2.2);
+    s.cylinder(47, 6, 0, 4, 10);
+    s.arc(47, 6, 6, 4, 315, 495, faint);
+  }),
+
+  /** No friend requests: a mailbox on its post, flag down. */
+  mailbox: sketch((s) => {
+    s.circle(12, 6, 0, 7, dashed);
+    s.slab(10, 4, 0, 4, 4, 17);
+    s.slab(0, 0, 17, 24, 12, 12);
+    outline(s, [[5, 12, 24], [19, 12, 24], [19, 12, 25.6], [5, 12, 25.6]], { o: 0.6 });
+    s.slab(24, 3, 20, 1.2, 7, 2);
+  }),
+
+  /** No conversations: two message cards, one on the table and one on its way. */
+  messages: sketch((s) => {
+    s.slab(0, 0, 0, 30, 17, 2.5, 4);
+    s.line([[6, 6, 2.5], [22, 6, 2.5]], faint);
+    s.line([[6, 10.5, 2.5], [15, 10.5, 2.5]], fainter);
+    s.float(() => {
+      s.slab(18, -17, 13, 26, 14, 2.5, 4);
+      s.line([[23, -11.5, 15.5], [36, -11.5, 15.5]], faint);
+      s.line([[23, -7.5, 15.5], [30, -7.5, 15.5]], fainter);
+    });
+  }),
+
+  /** Nothing found: a magnifying glass over an empty spot. */
+  search: sketch((s) => {
+    s.circle(4, 0, 0, 14, dashed);
+    s.float(() => {
+      s.tube(0, 0, 8, 10.5, 8, 2.5);
+      s.slab(10, -1.8, 8, 14, 3.6, 2.5, 1.8);
+    });
+  }),
+
+  /** No notifications: an empty tray, something on its way down into it. */
+  tray: sketch((s) => {
+    const [w, d, h, t, floor] = [36, 26, 6, 2, 1.5];
+    const depth = h - floor;
+    s.slab(0, 0, 0, w, d, h);
+    outline(s, [[t, t, h], [w - t, t, h], [w - t, d - t, h], [t, d - t, h]], { o: 1 });
+    // Inside: the back corner and the floor's two far edges, as far as the opening lets them be seen.
+    s.line([[t, t, h], [t, t, floor]], faint);
+    s.line([[w - t - depth, t, floor], [t, t, floor], [t, d - t - depth, floor]], faint);
+    s.float(() => arrowDown(s, w / 2, d / 2, h + 20, h + 7));
+  }),
+
+  /** Nothing open: a bare floor, and the dashed outline of what will stand on it. */
+  nothing: sketch((s) => {
+    s.slab(0, 0, 0, 40, 40, 2, 3);
+    const [x0, y0, x1, y1, z0, z1] = [11, 11, 29, 29, 2, 16];
+    const ghost = { dash: '2 2.4', o: 0.5 };
+    s.line([[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], ghost, true);
+    s.line([[x0, y1, z1], [x0, y1, z0], [x1, y1, z0], [x1, y0, z0], [x1, y0, z1]], ghost);
+    s.line([[x1, y1, z0], [x1, y1, z1]], ghost);
+  }),
+
+  /** Signing in: the server, and the computer and phone it's reached from. */
+  signIn: sketch((s) => {
+    s.line([[5, 16, 0], [5, 40, 0]], { dash: '2 2.6', o: 0.45 });
+    s.line([[28, 8, 0], [44, 8, 0]], { dash: '2 2.6', o: 0.45 });
+    for (const z of [0, 9]) {
+      s.slab(0, 0, z, 28, 16, 7);
+      s.line([[4, 16, z + 3.5], [5.5, 16, z + 3.5]], { o: 0.5 });
+      s.line([[8, 16, z + 3.5], [9.5, 16, z + 3.5]], { o: 0.5 });
+      s.line([[12, 16, z + 3.5], [13.5, 16, z + 3.5]], { o: 0.5 });
+      s.circle(23, 16, z + 3.5, 0.9, { cls: 'art-led', ink: true });
+    }
+    laptop(s, -14, 40, 26, 17, 17);
+    phone(s, 44, -4, 13, 23);
+  }),
+
+  /** The desktop app: a laptop, the download coming down to it. */
+  computer: sketch((s) => {
+    laptop(s, 0, 0);
+    s.float(() => arrowDown(s, 20, 0.75, 46, 32, { dash: '2 2.4', o: 0.55 }));
+  }),
+
+  /** On the iPhone: Share, then the app's tile rising off the phone onto the home screen. */
+  iphone: sketch((s) => {
+    phone(s, 0, 0);
+    // The share button in the toolbar: a box open at the top and the arrow out of it.
+    s.line([[9.4, 33.4, 2.5], [9.4, 37, 2.5], [12.6, 37, 2.5], [12.6, 33.4, 2.5]]);
+    s.line([[11, 35.4, 2.5], [11, 31.6, 2.5]]);
+    s.line([[9.9, 32.7, 2.5], [11, 31.6, 2.5], [12.1, 32.7, 2.5]]);
+    s.line([[11, 31.6, 2.5], [11, 18, 19]], { dash: '2 2.4', o: 0.45 });
+    s.float(() => {
+      s.slab(7, 14, 19, 8, 8, 2.5, 2);
+      // The plus runs along the tile's diagonals, so on screen it stands upright instead of reading as an x.
+      s.line([[9.6, 16.6, 21.5], [12.4, 19.4, 21.5]]);
+      s.line([[11.7, 17.3, 21.5], [10.3, 18.7, 21.5]]);
+    });
+  }),
+
+  /** On Android: the app coming down onto the phone. */
+  android: sketch((s) => {
+    phone(s, 0, 0);
+    s.float(() => arrowDown(s, 11, 20, 36, 18, { dash: '2 2.4', o: 0.55 }));
+  }),
+} satisfies Record<string, Drawing>;
+
+export type ArtName = keyof typeof ART;
 
 /**
- * What fills the band's spheres: art-directed images (web/public/art, sources in its CREDITS.txt) — one palette
- * of deep blue, hot pink and glass.
+ * One drawing. `scale` sizes it (1 is the landing's size, where the line is 0.9 px); `plate` is the colour of
+ * the surface under it, which every face is filled with.
  */
-export const DEFAULT_PHOTOS = [
-  '/art/portrait.webp',
-  '/art/mushroom.webp',
-  '/art/flower.webp',
-  '/art/burst.webp',
-  '/art/glass-flowers.webp',
-  '/art/blue-mushrooms.webp',
-  '/art/eye.webp',
-];
-
-// Canvas: 1000 wide, 500 tall — the band, room below for the "+" sphere, and margin so shadows aren't cut off.
-const W = 1000;
-const H = 500;
-const TOP = 24; // everything sits this much lower than the layout numbers, leaving room for the top row's shadows
-const pct = (n: number, of: number) => `${(n / of) * 100}%`;
-
-/**
- * Gomex's illustration, after the Wabi references: a band of glassy spheres running off both edges, with a
- * white "+" sphere in front. Pass people's photos to put real faces in the big spheres; `onPlus` turns the
- * "+" into a button. Sized by its width; everything is in percentages, so it scales without JS.
- */
-export function Bubbles({
-  photos = DEFAULT_PHOTOS,
-  onPlus,
-  plusLabel = 'Добавить',
-  className = '',
-}: {
-  photos?: string[];
-  onPlus?: () => void;
-  plusLabel?: string;
-  className?: string;
-}) {
-  const photoAt = new Map(PHOTO_SLOTS.slice(0, photos.length).map((slot, i) => [slot, photos[i]]));
-  // Small ones first so the big ones overlap them.
-  const order = LAYOUT.map((s, i) => [s, i] as const).sort((a, b) => a[0][2] - b[0][2]);
-  const plusStyle: CSSProperties = { left: '50%', top: pct(350 + TOP, H), width: pct(128, W), aspectRatio: '1' };
-
+export function LineArt({ art, scale = 1.6, plate, className = '' }: { art: ArtName; scale?: number; plate?: string; className?: string }) {
+  const { marks, box } = ART[art];
+  const style = plate ? ({ '--plate': plate } as CSSProperties) : undefined;
   return (
-    <div
-      aria-hidden={onPlus ? undefined : true}
-      // The band dissolves at the sides instead of ending in a hard edge.
-      className={`relative w-full overflow-hidden [mask-image:linear-gradient(90deg,transparent,#000_8%,#000_92%,transparent)] ${className}`}
-      style={{ aspectRatio: `${W} / ${H}` }}
+    <svg
+      viewBox={box.join(' ')}
+      width={Math.round(box[2] * scale)}
+      height={Math.round(box[3] * scale)}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={0.9}
+      strokeLinejoin="round"
+      strokeLinecap="round"
+      aria-hidden="true"
+      focusable="false"
+      className={`line-art shrink-0 ${className}`}
+      style={style}
     >
-      {order.map(([[x, y, d, art], i]) => {
-        const photo = photoAt.get(i);
-        return (
-          <span
-            key={i}
-            className="glass-sphere absolute -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full"
-            style={{ left: pct(x, W), top: pct(y + TOP, H), width: pct(d, W), aspectRatio: '1', background: photo ? '#222' : ART[art] }}
-          >
-            {photo && <img src={photo} alt="" draggable={false} className="h-full w-full object-cover" />}
-          </span>
-        );
-      })}
-      {onPlus ? (
-        <button onClick={onPlus} aria-label={plusLabel} title={plusLabel} className="plus-sphere absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-transform active:scale-95" style={plusStyle}>
-          <PlusIcon className="mx-auto h-[30%] w-[30%]" strokeWidth={2.4} />
-        </button>
-      ) : (
-        <span className="plus-sphere absolute -translate-x-1/2 -translate-y-1/2 rounded-full" style={plusStyle}>
-          <PlusIcon className="mx-auto h-[30%] w-[30%]" strokeWidth={2.4} />
-        </span>
-      )}
-    </div>
-  );
-}
-
-/**
- * [x, y, diameter, image, zoom] on an LW x LH canvas — a cluster after the reference, packed so every
- * neighbouring pair is the same 12 apart, with the "+" below on the centre line (the canvas's middle is also
- * the cluster's centre of mass), and the canvas trimmed to the cluster.
- */
-const LW = 491;
-const LH = 563;
-const LENSES: [number, number, number, string, number][] = [
-  [183.9, 75.5, 135, '/art/mushroom.webp', 1.08],
-  [285.2, 70.1, 44, '/art/eye.webp', 1.08],
-  [93, 212.6, 170, '/art/flower.webp', 1.35],
-  [335.4, 244.5, 295, '/art/portrait.webp', 1.08],
-  [111.9, 376, 135, '/art/burst.webp', 1.08],
-];
-const LENS_PLUS = [245.5, 470.7, 168];
-
-/**
- * The empty-screen illustration: a few big glass lenses, each holding one picture, and a soft "+" sphere.
- * Each lens shows its picture sharp and slightly magnified, ringed by the same picture blurred — the
- * glass's thickness — under reflections (`.lens` in index.css).
- */
-export function LensArt({ className = '' }: { className?: string }) {
-  return (
-    <div aria-hidden="true" className={`relative w-full ${className}`} style={{ aspectRatio: `${LW} / ${LH}` }}>
-      {LENSES.map(([x, y, d, src, zoom]) => (
-        <span key={src} className="lens" style={{ left: pct(x, LW), top: pct(y, LH), width: pct(d, LW) }}>
-          <img src={src} alt="" draggable={false} className="lens-back" />
-          <span className="lens-inner">
-            <img src={src} alt="" draggable={false} style={{ transform: `scale(${zoom})` }} />
-          </span>
-        </span>
+      {marks.map((m, i) => (
+        <path
+          key={i}
+          d={m.d}
+          fill={m.ink ? 'currentColor' : m.plate ? 'var(--plate)' : undefined}
+          fillRule={m.even ? 'evenodd' : undefined}
+          stroke={m.ink ? 'none' : undefined}
+          opacity={m.o}
+          strokeDasharray={m.dash}
+          strokeWidth={m.w}
+          className={m.cls}
+        />
       ))}
-      <span className="lens-plus" style={{ left: pct(LENS_PLUS[0], LW), top: pct(LENS_PLUS[1], LH), width: pct(LENS_PLUS[2], LW) }}>
-        <PlusIcon className="h-[34%] w-[34%]" strokeWidth={1.6} />
-      </span>
-    </div>
+    </svg>
   );
 }
 
 /**
- * Friendly empty state: the lens illustration, a title and a hint. It fills the rest of a flex column and sits
- * in its middle (a touch above, where the eye puts the centre).
+ * An empty place: its drawing, a short title and one quiet line. It fills the rest of a flex column and sits in
+ * its middle, a touch above, where the eye puts the centre. `compact` is for narrow lists, dialogs and popovers.
  */
-export function EmptyState({ title, text }: { title: string; text: string }) {
+export function EmptyState({ art, title, text, compact, plate }: { art: ArtName; title: string; text?: string; compact?: boolean; plate?: string }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center px-4 pb-[6vh] pt-6 text-center">
-      <LensArt className="max-w-[260px] md:max-w-[300px]" />
-      <p className="mt-6 text-[18px] font-medium">{title}</p>
-      <p className="mt-1 max-w-[320px] text-[14px] text-muted">{text}</p>
+    <div className={`flex flex-1 flex-col items-center justify-center text-center ${compact ? 'px-4 py-8' : 'px-6 pb-[8vh] pt-8'}`}>
+      <LineArt art={art} scale={compact ? 1.1 : 1.6} plate={plate} />
+      <p className={`font-medium ${compact ? 'mt-4 text-[15px]' : 'mt-6 text-[17px]'}`}>{title}</p>
+      {text && <p className={`mt-1 max-w-[320px] text-muted ${compact ? 'text-[13px]' : 'text-[14px]'}`}>{text}</p>}
+    </div>
+  );
+}
+
+/** The phone sign-in's picture: the server, and the computer and phone that reach it. */
+export function SignInArt({ className = '' }: { className?: string }) {
+  return (
+    <div className={`flex justify-center pb-4 pt-10 ${className}`}>
+      <LineArt art="signIn" scale={2} />
     </div>
   );
 }

@@ -309,7 +309,7 @@ function HomeTab() {
               <PlusIcon />
             </RoundButton>
           </div>
-          {dms.length === 0 ? <EmptyState title="Пока пусто" text="Лички и группы" /> : dms.map((dm) => <FeedDm key={dm.id} dm={dm} big />)}
+          {dms.length === 0 ? <EmptyState compact art="messages" title="Сообщений пока нет" text="Здесь будут лички и группы" /> : dms.map((dm) => <FeedDm key={dm.id} dm={dm} big />)}
         </section>
       </div>
     </div>

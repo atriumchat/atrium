@@ -6,6 +6,7 @@ import { sameDay, timeOf } from '../chat/format';
 import type { InboxItem } from '../types';
 import { Avatar } from '../ui/Avatar';
 import { Markdown } from '../ui/Markdown';
+import { EmptyState } from '../ui/Illustrations';
 import { AtIcon, BellIcon, ReplyIcon } from '../ui/icons';
 
 /**
@@ -66,7 +67,7 @@ export function InboxButton() {
             {items === null ? (
               <p className="py-10 text-center text-[14px] text-muted">Загружаем…</p>
             ) : items.length === 0 ? (
-              <p className="px-6 py-10 text-center text-[14px] leading-snug text-muted">Здесь появятся упоминания и ответы</p>
+              <EmptyState compact art="tray" title="Уведомлений нет" text="Упоминания и ответы появятся здесь" plate="var(--overlay)" />
             ) : (
               <InboxList items={items} onOpen={go} />
             )}

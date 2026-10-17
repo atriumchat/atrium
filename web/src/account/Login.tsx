@@ -3,7 +3,7 @@ import { Button, Input, Label, TextField } from '@heroui/react';
 import { api, setToken } from '../api';
 import { clearInviteFromUrl, inviteFromUrl, parseInvite } from '../people/invite';
 import type { Session } from '../types';
-import { Bubbles } from '../ui/Illustrations';
+import { SignInArt } from '../ui/Illustrations';
 import { GomexMark } from '../ui/Logo';
 import { RecoveryKeyInput } from './RecoveryKeyInput';
 
@@ -73,8 +73,8 @@ export function Login({ onLoggedIn }: { onLoggedIn: (session: Session) => void }
   return (
     <div className="flex h-full overflow-y-auto bg-background">
       <div className="m-auto flex w-full flex-col items-center pb-8">
-        {/* The sphere band is a phone thing; on a computer, the mark alone. */}
-        <Bubbles className="md:hidden" />
+        {/* The drawing is a phone thing; on a computer, the mark alone. */}
+        <SignInArt className="md:hidden" />
         <div className="mb-5 max-md:hidden">
           <GomexMark size={72} />
         </div>

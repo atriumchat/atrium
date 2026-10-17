@@ -21,6 +21,7 @@ import { ensureHistory } from './history';
 import { invitedRoom, Markdown, mentionsToNames, namesToMentions, plainText } from '../ui/Markdown';
 import { RoomCard } from '../voice/RoomCard';
 import { RoundButton } from '../ui/ui';
+import { EmptyState } from '../ui/Illustrations';
 import { ArrowUpIcon, AtIcon, DotsIcon, HashIcon, LogoutIcon, PaperclipIcon, PencilIcon, PlusIcon, ReplyIcon, SmileIcon, TrashIcon, UserPlusIcon, XIcon } from '../ui/icons';
 
 const GROUP_GAP = 7 * 60_000;
@@ -174,8 +175,17 @@ export function ChatView({ conversation }: { conversation: Conversation }) {
         }}
         className="flex flex-1 flex-col overflow-y-auto px-2 pb-2"
       >
-        <div className="flex-1" />
-        {loaded && !hasMore && (
+        {/* Nothing written yet: the conversation's drawing in the middle instead of the header at the top. */}
+        {loaded && !hasMore && list.length === 0 ? (
+          <EmptyState
+            art={isGroup ? 'group' : isDm ? 'chat' : 'channel'}
+            title={isDm ? channel.title : `#${channel.title}`}
+            text={isGroup ? 'Это начало группы' : isDm ? 'Это начало переписки' : 'Это начало канала'}
+          />
+        ) : (
+          <div className="flex-1" />
+        )}
+        {loaded && !hasMore && list.length > 0 && (
           <div className="px-4 pb-2 pt-6">
             {isGroup && dm ? (
               <>

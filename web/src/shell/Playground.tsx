@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { BubbleCloud, BubblePair, BubblePeanut, type BubblePerson } from '../voice/Bubbles';
 import { CallControls } from '../voice/VoiceView';
+import { ART, EmptyState, LineArt, SignInArt, type ArtName } from '../ui/Illustrations';
 
 /**
  * Development only (open the app with #bubbles): the call layouts with whoever is on this server, and
@@ -55,6 +56,64 @@ export function Playground() {
             {users[p.id]?.name} говорит
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+const EMPTY: { art: ArtName; title: string; text: string; where: 'main' | 'list' | 'dialog' }[] = [
+  { art: 'couch', title: 'Друзей пока нет', text: 'Здесь появятся друзья с сервера', where: 'main' },
+  { art: 'away', title: 'Никого нет в сети', text: 'Здесь появятся те, кто зайдёт', where: 'main' },
+  { art: 'mailbox', title: 'Заявок нет', text: 'Новые заявки появятся здесь', where: 'main' },
+  { art: 'channel', title: '#общий', text: 'Это начало канала', where: 'main' },
+  { art: 'chat', title: 'Маша', text: 'Это начало переписки', where: 'main' },
+  { art: 'group', title: 'Катка по вечерам', text: 'Это начало группы', where: 'main' },
+  { art: 'voice', title: 'Голосовая', text: 'В комнате никого нет', where: 'main' },
+  { art: 'nothing', title: 'Канал не выбран', text: 'Здесь откроется канал', where: 'main' },
+  { art: 'messages', title: 'Сообщений пока нет', text: 'Здесь будут лички и группы', where: 'list' },
+  { art: 'search', title: 'Ничего не нашлось', text: 'Каналов с таким названием нет', where: 'list' },
+  { art: 'tray', title: 'Уведомлений нет', text: 'Упоминания и ответы появятся здесь', where: 'dialog' },
+  { art: 'search', title: 'Никого не нашлось', text: 'Друзей с таким ником нет', where: 'dialog' },
+  { art: 'group', title: 'Все друзья уже здесь', text: 'Позвать больше некого', where: 'dialog' },
+];
+
+/**
+ * Development only (open the app with #art): the line drawings at any size, every empty state at the size it has
+ * in the app (the content panel, the list on the left, a dialog) and the phone sign-in's picture.
+ */
+export function ArtPlayground() {
+  const [scale, setScale] = useState(() => Number(new URLSearchParams(location.search).get('scale')) || 3);
+  const frame = 'flex flex-col overflow-hidden rounded-[24px] border-[0.5px] border-edge';
+  return (
+    <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex items-center gap-3">
+        <h1 className="text-[20px] font-medium">Рисунки</h1>
+        <input type="range" min={1} max={8} step={0.5} value={scale} onChange={(e) => setScale(Number(e.target.value))} aria-label="Масштаб" />
+        <span className="text-[14px] text-muted">×{scale}</span>
+      </div>
+      <div className="mt-4 flex flex-wrap items-end gap-x-10 gap-y-6">
+        {(Object.keys(ART) as ArtName[]).map((name) => (
+          <figure key={name} className="flex flex-col items-center gap-2">
+            <LineArt art={name} scale={scale} />
+            <figcaption className="text-[12px] text-faint">{name}</figcaption>
+          </figure>
+        ))}
+      </div>
+      <h1 className="mt-10 text-[20px] font-medium">Пустые места</h1>
+      <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(360px,1fr))] gap-3">
+        {EMPTY.map((e, i) => (
+          <div
+            key={i}
+            data-shot={`empty-${i}`}
+            className={`${frame} ${e.where === 'list' ? 'h-[300px] w-[320px]' : e.where === 'dialog' ? 'h-[300px] bg-overlay' : 'h-[420px]'}`}
+          >
+            <EmptyState art={e.art} title={e.title} text={e.text} compact={e.where !== 'main'} plate={e.where === 'dialog' ? 'var(--overlay)' : undefined} />
+          </div>
+        ))}
+      </div>
+      <h1 className="mt-10 text-[20px] font-medium">Вход на телефоне</h1>
+      <div data-shot="sign-in" className={`${frame} mt-4 w-[375px] bg-background`}>
+        <SignInArt />
       </div>
     </div>
   );

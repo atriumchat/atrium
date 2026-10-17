@@ -5,6 +5,7 @@ import { addDm, closePicker, messageUser, openDm, showError, useStore, type Pick
 import { plural } from '../chat/format';
 import { Avatar } from '../ui/Avatar';
 import { Dialog } from '../ui/Dialog';
+import { EmptyState } from '../ui/Illustrations';
 import { CheckIcon, SearchIcon } from '../ui/icons';
 
 const MAX_MEMBERS = 10;
@@ -94,9 +95,11 @@ function PickerDialog({ picker }: { picker: Picker }) {
         />
       </label>
       {candidates.length === 0 ? (
-        <p className="px-2 py-10 text-center text-[15px] text-muted">
-          {friends.some((f) => f.status === 'friend') ? 'Никого не нашлось' : 'В группу можно позвать только друзей'}
-        </p>
+        friends.some((f) => f.status === 'friend') ? (
+          <EmptyState compact art="search" title="Никого не нашлось" text="Друзей с таким ником нет" plate="var(--overlay)" />
+        ) : (
+          <EmptyState compact art="couch" title="Друзей пока нет" text="В группу зовут только друзей" plate="var(--overlay)" />
+        )
       ) : (
         <ul>
           {candidates.map((u) => {

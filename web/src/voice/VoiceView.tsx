@@ -13,6 +13,7 @@ import { CallDuration } from './CallDuration';
 import { ChannelHeader, HeaderIcon } from '../shell/ChannelHeader';
 import { ChannelMenu } from '../shell/ChannelMenu';
 import { RoundButton, VolumeSlider } from '../ui/ui';
+import { LineArt } from '../ui/Illustrations';
 import {
   ExpandIcon,
   HeadphonesIcon,
@@ -64,6 +65,7 @@ function JoinPrompt({ channel, connecting }: { channel: Channel; connecting: boo
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 pb-16 text-center">
+      {members.length === 0 && <LineArt art="voice" className="mb-6" />}
       <h2 className="text-[30px] font-bold">{channel.name}</h2>
       {members.length > 0 ? (
         <div className="flex flex-col items-center gap-3">
@@ -75,7 +77,7 @@ function JoinPrompt({ channel, connecting }: { channel: Channel; connecting: boo
           </div>
         </div>
       ) : (
-        <p className="text-[15px] text-foreground/80">Сейчас в голосовом канале никого нет</p>
+        <p className="text-[15px] text-muted">В комнате никого нет</p>
       )}
       <Button
         onPress={() => joinVoice(channel.id)}

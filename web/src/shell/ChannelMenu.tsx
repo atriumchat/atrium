@@ -7,6 +7,7 @@ import { roomToken } from '../ui/Markdown';
 import { Avatar } from '../ui/Avatar';
 import type { Channel } from '../types';
 import { ConfirmDialog, Dialog } from '../ui/Dialog';
+import { EmptyState } from '../ui/Illustrations';
 import { BellIcon, BellSlashIcon, CheckIcon, DotsIcon, PencilIcon, SearchIcon, TrashIcon, UserPlusIcon } from '../ui/icons';
 
 type Action = 'read' | 'mute' | 'invite' | 'rename' | 'delete';
@@ -151,7 +152,11 @@ function InviteToRoom({ channel, onClose }: { channel: Channel; onClose: () => v
         />
       </label>
       {candidates.length === 0 ? (
-        <p className="px-2 py-10 text-center text-[15px] text-muted">{q ? 'Никого не нашлось' : 'Все друзья уже здесь'}</p>
+        q ? (
+          <EmptyState compact art="search" title="Никого не нашлось" text="Друзей с таким ником нет" plate="var(--overlay)" />
+        ) : (
+          <EmptyState compact art="group" title="Все друзья уже здесь" text="Позвать больше некого" plate="var(--overlay)" />
+        )
       ) : (
         <ul>
           {candidates.map((u) => {

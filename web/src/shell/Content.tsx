@@ -2,11 +2,12 @@ import { dmTitle, useStore } from '../store';
 import { ChatView } from '../chat/ChatView';
 import { VoiceView } from '../voice/VoiceView';
 import { FriendsView } from '../people/FriendsView';
+import { EmptyState } from '../ui/Illustrations';
 
 /** The selected channel: a text chat or a voice room. */
 export function ServerContent() {
   const channel = useStore((s) => s.channels.find((c) => c.id === s.selectedChannelId));
-  if (!channel) return <div className="m-auto text-muted">Канал не выбран</div>;
+  if (!channel) return <EmptyState art="nothing" title="Канал не выбран" text="Здесь откроется канал" />;
   if (channel.kind === 'voice') return <VoiceView channel={channel} />;
   return <ChatView key={channel.id} conversation={{ id: channel.id, kind: 'channel', title: channel.name }} />;
 }

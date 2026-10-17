@@ -10,6 +10,7 @@ import { Avatar } from '../ui/Avatar';
 import { CallDuration } from '../voice/CallDuration';
 import { ChannelMenu } from './ChannelMenu';
 import { RoundButton, VolumeSlider } from '../ui/ui';
+import { EmptyState } from '../ui/Illustrations';
 import { BellSlashIcon, HashIcon, HeadphonesSlashIcon, MicSlashIcon, PlusIcon, SearchIcon, SpeakerIcon, VideoIcon } from '../ui/icons';
 
 export function Sidebar() {
@@ -36,24 +37,31 @@ export function Sidebar() {
         </label>
       </div>
       <nav className="flex-1 overflow-y-auto px-2 pb-3 max-md:px-3">
-        <Section title="Текстовые каналы" kind="text">
-          {visible
-            .filter((c) => c.kind === 'text')
-            .map((c) => (
-              <Draggable key={c.id} channel={c} drag={canDrag ? drag : null}>
-                <TextItem channel={c} />
-              </Draggable>
-            ))}
-        </Section>
-        <Section title="Голосовые комнаты" kind="voice">
-          {visible
-            .filter((c) => c.kind === 'voice')
-            .map((c) => (
-              <Draggable key={c.id} channel={c} drag={canDrag ? drag : null}>
-                <VoiceItem channel={c} />
-              </Draggable>
-            ))}
-        </Section>
+        {/* A search that finds nothing shows only that, without the two empty sections under it. */}
+        {query && visible.length === 0 ? (
+          <EmptyState compact art="search" title="Ничего не нашлось" text="Каналов с таким названием нет" />
+        ) : (
+          <>
+            <Section title="Текстовые каналы" kind="text">
+              {visible
+                .filter((c) => c.kind === 'text')
+                .map((c) => (
+                  <Draggable key={c.id} channel={c} drag={canDrag ? drag : null}>
+                    <TextItem channel={c} />
+                  </Draggable>
+                ))}
+            </Section>
+            <Section title="Голосовые комнаты" kind="voice">
+              {visible
+                .filter((c) => c.kind === 'voice')
+                .map((c) => (
+                  <Draggable key={c.id} channel={c} drag={canDrag ? drag : null}>
+                    <VoiceItem channel={c} />
+                  </Draggable>
+                ))}
+            </Section>
+          </>
+        )}
       </nav>
     </aside>
   );
