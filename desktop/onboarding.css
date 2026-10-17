@@ -456,7 +456,9 @@ h1 {
 .task .label {
   overflow: hidden;
   font-size: 22px;
-  /* As tall as the icon, so the two share one middle. */
+  /* As tall as the icon, and a little lower, where its letters look level with it. */
+  position: relative;
+  top: 2px;
   line-height: 20px;
   font-weight: 500;
   letter-spacing: -0.015em;
