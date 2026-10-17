@@ -4,7 +4,8 @@ import { showError } from '../store';
 import { GomexMark } from '../ui/Logo';
 
 /** A recovery key on its way to the person: the key itself and what the saved file should say. */
-export type NewKey = { key: string; name: string; serverName: string };
+// `newcomer`: made at sign-up (not by a recovery), so the "where to use Gomex" screen follows it.
+export type NewKey = { key: string; name: string; serverName: string; newcomer?: boolean };
 
 // The key is shown once, so a reload on its screen mustn't lose it: it waits in this tab until "Дальше".
 const PENDING = 'gomex_new_key';

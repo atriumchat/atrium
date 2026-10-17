@@ -10,9 +10,10 @@ import { DEMO, SetupWizard } from './account/SetupWizard';
 import { RecoveryKeyScreen, loadNewKey, storeNewKey, type NewKey } from './account/RecoveryKey';
 import { ResetPassword } from './account/ResetPassword';
 import { clearResetFromUrl, resetFromUrl } from './account/resetLink';
+import { WhereToUse, whereToUseNeeded } from './account/WhereToUse';
 import type { Session } from './types';
 
-type Phase = 'loading' | 'login' | 'setup' | 'reset' | 'key' | 'ready' | 'offline';
+type Phase = 'loading' | 'login' | 'setup' | 'reset' | 'key' | 'where' | 'ready' | 'offline';
 
 export function App() {
   // Opened from an admin's reset link; or reloaded on the recovery key's screen, where the key waits (see RecoveryKey).
@@ -29,23 +30,24 @@ export function App() {
   }, [resetToken]);
 
   // Sign-up, recovery and a reset link end here: the new recovery key comes first, then the app.
-  function signedIn(session?: Session) {
+  function signedIn(session?: Session, signedUp = false) {
     if (!session?.recoveryKey) {
       storeNewKey(null);
       return setPhase('loading');
     }
-    const fresh = { key: session.recoveryKey, name: session.user.name, serverName: session.serverName ?? '' };
+    const fresh = { key: session.recoveryKey, name: session.user.name, serverName: session.serverName ?? '', newcomer: signedUp };
     storeNewKey(fresh);
     setNewKey(fresh);
     setPhase('key');
   }
 
-  // The order after sign-up is: the key, then the "where to use Gomex" screen, then the app. The next screen goes
-  // here: this is what happens when the key screen is done.
+  // The order after sign-up is: the key, then the "where to use Gomex" screen (not in the desktop app or a Home
+  // Screen app, and not after a recovery), then the app.
   function keySeen() {
+    const newcomer = newKey?.newcomer;
     storeNewKey(null);
     setNewKey(null);
-    setPhase('loading');
+    setPhase(newcomer && whereToUseNeeded() ? 'where' : 'loading');
   }
 
   const start = useCallback(async () => {
@@ -89,6 +91,8 @@ export function App() {
         />
       ) : phase === 'key' && newKey ? (
         <RecoveryKeyScreen value={newKey} onDone={keySeen} />
+      ) : phase === 'where' ? (
+        <WhereToUse onDone={() => setPhase('loading')} />
       ) : phase === 'login' ? (
         <Login onLoggedIn={signedIn} />
       ) : phase === 'ready' ? (

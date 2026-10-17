@@ -9,7 +9,7 @@ import { RecoveryKeyInput } from './RecoveryKeyInput';
 
 type Mode = 'login' | 'register' | 'recover';
 
-export function Login({ onLoggedIn }: { onLoggedIn: (session: Session) => void }) {
+export function Login({ onLoggedIn }: { onLoggedIn: (session: Session, signedUp: boolean) => void }) {
   // Opened from an invite link: straight to sign-up with the code filled in.
   const [linkCode] = useState(inviteFromUrl);
   const [mode, setMode] = useState<Mode>(linkCode ? 'register' : 'login');
@@ -46,7 +46,7 @@ export function Login({ onLoggedIn }: { onLoggedIn: (session: Session) => void }
             : await api.register(parseInvite(invite), name, password);
       setToken(session.token);
       clearInviteFromUrl();
-      onLoggedIn(session);
+      onLoggedIn(session, mode === 'register');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не получилось');
     } finally {
