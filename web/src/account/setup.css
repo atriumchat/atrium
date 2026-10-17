@@ -229,6 +229,8 @@
 /* Rows between hairlines: the icon, the summary at the end. */
 .setup .rows {
   display: grid;
+  /* One column no wider than the form: a row's long text is cut short, it doesn't push the row out. */
+  grid-template-columns: minmax(0, 1fr);
   border-top: 1px solid var(--line);
 }
 .setup .row {
@@ -262,6 +264,13 @@
   color: var(--quiet);
   font-size: 13px;
   white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.setup .file-name {
+  display: flex;
+}
+.setup .file-name > span {
+  overflow: hidden;
   text-overflow: ellipsis;
 }
 .setup .logo {

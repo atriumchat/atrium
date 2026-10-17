@@ -68,6 +68,18 @@ function keyLines(key: string) {
   return [groups.slice(0, half), groups.slice(half)].filter((g) => g.length).map((g) => g.join('-'));
 }
 
+/** A long file name loses the middle of its name, never the extension: "32-351-785…jpg". */
+function FileName({ name }: { name: string }) {
+  const dot = name.lastIndexOf('.');
+  const cut = dot > 0 && name.length - dot <= 6 ? dot : name.length;
+  return (
+    <span className="file-name">
+      <span>{name.slice(0, cut)}</span>
+      {name.slice(cut)}
+    </span>
+  );
+}
+
 function useWide() {
   const query = '(min-width: 821px)';
   const [wide, setWide] = useState(() => window.matchMedia(query).matches);
@@ -414,7 +426,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
                 </button>
                 <span className="grow">
                   <b>Значок</b>
-                  <small>{icon ? icon.name : 'Знак Gomex'}</small>
+                  <small>{icon ? <FileName name={icon.name} /> : 'Знак Gomex'}</small>
                 </span>
                 {icon && (
                   <button type="button" className="quiet" onClick={dropIcon}>
