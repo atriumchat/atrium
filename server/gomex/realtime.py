@@ -10,6 +10,7 @@ import uuid
 import jwt
 import socketio
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 from .config import (
@@ -47,6 +48,11 @@ def livekit_token(user: dict, room: str) -> str:
         },
     }
     return jwt.encode(claims, LIVEKIT_API_SECRET, algorithm="HS256")
+
+
+def livekit_room(kind: str, target: str) -> str:
+    """Separate LiveKit room names: only a DM's members ever get a token for its room."""
+    return f"voice-{target}" if kind == "channel" else f"dm-{target}"
 
 
 def livekit_remove(room: str, identity: str) -> None:
@@ -377,7 +383,21 @@ async def voice_join(sid, data):
     }
     if previous and previous["channelId"] != target:
         await voice_changed(previous)
+    await end_other_devices(sid)
     await voice_changed(voice[sid])
+
+
+async def end_other_devices(sid: str) -> None:
+    """One voice connection per person: joining from another tab or device ends the one before. Otherwise it
+    stays in the room's list with its own mute state until its socket drops (a sleeping phone, a forgotten tab)."""
+    entry = voice[sid]
+    for other in [s for s, e in voice.items() if e["userId"] == entry["userId"] and s != sid]:
+        old = voice.pop(other)
+        await sio.emit("voice:moved", to=other)
+        if old["channelId"] != entry["channelId"]:
+            # In the same room LiveKit drops the old connection itself (one per identity); elsewhere it's up to us.
+            await run_in_threadpool(livekit_remove, livekit_room(old["kind"], old["channelId"]), entry["userId"])
+            await voice_changed(old)
 
 
 @sio.on("voice:leave")
@@ -387,15 +407,34 @@ async def voice_leave(sid, data=None):
         await voice_changed(entry)
 
 
+# Broadcasts held back by the rate limit, one per person, so a change is late at worst, never lost.
+voice_pending: dict[str, asyncio.Task] = {}
+
+
 @sio.on("voice:update")
 async def voice_update(sid, data):
     entry = voice.get(sid)
-    if not entry or VOICE_EVENTS_BY_USER.wait(entry["userId"]):
+    if not entry:
         return
+    changed = False
     for key in ("muted", "deafened", "video", "screen"):
-        if key in (data or {}):
+        if key in (data or {}) and entry[key] != bool(data[key]):
             entry[key] = bool(data[key])
-    await voice_changed(entry)
+            changed = True
+    # Clients repeat their state (every push-to-talk press, every track change): only a change goes out.
+    if not changed:
+        return
+    wait = VOICE_EVENTS_BY_USER.wait(entry["userId"])
+    if not wait:
+        await voice_changed(entry)
+    elif entry["userId"] not in voice_pending:
+
+        async def later():
+            await asyncio.sleep(wait)
+            del voice_pending[entry["userId"]]
+            await voice_changed(entry)
+
+        voice_pending[entry["userId"]] = asyncio.create_task(later())
 
 
 @sio.on("call:decline")
@@ -456,9 +495,7 @@ def voice_token(body: VoiceTokenIn, user: dict = Depends(current_user)):
     kind = voice_target(user["id"], body.channelId)
     if not kind:
         raise HTTPException(status_code=404, detail="Нет такого звонка")
-    # Separate LiveKit room names: only a DM's members ever get a token for its room.
-    room = f"voice-{body.channelId}" if kind == "channel" else f"dm-{body.channelId}"
-    return {"token": livekit_token(user, room), "url": LIVEKIT_URL}
+    return {"token": livekit_token(user, livekit_room(kind, body.channelId)), "url": LIVEKIT_URL}
 
 
 # The other gomex modules import this one too: they come last, once everything above is defined.

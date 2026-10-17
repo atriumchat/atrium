@@ -1,6 +1,6 @@
-import { createLocalVideoTrack, LocalVideoTrack, Room, RoomEvent, ScreenSharePresets, Track, VideoPresets } from 'livekit-client';
+import { createLocalVideoTrack, DisconnectReason, LocalVideoTrack, Room, RoomEvent, ScreenSharePresets, Track, VideoPresets } from 'livekit-client';
 import { api } from '../api';
-import { getSocket } from '../socket';
+import { getSocket, MOVED } from '../socket';
 import { isDmId, openDm, selectChannel, selfEntry, showError, useStore } from '../store';
 import { playSound } from './sounds';
 import { applyNoise, micTrack, suspendNoise } from './noise';
@@ -39,9 +39,19 @@ export async function applyMic() {
   const live = !muted && !deafened && (!voicePrefs.ptt || pttDown);
   try {
     await room.localParticipant.setMicrophoneEnabled(live);
-  } catch {
-    set({ muted: true });
-    showError('Нет доступа к микрофону: он выключен в настройках браузера или системы');
+  } catch (e) {
+    // Only a mic that really didn't come on counts as muted: a publish can time out on a slow network after the
+    // mic is already live, and a muted icon over a live mic is worse than no change.
+    if (live && !room.localParticipant.isMicrophoneEnabled) {
+      set({ muted: true });
+      showError(
+        e instanceof Error && e.name === 'NotAllowedError'
+          ? 'Нет доступа к микрофону: он выключен в настройках браузера или системы'
+          : `Микрофон не включился: ${e instanceof Error ? e.message : e}`,
+      );
+    } else if (!live && room.localParticipant.isMicrophoneEnabled) {
+      showError('Микрофон не выключился');
+    }
   }
   if (live) await applyNoise();
   emitVoiceUpdate();
@@ -145,12 +155,13 @@ export async function joinVoice(channelId: string, { video = false, navigate = t
     .on(RoomEvent.ParticipantConnected, applyVolume)
     .on(RoomEvent.LocalTrackPublished, () => syncLocalMedia(room))
     .on(RoomEvent.LocalTrackUnpublished, () => syncLocalMedia(room))
-    .on(RoomEvent.Disconnected, () => {
+    .on(RoomEvent.Disconnected, (reason) => {
       // Only an unexpected drop lands here: leaveVoice() detaches the room from the store first.
       if (get().room !== room) return;
       resetVoice();
       getSocket()?.emit('voice:leave');
-      showError('Связь с голосовым каналом потеряна');
+      // The same person joined the same room from another tab or device, and LiveKit let only one stay.
+      showError(reason === DisconnectReason.DUPLICATE_IDENTITY ? MOVED : 'Связь с голосовым каналом потеряна');
     });
 
   try {

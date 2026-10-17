@@ -277,7 +277,16 @@ export function connectSocket(token: string, onUnauthorized: () => void) {
     const mine = self && !entries.some((e) => e.userId === self.userId && e.channelId === self.channelId);
     useStore.setState({ voiceState: mine ? [...entries, self] : entries });
   });
+
+  // You joined from another tab or device: the server moved you there, this one hangs up.
+  socket.on('voice:moved', () => {
+    if (!useStore.getState().voiceChannelId) return;
+    void leaveVoice({ silent: true });
+    showError(MOVED);
+  });
 }
+
+export const MOVED = 'Звонок перешёл на другое устройство';
 
 export function disconnectSocket() {
   socket?.disconnect();
