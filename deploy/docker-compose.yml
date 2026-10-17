@@ -1,0 +1,72 @@
+# Production stack from prebuilt images (ghcr.io, built by .github/workflows/images.yml for every v* tag).
+# install.sh writes GOMEX_REGISTRY, GOMEX_VERSION and the release's image digests into .env: a release runs
+# exactly the images it was tested with. To build from this checkout instead (development):
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+# Host networking everywhere: LiveKit needs a wide UDP range, and it keeps app/LiveKit ports on 127.0.0.1.
+
+# Rotate container logs so they can't fill the disk.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  app:
+    image: ${GOMEX_REGISTRY:-ghcr.io/networkfreedom}/gomex-app:${GOMEX_VERSION:-latest}${GOMEX_APP_DIGEST:+@}${GOMEX_APP_DIGEST:-}
+    restart: unless-stopped
+    network_mode: host
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+      # The app lives at app.DOMAIN (the root domain is the cover page).
+      LIVEKIT_URL: wss://app.${DOMAIN}
+    volumes:
+      - ./data:/data
+    # Least privilege: an unprivileged user, read-only filesystem except /data and /tmp, no Linux capabilities.
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    # A runaway upload can't take the whole box: past this the app restarts, calls (LiveKit) carry on.
+    mem_limit: 1g
+    logging: *logging
+
+  livekit:
+    image: livekit/livekit-server:v1.13.10
+    restart: unless-stopped
+    network_mode: host
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    # Only the right to listen on a low port: TURN takes UDP 443.
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    # If memory runs out anyway, the kernel picks something other than the calls.
+    oom_score_adj: -500
+    logging: *logging
+
+  caddy:
+    # Caddy 2.11.7 + caddy-l4, to share port 443 between the site and TURN (see caddy/Dockerfile).
+    image: ${GOMEX_REGISTRY:-ghcr.io/networkfreedom}/gomex-caddy:${GOMEX_VERSION:-latest}${GOMEX_CADDY_DIGEST:+@}${GOMEX_CADDY_DIGEST:-}
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      DOMAIN: ${DOMAIN}
+      TURN_HOST: ${TURN_HOST:-turn}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../landing/site:/srv/landing:ro
+      - ./caddy-data:/data
+      - ./caddy-config:/config
+    # Only the right to listen on ports 80/443.
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging

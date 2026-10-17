@@ -1,0 +1,131 @@
+# Prebuilt images for install.sh: a fresh VPS pulls them instead of compiling Caddy and the web client
+# (minutes and over a gigabyte of build cache on a small disk). Runs on every release tag (deploy/release.sh).
+# An image whose sources haven't changed since it was last built isn't built again: the existing one just gets
+# this release's tags (seconds instead of minutes; Caddy alone takes five). Same bytes, so the same digest.
+name: images
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: gomex-app
+            context: .
+            file: Dockerfile
+            # Everything the image is built from: the Dockerfile copies only these.
+            sources: Dockerfile .dockerignore server web
+          - image: gomex-caddy
+            context: deploy/caddy
+            file: deploy/caddy/Dockerfile
+            sources: deploy/caddy
+    steps:
+      # Pinned by commit: a moved tag can't change what runs with write access to the packages.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # ghcr.io wants the owner in lower case.
+      - name: Image name
+        id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${{ matrix.image }}" >> "$GITHUB_OUTPUT"
+
+      # Git's own hashes of the source files and folders: the same sources give the same tag, whatever else changed.
+      # (A newer base image alone doesn't count: to pick one up, change the Dockerfile.)
+      - name: Source hash
+        id: src
+        env:
+          SOURCES: ${{ matrix.sources }}
+        run: |
+          set -euo pipefail
+          hash=$(for path in $SOURCES; do git rev-parse "HEAD:$path"; done | sha256sum | cut -c1-16)
+          echo "tag=src-$hash" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # v1.2.3 → 1.2.3 and latest; a pre-release (v1.2.3-rc.1) never becomes latest. Plus the source tag, which the
+      # next release looks for.
+      - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        id: meta
+        with:
+          images: ${{ steps.name.outputs.image }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+            type=raw,value=${{ steps.src.outputs.tag }}
+
+      - name: Already built from these sources?
+        id: cached
+        env:
+          IMAGE: ${{ steps.name.outputs.image }}
+          SRC: ${{ steps.src.outputs.tag }}
+        run: |
+          if docker buildx imagetools inspect "$IMAGE:$SRC" >/dev/null 2>&1; then
+            echo "hit=true" >> "$GITHUB_OUTPUT"
+            echo "Reusing $IMAGE:$SRC"
+          else
+            echo "hit=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # A copy of a single image keeps its manifest as it is, so the new tags carry the same digest.
+      - name: Tag the existing image
+        if: steps.cached.outputs.hit == 'true'
+        env:
+          IMAGE: ${{ steps.name.outputs.image }}
+          SRC: ${{ steps.src.outputs.tag }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r tag; do
+            [[ -n $tag ]] && args+=(-t "$tag")
+          done <<<"$TAGS"
+          docker buildx imagetools create "${args[@]}" "$IMAGE:$SRC"
+
+      # Only the app's Python stage runs arm64 code while building; Caddy cross-compiles.
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        if: steps.cached.outputs.hit != 'true'
+
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        if: steps.cached.outputs.hit != 'true'
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+      # release.sh reads the digests from the registry; this is for a human looking at the run.
+      - name: Digest
+        env:
+          IMAGE: ${{ steps.name.outputs.image }}
+          SRC: ${{ steps.src.outputs.tag }}
+          REUSED: ${{ steps.cached.outputs.hit }}
+        run: |
+          digest=$(docker buildx imagetools inspect "$IMAGE:$SRC" --format '{{.Manifest.Digest}}')
+          how=built
+          [[ $REUSED == true ]] && how="reused, not rebuilt"
+          echo "\`${IMAGE}@${digest}\` (${how})" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.venv/
+__pycache__/
+server/data/
+.env
+.DS_Store
+deploy/.env
+deploy/livekit.yaml
+deploy/data/
+deploy/caddy-data/
+deploy/caddy-config/
+
+# Desktop app
+desktop/node_modules/
+desktop/dist/
+deploy/downloads/
+*.tsbuildinfo

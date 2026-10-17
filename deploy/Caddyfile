@@ -1,0 +1,144 @@
+# Public port 443 is shared (layer4 app, see caddy/Dockerfile):
+#   - TLS for TURN_HOST.DOMAIN ("turn" on older installs, a neutral name on new ones) ends here and
+#     goes on as plain TCP to LiveKit's TURN server (calls that can't use UDP still get through,
+#     looking like ordinary HTTPS);
+#   - everything else passes through untouched to the website below on 127.0.0.1:8443, with the
+#     PROXY protocol so the app still sees each visitor's real IP (needed for the login rate limits).
+# UDP 443 belongs to LiveKit's TURN, so HTTP/3 is off.
+{
+	layer4 {
+		:443 {
+			@turn tls sni {$TURN_HOST}.{$DOMAIN}
+			route @turn {
+				tls
+				proxy 127.0.0.1:5349
+			}
+			route {
+				proxy {
+					proxy_protocol v2
+					upstream 127.0.0.1:8443
+				}
+			}
+		}
+	}
+
+	https_port 8443
+	# Redirects would otherwise point at :8443; the http:// block below does them instead.
+	auto_https disable_redirects
+
+	servers :8443 {
+		listener_wrappers {
+			proxy_protocol {
+				timeout 5s
+				allow 127.0.0.1/32
+			}
+			tls
+		}
+		protocols h1 h2
+	}
+}
+
+# The root domain is this install's own cover page (install.sh writes it) and nothing else, so installs share
+# no page, file or path that would let them be found and blocked as a batch. The app is on app.DOMAIN.
+
+http://{$DOMAIN}, http://{$TURN_HOST}.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}
+
+http://app.{$DOMAIN} {
+	redir https://app.{$DOMAIN}{uri} permanent
+}
+
+# Security headers and the upload limit, wherever the app answers.
+(common) {
+	encode zstd gzip
+
+	header {
+		# HTTPS only, remembered by the browser for a year.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		# Only our own code and resources may run or load: a slipped-through script tag can't pull anything in
+		# or send data elsewhere. Inline styles are allowed because React sets style attributes. LiveKit's
+		# signalling is on app.DOMAIN, also for the desktop app, which may open the root domain.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' wss://app.{$DOMAIN} wss://{$DOMAIN}; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		Permissions-Policy "camera=(self), microphone=(self), display-capture=(self), geolocation=(), payment=(), usb=()"
+		Cross-Origin-Opener-Policy same-origin
+		# Private server: keep it out of search engines.
+		X-Robots-Tag "noindex, nofollow, noarchive"
+		# Don't advertise what software (and version) answers.
+		defer
+		-Server
+	}
+
+	# Biggest legit request is a 20 MB photo upload.
+	request_body {
+		max_size 25MB
+	}
+}
+
+# The app's download buttons (/download/Gomex-windows.exe, …): the desktop builds are in this project's GitHub
+# Releases (deploy/release-desktop.sh keeps the fixed names in the release "desktop"), not on any server.
+(downloads) {
+	handle_path /download/* {
+		redir https://github.com/networkfreedom/gomex/releases/download/desktop{path} 302
+	}
+}
+
+# The app: LiveKit's signalling (its client connects to wss://HOST/rtc), everything else to the Python server.
+(app) {
+	@livekit path /rtc /rtc/*
+	reverse_proxy @livekit 127.0.0.1:7880
+	reverse_proxy 127.0.0.1:8000
+}
+
+# The desktop app opens whatever address it was given, often the root domain: it gets the app itself there.
+(desktop) {
+	@desktop header_regexp User-Agent \bGomex/[0-9]\S*\s.*\bElectron/
+}
+
+# The root domain: the cover page as a plain static site (its own few headers, a 404 for any other path).
+# No www: install.sh asks for no DNS record for it.
+{$DOMAIN} {
+	route {
+		import desktop
+		handle @desktop {
+			import common
+			import app
+		}
+		handle {
+			encode zstd gzip
+			header {
+				Strict-Transport-Security "max-age=31536000; includeSubDomains"
+				X-Content-Type-Options nosniff
+				defer
+				-Server
+			}
+			root * /srv/landing
+			file_server
+		}
+	}
+}
+
+# The app itself, with its API, socket and LiveKit signalling.
+app.{$DOMAIN} {
+	import common
+	route {
+		import downloads
+		handle {
+			import app
+		}
+	}
+}
+
+# Only here so Caddy keeps a certificate for the TURN name; its connections never reach this block
+# (layer4 above hands them to LiveKit). HTTP-01 only: the TLS-ALPN challenge would land on TURN.
+{$TURN_HOST}.{$DOMAIN} {
+	tls {
+		issuer acme {
+			disable_tlsalpn_challenge
+		}
+	}
+	respond 404
+}

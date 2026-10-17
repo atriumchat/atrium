@@ -1,0 +1,30 @@
+# LiveKit config. install.sh renders it into livekit.yaml, filling each double-braced NAME with that .env value,
+# so the keys always match the app's. Edit this template, not livekit.yaml: every install and update rewrites it.
+port: 7880
+bind_addresses:
+  - 127.0.0.1
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 60000
+  use_external_ip: true
+  # Don't offer Docker's internal bridge address to clients; it's unreachable from outside.
+  ips:
+    excludes:
+      - 172.16.0.0/12
+# Built-in TURN, for networks that block or throttle the UDP media ports: clients fall back to
+# TURN_HOST.DOMAIN on port 443 — TLS over TCP (Caddy ends the TLS and forwards to 5349, which the
+# firewall keeps closed from outside) or UDP 443.
+turn:
+  enabled: true
+  domain: {{TURN_HOST}}.{{DOMAIN}}
+  tls_port: 5349
+  external_tls: true
+  udp_port: 443
+room:
+  # A server for friends: a room bigger than this is a mistake or abuse, and every extra person costs the one CPU.
+  max_participants: 25
+keys:
+  {{LIVEKIT_API_KEY}}: {{LIVEKIT_API_SECRET}}
+logging:
+  level: info

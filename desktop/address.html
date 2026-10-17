@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'self'" />
+    <title>Адрес сервера</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        padding: 20px;
+        background: #0b0b0d;
+        color: #f2f2f4;
+        font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 17px;
+      }
+      p {
+        margin: 0 0 14px;
+        color: #9a9aa3;
+      }
+      form {
+        display: flex;
+        gap: 8px;
+      }
+      input {
+        flex: 1;
+        min-width: 0;
+        height: 38px;
+        padding: 0 12px;
+        border: 0;
+        border-radius: 12px;
+        background: #26262b;
+        color: inherit;
+        font: inherit;
+        outline: none;
+      }
+      input:focus {
+        box-shadow: 0 0 0 2px #0052ff;
+      }
+      button {
+        height: 38px;
+        padding: 0 16px;
+        border: 0;
+        border-radius: 999px;
+        background: #0052ff;
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+      }
+      #error {
+        margin-top: 10px;
+        color: #ff6b6b;
+        min-height: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Адрес сервера</h1>
+    <p id="hint">Если Gomex переехал на другой адрес — вставь новый. Приложение перезапустится.</p>
+    <form id="form">
+      <input id="url" type="text" required placeholder="https://app.example.com" spellcheck="false" autocapitalize="off" />
+      <button id="save" type="submit">Сохранить</button>
+    </form>
+    <div id="error"></div>
+    <script src="address.js"></script>
+  </body>
+</html>

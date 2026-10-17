@@ -1,0 +1,10 @@
+# Build both images from this checkout instead of pulling a release (development).
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+# (or COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml for every docker compose command).
+services:
+  app:
+    build: ..
+    image: gomex-app:local
+  caddy:
+    build: ./caddy
+    image: gomex-caddy:2.11.7-l4

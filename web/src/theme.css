@@ -1,0 +1,97 @@
+/*
+ * HeroUI Theme Customization
+ * Add this to your global.css after importing @heroui/styles
+ * Only includes variables users need to customize
+ * @see https://heroui.com/docs/react/getting-started/theming
+ */
+
+:root,
+.light,
+.default,
+[data-theme="light"],
+[data-theme="default"] {
+  /* Theme Colors (Light Mode) */
+  --accent: oklch(52.82% 0.2628 262.87);
+  --accent-foreground: oklch(99.11% 0 0);
+  --background: oklch(97.02% 0.0020 262.87);
+  --border: oklch(90.00% 0.0020 262.87);
+  --danger: oklch(0.5507 0.2062 24);
+  --danger-foreground: oklch(98% 0.0200 24.00);
+  --default: oklch(94.00% 0.0020 262.87);
+  --default-foreground: oklch(21.03% 0.0059 262.87);
+  --field-background: oklch(100.00% 0.0010 262.87);
+  --field-border: transparent;
+  --field-foreground: oklch(21.03% 0.0020 262.87);
+  --field-placeholder: oklch(55.17% 0.0040 262.87);
+  --focus: oklch(52.82% 0.2628 262.87);
+  --foreground: oklch(21.03% 0.0020 262.87);
+  --muted: oklch(55.17% 0.0040 262.87);
+  --overlay: oklch(100.00% 0.0006 262.87);
+  --overlay-foreground: oklch(21.03% 0.0020 262.87);
+  --scrollbar: oklch(87.10% 0.0020 262.87);
+  --segment: oklch(100.00% 0.0020 262.87);
+  --segment-foreground: oklch(21.03% 0.0020 262.87);
+  --separator: oklch(92.00% 0.0020 262.87);
+  --success: oklch(0.5438 0.1268 157.17);
+  --success-foreground: oklch(98% 0.0127 157.17);
+  --surface: oklch(100.00% 0.0010 262.87);
+  --surface-foreground: oklch(21.03% 0.0020 262.87);
+  --surface-secondary: oklch(95.24% 0.0016 262.87);
+  --surface-secondary-foreground: oklch(21.03% 0.0020 262.87);
+  --surface-tertiary: oklch(93.73% 0.0016 262.87);
+  --surface-tertiary-foreground: oklch(21.03% 0.0020 262.87);
+  --warning: oklch(0.8095 0.1119 61.69);
+  --warning-foreground: oklch(15% 0.0336 61.69);
+
+  /* Border Radius */
+  --radius: 0.5rem;
+  /* 12px, matching the app's own search and message fields (the theme builder had "extra-small", 2px). */
+  --field-radius: 0.75rem;
+
+  /* Font Family */
+  --font-sans: var(--font-inter);
+}
+
+.dark,
+[data-theme="dark"] {
+  color-scheme: dark;
+  /*
+   * Bubble look: pure black under everything, one near-black card for the content and graphite for
+   * anything you can press or type into. White is the accent; no blue anywhere.
+   */
+  --accent: #ffffff;
+  --accent-foreground: #000000;
+  --background: #000000;
+  --border: #28282c;
+  --danger: #ff453a;
+  --danger-foreground: #ffffff;
+  --default: #1e1e22;
+  --default-foreground: #ffffff;
+  --field-background: #1e1e22;
+  --field-border: transparent;
+  --field-foreground: #ffffff;
+  --field-placeholder: #71717a;
+  --focus: #4a4a52;
+  --foreground: #ffffff;
+  --muted: #a1a1aa;
+  --overlay: #18181b;
+  --overlay-foreground: #ffffff;
+  --scrollbar: #3f3f46;
+  --segment: #3f3f46;
+  --segment-foreground: #ffffff;
+  --separator: #1c1c20;
+  --success: #30d158;
+  --success-foreground: #00210c;
+  --surface: #0b0b0d;
+  --surface-foreground: #ffffff;
+  --surface-secondary: #1e1e22;
+  --surface-secondary-foreground: #ffffff;
+  --surface-tertiary: #27272a;
+  --surface-tertiary-foreground: #ffffff;
+  --warning: #ffd60a;
+  --warning-foreground: #1f1a00;
+
+  /* Pills and circles: fields are fully round, everything else generously rounded. */
+  --radius: 1rem;
+  --field-radius: 999px;
+}
