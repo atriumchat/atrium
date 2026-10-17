@@ -155,12 +155,11 @@ npm run dev
 
 На пустой базе откроется мастер первого запуска. Код по умолчанию — `friends`.
 
-Десктоп против локального клиента. `package-lock.json` в `desktop/` пока отстаёт от `package.json`, поэтому
-`npm install`, а не `npm ci`. Скрипт `npm run dev` смотрит на старый порт 5180, поэтому адрес задаётся явно:
+Десктоп против локального клиента. Скрипт `npm run dev` смотрит на старый порт 5180, поэтому адрес задаётся явно:
 
 ```bash
 cd desktop
-npm install
+npm ci
 GOMEX_URL=http://localhost:5190 npx electron .
 ```
 
