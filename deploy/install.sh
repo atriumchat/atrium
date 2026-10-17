@@ -44,13 +44,13 @@ shopt -u patsub_replacement 2>/dev/null || true
 umask 022
 
 # == The release this installer puts on the server. deploy/release.sh rewrites these lines.
-RELEASE_VERSION=0.2.2
-RELEASE_SHA256=be7b427afe59a99cc3f7e215466a2012513258238c69b6aa73928281f462019b
+RELEASE_VERSION=0.3.0-rc.1
+RELEASE_SHA256=b67671a41b08d24be68d24a2caff4459a846e092482ee07c88bf7f8de76a1c78
 RELEASE_REPO=gomex-inc/gomex
 # The npm package that mirrors each release's install.sh and tarball (deploy/release.sh publishes it).
 RELEASE_NPM=@gomex.llc/install
 RELEASE_REGISTRY=ghcr.io/gomex-inc
-RELEASE_APP_DIGEST=sha256:3217f682ec4595baf9c974b81c4f9013af7b526cae044269dc7af4105669ea76
+RELEASE_APP_DIGEST=sha256:c2dff691179db5cb0ddbe54b80caccbf2876ec63f11a27c4f7434891034fb302
 RELEASE_CADDY_DIGEST=sha256:000dec7938cd326dfe290cd91c34cf950260245e01b7e0f6a7e02453affc934b
 
 # == gum, for this run only.
