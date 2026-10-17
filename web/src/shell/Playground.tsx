@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { BubbleCloud, BubblePair, BubblePeanut, type BubblePerson } from '../voice/Bubbles';
 import { CallControls } from '../voice/VoiceView';
 import { ART, EmptyState, LineArt, SignInArt, type ArtName } from '../ui/Illustrations';
+import { WhereToUse, type Platform } from '../account/WhereToUse';
 
 /**
  * Development only (open the app with #bubbles): the call layouts with whoever is on this server, and
@@ -79,9 +80,11 @@ const EMPTY: { art: ArtName; title: string; text: string; where: 'main' | 'list'
 
 /**
  * Development only (open the app with #art): the line drawings at any size, every empty state at the size it has
- * in the app (the content panel, the list on the left, a dialog) and the phone sign-in's picture.
+ * in the app (the content panel, the list on the left, a dialog), the "where to use Gomex" screen for each system
+ * and the phone sign-in's picture.
  */
 export function ArtPlayground() {
+  const [platform, setPlatform] = useState<Platform>('mac');
   const [scale, setScale] = useState(() => Number(new URLSearchParams(location.search).get('scale')) || 3);
   const frame = 'flex flex-col overflow-hidden rounded-[24px] border-[0.5px] border-edge';
   return (
@@ -110,6 +113,17 @@ export function ArtPlayground() {
             <EmptyState art={e.art} title={e.title} text={e.text} compact={e.where !== 'main'} plate={e.where === 'dialog' ? 'var(--overlay)' : undefined} />
           </div>
         ))}
+      </div>
+      <div className="mt-10 flex items-center gap-2">
+        <h1 className="mr-3 text-[20px] font-medium">Где пользоваться</h1>
+        {(['mac', 'windows', 'ios', 'android', 'other'] as const).map((p) => (
+          <button key={p} onClick={() => setPlatform(p)} className={`h-9 rounded-full px-4 text-[14px] ${platform === p ? 'bg-white text-black' : 'bg-default text-muted'}`}>
+            {p}
+          </button>
+        ))}
+      </div>
+      <div data-shot="where" className={`${frame} mt-4 h-[760px] ${platform === 'ios' || platform === 'android' ? 'w-[375px]' : ''}`}>
+        <WhereToUse key={platform} platform={platform} onDone={() => setPlatform('mac')} />
       </div>
       <h1 className="mt-10 text-[20px] font-medium">Вход на телефоне</h1>
       <div data-shot="sign-in" className={`${frame} mt-4 w-[375px] bg-background`}>
