@@ -547,6 +547,8 @@ h1 {
   gap: 10px;
 }
 .elapsed {
+  position: relative;
+  top: -1px;
   color: var(--faint);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
