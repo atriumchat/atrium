@@ -7,14 +7,18 @@
 const $ = (id) => document.getElementById(id);
 const setup = window.gomexSetup ?? fakeSetup();
 
-// [id, the line in the list, the installer's own line it leaves in the picture, the installer's steps it covers
-// (install.sh, "::gomex run|done STEP"), in the order they run, and a quiet second line under it, if it needs one]
+// The drum's rows, one per installer step (install.sh, "::gomex run|done STEP"), in the order they run:
+// [step, the row's words, the installer's own line it leaves in the picture, the installer's steps it covers]
 const TASKS = [
   ['check', 'Проверяем сервер', 'Проверка сервера', ['check']],
-  ['address', 'Ждём адрес', 'Адрес в DNS', ['address'], 'до пары минут'],
+  ['address', 'Ждём адрес', 'Адрес в DNS', ['address']],
   ['docker', 'Ставим Docker', 'Docker', ['docker']],
-  ['secure', 'Закрываем вход по паролю', 'SSH только по ключу', ['firewall', 'ssh']],
-  ['pull', 'Скачиваем Gomex', 'Файлы Gomex', ['files', 'config', 'backups', 'pull']],
+  ['firewall', 'Настраиваем файрвол', 'Файрвол', ['firewall']],
+  ['ssh', 'Закрываем вход по паролю', 'SSH только по ключу', ['ssh']],
+  ['files', 'Скачиваем Gomex', 'Файлы Gomex', ['files']],
+  ['config', 'Создаём ключи', 'Настройки и ключи', ['config']],
+  ['backups', 'Включаем бэкапы', 'Ночные бэкапы', ['backups']],
+  ['pull', 'Скачиваем приложение', 'Образы', ['pull']],
   ['up', 'Запускаем', 'Запуск', ['up']],
   ['https', 'Получаем сертификаты', 'HTTPS-сертификаты', ['https']],
 ];
@@ -482,21 +486,12 @@ $('skip-backup').addEventListener('click', () => {
 
 const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
-// Under a running line: what the installer is doing now (its "::gomex sub" lines, the latest two), and, once the line
-// has run this long, the installer's last line of output instead of the older one.
-const OUT_AFTER = 20000;
-const live = {}; // task id → { subs, out, since }
-let running = null; // the task that is running
-
 function renderTasks() {
   $('tasks').innerHTML = TASKS.map(
-    ([id, label, , , note]) =>
-      `<li class="row task" data-task="${id}" data-state="wait"><span class="state">${CHECK}</span><span class="grow"><span class="label">${label}</span>${note ? `<small class="note">${note}</small>` : ''}<span class="subs"><span class="lines"></span></span></span><span class="took"></span></li>`,
+    ([id, label]) =>
+      `<li class="task" data-task="${id}" data-state="wait"><span class="state">${CHECK}</span><span class="label">${label}</span></li>`,
   ).join('');
-  Object.keys(live).forEach((id) => delete live[id]);
-  running = null;
   current(TASKS[0][0]);
-  $('task-fill').style.setProperty('--fill', '0');
   // A fresh run: the install screen as it was before any line came in.
   document.querySelectorAll('[data-screen="install"]').forEach((ui) => (ui.innerHTML = SCREENS.install()));
   Object.entries(bound).forEach(([name, value]) => bind(name, value));
@@ -518,27 +513,15 @@ function logLine(text, took) {
   frame(document.querySelector('.scene[data-scene="install"]'));
 }
 
-/** The one line on screen: the step that is on (or failed), the others stay out of sight. */
+/** Rolls the drum to the step that is on (or failed): every row learns how far it is from the middle. */
 function current(id) {
+  const at = TASKS.findIndex(([task]) => task === id);
   const row = document.querySelector(`.task[data-task="${id}"]`);
   if (!row || row.classList.contains('current')) return;
   document.querySelectorAll('.task.current').forEach((el) => el.classList.remove('current'));
   row.classList.add('current');
-}
-
-/** Draws what's under the task's line from what has come in. */
-function showSubs(id) {
-  const row = document.querySelector(`.task[data-task="${id}"]`);
-  const view = live[id];
-  if (!row || !view) return;
-  const long = view.out && Date.now() - view.since > OUT_AFTER;
-  const texts = long ? [view.out] : view.subs.slice(-1);
-  const box = row.querySelector('.lines');
-  const key = texts.join('\n');
-  if (box.dataset.key === key) return;
-  box.dataset.key = key;
-  box.replaceChildren(...texts.map((text) => Object.assign(document.createElement('small'), { textContent: text, title: text })));
-  row.querySelector('.subs').classList.toggle('on', texts.length > 0);
+  $('tasks').style.setProperty('--at', String(at));
+  document.querySelectorAll('.task').forEach((el, i) => el.style.setProperty('--d', String(i - at)));
 }
 
 let opening = null; // the wait for the new address, as long as the button is held back
@@ -550,7 +533,6 @@ function startClock() {
   clock = setInterval(() => {
     const s = Math.floor((Date.now() - started) / 1000);
     $('elapsed').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-    if (running) showSubs(running);
   }, 250);
 }
 
@@ -570,18 +552,13 @@ function startInstall() {
     const row = document.querySelector(`.task[data-task="${id}"]`);
     if (!row || row.dataset.state === 'done') return;
     row.dataset.state = 'done';
-    row.querySelector('.subs').classList.remove('on');
-    if (running === id) running = null;
     const s = Math.max(1, Math.round((Date.now() - (started[id] ?? Date.now())) / 1000));
     const took = s < 60 ? `${s} с` : `${Math.floor(s / 60)} мин`;
-    row.querySelector('.took').textContent = took;
     logLine(TASKS.find(([task]) => task === id)?.[2] ?? '', took);
-    const done = document.querySelectorAll('.task[data-state="done"]').length / TASKS.length;
-    $('task-fill').style.setProperty('--fill', String(done));
-    progress((PLACE.install + done) / 5);
+    progress((PLACE.install + document.querySelectorAll('.task[data-state="done"]').length / TASKS.length) / 5);
   };
-  // The installer reports its own steps; a line here starts with the first of its steps and is done once a later
-  // line's step starts (a step the server didn't need just never shows up).
+  // The installer reports its own steps; a row is done once a later one starts (a step the server didn't need is
+  // simply passed by).
   setup.install({ domain: state.address.domain, turn: state.turn }, (event) => {
     if (event.step) {
       const id = TASK_OF[event.step];
@@ -593,26 +570,12 @@ function startInstall() {
         if (row.dataset.state === 'wait') {
           started[id] = Date.now();
           row.dataset.state = 'run';
-          live[id] = { subs: [], out: '', since: started[id] };
         }
-        running = id;
         current(id);
-        // Another step of the same line: the last output was the step before's.
-        if (live[id]) live[id].out = '';
-      } else if (event.state === 'sub') {
-        const view = live[id];
-        const text = String(event.text ?? '').trim();
-        // The same thing said again (a wait that checks every few seconds) isn't news.
-        if (view && text && view.subs.at(-1) !== text) view.subs.push(text);
-        showSubs(id);
       } else if (event.state === 'fail') {
         document.querySelector(`.task[data-task="${id}"]`).dataset.state = 'fail';
         current(id);
       }
-      return;
-    }
-    if (event.state === 'out') {
-      if (running && live[running]) live[running].out = event.text;
       return;
     }
     if (event.state === 'fail') {

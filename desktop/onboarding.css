@@ -422,40 +422,62 @@ h1 {
   color: var(--here);
 }
 
-/* The install: one line, the step that is on, with what it's doing under it; a thin bar for the whole of it. */
+/*
+ * The install as a drum, like a time picker: the step that is on, big, in the middle; the one before (done) above and
+ * the next one below, turned away on the drum's curve and fading out. Each step of the installer rolls it by one.
+ */
+.wheel {
+  --row: 50px;
+  height: calc(var(--row) * 3);
+  overflow: hidden;
+  perspective: 520px;
+  /* The eye in front of the labels, not of the column's middle, so the tilted rows don't lean sideways. */
+  perspective-origin: 25% 50%;
+  mask-image: linear-gradient(to bottom, transparent, #0008 22%, #000 40%, #000 60%, #0008 78%, transparent);
+}
 .tasks {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
   margin: 0;
   padding: 0;
   list-style: none;
+  transform: translateY(calc((1 - var(--at, 0)) * var(--row)));
+  transform-style: preserve-3d;
+  transition: transform 0.8s var(--ease);
 }
 .task {
-  display: none;
-  align-items: flex-start;
-  border-bottom: 0;
+  display: flex;
+  align-items: center;
   gap: 14px;
-  /* Room for the label and two quiet lines, so the column doesn't jump as steps say more or less. */
-  min-height: 84px;
-  padding: 14px 0 12px;
+  height: var(--row);
   color: var(--faint);
-  font-size: 15px;
+  /* --d: how many rows away from the middle; the drum tilts a row that far away from the eye. */
+  transform: rotateX(calc(var(--d, 0) * -24deg));
+  transition: transform 0.8s var(--ease), color 0.4s;
+}
+.task .label {
+  overflow: hidden;
+  font-size: 22px;
+  /* As tall as the icon, so the two share one middle. */
+  line-height: 20px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transform: scale(0.7);
+  transform-origin: left center;
+  transition: transform 0.8s var(--ease);
 }
 .task.current {
-  display: flex;
-  animation: task-in 0.35s var(--ease);
+  color: var(--fg);
 }
-@keyframes task-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
+.task.current .label {
+  transform: none;
 }
-.task-bar {
-  margin-top: 2px;
+/* The rows off the middle shrink their icon with their words. */
+.task:not(.current) .state {
+  transform: scale(0.75);
 }
 [data-step="install"] .sub {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 [data-step="install"] .actions {
   margin-top: 20px;
@@ -469,20 +491,15 @@ h1 {
   height: 20px;
   border-radius: 999px;
   box-shadow: inset 0 0 0 1.5px #ffffff26;
-  transition: background 0.3s, box-shadow 0.3s;
+  transform-origin: left center;
+  transition: background 0.3s, box-shadow 0.3s, transform 0.8s var(--ease);
 }
-.task[data-state="run"],
-.task[data-state="wait"] {
-  color: var(--fg);
-}
-.task[data-state="run"] .state {
+.task.current[data-state="run"] .state,
+.task.current[data-state="wait"] .state {
   box-shadow: none;
 }
-.task[data-state="wait"] .state {
-  box-shadow: none;
-}
-.task[data-state="run"] .state::after,
-.task[data-state="wait"] .state::after {
+.task.current[data-state="run"] .state::after,
+.task.current[data-state="wait"] .state::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -496,13 +513,13 @@ h1 {
     transform: rotate(360deg);
   }
 }
-.task[data-state="done"] {
-  color: var(--fg);
-}
 .task[data-state="done"] .state {
-  background: var(--fg);
+  background: var(--muted);
   box-shadow: none;
   color: var(--window);
+}
+.task.current[data-state="done"] .state {
+  background: var(--fg);
 }
 .task .state svg {
   width: 12px;
@@ -515,48 +532,9 @@ h1 {
   opacity: 1;
   transform: none;
 }
-.task[data-state="fail"] {
-  color: var(--fg);
-}
 .task[data-state="fail"] .state {
   background: var(--danger);
   box-shadow: none;
-}
-/* Under the line: a quiet note that is always there, and what the installer is doing now, which comes and goes. */
-.task .label {
-  display: block;
-}
-.task small {
-  color: var(--faint);
-  font-size: 12.5px;
-  line-height: 1.5;
-}
-.task .note {
-  margin-top: 1px;
-}
-.task[data-state="done"] .note {
-  display: none;
-}
-.task .subs {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.25s var(--ease);
-}
-.task .subs.on {
-  grid-template-rows: 1fr;
-}
-.task .lines {
-  display: block;
-  min-height: 0;
-  overflow: hidden;
-}
-/* The newest one a little clearer than the one before. */
-.task[data-state="run"] .lines small:last-child {
-  color: var(--muted);
-}
-/* How long each step took isn't news when only one is on screen; the clock below counts the whole. */
-.task .took {
-  display: none;
 }
 .elapsed {
   color: var(--faint);
