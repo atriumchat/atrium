@@ -7,6 +7,7 @@ import { applyNoise, micTrack, suspendNoise } from './noise';
 import { applyVolume, getPreferredDevice } from './devices';
 import { savePrefs, type VoicePrefs } from '../prefs';
 import { desktop } from '../desktop';
+import { startQualityReports, type QualityReporter } from './report';
 // Push-to-talk listens from the moment the call code loads; it calls back into applyMic() below.
 import './ptt';
 
@@ -73,7 +74,11 @@ export async function setVoicePrefs(patch: Partial<VoicePrefs>) {
   await applyNoise();
 }
 
+let reporter: QualityReporter | null = null;
+
 function resetVoice() {
+  reporter?.drop();
+  reporter = null;
   suspendNoise();
   // Gone from the room's list at once, not when the server's next update comes round.
   const { me, voiceChannelId } = get();
@@ -184,6 +189,7 @@ export async function joinVoice(channelId: string, { video = false, navigate = t
 
   room.remoteParticipants.forEach(applyVolume);
   set({ room, voiceStatus: 'connected', joinedAt: Date.now() });
+  reporter = startQualityReports(room, channelId);
   const { muted, deafened } = get();
   getSocket()?.emit('voice:join', { channelId, muted, deafened });
   playSound('join');
@@ -212,8 +218,11 @@ export const canShareScreen = typeof navigator !== 'undefined' && typeof navigat
 export async function leaveVoice({ silent = false } = {}) {
   const { room, voiceChannelId } = get();
   if (!voiceChannelId) return;
+  // Taken before resetVoice() drops it: the last report needs the room still connected.
+  const last = reporter;
   resetVoice();
   getSocket()?.emit('voice:leave');
+  await last?.stop();
   if (room) {
     await room.disconnect();
     if (!silent) playSound('leave');
