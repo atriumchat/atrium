@@ -153,6 +153,34 @@ a,
   transform: scale(calc(clamp(14, 0.8 * var(--bubble-r), 64) / 64 / var(--bubble-s)));
 }
 
+/*
+ * The phone's sheet (ui/Dialog.tsx) slides up and its backdrop fades in on keyframes of their own: HeroUI's Drawer
+ * enters on a transition from its data-entering state, and a sheet mounted already open showed up without it.
+ * Leaving stays HeroUI's.
+ */
+@keyframes sheet-up {
+  from {
+    translate: 0 100%;
+  }
+}
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
+}
+.sheet {
+  animation: sheet-up 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.sheet-backdrop {
+  animation: sheet-fade 250ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .sheet-backdrop {
+    animation: none;
+  }
+}
+
 /* The icon crop's zoom (ui/IconCropper.tsx), in the setup wizard and the settings: a thin line and a white dot. */
 .icon-zoom .slider__track {
   height: 20px;

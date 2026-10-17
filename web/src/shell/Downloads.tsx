@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Modal, Tooltip } from '@heroui/react';
-import { useStore } from '../store';
+import { Tooltip } from '@heroui/react';
 import { DownloadIcon } from '../ui/icons';
+import { Window } from '../ui/Dialog';
 
 export function AppleLogo({ size = 22 }: { size?: number }) {
   return (
@@ -57,36 +57,32 @@ export function DownloadRailButton() {
 
 function DownloadDialog({ onClose }: { onClose: () => void }) {
   const mine = guess();
-  const isMobile = useStore((s) => s.isMobile);
   const ordered = [...DOWNLOADS].sort((a, b) => Number(b.id === mine) - Number(a.id === mine));
   return (
-    <Modal.Backdrop isOpen onOpenChange={(o) => !o && onClose()}>
-      <Modal.Container size={isMobile ? 'full' : 'sm'} placement="center">
-        <Modal.Dialog aria-label="Gomex для компьютера" className="p-6">
-          <Modal.CloseTrigger />
-          <h2 className="pr-8 text-[20px] font-medium">Gomex для компьютера</h2>
-          <p className="mt-1 text-[14px] text-muted">Push-to-talk в фоне, уведомления, значок в доке</p>
-          <div className="mt-5 flex flex-col gap-2">
-            {ordered.map((d) => (
-              <a
-                key={d.id}
-                href={d.file}
-                onClick={onClose}
-                className={`flex h-14 items-center gap-3 rounded-full bg-default px-5 transition-colors hover:bg-[#28282d] ${
-                  d.id === mine ? 'ring-[1.5px] ring-white ring-inset' : ''
-                }`}
-              >
-                {d.id === 'windows' ? <WindowsLogo /> : <AppleLogo />}
-                <span className="flex-1 text-[16px] font-medium">
-                  {d.label} <span className="text-muted">{d.detail}</span>
-                </span>
-                {d.id === mine && <span className="rounded-full bg-white px-2.5 py-0.5 text-[12px] font-medium text-black">Рекомендуется</span>}
-                <DownloadIcon size={20} />
-              </a>
-            ))}
-          </div>
-        </Modal.Dialog>
-      </Modal.Container>
-    </Modal.Backdrop>
+    <Window label="Gomex для компьютера" onClose={onClose} className="p-0">
+      <div className="p-6 max-md:pt-3">
+        <h2 className="pr-8 text-[20px] font-medium">Gomex для компьютера</h2>
+        <p className="mt-1 text-[14px] text-muted">Push-to-talk в фоне, уведомления, значок в доке</p>
+        <div className="mt-5 flex flex-col gap-2">
+          {ordered.map((d) => (
+            <a
+              key={d.id}
+              href={d.file}
+              onClick={onClose}
+              className={`flex h-14 items-center gap-3 rounded-full bg-default px-5 transition-colors hover:bg-[#28282d] ${
+                d.id === mine ? 'ring-[1.5px] ring-white ring-inset' : ''
+              }`}
+            >
+              {d.id === 'windows' ? <WindowsLogo /> : <AppleLogo />}
+              <span className="flex-1 text-[16px] font-medium">
+                {d.label} <span className="text-muted">{d.detail}</span>
+              </span>
+              {d.id === mine && <span className="rounded-full bg-white px-2.5 py-0.5 text-[12px] font-medium text-black">Рекомендуется</span>}
+              <DownloadIcon size={20} />
+            </a>
+          ))}
+        </div>
+      </div>
+    </Window>
   );
 }
