@@ -125,5 +125,6 @@ export const api = {
   checkToken: () => request<{ token: string; url: string }>('/api/check-token', post()),
   markRead: (conversationId: string, at: number) => request<{ ok: boolean }>('/api/read', post({ conversationId, at })),
   inbox: (before?: number) => request<InboxItem[]>(`/api/inbox${before ? `?before=${before}` : ''}`),
+  callQuality: (report: Record<string, unknown>) => request<{ ok: boolean }>('/api/call-quality', post(report)),
   voiceToken: (channelId: string) => request<{ token: string; url: string }>('/api/voice-token', post({ channelId })),
 };

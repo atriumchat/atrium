@@ -32,15 +32,15 @@ export type CallStats = {
   quality: 'good' | 'fair' | 'bad' | 'unknown';
 };
 
-type Stat = RTCStats & Record<string, unknown>;
+export type Stat = RTCStats & Record<string, unknown>;
 type Transport = { getStats(): Promise<RTCStatsReport> | undefined };
 
-function transports(room: Room) {
+export function transports(room: Room) {
   const pcs = (room.engine as unknown as { pcManager?: { publisher?: Transport; subscriber?: Transport } }).pcManager;
   return { pub: pcs?.publisher, sub: pcs?.subscriber };
 }
 
-async function collect(t?: Transport) {
+export async function collect(t?: Transport) {
   const report = await t?.getStats();
   const list: Stat[] = [];
   report?.forEach((r) => list.push(r as Stat));

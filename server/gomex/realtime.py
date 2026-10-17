@@ -316,6 +316,8 @@ TYPING_BY_USER = RateLimit(10, 10)
 VOICE_EVENTS_BY_USER = RateLimit(30, 10)
 RINGS_BY_USER = RateLimit(5, 60)
 READS_BY_USER = RateLimit(30, 10)
+# A report a minute plus one on leaving; a few extra for rejoins.
+CALL_QUALITY_BY_USER = RateLimit(10, 60)
 
 
 @sio.on("reaction:toggle")
@@ -496,6 +498,47 @@ def voice_token(body: VoiceTokenIn, user: dict = Depends(current_user)):
     if not kind:
         raise HTTPException(status_code=404, detail="Нет такого звонка")
     return {"token": livekit_token(user, livekit_room(kind, body.channelId)), "url": LIVEKIT_URL}
+
+
+class CallQualityIn(BaseModel):
+    channelId: str
+    # Where the report came from: "tick" during the call, "leave" at its end.
+    when: str = "tick"
+    transport: str = ""
+    lossIn: float | None = None
+    lossInWorst: float | None = None
+    jitter: float | None = None
+    jitterWorst: float | None = None
+    rtt: float | None = None
+    lossOut: float | None = None
+    screenAudio: bool = False
+
+
+def _num(value: float | None, top: float, unit: str) -> str:
+    """A report number clamped to what is plausible, or '-' when the browser had none."""
+    if value is None or value != value:
+        return "-"
+    return f"{min(max(value, 0), top):.1f}".rstrip("0").rstrip(".") + unit
+
+
+@router.post("/api/call-quality")
+def call_quality(body: CallQualityIn, user: dict = Depends(current_user)):
+    """One log line per report from a call (nothing is stored), so a bad call can be looked at afterwards."""
+    CALL_QUALITY_BY_USER.check(user["id"])
+    if not voice_target(user["id"], body.channelId):
+        raise HTTPException(status_code=404, detail="Нет такого звонка")
+    # The transport is free text from the browser: only a short word like "relay/turn-tls" gets into the log.
+    transport = body.transport if re.fullmatch(r"[a-z0-9/-]{1,24}", body.transport) else "?"
+    when = "leave" if body.when == "leave" else "tick"
+    print(
+        f"call quality: user={user['id']} room={body.channelId} at={when} transport={transport}"
+        f" loss_in={_num(body.lossIn, 100, '%')} loss_in_worst={_num(body.lossInWorst, 100, '%')}"
+        f" jitter_in={_num(body.jitter, 10000, 'ms')} jitter_in_worst={_num(body.jitterWorst, 10000, 'ms')}"
+        f" rtt={_num(body.rtt, 60000, 'ms')} loss_out={_num(body.lossOut, 100, '%')}"
+        f" screen_audio={'yes' if body.screenAudio else 'no'}",
+        flush=True,
+    )
+    return {"ok": True}
 
 
 # The other gomex modules import this one too: they come last, once everything above is defined.
