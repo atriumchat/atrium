@@ -340,16 +340,44 @@ setupCall('check-name', ({ name }) => serverSetup.checkName({ name }));
 setupCall('register', (form) => serverSetup.register(form));
 setupCall('wait-mail', async (where) => {
   const answer = await serverSetup.waitMail(where);
-  if (answer.ok) freeAccount = { domain: answer.domain, account: answer.account };
+  if (answer.ok) {
+    freeAccount = { domain: answer.domain, account: answer.account };
+    callBack('Почта подтверждена', 'Адрес готов, можно продолжать');
+  }
   return answer.ok ? { ok: true } : answer;
 });
+
+/** The person is off in the browser (deSEC's page): bring the setup window back in front, and say why. */
+function callBack(title, body) {
+  if (!setupWindow) return;
+  if (setupWindow.isMinimized()) setupWindow.restore();
+  setupWindow.show();
+  if (isMac) {
+    app.focus({ steal: true });
+    app.dock?.bounce('informational');
+  } else {
+    setupWindow.flashFrame(true);
+    setupWindow.once('focus', () => setupWindow?.flashFrame(false));
+  }
+  setupWindow.focus();
+  if (Notification.isSupported()) {
+    const note = new Notification({ title, body, silent: true });
+    note.on('click', () => setupWindow?.focus());
+    note.show();
+  }
+}
 setupCall('cancel-mail', () => serverSetup.cancelMail());
 setupCall('check-domain', (domain) => serverSetup.checkDomain(domain));
 setupCall('connect-drive', () => ({ error: 'Google Диск появится в следующей версии, пока можно без бэкапов' }));
 setupCall('install', ({ domain, turn }) =>
   serverSetup.install(
     { domain, turn, installer: devEnv('GOMEX_INSTALLER') },
-    (data) => setupWindow?.webContents.send('setup:event', data),
+    (data) => {
+      setupWindow?.webContents.send('setup:event', data);
+      // The install takes minutes and the window may be away: it comes back when it's over, either way.
+      if (data.state === 'ready') callBack('Сервер готов', 'Gomex установлен');
+      if (data.state === 'fail' && !data.step) callBack('Установка остановилась', data.why ?? '');
+    },
     ({ privateKey, ...server }) => {
       const account = freeAccount?.domain === server.domain ? seal(JSON.stringify(freeAccount.account)) : undefined;
       remember(server.domain, { ...server, key: seal(privateKey), ...(account ? { desec: account } : {}) });
