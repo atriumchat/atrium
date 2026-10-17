@@ -259,8 +259,17 @@ EOF
     (cd "$pkg" && npm publish --access public --tag "$npm_tag")
     rm -rf "$pkg"
   fi
-  # jsDelivr fetches from npm on the first request: give it a minute.
+  # npm takes a few minutes to make a new version public. jsDelivr remembers a "not found" for 10 minutes, so it's
+  # asked only once npm has the version, and its cached answers are dropped (purge) before each try.
+  for i in $(seq 1 60); do
+    [[ $(npm view "$npm_package@$version" version 2>/dev/null) == "$version" ]] && break
+    (( i < 60 )) || die "npm doesn't show $npm_package@$version yet: check it, then run deploy/release.sh $version again"
+    sleep 10
+  done
   for i in $(seq 1 12); do
+    for path in "$npm_package@$version/$tarball" "$npm_package@$version/install.sh" "$npm_package@latest/install.sh"; do
+      curl -fsS "https://purge.jsdelivr.net/npm/$path" >/dev/null 2>&1 || true
+    done
     if [[ $(curl -fsSL "$npm_cdn/$tarball" 2>/dev/null | shasum -a 256 | awk '{print $1}') == "$sha" ]] &&
       curl -fsSL "$npm_cdn/install.sh" 2>/dev/null | cmp -s - "$INSTALLER"; then
       break
