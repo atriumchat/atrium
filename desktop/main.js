@@ -119,6 +119,7 @@ function createWindow() {
     },
   });
 
+  win.webContents.on('context-menu', (_event, params) => showTextMenu(params));
   win.loadURL(START_URL);
   win.once('ready-to-show', () => win?.show());
 
@@ -129,6 +130,38 @@ function createWindow() {
     win?.hide();
   });
 
+}
+
+// Electron has no context menu of its own, not even copy and paste in a text field. This is the usual text one:
+// copy for a selection; cut, copy, paste, select all and spelling for a field. Pictures and files in the chat have
+// their own menu in the page, which cancels the browser's contextmenu event, so this event never comes for them;
+// anywhere else there's nothing to offer and no menu is shown.
+function showTextMenu(params) {
+  const contents = win.webContents;
+  const { editFlags } = params;
+  const items = [];
+  if (params.isEditable && params.misspelledWord) {
+    for (const word of params.dictionarySuggestions.slice(0, 5)) {
+      items.push({ label: word, click: () => contents.replaceMisspelling(word) });
+    }
+    if (items.length === 0) items.push({ label: 'Нет вариантов', enabled: false });
+    items.push(
+      { label: 'Добавить в словарь', click: () => contents.session.addWordToSpellCheckerDictionary(params.misspelledWord) },
+      { type: 'separator' },
+    );
+  }
+  if (params.isEditable) {
+    items.push(
+      { label: 'Вырезать', role: 'cut', enabled: editFlags.canCut },
+      { label: 'Копировать', role: 'copy', enabled: editFlags.canCopy },
+      { label: 'Вставить', role: 'paste', enabled: editFlags.canPaste },
+      { type: 'separator' },
+      { label: 'Выделить всё', role: 'selectAll', enabled: editFlags.canSelectAll },
+    );
+  } else if (params.selectionText) {
+    items.push({ label: 'Копировать', role: 'copy', enabled: editFlags.canCopy });
+  }
+  if (items.length > 0) Menu.buildFromTemplate(items).popup();
 }
 
 // Every window — the main one, a Gomex pop-up (e.g. a chat image) and pop-ups of pop-ups — stays on Gomex:
