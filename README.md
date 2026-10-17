@@ -124,6 +124,18 @@ curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.s
 `/opt/gomex/landing/site` вместе с пустым файлом `.custom`: тогда установщик его не трогает. Страницы открываются
 без `.html`: `/about` — это `about.html`.
 
+Свои блоки Caddy кладутся файлами `*.caddy` в `/opt/gomex/deploy/sites`, обновления их не трогают. Например,
+`www.caddy` для переадресации с `www.` (нужна A-запись `www`):
+
+```caddy
+www.{$DOMAIN}, http://www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}
+```
+
+После правки, без обрыва звонков:
+`cd /opt/gomex/deploy && docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile`.
+
 ### Локальная разработка
 
 Нужны Python 3.13, Node 22 и [LiveKit](https://docs.livekit.io/home/self-hosting/local/). Три процесса в трёх

@@ -146,3 +146,6 @@ app.{$DOMAIN} {
 	}
 	respond 404
 }
+
+# Sites of one's own beside Gomex, such as www.DOMAIN sent on to DOMAIN: deploy/sites/*.caddy, which updates keep.
+import /etc/caddy/sites/*.caddy

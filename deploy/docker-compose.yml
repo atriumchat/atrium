@@ -62,6 +62,7 @@ services:
       TURN_HOST: ${TURN_HOST:-turn}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./sites:/etc/caddy/sites:ro
       - ../landing/site:/srv/landing:ro
       - ./caddy-data:/data
       - ./caddy-config:/config
