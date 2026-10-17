@@ -183,8 +183,8 @@ export async function joinVoice(channelId: string, { video = false, navigate = t
 }
 
 /**
- * The bypass: every call goes only through our relay on 443, looking like an ordinary website — what gets
- * through Russian networks. In a call it reconnects right away rather than waiting for the next one.
+ * Relay-only: every call goes only through our relay on 443, the path that holds on restrictive networks.
+ * In a call it reconnects right away rather than waiting for the next one.
  */
 export async function setBypass(on: boolean) {
   await setVoicePrefs({ relayOnly: on });

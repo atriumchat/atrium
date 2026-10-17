@@ -39,7 +39,7 @@ export function CallQuality({ stats, connected }: { stats: CallStats | null; con
   );
 }
 
-/** "Обход блокировок": every call only through our relay on 443, which is what gets through in Russia. */
+/** Relay-only mode: every call goes only through our relay on 443, the path that holds on the most restrictive networks. */
 export function BypassSwitch() {
   const on = useStore((s) => s.serverRelayOnly || s.voicePrefs.relayOnly);
   const forced = useStore((s) => s.serverRelayOnly);

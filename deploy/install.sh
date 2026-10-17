@@ -260,7 +260,7 @@ resolve4() {
   done
   getent ahostsv4 "$1" 2>/dev/null | awk '{print $1}' | sort -u | tr '\n' ' ' || true
 }
-# Cloudflare's proxy ("orange cloud") ranges: calls can't go through it, and it's throttled in Russia.
+# Cloudflare's proxy ("orange cloud") ranges: calls can't go through it.
 cloudflare_ip() {
   [[ $1 =~ ^(104\.(1[6-9]|2[0-9]|3[01])|172\.(6[4-9]|7[01])|188\.114\.(9[6-9]|10[0-9]|11[01])|162\.158|141\.101|108\.162|190\.93|198\.41|173\.245|103\.2[1-2]|103\.31)\. ]]
 }
