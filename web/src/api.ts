@@ -1,5 +1,7 @@
 import type { Bootstrap, Channel, Dm, Friend, InboxItem, Message, MyInvite, MyStatus, Session, Upload, User } from './types';
 
+type ServerInfo = { serverName: string; serverIcon: string | null };
+
 const TOKEN_KEY = 'hangout_token';
 
 export function getToken(): string | null {
@@ -111,10 +113,15 @@ export const api = {
   reset: (token: string, password: string) => request<Session>('/api/reset', post({ token, password })),
   block: (userId: string) => request<string[]>(`/api/blocks/${userId}`, { method: 'PUT' }),
   unblock: (userId: string) => request<string[]>(`/api/blocks/${userId}`, { method: 'DELETE' }),
-  setupStatus: () => request<{ needed: boolean; serverName: string }>('/api/setup'),
+  setupStatus: () => request<{ needed: boolean; serverName: string; serverIcon: string | null }>('/api/setup'),
   setupCheck: (code: string) => request<{ ok: boolean }>('/api/setup/check', post({ code })),
   setup: (code: string, serverName: string, name: string, password: string) =>
     request<{ token: string; user: User }>('/api/setup', post({ code, serverName, name, password })),
+  /** The server's icon and name, for its admin: raw image bytes, as for avatars. */
+  uploadServerIcon: (image: Blob) =>
+    request<ServerInfo>('/api/server/icon', { method: 'POST', body: image, headers: { 'Content-Type': image.type || 'application/octet-stream' } }),
+  deleteServerIcon: () => request<ServerInfo>('/api/server/icon', { method: 'DELETE' }),
+  renameServer: (name: string) => request<ServerInfo>('/api/server', { method: 'PATCH', body: JSON.stringify({ name }) }),
   checkToken: () => request<{ token: string; url: string }>('/api/check-token', post()),
   markRead: (conversationId: string, at: number) => request<{ ok: boolean }>('/api/read', post({ conversationId, at })),
   inbox: (before?: number) => request<InboxItem[]>(`/api/inbox${before ? `?before=${before}` : ''}`),

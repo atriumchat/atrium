@@ -681,7 +681,7 @@ def setup_needed() -> bool:
 @router.get("/api/setup")
 def setup_status():
     """Whether this server still waits for its first-run setup (no accounts yet)."""
-    return {"needed": setup_needed(), "serverName": server_name()}
+    return {"needed": setup_needed(), "serverName": server_name(), "serverIcon": icon_url()}
 
 
 class SetupCodeIn(BaseModel):
@@ -761,6 +761,7 @@ def bootstrap(request: Request, response: Response, user: dict = Depends(current
         "channels": list_channels(),
         "livekitUrl": LIVEKIT_URL,
         "serverName": server_name(),
+        "serverIcon": icon_url(),
         "relayOnly": RELAY_ONLY,
         "canManageChannels": is_admin(user),
         "mutedChannels": muted_channels(user["id"]),
@@ -774,3 +775,4 @@ def bootstrap(request: Request, response: Response, user: dict = Depends(current
 from .channels import list_channels, muted_channels, unread_counts
 from .uploads import PRIVATE_IMAGE_HEADERS, make_avatar, process_image
 from .realtime import disconnect_user, presence_payload, sio, user_room
+from .server import icon_url

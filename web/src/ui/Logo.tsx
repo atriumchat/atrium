@@ -27,3 +27,9 @@ export function GomexMark({ size = 24, className, filled = false }: { size?: num
     </svg>
   );
 }
+
+/** The server's own icon, a circle, where it has one (`icon`, its URL); Gomex's mark where it doesn't. */
+export function ServerMark({ icon, size = 24, className, filled = false }: { icon: string | null; size?: number; className?: string; filled?: boolean }) {
+  if (!icon) return <GomexMark size={size} className={className} filled={filled} />;
+  return <img src={icon} alt="" draggable={false} width={size} height={size} className={`shrink-0 rounded-full object-cover ${className ?? ''}`} style={{ width: size, height: size }} />;
+}

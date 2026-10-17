@@ -5,9 +5,11 @@ import { desktop, type DesktopUpdate } from '../desktop';
 import { showError, useStore } from '../store';
 import { AccountSettings } from '../account/Account';
 import { VoiceSettings } from '../voice/VoiceSettings';
+import { ServerSettings } from './ServerSettings';
+import { GomexMark } from '../ui/Logo';
 import { LogoutIcon, MicIcon, RefreshIcon, UserIcon } from '../ui/icons';
 
-type Page = 'account' | 'voice' | 'app';
+type Page = 'account' | 'voice' | 'server' | 'app';
 
 /** The update line in the desktop app's settings, by the updater's state. */
 function updateLabel(update: DesktopUpdate | null) {
@@ -30,10 +32,13 @@ async function checkForUpdate() {
  */
 export function SettingsDialog({ onClose, start = 'account' }: { onClose: () => void; start?: Page }) {
   const isMobile = useStore((s) => s.isMobile);
+  const isAdmin = useStore((s) => s.canManageChannels);
   const [page, setPage] = useState<Page>(start);
   const pages: [Page, string, ReactNode][] = [
     ['account', 'Аккаунт', <UserIcon size={18} />],
     ['voice', 'Голос', <MicIcon size={18} />],
+    // The server's icon and name: the admin's, like the channels.
+    ...(isAdmin ? ([['server', 'Сервер', <GomexMark size={18} />]] as [Page, string, ReactNode][]) : []),
     ...(desktop?.update ? ([['app', 'Приложение', <RefreshIcon size={18} />]] as [Page, string, ReactNode][]) : []),
   ];
   const title = pages.find((p) => p[0] === page)?.[1] ?? '';
@@ -69,6 +74,7 @@ export function SettingsDialog({ onClose, start = 'account' }: { onClose: () => 
               <h2 className="text-[20px] font-medium max-md:hidden">{title}</h2>
               {page === 'account' && <AccountSettings />}
               {page === 'voice' && <VoiceSettings />}
+              {page === 'server' && <ServerSettings />}
               {page === 'app' && <AppSettings />}
             </div>
           </div>

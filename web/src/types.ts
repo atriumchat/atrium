@@ -103,6 +103,8 @@ export type Bootstrap = {
   channels: Channel[];
   livekitUrl: string;
   serverName: string;
+  /** The server's own icon (/api/server/icon?v=…), or null for Gomex's mark. */
+  serverIcon?: string | null;
   canManageChannels: boolean;
   mutedChannels: string[];
   /** Unread messages and unread mentions of you, per channel and DM, from the server's read marks. */

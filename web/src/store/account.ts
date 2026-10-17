@@ -27,6 +27,7 @@ export function initStore(data: Bootstrap) {
   const firstText = data.channels.find((c) => c.kind === 'text');
   set({
     serverName: data.serverName,
+    serverIcon: data.serverIcon ?? null,
     me: data.me,
     users: Object.fromEntries(data.users.map((u) => [u.id, u])),
     channels: data.channels,

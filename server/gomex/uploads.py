@@ -61,13 +61,13 @@ async def process_image(fn, *args):
         return await run_in_threadpool(fn, *args)
 
 
-def make_avatar(data: bytes) -> bytes:
-    """Square-crop to AVATAR_SIZE and re-encode as WebP. Re-encoding drops EXIF (e.g. GPS) and anything odd in the file."""
+def make_avatar(data: bytes, size: int = AVATAR_SIZE) -> bytes:
+    """Square-crop to `size` and re-encode as WebP. Re-encoding drops EXIF (e.g. GPS) and anything odd in the file."""
     try:
-        with open_checked(data, AVATAR_SIZE) as img:
+        with open_checked(data, size) as img:
             img = ImageOps.exif_transpose(img)  # respect phone camera rotation before EXIF is discarded
             img = img.convert("RGBA") if img.mode in ("RGBA", "LA", "P") else img.convert("RGB")
-            img = ImageOps.fit(img, (AVATAR_SIZE, AVATAR_SIZE), method=Image.Resampling.LANCZOS)
+            img = ImageOps.fit(img, (size, size), method=Image.Resampling.LANCZOS)
             out = io.BytesIO()
             img.save(out, format="WEBP", quality=85)
             return out.getvalue()

@@ -11,7 +11,7 @@ import socketio
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from gomex import channels, dms, realtime, uploads, users
+from gomex import channels, dms, realtime, server, uploads, users
 from gomex.config import WEB_DIST
 from gomex.db import init_db
 from gomex.realtime import sio
@@ -21,7 +21,7 @@ from gomex.users import expire_statuses
 init_db()
 
 api = FastAPI(title="Hangout", docs_url=None, redoc_url=None, openapi_url=None)
-for module in (users, uploads, dms, channels, realtime):
+for module in (users, server, uploads, dms, channels, realtime):
     api.include_router(module.router)
 
 

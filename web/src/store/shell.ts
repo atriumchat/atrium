@@ -10,6 +10,8 @@ export type Picker = { mode: 'create' } | { mode: 'add'; dmId: string };
 /** Where you are in the app: the server's channels, home or a DM, the phone's tabs, update banners. */
 export type ShellSlice = {
   serverName: string;
+  /** The server's icon, or null: Gomex's mark stands in. */
+  serverIcon: string | null;
   channels: Channel[];
   selectedChannelId: string | null;
   canManageChannels: boolean;
@@ -35,6 +37,7 @@ export type ShellSlice = {
 export function shellSlice(): ShellSlice {
   return {
     serverName: 'Gomex',
+    serverIcon: null,
     channels: [],
     selectedChannelId: null,
     canManageChannels: false,

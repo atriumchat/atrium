@@ -13,7 +13,7 @@ import { EmptyState } from '../ui/Illustrations';
 import { InviteCardButton } from '../people/Invites';
 import { Avatar } from '../ui/Avatar';
 import { CallDuration } from '../voice/CallDuration';
-import { GomexMark } from '../ui/Logo';
+import { ServerMark } from '../ui/Logo';
 import { RoundButton } from '../ui/ui';
 import { UpdateBanner } from './UpdateBanner';
 import { SettingsDialog } from './SettingsDialog';
@@ -257,9 +257,10 @@ function CallBar() {
 /** The same header on the home and server tabs, so switching between them doesn't shift anything. */
 function TabHeader() {
   const serverName = useStore((s) => s.serverName);
+  const serverIcon = useStore((s) => s.serverIcon);
   return (
     <header className="flex h-16 shrink-0 items-center gap-3 px-4">
-      <GomexMark size={36} />
+      <ServerMark icon={serverIcon} size={36} />
       <h1 className="min-w-0 flex-1 truncate text-[24px] font-bold">{serverName}</h1>
       <InboxButton />
     </header>
@@ -355,11 +356,12 @@ function TabBar() {
   const serverUnread = useStore(serverBadgeCount);
   const homeBadge = useStore(homeBadgeCount);
   const me = useStore((s) => s.me);
+  const serverIcon = useStore((s) => s.serverIcon);
   return (
     <nav className="shrink-0 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-2">
       <div className="flex h-16 items-center gap-1 rounded-full border-[0.5px] border-white/10 bg-default p-1.5">
         <Tab id="home" label="Главная" badge={homeBadge} icon={(on) => (on ? <HomeFilledIcon size={24} /> : <HomeIcon size={24} />)} />
-        <Tab id="server" label="Сервер" badge={serverUnread} icon={(on) => <GomexMark size={24} filled={on} />} />
+        <Tab id="server" label="Сервер" badge={serverUnread} icon={(on) => <ServerMark icon={serverIcon} size={24} filled={on} />} />
         <Tab id="you" label="Вы" icon={() => <Avatar user={me ?? undefined} size={28} ringBg="var(--default)" />} />
       </div>
     </nav>

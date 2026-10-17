@@ -43,6 +43,8 @@ RING_SECONDS = 45
 MEDIA_COOKIE = "gx_media"
 MAX_AVATAR_UPLOAD = 8 * 1024 * 1024
 AVATAR_SIZE = 256
+# The server's own icon: big enough for a phone's home screen when the app is installed from the browser.
+SERVER_ICON_SIZE = 512
 MAX_IMAGE_UPLOAD = 20 * 1024 * 1024
 MAX_ATTACHMENTS = 10
 # Any file that isn't a picture: kept as is (the disk is small, so the limit is too) and always downloaded, never shown.

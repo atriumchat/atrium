@@ -137,6 +137,7 @@ function usePlayground() {
 
 function ServerRail({ className }: { className: string }) {
   const serverName = useStore((s) => s.serverName);
+  const serverIcon = useStore((s) => s.serverIcon);
   const mode = useStore((s) => s.mode);
   const homeBadge = useStore(homeBadgeCount);
   const serverBadge = useStore(serverBadgeCount);
@@ -151,11 +152,16 @@ function ServerRail({ className }: { className: string }) {
         </span>
       </RailItem>
       <RailItem label={serverName} active={mode === 'server'} badge={mode === 'server' ? 0 : serverBadge} onPress={openServer}>
-        <span
-          className={`flex h-12 w-12 items-center justify-center ${mode === 'server' ? 'bg-white text-black' : 'bg-default group-hover:bg-[#28282d]'} ${railShape(mode === 'server')}`}
-        >
-          <GomexMark size={27} />
-        </span>
+        {/* The server's own icon fills the circle; without one, Gomex's mark on the circle, as for home. */}
+        {serverIcon ? (
+          <img src={serverIcon} alt="" draggable={false} className="h-12 w-12 rounded-full object-cover" />
+        ) : (
+          <span
+            className={`flex h-12 w-12 items-center justify-center ${mode === 'server' ? 'bg-white text-black' : 'bg-default group-hover:bg-[#28282d]'} ${railShape(mode === 'server')}`}
+          >
+            <GomexMark size={27} />
+          </span>
+        )}
       </RailItem>
       {/* In a browser: get the app, at the foot of the rail as in Discord. */}
       {!desktop && (

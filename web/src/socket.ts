@@ -195,6 +195,10 @@ export function connectSocket(token: string, onUnauthorized: () => void) {
     const { voiceChannelId } = useStore.getState();
     if (voiceChannelId && !isDmId(voiceChannelId) && !channels.some((c) => c.id === voiceChannelId)) leaveVoice();
   });
+  // An admin renamed the server or changed its icon.
+  socket.on('server:updated', ({ serverName, serverIcon }: { serverName: string; serverIcon: string | null }) =>
+    useStore.setState({ serverName, serverIcon }),
+  );
   socket.on('channels:muted', (mutedChannels: string[]) => useStore.setState({ mutedChannels }));
   socket.on('user:new', (user: User) => addUser(user));
   socket.on('user:updated', (user: User) => {
