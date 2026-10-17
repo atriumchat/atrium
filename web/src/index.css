@@ -30,6 +30,18 @@
   --color-faint: var(--field-placeholder);
 }
 
+/*
+ * The phone layout is full-bleed in the window tone, with no black behind it. Safari paints its own bars (and the
+ * home-screen app its status bar and any gap at the bottom) from the page background, so on the phone that is the
+ * window tone too: no black bands above and below the app. Same width as the switch in hooks.ts.
+ */
+@media (max-width: 767px) {
+  .dark,
+  [data-theme="dark"] {
+    --background: var(--app-window);
+  }
+}
+
 html,
 body,
 #root {
