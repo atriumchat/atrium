@@ -68,6 +68,13 @@
         <section class="step" data-step="free-name" hidden>
           <h1>Бесплатный адрес</h1>
           <p class="sub">Имя на dedyn.io и почта для письма</p>
+          <div class="rows saved" id="saved" hidden>
+            <div class="row">
+              <span class="grow"><b id="saved-name">Есть адрес podval.dedyn.io</b></span>
+              <button class="secondary" type="button" id="use-saved">Использовать</button>
+            </div>
+          </div>
+          <p class="error" id="e-saved" role="alert"></p>
           <label class="label" for="free-name">Имя</label>
           <span class="with-suffix"><input class="input" id="free-name" placeholder="podval" spellcheck="false" autocapitalize="off" /><span class="suffix">.dedyn.io</span></span>
           <label class="label" for="free-email">Почта</label>
@@ -91,10 +98,12 @@
               </button>
             </div>
             <div class="row wait" id="mail-wait"><span class="spinner"></span><span class="grow" id="mail-state">Ждём подтверждение</span></div>
+            <div class="row" id="mail-late" hidden><span class="grow"><b>Письмо не пришло</b></span></div>
           </div>
           <p class="error" id="e-mail" role="alert"></p>
           <div class="actions">
             <button class="quiet" type="button" id="other-mail">Другая почта</button>
+            <button class="quiet" type="button" id="own-instead" hidden>Свой домен</button>
           </div>
         </section>
 

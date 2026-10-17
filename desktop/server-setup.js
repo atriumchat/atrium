@@ -229,13 +229,53 @@ async function waitMail({ ip }) {
     if ((await api(`/domains/${domain}/`, { token })).status === 200) break;
     await wait(2500);
   }
+  const failed = await pointAt({ domain, token, ip });
+  if (failed) return failed;
+  return { ok: true, domain, account: { email: desec.email, password: desec.password } };
+}
+
+/** The name and everything under it (app., the relay) to the server; null when deSEC took it, else { error }. */
+async function pointAt({ domain, token, ip }) {
   const records = [
     { subname: '', type: 'A', ttl: 3600, records: [ip] },
     { subname: '*', type: 'A', ttl: 3600, records: [ip] },
   ];
-  const set = await api(`/domains/${domain}/rrsets/`, { method: 'PUT', body: records, token });
-  if (set.status !== 200) return { error: `deSEC не принял адрес сервера (${set.status})` };
-  return { ok: true, domain, account: { email: desec.email, password: desec.password } };
+  let set;
+  try {
+    set = await api(`/domains/${domain}/rrsets/`, { method: 'PUT', body: records, token });
+  } catch {
+    return { error: 'deSEC не отвечает, попробуйте ещё раз' };
+  }
+  if (set.status === 200) return null;
+  console.log('deSEC rrsets refused:', set.status, set.text.slice(0, 400));
+  if (set.status === 404) return { error: 'Этого адреса на deSEC больше нет' };
+  if (set.status === 401 || set.status === 403) return { error: 'deSEC не пускает к этому адресу' };
+  if (set.status === 429) return { error: 'Слишком часто, подождите минуту' };
+  return { error: `deSEC не принял адрес сервера (${set.status})` };
+}
+
+/**
+ * An account this computer already made for an earlier server (deSEC gives one name per account, so a second
+ * sign-up with the same e-mail creates nothing): signs in with it and points its name at this server.
+ */
+async function reuse({ email, password, name, ip }) {
+  let login;
+  try {
+    login = await api('/auth/login/', { method: 'POST', body: { email, password } });
+  } catch {
+    return { error: 'deSEC не отвечает, попробуйте ещё раз' };
+  }
+  if (login.status !== 200) {
+    console.log('deSEC login refused:', login.status, login.text.slice(0, 400));
+    if (login.status === 429) return { error: 'Слишком часто, подождите минуту' };
+    if (login.status === 400 || login.status === 401) return { error: 'deSEC не принял сохранённый вход' };
+    if (login.status === 403) return { error: 'deSEC не пускает в этот аккаунт' };
+    return { error: `deSEC: ${login.status}` };
+  }
+  const domain = `${name}.dedyn.io`;
+  const failed = await pointAt({ domain, token: login.json.token, ip });
+  if (failed) return failed;
+  return { ok: true, domain, account: { email, password } };
 }
 
 function cancelMail() {
@@ -327,4 +367,4 @@ async function install({ domain, turn, installer }, report, save) {
   report({ state: 'fail', why: why || `Установщик остановился (код ${code})`, tail });
 }
 
-module.exports = { connect, close, register, waitMail, cancelMail, checkDomain, install };
+module.exports = { connect, close, register, reuse, waitMail, cancelMail, checkDomain, install };
