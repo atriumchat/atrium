@@ -7,17 +7,44 @@ import { clearInviteFromUrl } from './people/invite';
 import { Login } from './account/Login';
 import { Shell } from './shell/Shell';
 import { SetupWizard } from './account/SetupWizard';
+import { RecoveryKeyScreen, loadNewKey, storeNewKey, type NewKey } from './account/RecoveryKey';
+import { ResetPassword } from './account/ResetPassword';
+import { clearResetFromUrl, resetFromUrl } from './account/resetLink';
+import type { Session } from './types';
 
-type Phase = 'loading' | 'login' | 'setup' | 'ready' | 'offline';
+type Phase = 'loading' | 'login' | 'setup' | 'reset' | 'key' | 'ready' | 'offline';
 
 export function App() {
-  const [phase, setPhase] = useState<Phase>(getToken() ? 'loading' : 'login');
+  // Opened from an admin's reset link; or reloaded on the recovery key's screen, where the key waits (see RecoveryKey).
+  const [resetToken] = useState(resetFromUrl);
+  const [newKey, setNewKey] = useState<NewKey | null>(() => (getToken() ? loadNewKey() : null));
+  const [phase, setPhase] = useState<Phase>(resetToken ? 'reset' : newKey ? 'key' : getToken() ? 'loading' : 'login');
 
   // Signed out on a server with no accounts yet: that's a fresh install, so the setup wizard instead of sign-in.
   useEffect(() => {
-    if (getToken()) return;
+    if (getToken() || resetToken) return;
     api.setupStatus().then((s) => s.needed && setPhase('setup'), () => undefined);
-  }, []);
+  }, [resetToken]);
+
+  // Sign-up, recovery and a reset link end here: the new recovery key comes first, then the app.
+  function signedIn(session?: Session) {
+    if (!session?.recoveryKey) {
+      storeNewKey(null);
+      return setPhase('loading');
+    }
+    const fresh = { key: session.recoveryKey, name: session.user.name, serverName: session.serverName ?? '' };
+    storeNewKey(fresh);
+    setNewKey(fresh);
+    setPhase('key');
+  }
+
+  // The order after sign-up is: the key, then the "where to use Gomex" screen, then the app. The next screen goes
+  // here: this is what happens when the key screen is done.
+  function keySeen() {
+    storeNewKey(null);
+    setNewKey(null);
+    setPhase('loading');
+  }
 
   const start = useCallback(async () => {
     try {
@@ -49,8 +76,19 @@ export function App() {
       <Toast.Provider placement="top" />
       {phase === 'setup' ? (
         <SetupWizard onDone={() => setPhase('loading')} />
+      ) : phase === 'reset' && resetToken ? (
+        <ResetPassword
+          token={resetToken}
+          onDone={signedIn}
+          onCancel={() => {
+            clearResetFromUrl();
+            setPhase(getToken() ? 'loading' : 'login');
+          }}
+        />
+      ) : phase === 'key' && newKey ? (
+        <RecoveryKeyScreen value={newKey} onDone={keySeen} />
       ) : phase === 'login' ? (
-        <Login onLoggedIn={() => setPhase('loading')} />
+        <Login onLoggedIn={signedIn} />
       ) : phase === 'ready' ? (
         <Shell />
       ) : (

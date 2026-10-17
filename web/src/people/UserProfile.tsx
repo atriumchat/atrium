@@ -5,6 +5,7 @@ import { messageUser, showError, useStore } from '../store';
 import type { MyStatus, User } from '../types';
 import { Avatar } from '../ui/Avatar';
 import { ConfirmDialog } from '../ui/Dialog';
+import { ResetLinkButton } from './ResetLink';
 import { CameraIcon, PencilIcon } from '../ui/icons';
 
 type Placement = 'top' | 'bottom' | 'left' | 'right' | 'right top' | 'left top' | 'top start' | 'bottom start';
@@ -32,6 +33,7 @@ export function ProfileCard({ userId, onClose }: { userId: string; onClose: () =
   const inviter = useStore((s) => (s.users[userId]?.invitedBy ? s.users[s.users[userId].invitedBy!] : undefined));
   const isMe = useStore((s) => s.me?.id === userId);
   const online = useStore((s) => s.online.includes(userId));
+  const isAdmin = useStore((s) => s.isAdmin);
   const room = useStore((s) => {
     const entry = s.voiceState.find((v) => v.userId === userId);
     return entry ? s.channels.find((c) => c.id === entry.channelId)?.name : undefined;
@@ -102,6 +104,7 @@ export function ProfileCard({ userId, onClose }: { userId: string; onClose: () =
           </div>
         )}
         {!isMe && <BlockButton userId={userId} name={user.name} />}
+        {!isMe && isAdmin && <ResetLinkButton userId={userId} name={user.name} />}
       </div>
     </div>
   );

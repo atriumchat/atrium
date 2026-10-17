@@ -1,6 +1,7 @@
 """Accounts: sign-up, sign-in and recovery, invites, profile and status, blocks, friends, avatars, first-run setup."""
 
 import asyncio
+import hashlib
 import hmac
 import secrets
 import sqlite3
@@ -33,10 +34,13 @@ from .auth import (
     LOGIN_BY_IP,
     LOGIN_BY_NAME,
     REGISTER_BY_IP,
+    RESET_BY_IP,
+    RESET_LINKS_BY_USER,
     RateLimit,
     client_ip,
     current_user,
     hash_password,
+    is_account_admin,
     is_admin,
     issue_token,
     media_user,
@@ -204,13 +208,14 @@ async def register(body: RegisterIn, request: Request, response: Response):
     created_at = now_ms()
     user_id = uuid.uuid4().hex
     password_hash = await password_work(hash_password, body.password)
+    recovery_key, recovery_hash = await fresh_recovery_key()
     try:
         # One transaction: the account, the limit check (SQLite holds the write lock from the INSERT on, so two
         # sign-ups can't both take the last place), and the friendship with whoever invited them.
         with connect_db() as conn:
             conn.execute(
-                "INSERT INTO users (id, name, name_key, password_hash, color, created_at, invited_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (user_id, name, name.casefold(), password_hash, secrets.choice(USER_COLORS), created_at, inviter and inviter["id"]),
+                "INSERT INTO users (id, name, name_key, password_hash, recovery_hash, color, created_at, invited_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (user_id, name, name.casefold(), password_hash, recovery_hash, secrets.choice(USER_COLORS), created_at, inviter and inviter["id"]),
             )
             # The person ADMINS names may sign up after the server started.
             seed_admins(conn)
@@ -235,7 +240,8 @@ async def register(body: RegisterIn, request: Request, response: Response):
         await notify_friends_changed(inviter["id"])
         await sio.emit("invite:used", to=user_room(inviter["id"]))
     set_media_cookie(request, response, user_id)
-    return {"token": issue_token(user_id), "user": user}
+    # The key is shown once, on the screen right after sign-up; whoever forgets the password later has nothing else.
+    return {"token": issue_token(user_id), "user": user, "recoveryKey": recovery_key, "serverName": server_name()}
 
 
 @router.post("/api/login")
@@ -393,13 +399,25 @@ async def change_password(body: PasswordChangeIn, request: Request, response: Re
     return {"token": issue_token(user["id"])}
 
 
+RECOVERY_KEY_LEN = 16
+
+
 def new_recovery_key() -> str:
-    raw = "".join(secrets.choice(INVITE_ALPHABET) for _ in range(32))
-    return "-".join(raw[i : i + 4] for i in range(0, 32, 4))
+    """XXXX-XXXX-XXXX-XXXX: 16 characters, about 79 bits. Guessing is capped at a few tries per nick every ten
+    minutes and the stored hash is scrypt, so that is far out of reach, and it is short enough for the sign-in page to
+    take it in boxes. Keys made before were 32 characters; they still work, normalize_key doesn't look at the length."""
+    raw = "".join(secrets.choice(INVITE_ALPHABET) for _ in range(RECOVERY_KEY_LEN))
+    return "-".join(raw[i : i + 4] for i in range(0, RECOVERY_KEY_LEN, 4))
 
 
 def normalize_key(key: str) -> str:
     return "".join(ch for ch in key.upper() if ch.isalnum())
+
+
+async def fresh_recovery_key() -> tuple[str, str]:
+    """A new key to show the person, and the hash to store."""
+    key = new_recovery_key()
+    return key, await password_work(hash_password, normalize_key(key))
 
 
 class RecoveryKeyIn(BaseModel):
@@ -413,8 +431,8 @@ async def make_recovery_key(body: RecoveryKeyIn, user: dict = Depends(current_us
     row = query("SELECT * FROM users WHERE id = ?", (user["id"],))[0]
     if not await password_work(verify_password, body.password, row["password_hash"]):
         raise HTTPException(status_code=403, detail="Неверный пароль")
-    key = new_recovery_key()
-    execute("UPDATE users SET recovery_hash = ? WHERE id = ?", (await password_work(hash_password, normalize_key(key)), user["id"]))
+    key, key_hash = await fresh_recovery_key()
+    execute("UPDATE users SET recovery_hash = ? WHERE id = ?", (key_hash, user["id"]))
     return {"key": key}
 
 
@@ -426,7 +444,8 @@ class RecoverIn(BaseModel):
 
 @router.post("/api/recover")
 async def recover(body: RecoverIn, request: Request, response: Response):
-    """Forgot the password: nick + recovery key + a new password. The key works once; old sessions end."""
+    """Forgot the password: nick + recovery key + a new password. The key works once, so the next one comes back
+    with the sign-in; old sessions end."""
     LOGIN_BY_IP.check(client_ip(request))
     LOGIN_BY_NAME.check(" ".join(body.name.split()).casefold())
     row = find_user_by_name(body.name)
@@ -435,13 +454,103 @@ async def recover(body: RecoverIn, request: Request, response: Response):
     if not row or not row["recovery_hash"] or not valid:
         raise HTTPException(status_code=401, detail="Неверный ник или ключ восстановления")
     password_hash = await password_work(hash_password, body.password)
+    recovery_key, recovery_hash = await fresh_recovery_key()
     execute(
-        "UPDATE users SET password_hash = ?, recovery_hash = NULL, token_version = token_version + 1 WHERE id = ?",
-        (password_hash, row["id"]),
+        "UPDATE users SET password_hash = ?, recovery_hash = ?, token_version = token_version + 1 WHERE id = ?",
+        (password_hash, recovery_hash, row["id"]),
     )
     await disconnect_user(row["id"])
     set_media_cookie(request, response, row["id"])
-    return {"token": issue_token(row["id"]), "user": public_user(row)}
+    return {"token": issue_token(row["id"]), "user": public_user(row), "recoveryKey": recovery_key, "serverName": server_name()}
+
+
+# --- admin reset link: for someone who lost the password and the recovery key (there's no e-mail to send it to) ---
+
+RESET_TTL_MS = 24 * 3600 * 1000
+RESET_GONE = "Ссылка не работает: ей больше суток, по ней уже входили или сделали новую"
+
+
+def token_digest(token: str) -> str:
+    # The token is 256 random bits, so a plain SHA-256 is enough to keep it unreadable in the database, and it can be
+    # looked up by its hash.
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+@router.post("/api/users/{user_id}/reset-link")
+def make_reset_link(user_id: str, user: dict = Depends(current_user)):
+    """A one-time token for a new password, to be put in a link the admin passes on. It lives 24 hours and a newer
+    one replaces it. Only the hash is kept, so it is shown here and never again."""
+    if not is_account_admin(user["id"]):
+        raise HTTPException(status_code=403, detail="Это может только админ")
+    RESET_LINKS_BY_USER.check(user["id"])
+    rows = query("SELECT id, is_admin FROM users WHERE id = ?", (user_id,))
+    if not rows:
+        raise HTTPException(status_code=404, detail="Нет такого пользователя")
+    if rows[0]["is_admin"] and user_id != user["id"]:
+        # Servers have one admin; with several (ADMINS), one must not be able to take another's account.
+        raise HTTPException(status_code=403, detail="Для другого админа ссылку сделать нельзя")
+    token = secrets.token_urlsafe(32)
+    expires_at = now_ms() + RESET_TTL_MS
+    execute(
+        "INSERT OR REPLACE INTO password_resets (user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)",
+        (user_id, token_digest(token), expires_at, now_ms()),
+    )
+    return {"token": token, "expiresAt": expires_at}
+
+
+class ResetCheckIn(BaseModel):
+    token: str = Field(max_length=200)
+
+
+class ResetIn(BaseModel):
+    token: str = Field(max_length=200)
+    password: str = Field(min_length=MIN_PASSWORD_LEN, max_length=128)
+
+
+def find_reset(digest: str) -> dict | None:
+    rows = query(
+        "SELECT password_resets.user_id, users.name FROM password_resets JOIN users ON users.id = password_resets.user_id"
+        " WHERE token_hash = ? AND expires_at > ?",
+        (digest, now_ms()),
+    )
+    return rows[0] if rows else None
+
+
+@router.post("/api/reset/check")
+def check_reset(body: ResetCheckIn, request: Request):
+    """For the page a reset link opens: whether the link still works, and whose password it sets."""
+    RESET_BY_IP.check(client_ip(request))
+    reset = find_reset(token_digest(body.token))
+    if not reset:
+        raise HTTPException(status_code=404, detail=RESET_GONE)
+    return {"name": reset["name"]}
+
+
+@router.post("/api/reset")
+async def reset_password(body: ResetIn, request: Request, response: Response):
+    """The reset link's page: a new password and, signed in with it, a fresh recovery key. The link works once; old
+    sessions end."""
+    RESET_BY_IP.check(client_ip(request))
+    digest = token_digest(body.token)
+    if not find_reset(digest):
+        # Before the two scrypt runs below: a wrong token costs next to nothing.
+        raise HTTPException(status_code=404, detail=RESET_GONE)
+    password_hash = await password_work(hash_password, body.password)
+    recovery_key, recovery_hash = await fresh_recovery_key()
+    with connect_db() as conn:
+        # Whoever deletes the row owns the link, so two requests with the same token can't both set a password.
+        reset = find_reset(digest)
+        if not reset or not conn.execute("DELETE FROM password_resets WHERE token_hash = ?", (digest,)).rowcount:
+            raise HTTPException(status_code=404, detail=RESET_GONE)
+        conn.execute(
+            "UPDATE users SET password_hash = ?, recovery_hash = ?, token_version = token_version + 1 WHERE id = ?",
+            (password_hash, recovery_hash, reset["user_id"]),
+        )
+    user_id = reset["user_id"]
+    await disconnect_user(user_id)
+    set_media_cookie(request, response, user_id)
+    user = public_user(query("SELECT * FROM users WHERE id = ?", (user_id,))[0])
+    return {"token": issue_token(user_id), "user": user, "recoveryKey": recovery_key, "serverName": server_name()}
 
 
 def blocked_ids(user_id: str) -> list[str]:
@@ -630,13 +739,14 @@ async def setup(body: SetupIn, request: Request, response: Response):
 
 
 def my_account(user_id: str) -> dict:
-    """What only you see about yourself: your real status and whether a recovery key exists."""
+    """What only you see about yourself: your real status, whether a recovery key exists and whether you are the admin."""
     row = query("SELECT status, status_text, status_until, recovery_hash FROM users WHERE id = ?", (user_id,))[0]
     return {
         "myStatus": row["status"],
         "myStatusText": row["status_text"],
         "myStatusUntil": row["status_until"],
         "hasRecoveryKey": bool(row["recovery_hash"]),
+        "isAdmin": is_account_admin(user_id),
     }
 
 

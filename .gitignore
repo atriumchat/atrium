@@ -16,3 +16,4 @@ desktop/node_modules/
 desktop/dist/
 deploy/downloads/
 *.tsbuildinfo
+.pytest_cache/

@@ -1,4 +1,4 @@
-import type { Bootstrap, Channel, Dm, Friend, InboxItem, Message, MyInvite, MyStatus, Upload, User } from './types';
+import type { Bootstrap, Channel, Dm, Friend, InboxItem, Message, MyInvite, MyStatus, Session, Upload, User } from './types';
 
 const TOKEN_KEY = 'hangout_token';
 
@@ -55,9 +55,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 const post = (body?: unknown): RequestInit => ({ method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });
 
 export const api = {
-  register: (invite: string, name: string, password: string) =>
-    request<{ token: string; user: User }>('/api/register', post({ invite, name, password })),
-  login: (name: string, password: string) => request<{ token: string; user: User }>('/api/login', post({ name, password })),
+  register: (invite: string, name: string, password: string) => request<Session>('/api/register', post({ invite, name, password })),
+  login: (name: string, password: string) => request<Session>('/api/login', post({ name, password })),
   updateMe: (bio: string) => request<User>('/api/me', { method: 'PATCH', body: JSON.stringify({ bio }) }),
   uploadAvatar: (file: File) =>
     request<User>('/api/me/avatar', { method: 'POST', body: file, headers: { 'Content-Type': file.type || 'application/octet-stream' } }),
@@ -105,7 +104,11 @@ export const api = {
   changeName: (name: string, password: string) => request<User>('/api/me/name', { method: 'PATCH', body: JSON.stringify({ name, password }) }),
   changePassword: (current: string, next: string) => request<{ token: string }>('/api/me/password', post({ current, new: next })),
   makeRecoveryKey: (password: string) => request<{ key: string }>('/api/me/recovery-key', post({ password })),
-  recover: (name: string, key: string, password: string) => request<{ token: string; user: User }>('/api/recover', post({ name, key, password })),
+  recover: (name: string, key: string, password: string) => request<Session>('/api/recover', post({ name, key, password })),
+  /** Admin only: a one-time token for a new password for this person. A newer one replaces it. */
+  makeResetLink: (userId: string) => request<{ token: string; expiresAt: number }>(`/api/users/${userId}/reset-link`, post()),
+  checkReset: (token: string) => request<{ name: string }>('/api/reset/check', post({ token })),
+  reset: (token: string, password: string) => request<Session>('/api/reset', post({ token, password })),
   block: (userId: string) => request<string[]>(`/api/blocks/${userId}`, { method: 'PUT' }),
   unblock: (userId: string) => request<string[]>(`/api/blocks/${userId}`, { method: 'DELETE' }),
   setupStatus: () => request<{ needed: boolean; serverName: string }>('/api/setup'),

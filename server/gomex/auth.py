@@ -94,6 +94,8 @@ FRIEND_REQUESTS_BY_USER = RateLimit(30, 3600)
 GROUPS_BY_USER = RateLimit(20, 3600)
 INVITE_RESETS_BY_USER = RateLimit(10, 86400)
 INVITE_CHECKS_BY_IP = RateLimit(30, 600)
+RESET_LINKS_BY_USER = RateLimit(20, 3600)
+RESET_BY_IP = RateLimit(30, 600)
 
 
 def client_ip(request: Request) -> str:
@@ -173,3 +175,9 @@ def is_admin(user: dict) -> bool:
         return bool(query("SELECT 1 FROM users WHERE id = ? AND is_admin = 1", (user["id"],)))
     # Nobody is an admin yet: everyone may manage the server, unless ADMINS says who will be.
     return not ADMINS
+
+
+def is_account_admin(user_id: str) -> bool:
+    """The account itself holds the admin flag. Unlike is_admin(), this is not true for everyone on a server that
+    never got an admin: fine for renaming channels, not for taking over somebody's account."""
+    return bool(query("SELECT 1 FROM users WHERE id = ? AND is_admin = 1", (user_id,)))

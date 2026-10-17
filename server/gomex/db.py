@@ -271,6 +271,14 @@ def init_db() -> None:
               created_at INTEGER NOT NULL,
               PRIMARY KEY (user_id, blocked_id)
             );
+            -- The link an admin makes for someone who lost both password and recovery key. One per person (a newer
+            -- link replaces the older one); only the SHA-256 of the token is kept, and using it deletes the row.
+            CREATE TABLE IF NOT EXISTS password_resets (
+              user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+              token_hash TEXT NOT NULL UNIQUE,
+              expires_at INTEGER NOT NULL,
+              created_at INTEGER NOT NULL
+            );
             """
         )
         upload_columns = {row[1] for row in conn.execute("PRAGMA table_info(uploads)")}

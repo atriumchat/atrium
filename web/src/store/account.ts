@@ -9,6 +9,7 @@ export type AccountSlice = {
   /** When a timed "do not disturb" / "invisible" runs out (ms); null = until changed. */
   myStatusUntil: number | null;
   hasRecoveryKey: boolean;
+  isAdmin: boolean;
 };
 
 export function accountSlice(): AccountSlice {
@@ -18,6 +19,7 @@ export function accountSlice(): AccountSlice {
     myStatusText: '',
     myStatusUntil: null,
     hasRecoveryKey: false,
+    isAdmin: false,
   };
 }
 
@@ -37,6 +39,7 @@ export function initStore(data: Bootstrap) {
     myStatusText: data.myStatusText ?? '',
     myStatusUntil: data.myStatusUntil ?? null,
     hasRecoveryKey: !!data.hasRecoveryKey,
+    isAdmin: !!data.isAdmin,
     serverRelayOnly: !!data.relayOnly,
     selectedChannelId: get().selectedChannelId ?? firstText?.id ?? data.channels[0]?.id ?? null,
   });

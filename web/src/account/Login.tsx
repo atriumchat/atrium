@@ -2,12 +2,14 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Button, Input, Label, TextField } from '@heroui/react';
 import { api, setToken } from '../api';
 import { clearInviteFromUrl, inviteFromUrl, parseInvite } from '../people/invite';
+import type { Session } from '../types';
 import { Bubbles } from '../ui/Illustrations';
 import { GomexMark } from '../ui/Logo';
+import { RecoveryKeyInput } from './RecoveryKeyInput';
 
 type Mode = 'login' | 'register' | 'recover';
 
-export function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
+export function Login({ onLoggedIn }: { onLoggedIn: (session: Session) => void }) {
   // Opened from an invite link: straight to sign-up with the code filled in.
   const [linkCode] = useState(inviteFromUrl);
   const [mode, setMode] = useState<Mode>(linkCode ? 'register' : 'login');
@@ -36,15 +38,15 @@ export function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      const { token } =
+      const session =
         mode === 'login'
           ? await api.login(name, password)
           : mode === 'recover'
             ? await api.recover(name, recoveryKey, password)
             : await api.register(parseInvite(invite), name, password);
-      setToken(token);
+      setToken(session.token);
       clearInviteFromUrl();
-      onLoggedIn();
+      onLoggedIn(session);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не получилось');
     } finally {
@@ -114,10 +116,7 @@ export function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
           <Input className="h-11 bg-default text-[16px]" />
         </TextField>
         {mode === 'recover' && (
-          <TextField isRequired fullWidth value={recoveryKey} onChange={setRecoveryKey} maxLength={64} autoComplete="off">
-            <Label>Ключ восстановления</Label>
-            <Input className="h-11 bg-default font-mono text-[15px]" placeholder="XXXX-XXXX-…" />
-          </TextField>
+          <RecoveryKeyInput value={recoveryKey} onChange={setRecoveryKey} />
         )}
         <TextField
           isRequired

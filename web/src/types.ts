@@ -14,6 +14,12 @@ export type User = {
 
 export type MyStatus = 'online' | 'dnd' | 'invisible';
 
+/**
+ * What signing in returns. Sign-up, recovery with a key and a reset link also hand out a recovery key, shown once on
+ * the screen before the app (the old one is spent or replaced), with the server's name for the file it can be saved to.
+ */
+export type Session = { token: string; user: User; recoveryKey?: string; serverName?: string };
+
 /** Your personal invite link: its code, who signed up with it, and how many may (null = no limit). */
 export type MyInvite = {
   code: string;
@@ -110,6 +116,8 @@ export type Bootstrap = {
   /** When a timed status runs out (ms), or null. */
   myStatusUntil?: number | null;
   hasRecoveryKey: boolean;
+  /** This account holds the admin flag (canManageChannels is also true while the server has no admin at all). */
+  isAdmin: boolean;
   /** Every call goes only through the relay on 443 (RELAY_ONLY on the server). */
   relayOnly?: boolean;
 };
