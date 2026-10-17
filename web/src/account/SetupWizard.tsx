@@ -1,39 +1,197 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { Button } from '@heroui/react';
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { InputOTP, REGEXP_ONLY_DIGITS_AND_CHARS } from '@heroui/react';
 import { api, setToken } from '../api';
 import { inviteLink } from '../people/invite';
-import { ConnectionCheck } from '../voice/ConnectionCheck';
 import { GomexMark } from '../ui/Logo';
-import { CheckIcon } from '../ui/icons';
+import { CheckIcon, UserPlusIcon } from '../ui/icons';
+import { IconCropper, centred, cropToBlob, cropToUrl, loadImage, type Crop } from '../ui/IconCropper';
+import { SetupScenes, type Facts, type SceneName } from './SetupScenes';
+import './setup.css';
 
 /**
- * First run on a fresh server, after Fluxer's setup: the code from .env, the server's name, the admin
- * account, a check that calls get through, and the first invite link. Shown while the server has no accounts.
+ * First run on a fresh server, shown while it has no accounts. The desktop app's "Свой сервер" sets the server up and
+ * opens this page with the setup code in the address (?setup=CODE), in the same window: this is the second half of
+ * that setup and looks the same (setup.css, after desktop/onboarding.css). The server's name and icon, the admin,
+ * their recovery key, the first invite link, and done.
  */
 
-const STEPS = ['Код', 'Сервер', 'Админ', 'Связь', 'Приглашение'] as const;
+type StepId = 'code' | 'server' | 'crop' | 'admin' | 'key' | 'invite' | 'done';
 
-const field = 'h-12 w-full rounded-full bg-default px-5 text-[16px] outline-none placeholder:text-faint focus:ring-2 focus:ring-focus';
-const primary = 'h-12 w-full rounded-full text-[16px] [--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]';
+// The picture on the right for each step (SetupScenes).
+const SCENE: Record<StepId, SceneName> = { code: 'code', server: 'server', crop: 'server', admin: 'admin', key: 'key', invite: 'invite', done: 'room' };
 
-function codeFromUrl() {
-  return new URLSearchParams(window.location.search).get('setup') ?? '';
+// install.sh makes the code 10 letters and digits (INVITE_CODE in .env).
+const CODE_LENGTH = 10;
+
+const EYE = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+const DONE = <CheckIcon size={14} strokeWidth={2.5} />;
+
+/** The code out of anything pasted: the whole link from the installer, or the code itself. */
+function codeFrom(text: string) {
+  let value = text.trim();
+  try {
+    value = new URL(value).searchParams.get('setup') ?? value;
+  } catch {
+    // Not a link: the code itself.
+  }
+  return value.replace(/[^a-zA-Z0-9]/g, '').slice(0, CODE_LENGTH);
 }
 
+/** The clipboard, or the old way where it's refused (a window without focus, an older webview). */
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return;
+  } catch {
+    // Below.
+  }
+  const area = Object.assign(document.createElement('textarea'), { value: text, readOnly: true });
+  area.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+  document.body.append(area);
+  area.select();
+  const copied = document.execCommand('copy');
+  area.remove();
+  if (!copied) throw new Error('Не получилось скопировать');
+}
+
+const letter = (name: string) => name.trim().charAt(0).toUpperCase() || '?';
+
+/** The key in two lines of groups (a long one), each breakable only between groups. */
+function keyLines(key: string) {
+  const groups = key.split('-');
+  const half = groups.length > 4 ? Math.ceil(groups.length / 2) : groups.length;
+  return [groups.slice(0, half), groups.slice(half)].filter((g) => g.length).map((g) => g.join('-'));
+}
+
+function useWide() {
+  const query = '(min-width: 821px)';
+  const [wide, setWide] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const sync = () => setWide(media.matches);
+    media.addEventListener('change', sync);
+    return () => media.removeEventListener('change', sync);
+  }, []);
+  return wide;
+}
+
+function Primary({
+  busy = false,
+  disabled = false,
+  type = 'button',
+  onClick,
+  children,
+}: {
+  busy?: boolean;
+  disabled?: boolean;
+  type?: 'button' | 'submit';
+  onClick?: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button type={type} className={`primary${busy ? ' busy' : ''}`} disabled={disabled || busy} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+// Design work, development only: #step=server (or code, admin, key, invite, done) opens that step with made-up answers
+// and nothing sent to the server, as desktop/onboarding.html does; #t=7000 also stops the cameras then (SetupScenes).
+export const DEMO = import.meta.env.DEV ? (window.location.hash.match(/step=(code|server|admin|key|invite|done)\b/)?.[1] as StepId | undefined) : undefined;
+const ORDER: StepId[] = ['code', 'server', 'crop', 'admin', 'key', 'invite', 'done'];
+const past = (id: StepId) => !!DEMO && ORDER.indexOf(DEMO) > ORDER.indexOf(id);
+
 export function SetupWizard({ onDone }: { onDone: () => void }) {
-  const [step, setStep] = useState(0);
-  const [code, setCode] = useState(codeFromUrl);
-  const [serverName, setServerName] = useState('');
-  const [name, setName] = useState('');
-  const [password, setPassword] = useState('');
-  const [repeat, setRepeat] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [fromUrl] = useState(() => codeFrom(new URLSearchParams(window.location.search).get('setup') ?? ''));
+  // The code step is only on the way when the address didn't bring the code (or brought a wrong one).
+  const [askCode, setAskCode] = useState(DEMO ? DEMO === 'code' : !fromUrl);
+  const [code, setCode] = useState(fromUrl);
+
+  const [step, setStep] = useState<{ id: StepId; back: boolean; n: number }>({ id: DEMO ?? (fromUrl ? 'server' : 'code'), back: false, n: 0 });
+  const current = useRef(step);
+  current.current = step;
+  const [leaving, setLeaving] = useState<{ id: StepId; n: number } | null>(null);
+  const leaveTimer = useRef(0);
+  const stepRef = useRef<HTMLElement>(null);
+  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [checked, setChecked] = useState(false);
+
+  const [defaultName, setDefaultName] = useState('Gomex');
+  const [serverName, setServerName] = useState(past('code') ? 'Подвал' : '');
+  const fileInput = useRef<HTMLInputElement>(null);
+  // The icon as chosen, and the picture being cropped right now (a new one, or the chosen one again).
+  const [icon, setIcon] = useState<{ image: HTMLImageElement; crop: Crop; name: string } | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{ image: HTMLImageElement; crop: Crop; name: string } | null>(null);
+  const [draftPreview, setDraftPreview] = useState<string | null>(null);
+
+  const [nick, setNick] = useState(past('crop') ? 'Тимур' : '');
+  const [password, setPassword] = useState(nick && 'password');
+  const [repeat, setRepeat] = useState(password);
+  const [showPassword, setShowPassword] = useState(false);
+  // What's already done on the server, so a retry after an error doesn't do it twice.
+  const [account, setAccount] = useState<{ color: string; serverName: string } | null>(past('admin') ? { color: '#5865f2', serverName: 'Подвал' } : null);
+  const [iconSent, setIconSent] = useState(false);
+
+  const [key, setKey] = useState(account ? 'K7QM-2XPA-9DHR-T4WC' : '');
+  const [keyKept, setKeyKept] = useState<'copied' | 'downloaded' | 'kept' | null>(past('key') ? 'copied' : null);
+  const [link, setLink] = useState(account ? `${window.location.origin}/?invite=7F3K9QAB` : '');
+  const [linkSent, setLinkSent] = useState<'copied' | 'shared' | null>(past('invite') ? 'copied' : null);
+
+  const wide = useWide();
+  const name = serverName.trim() || defaultName;
+  const host = window.location.host;
+
+  // The step before goes out first, then this one comes in (setup.css): the two never show at once.
+  function go(id: StepId, back = false, problem = '') {
+    const from = current.current;
+    current.current = { id, back, n: from.n + 1 };
+    setError(problem);
+    setLeaving({ id: from.id, n: from.n });
+    setStep(current.current);
+    clearTimeout(leaveTimer.current);
+    leaveTimer.current = window.setTimeout(() => setLeaving(null), 160);
+  }
+
+  // Focus once the step has settled, and without scrolling: a field focused mid-animation drags the step to it.
+  useEffect(() => {
+    const timer = setTimeout(
+      () => stepRef.current?.querySelector<HTMLElement>('input:not([disabled]):not([readonly]):not([type="file"])')?.focus({ preventScroll: true }),
+      560,
+    );
+    return () => clearTimeout(timer);
+  }, [step.n]);
+
+  useEffect(() => {
+    api.setupStatus().then(
+      (s) => setDefaultName(s.serverName),
+      () => undefined,
+    );
+    // The code from the address is checked quietly while the first step is already up; a wrong one asks for it.
+    if (fromUrl) {
+      api.setupCheck(fromUrl).catch((e) => {
+        setAskCode(true);
+        setCode('');
+        go('code', false, e instanceof Error ? e.message : 'Код не подходит');
+      });
+    }
+  }, []);
+
+  // The crop as it will look, in the picture on the right while it's being made.
+  useEffect(() => {
+    if (!draft) return;
+    const frame = requestAnimationFrame(() => setDraftPreview(cropToUrl(draft.image, draft.crop)));
+    return () => cancelAnimationFrame(frame);
+  }, [draft]);
 
   async function run(action: () => Promise<void>) {
     setBusy(true);
-    setError(null);
+    setError('');
     try {
       await action();
     } catch (e) {
@@ -43,143 +201,553 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     }
   }
 
-  const next = () => setStep((s) => s + 1);
+  /* ---------- 1. code ---------- */
 
-  function submitCode(e: FormEvent) {
-    e.preventDefault();
+  function checkCode(value = code) {
+    if (!value || busy) return;
     run(async () => {
-      await api.setupCheck(code);
-      next();
+      await api.setupCheck(value);
+      go('server');
     });
   }
 
-  function submitServer(e: FormEvent) {
-    e.preventDefault();
-    if (serverName.trim()) next();
+  /* ---------- 2. name and icon ---------- */
+
+  async function pick(file: File | undefined) {
+    if (fileInput.current) fileInput.current.value = '';
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) return setError('Картинка больше 8 МБ');
+    try {
+      const image = await loadImage(file);
+      if (draft && draft.image !== icon?.image) URL.revokeObjectURL(draft.image.src);
+      setDraft({ image, crop: centred(image), name: file.name });
+      go('crop');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не получилось открыть картинку');
+    }
   }
+
+  function keepCrop() {
+    if (!draft) return;
+    if (icon && icon.image !== draft.image) URL.revokeObjectURL(icon.image.src);
+    setIcon(draft);
+    setPreview(cropToUrl(draft.image, draft.crop));
+    setIconSent(false);
+    go('server', true);
+  }
+
+  function dropIcon() {
+    if (icon && icon.image !== draft?.image) URL.revokeObjectURL(icon.image.src);
+    setIcon(null);
+    setPreview(null);
+    setIconSent(false);
+  }
+
+  function skipServer() {
+    setServerName('');
+    dropIcon();
+    go('admin');
+  }
+
+  /* ---------- 3. admin ---------- */
+
+  const mismatch = repeat !== '' && repeat.length >= password.length && repeat !== password;
 
   function submitAdmin(e: FormEvent) {
     e.preventDefault();
     if (password !== repeat) return setError('Пароли не совпадают');
     run(async () => {
-      const { token } = await api.setup(code, serverName, name, password);
-      setToken(token);
-      // The code did its job; don't leave it in the address bar or the history.
-      window.history.replaceState(null, '', window.location.pathname);
-      next();
+      let made = account;
+      if (!made) {
+        const { token, user } = await api.setup(code, name, nick, password);
+        setToken(token);
+        // The code did its job; don't leave it in the address bar or the history.
+        window.history.replaceState(null, '', window.location.pathname);
+        made = { color: user.color, serverName: name };
+        setAccount(made);
+        api.myInvite().then(
+          (i) => setLink(inviteLink(i.code)),
+          () => undefined,
+        );
+      } else if (made.serverName !== name) {
+        // Back to the name after the account was made: the name changes the admin's way.
+        await api.renameServer(name);
+        made = { ...made, serverName: name };
+        setAccount(made);
+      }
+      if (icon && !iconSent) {
+        await api.uploadServerIcon(await cropToBlob(icon.image, icon.crop));
+        setIconSent(true);
+      }
+      if (!key) setKey((await api.makeRecoveryKey(password)).key);
+      go('key');
     });
   }
 
-  return (
-    <div className="flex h-full overflow-y-auto bg-background">
-      <div className="m-auto w-full max-w-[440px] px-4 py-10">
-        <div className="mb-8 flex items-center gap-3">
-          <GomexMark size={40} />
-          <span className="text-[15px] text-muted">Настройка сервера</span>
-        </div>
-        <ol className="mb-8 flex gap-1.5" aria-label="Шаги">
-          {STEPS.map((label, i) => (
-            <li key={label} className="flex-1" aria-current={i === step ? 'step' : undefined}>
-              <span className={`block h-1 rounded-full transition-colors ${i <= step ? 'bg-white' : 'bg-white/15'}`} />
-              <span className={`mt-1.5 block text-[11px] ${i === step ? 'text-foreground' : 'text-faint'}`}>{label}</span>
-            </li>
-          ))}
-        </ol>
+  /* ---------- 4. recovery key ---------- */
 
-        {step === 0 && (
-          <Step title="Привет! Это новый сервер" text="Чтобы настроить его, нужен код установки. Скрипт установки показал ссылку с ним; ещё он лежит в файле .env на сервере, строка INVITE_CODE.">
-            <form onSubmit={submitCode} className="flex flex-col gap-3">
-              <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Код установки" aria-label="Код установки" autoFocus className={`${field} font-mono`} />
-              <Button type="submit" isPending={busy} isDisabled={!code.trim()} className={primary}>
-                Дальше
-              </Button>
-            </form>
-          </Step>
-        )}
+  async function copyKey() {
+    await copyText(key).then(
+      () => {
+        setError('');
+        setKeyKept('copied');
+      },
+      (e: Error) => setError(e.message),
+    );
+  }
 
-        {step === 1 && (
-          <Step title="Как назовём сервер?" text="Это имя увидят все в шапке и в приглашениях. Поменять можно и потом.">
-            <form onSubmit={submitServer} className="flex flex-col gap-3">
-              <input value={serverName} onChange={(e) => setServerName(e.target.value)} maxLength={40} placeholder="Например, Подвал" aria-label="Имя сервера" autoFocus className={field} />
-              <Button type="submit" isDisabled={!serverName.trim()} className={primary}>
-                Дальше
-              </Button>
-            </form>
-          </Step>
-        )}
+  function downloadKey() {
+    const text = [`Gomex · ${name}`, window.location.origin, `Ник: ${nick.trim()}`, `Ключ восстановления: ${key}`, ''].join('\n');
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: `gomex-${window.location.hostname}-key.txt` });
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setKeyKept('downloaded');
+  }
 
-        {step === 2 && (
-          <Step title="Аккаунт админа" text="Админ создаёт каналы, управляет сервером и приглашает людей без лимита.">
-            <form onSubmit={submitAdmin} className="flex flex-col gap-3">
-              <input value={name} onChange={(e) => setName(e.target.value)} maxLength={32} placeholder="Ник" aria-label="Ник" autoComplete="username" autoFocus className={field} />
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Пароль, от 8 символов" aria-label="Пароль" autoComplete="new-password" className={field} />
-              <input type="password" value={repeat} onChange={(e) => setRepeat(e.target.value)} placeholder="Ещё раз" aria-label="Пароль ещё раз" autoComplete="new-password" className={field} />
-              <Button type="submit" isPending={busy} isDisabled={!name.trim() || password.length < 8 || !repeat} className={primary}>
-                Создать сервер
-              </Button>
-            </form>
-          </Step>
-        )}
+  /* ---------- 5. invite ---------- */
 
-        {step === 3 && (
-          <Step title="Проверим связь" text="Пробуем позвонить на свой же сервер: напрямую и через антилаг на 443.">
-            <ConnectionCheck onDone={() => setChecked(true)} />
-            <Button onPress={next} className={`${primary} mt-3`}>
-              {checked ? 'Дальше' : 'Пропустить'}
-            </Button>
-          </Step>
-        )}
-
-        {step === 4 && (
-          <Step title="Готово" text="Ссылка-приглашение: по ней люди регистрируются и сразу попадают в друзья. Она всегда внизу слева, в «Пригласить друзей».">
-            <InviteLink />
-            <Button onPress={onDone} className={`${primary} mt-3`}>
-              Войти в Gomex
-            </Button>
-          </Step>
-        )}
-
-        {error && <p className="mt-3 px-1 text-[14px] text-danger">{error}</p>}
-        {step > 0 && step < 3 && (
-          <button onClick={() => setStep((s) => s - 1)} className="mx-auto mt-4 block text-[14px] text-muted hover:text-foreground">
-            Назад
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Step({ title, text, children }: { title: string; text: string; children: ReactNode }) {
-  return (
-    <section>
-      <h1 className="text-[28px] font-medium leading-9 tracking-[-0.01em]">{title}</h1>
-      <p className="mb-6 mt-2 text-[15px] leading-snug text-muted">{text}</p>
-      {children}
-    </section>
-  );
-}
-
-function InviteLink() {
-  const [link, setLink] = useState('');
-  const [copied, setCopied] = useState(false);
   useEffect(() => {
-    api.myInvite().then((i) => setLink(inviteLink(i.code)), () => setLink(''));
-  }, []);
+    if (step.id !== 'invite' || link) return;
+    api.myInvite().then(
+      (i) => setLink(inviteLink(i.code)),
+      (e) => setError(e instanceof Error ? e.message : 'Не получилось загрузить ссылку'),
+    );
+  }, [step.id, link]);
+
+  const canShare = typeof navigator.share === 'function';
+
+  async function copyLink() {
+    await copyText(link).then(
+      () => {
+        setError('');
+        setLinkSent('copied');
+      },
+      (e: Error) => setError(e.message),
+    );
+  }
+
+  async function shareLink() {
+    try {
+      await navigator.share({ title: name, url: link });
+      setLinkSent('shared');
+    } catch {
+      // The sheet was closed: nothing sent.
+    }
+  }
+
+  /* ---------- the steps ---------- */
+
+  function render(id: StepId) {
+    switch (id) {
+      case 'code':
+        return (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              checkCode();
+            }}
+          >
+            <h1>Код установки</h1>
+            <p className="sub">Строка INVITE_CODE в .env на сервере</p>
+            <label className="field-label" htmlFor="setup-code">
+              Код
+            </label>
+            <InputOTP
+              id="setup-code"
+              maxLength={CODE_LENGTH}
+              pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
+              value={code}
+              onChange={(value) => {
+                setCode(value);
+                setError('');
+              }}
+              onComplete={(value: string) => checkCode(value)}
+              pasteTransformer={codeFrom}
+              isInvalid={!!error}
+              spellCheck={false}
+              autoComplete="off"
+              className="otp"
+            >
+              <InputOTP.Group>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <InputOTP.Slot key={i} index={i} />
+                ))}
+              </InputOTP.Group>
+              <InputOTP.Separator />
+              <InputOTP.Group>
+                {[5, 6, 7, 8, 9].map((i) => (
+                  <InputOTP.Slot key={i} index={i} />
+                ))}
+              </InputOTP.Group>
+            </InputOTP>
+            <p className="error" role="alert">
+              {error}
+            </p>
+            <div className="actions">
+              <Primary type="submit" busy={busy} disabled={!code}>
+                Дальше
+              </Primary>
+            </div>
+          </form>
+        );
+
+      case 'server':
+        return (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (serverName.trim()) go('admin');
+            }}
+          >
+            <h1>Название сервера</h1>
+            <p className="sub">Видно в приложении и в приглашениях</p>
+            <div className="rows">
+              <div className="row">
+                <button
+                  type="button"
+                  className="logo icon-button"
+                  aria-label="Значок"
+                  onClick={() => (icon ? (setDraft(icon), go('crop')) : fileInput.current?.click())}
+                >
+                  {preview ? <img src={preview} alt="" /> : <GomexMark size={18} />}
+                </button>
+                <span className="grow">
+                  <b>Значок</b>
+                  <small>{icon ? icon.name : 'Знак Gomex'}</small>
+                </span>
+                {icon && (
+                  <button type="button" className="quiet" onClick={dropIcon}>
+                    Убрать
+                  </button>
+                )}
+                <button type="button" className="secondary" onClick={() => fileInput.current?.click()}>
+                  {icon ? 'Другой' : 'Выбрать'}
+                </button>
+              </div>
+            </div>
+            <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => pick(e.target.files?.[0])} />
+            <label className="field-label gap" htmlFor="setup-name">
+              Название
+            </label>
+            <input
+              id="setup-name"
+              className="field"
+              value={serverName}
+              onChange={(e) => setServerName(e.target.value)}
+              maxLength={40}
+              placeholder="Подвал"
+              spellCheck={false}
+              autoComplete="off"
+            />
+            <p className="error" role="alert">
+              {error}
+            </p>
+            <div className="actions">
+              {askCode && (
+                <button type="button" className="quiet" onClick={() => go('code', true)}>
+                  Назад
+                </button>
+              )}
+              <span className="pair">
+                <button type="button" className="quiet" onClick={skipServer}>
+                  Пропустить
+                </button>
+                <Primary type="submit" disabled={!serverName.trim()}>
+                  Дальше
+                </Primary>
+              </span>
+            </div>
+          </form>
+        );
+
+      case 'crop':
+        if (!draft) return null;
+        return (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              keepCrop();
+            }}
+          >
+            <h1>Значок</h1>
+            <p className="sub">{draft.name}</p>
+            <IconCropper image={draft.image} crop={draft.crop} onChange={(crop) => setDraft((d) => d && { ...d, crop })} className="crop" />
+            <div className="actions">
+              <button type="button" className="quiet" onClick={() => go('server', true)}>
+                Назад
+              </button>
+              <Primary type="submit">Готово</Primary>
+            </div>
+          </form>
+        );
+
+      case 'admin':
+        return (
+          <form onSubmit={submitAdmin}>
+            <h1>Аккаунт админа</h1>
+            <p className="sub">Каналы, приглашения и настройки сервера</p>
+            <label className="field-label" htmlFor="setup-nick">
+              Ник
+            </label>
+            <input
+              id="setup-nick"
+              className="field"
+              value={nick}
+              onChange={(e) => {
+                setNick(e.target.value);
+                setError('');
+              }}
+              maxLength={32}
+              placeholder="Тимур"
+              autoComplete="username"
+              spellCheck={false}
+              autoCapitalize="off"
+              readOnly={!!account}
+            />
+            <label className="field-label" htmlFor="setup-password">
+              Пароль
+            </label>
+            <span className="with-eye">
+              <input
+                id="setup-password"
+                className="field"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="От 8 символов"
+                autoComplete="new-password"
+                readOnly={!!account}
+              />
+              <button type="button" className="eye" aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'} onClick={() => setShowPassword((s) => !s)}>
+                {EYE}
+              </button>
+            </span>
+            <label className="field-label" htmlFor="setup-repeat">
+              Ещё раз
+            </label>
+            <input
+              id="setup-repeat"
+              className={`field${mismatch ? ' bad' : ''}`}
+              type={showPassword ? 'text' : 'password'}
+              value={repeat}
+              onChange={(e) => setRepeat(e.target.value)}
+              autoComplete="new-password"
+              readOnly={!!account}
+            />
+            <p className="error" role="alert">
+              {error || (mismatch ? 'Пароли не совпадают' : '')}
+            </p>
+            <div className="actions">
+              <button type="button" className="quiet" onClick={() => go('server', true)}>
+                Назад
+              </button>
+              <Primary type="submit" busy={busy} disabled={!nick.trim() || password.length < 8 || repeat !== password}>
+                Создать
+              </Primary>
+            </div>
+          </form>
+        );
+
+      case 'key':
+        return (
+          <div>
+            <h1>Ключ восстановления</h1>
+            <p className="sub">Вернёт доступ, если пароль забыт</p>
+            <p className="key">
+              {keyLines(key).map((line) => (
+                <span key={line} className="block">
+                  {line}
+                </span>
+              ))}
+            </p>
+            <div className="tools">
+              <button type="button" className={`secondary${keyKept === 'copied' ? ' did' : ''}`} onClick={copyKey}>
+                {keyKept === 'copied' && DONE}
+                {keyKept === 'copied' ? 'Скопирован' : 'Скопировать'}
+              </button>
+              <button type="button" className={`secondary${keyKept === 'downloaded' ? ' did' : ''}`} onClick={downloadKey}>
+                {keyKept === 'downloaded' && DONE}
+                {keyKept === 'downloaded' ? 'Скачан' : 'Скачать'}
+              </button>
+            </div>
+            <p className="error" role="alert" style={{ marginTop: 10 }}>
+              {error}
+            </p>
+            <div className="actions">
+              <span className="pair">
+                {!keyKept && (
+                  <button
+                    type="button"
+                    className="quiet"
+                    onClick={() => {
+                      setKeyKept('kept');
+                      go('invite');
+                    }}
+                  >
+                    Сохранил
+                  </button>
+                )}
+                <Primary disabled={!keyKept} onClick={() => go('invite')}>
+                  Дальше
+                </Primary>
+              </span>
+            </div>
+          </div>
+        );
+
+      case 'invite':
+        return (
+          <div>
+            <h1>Позвать друзей</h1>
+            <p className="sub">По ссылке регистрация, и сразу в друзья</p>
+            <label className="field-label" htmlFor="setup-link">
+              Ссылка
+            </label>
+            <input
+              id="setup-link"
+              className="field"
+              readOnly
+              value={link.replace(/^https?:\/\//, '') || 'Загружаем…'}
+              onFocus={(e) => e.currentTarget.select()}
+            />
+            <div className="tools">
+              <button type="button" className={`secondary${linkSent === 'copied' ? ' did' : ''}`} disabled={!link} onClick={copyLink}>
+                {linkSent === 'copied' && DONE}
+                {linkSent === 'copied' ? 'Скопирована' : 'Скопировать'}
+              </button>
+              {canShare && (
+                <button type="button" className={`secondary${linkSent === 'shared' ? ' did' : ''}`} disabled={!link} onClick={shareLink}>
+                  {linkSent === 'shared' && DONE}
+                  Поделиться
+                </button>
+              )}
+            </div>
+            <p className="error" role="alert" style={{ marginTop: 10 }}>
+              {error}
+            </p>
+            <div className="actions">
+              <button type="button" className="quiet" onClick={() => go('key', true)}>
+                Назад
+              </button>
+              <span className="pair">
+                {!linkSent && (
+                  <button type="button" className="quiet" onClick={() => go('done')}>
+                    Позже
+                  </button>
+                )}
+                <Primary disabled={!linkSent} onClick={() => go('done')}>
+                  Дальше
+                </Primary>
+              </span>
+            </div>
+          </div>
+        );
+
+      case 'done':
+        return (
+          <div>
+            <h1>Всё готово</h1>
+            <p className="sub">{host}</p>
+            <div className="rows">
+              <div className="row">
+                <span className="logo">{preview ? <img src={preview} alt="" /> : <GomexMark size={18} />}</span>
+                <span className="grow">
+                  <b>{name}</b>
+                  <small>Сервер</small>
+                </span>
+              </div>
+              <div className="row">
+                <span className="logo person" style={{ background: account?.color }}>
+                  {letter(nick)}
+                </span>
+                <span className="grow">
+                  <b>{nick.trim()}</b>
+                  <small>Админ</small>
+                </span>
+              </div>
+              <div className="row">
+                <span className="logo ok">{DONE}</span>
+                <span className="grow">
+                  <b>Ключ восстановления</b>
+                  <small>{keyKept === 'copied' ? 'Скопирован' : keyKept === 'downloaded' ? 'Скачан' : 'Сохранён'}</small>
+                </span>
+              </div>
+              <div className="row">
+                <span className={`logo${linkSent ? ' ok' : ''}`}>{linkSent ? DONE : <UserPlusIcon size={18} />}</span>
+                <span className="grow">
+                  <b>Приглашение</b>
+                  <small>{linkSent === 'copied' ? 'Ссылка скопирована' : linkSent === 'shared' ? 'Ссылка отправлена' : 'Позже'}</small>
+                </span>
+              </div>
+            </div>
+            <div className="actions">
+              <button type="button" className="quiet" onClick={() => go('invite', true)}>
+                Назад
+              </button>
+              <Primary onClick={onDone}>Начать использование</Primary>
+            </div>
+          </div>
+        );
+    }
+  }
+
+  // The three bars: the server was set up in the desktop app (or by the installer), so it's full; the account
+  // fills over its steps, friends with the link and the end.
+  const at = step.id === 'crop' ? 'server' : step.id;
+  const accountSteps: StepId[] = askCode ? ['code', 'server', 'admin', 'key'] : ['server', 'admin', 'key'];
+  const onAccount = accountSteps.includes(at);
+  const fill = {
+    server: 1,
+    account: onAccount ? accountSteps.indexOf(at) / accountSteps.length : 1,
+    friends: at === 'done' ? 1 : at === 'invite' && linkSent ? 0.5 : 0,
+  };
+  const now = onAccount ? 'account' : 'friends';
+
+  const facts: Facts = {
+    host,
+    code,
+    serverName: name,
+    icon: step.id === 'crop' ? draftPreview : preview,
+    nick: nick.trim(),
+    color: account?.color ?? '#5865f2',
+    passwordLength: password.length,
+    key,
+    link: link.replace(/^https?:\/\//, ''),
+  };
+
   return (
-    <div className="flex h-12 items-center gap-2 rounded-full bg-default pl-5 pr-1.5">
-      <span className="min-w-0 flex-1 truncate text-[14px]">{link.replace(/^https?:\/\//, '') || 'Загружаем…'}</span>
-      <Button
-        isDisabled={!link}
-        onPress={async () => {
-          await navigator.clipboard.writeText(link).catch(() => undefined);
-          setCopied(true);
-        }}
-        className="h-9 shrink-0 rounded-full px-4 text-[14px] [--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]"
-      >
-        {copied && <CheckIcon size={16} strokeWidth={2.5} />}
-        {copied ? 'Скопировано' : 'Скопировать'}
-      </Button>
+    <div className="setup">
+      <div className="left">
+        <GomexMark size={26} className="mark" />
+        <main className="steps">
+          {leaving && (
+            <section key={leaving.n} className="step leaving" aria-hidden="true">
+              {render(leaving.id)}
+            </section>
+          )}
+          <section key={step.n} ref={stepRef} className={`step${step.back ? ' back-in' : ''}`}>
+            {render(step.id)}
+          </section>
+        </main>
+        <nav className="progress" aria-label="Шаги">
+          {(
+            [
+              ['server', 'Сервер'],
+              ['account', 'Аккаунт'],
+              ['friends', 'Друзья'],
+            ] as const
+          ).map(([part, label]) => (
+            <span key={part} className={`part${now === part ? ' now' : ''}`}>
+              <span className="track">
+                <i style={{ '--fill': fill[part] } as CSSProperties} />
+              </span>
+              <span className="name">{label}</span>
+            </span>
+          ))}
+        </nav>
+      </div>
+      {wide && <SetupScenes scene={SCENE[step.id]} facts={facts} />}
     </div>
   );
 }

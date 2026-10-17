@@ -6,7 +6,7 @@ import { connectSocket } from './socket';
 import { clearInviteFromUrl } from './people/invite';
 import { Login } from './account/Login';
 import { Shell } from './shell/Shell';
-import { SetupWizard } from './account/SetupWizard';
+import { DEMO, SetupWizard } from './account/SetupWizard';
 import { RecoveryKeyScreen, loadNewKey, storeNewKey, type NewKey } from './account/RecoveryKey';
 import { ResetPassword } from './account/ResetPassword';
 import { clearResetFromUrl, resetFromUrl } from './account/resetLink';
@@ -18,7 +18,9 @@ export function App() {
   // Opened from an admin's reset link; or reloaded on the recovery key's screen, where the key waits (see RecoveryKey).
   const [resetToken] = useState(resetFromUrl);
   const [newKey, setNewKey] = useState<NewKey | null>(() => (getToken() ? loadNewKey() : null));
-  const [phase, setPhase] = useState<Phase>(resetToken ? 'reset' : newKey ? 'key' : getToken() ? 'loading' : 'login');
+  const [phase, setPhase] = useState<Phase>(
+    DEMO ? 'setup' : resetToken ? 'reset' : newKey ? 'key' : getToken() ? 'loading' : 'login',
+  );
 
   // Signed out on a server with no accounts yet: that's a fresh install, so the setup wizard instead of sign-in.
   useEffect(() => {
