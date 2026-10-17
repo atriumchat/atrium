@@ -408,6 +408,36 @@ function callBack(title, body) {
   }
 }
 setupCall('cancel-mail', () => serverSetup.cancelMail());
+
+/** The deSEC account an earlier server of this computer left, unsealed; the newest one, or null. */
+function savedDesec() {
+  let all;
+  try {
+    all = JSON.parse(fs.readFileSync(SERVERS_FILE, 'utf8'));
+  } catch {
+    return null;
+  }
+  const newest = Object.entries(all)
+    .filter(([domain, server]) => server.desec && domain.endsWith('.dedyn.io'))
+    .sort((a, b) => String(b[1].at).localeCompare(String(a[1].at)))[0];
+  if (!newest) return null;
+  try {
+    const { sealed, plain } = newest[1].desec;
+    const account = JSON.parse(sealed ? safeStorage.decryptString(Buffer.from(sealed, 'base64')) : plain);
+    return { domain: newest[0], account };
+  } catch {
+    return null;
+  }
+}
+// Only the name goes to the window; the password stays here.
+setupCall('saved-address', () => ({ domain: savedDesec()?.domain ?? null }));
+setupCall('use-saved', async ({ ip }) => {
+  const saved = savedDesec();
+  if (!saved) return { error: 'Сохранённого адреса нет' };
+  const answer = await serverSetup.reuse({ ...saved.account, name: saved.domain.replace(/\.dedyn\.io$/, ''), ip });
+  if (answer.ok) freeAccount = { domain: answer.domain, account: answer.account };
+  return answer.ok ? { ok: true, domain: answer.domain } : answer;
+});
 setupCall('check-domain', (domain) => serverSetup.checkDomain(domain));
 setupCall('connect-drive', () => ({ error: 'Google Диск появится в следующей версии, пока можно без бэкапов' }));
 

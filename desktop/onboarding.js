@@ -244,6 +244,7 @@ function show(name, { back = false } = {}) {
     if (scene.classList.contains('on')) frame(scene);
   }
   progress(PLACE[name] / 5);
+  if (name === 'free-name') offerSaved();
   // Focus once the step has settled, and without scrolling: a field focused mid-animation drags the step to it.
   setTimeout(() => to.querySelector('.input:not([disabled])')?.focus({ preventScroll: true }), 560);
 }
@@ -353,6 +354,26 @@ $('go-free-name').addEventListener('click', async () => {
   waitForMail();
 });
 
+// An address this computer already has from an earlier server: deSEC allows one name per e-mail, so it is offered
+// first and pointed at this server.
+async function offerSaved() {
+  $('e-saved').textContent = '';
+  const { domain } = await setup.savedAddress();
+  $('saved').hidden = !domain;
+  if (domain) $('saved-name').textContent = `Есть адрес ${domain}`;
+}
+$('use-saved').addEventListener('click', async () => {
+  busy($('use-saved'), true);
+  const answer = await setup.useSaved({ ip: state.facts.ip });
+  busy($('use-saved'), false);
+  if (answer.error) {
+    $('e-saved').textContent = answer.error;
+    return;
+  }
+  state.address = { domain: answer.domain };
+  show('backup');
+});
+
 // Then the letter: a button straight into the person's mailbox, and the app waiting for the link to be pressed and
 // deSEC's captcha on its page solved. Once it is, the app signs in to deSEC and points the name at the server itself.
 const MAILBOXES = [
@@ -363,6 +384,7 @@ const MAILBOXES = [
   [/^(icloud|me|mac)\.com$/, 'Открыть iCloud Почту', 'https://www.icloud.com/mail'],
   [/^(proton\.me|protonmail\.com)$/, 'Открыть Proton Mail', 'https://mail.proton.me/'],
 ];
+let lateTimer = null;
 function waitForMail() {
   const email = freeEmail();
   const box = MAILBOXES.find(([domain]) => domain.test(email.split('@')[1]?.toLowerCase() ?? ''));
@@ -374,9 +396,20 @@ function waitForMail() {
     bind('mailhost', new URL(box[2]).host);
   }
   $('mail-wait').hidden = false;
+  $('mail-wait').classList.remove('done');
   $('mail-state').textContent = 'Ждём подтверждение';
   $('e-mail').textContent = '';
+  $('mail-late').hidden = true;
+  $('own-instead').hidden = true;
   show('free-mail');
+  // A sign-up for an e-mail that already has an account sends no letter at all; after this long the person gets
+  // the ways on. The wait itself goes on, so a late confirmation still works.
+  clearTimeout(lateTimer);
+  lateTimer = setTimeout(() => {
+    if (state.step !== 'free-mail') return;
+    $('mail-late').hidden = false;
+    $('own-instead').hidden = false;
+  }, location.hash.includes('slowmail') ? 5000 : 15 * 60 * 1000);
   setup.waitMail({ ip: state.facts.ip }).then((answer) => {
     if (state.step !== 'free-mail') return;
     if (answer.error) {
@@ -384,6 +417,9 @@ function waitForMail() {
       $('e-mail').textContent = answer.error;
       return;
     }
+    clearTimeout(lateTimer);
+    $('mail-late').hidden = true;
+    $('own-instead').hidden = true;
     $('mail-state').textContent = 'Подтверждено';
     $('mail-wait').classList.add('done');
     state.address = { domain: `${freeName()}.dedyn.io` };
@@ -391,6 +427,10 @@ function waitForMail() {
   });
 }
 $('open-mail').addEventListener('click', () => setup.openExternal($('open-mail').dataset.url));
+$('own-instead').addEventListener('click', () => {
+  setup.cancelMail();
+  show('own');
+});
 $('other-mail').addEventListener('click', () => {
   setup.cancelMail();
   show('free-name', { back: true });
@@ -645,8 +685,17 @@ function fakeSetup() {
       await wait(900);
       return name === 'taken' ? { error: 'Имя занято, нужно другое' } : { ok: true };
     },
-    waitMail: () => wait(6000).then(() => ({ ok: true })),
+    // #slowmail: the letter never comes (a late confirmation arrives after a minute).
+    waitMail: () => wait(location.hash.includes('slowmail') ? 60000 : 6000).then(() => ({ ok: true })),
     cancelMail() {},
+    // A made-up saved account; #nosaved has none, #deaddesec has one deSEC refuses.
+    async savedAddress() {
+      return { domain: location.hash.includes('nosaved') ? null : 'podval.dedyn.io' };
+    },
+    async useSaved() {
+      await wait(900);
+      return location.hash.includes('deaddesec') ? { error: 'deSEC не принял сохранённый вход' } : { ok: true, domain: 'podval.dedyn.io' };
+    },
     async checkDomain() {
       await wait(800);
       return { ok: true };
