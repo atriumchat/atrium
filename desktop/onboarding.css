@@ -240,9 +240,11 @@ h1 {
   font-size: 13px;
 }
 
-/* Rows between hairlines: choices, how-tos, facts, the install's tasks. */
+/* Rows between hairlines: choices, how-tos, facts. */
 .rows {
   display: grid;
+  /* One column no wider than the form: a long name is cut short, it doesn't push the row's buttons out. */
+  grid-template-columns: minmax(0, 1fr);
   border-top: 1px solid var(--line);
 }
 .row {
@@ -420,14 +422,37 @@ h1 {
   color: var(--here);
 }
 
-/* The install: what's done, what's on, what's next. */
+/* The install: one line, the step that is on, with what it's doing under it; a thin bar for the whole of it. */
+.tasks {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .task {
-  /* Seven lines and what's under the running one have to fit the window: the icon sits at the label, not the middle. */
+  display: none;
   align-items: flex-start;
-  min-height: 44px;
-  padding: 11px 0;
+  border-bottom: 0;
+  gap: 14px;
+  /* Room for the label and two quiet lines, so the column doesn't jump as steps say more or less. */
+  min-height: 84px;
+  padding: 14px 0 12px;
   color: var(--faint);
-  transition: color 0.3s;
+  font-size: 15px;
+}
+.task.current {
+  display: flex;
+  animation: task-in 0.35s var(--ease);
+}
+@keyframes task-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.task-bar {
+  margin-top: 2px;
 }
 [data-step="install"] .sub {
   margin-bottom: 20px;
@@ -446,13 +471,18 @@ h1 {
   box-shadow: inset 0 0 0 1.5px #ffffff26;
   transition: background 0.3s, box-shadow 0.3s;
 }
-.task[data-state="run"] {
+.task[data-state="run"],
+.task[data-state="wait"] {
   color: var(--fg);
 }
 .task[data-state="run"] .state {
   box-shadow: none;
 }
-.task[data-state="run"] .state::after {
+.task[data-state="wait"] .state {
+  box-shadow: none;
+}
+.task[data-state="run"] .state::after,
+.task[data-state="wait"] .state::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -467,7 +497,7 @@ h1 {
   }
 }
 .task[data-state="done"] {
-  color: var(--muted);
+  color: var(--fg);
 }
 .task[data-state="done"] .state {
   background: var(--fg);
@@ -524,11 +554,9 @@ h1 {
 .task[data-state="run"] .lines small:last-child {
   color: var(--muted);
 }
+/* How long each step took isn't news when only one is on screen; the clock below counts the whole. */
 .task .took {
-  flex: none;
-  color: var(--faint);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
+  display: none;
 }
 .elapsed {
   color: var(--faint);
@@ -588,6 +616,10 @@ h1 {
 }
 .secondary:hover {
   background: var(--default-hover);
+}
+.secondary.icon {
+  width: 34px;
+  padding: 0;
 }
 .primary svg,
 .secondary svg {

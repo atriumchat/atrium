@@ -142,7 +142,9 @@
         <section class="step" data-step="install" hidden>
           <h1 id="install-title">Ставим Gomex</h1>
           <p class="sub" id="install-sub">Пара минут, окно можно свернуть</p>
-          <ol class="rows tasks" id="tasks"></ol>
+          <!-- One line at a time: the step that is on, what it's doing under it, and how far the whole install is. -->
+          <ol class="tasks" id="tasks"></ol>
+          <span class="track task-bar"><i id="task-fill"></i></span>
           <p class="error" id="e-install" role="alert"></p>
           <div class="actions">
             <span class="elapsed" id="elapsed">0:00</span>

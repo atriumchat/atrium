@@ -404,6 +404,13 @@ $('domain').addEventListener('input', () => {
   renderRecords();
 });
 
+const ICON = (paths) =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+const COPY_ICON = ICON(
+  '<rect x="8.5" y="8.5" width="12" height="12" rx="3" /><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5" />',
+);
+const DONE_ICON = ICON('<path d="M5 12.5l4.5 4.5L19 7.5" />');
+
 function renderRecords() {
   const box = $('records');
   box.hidden = !domainOk(domain());
@@ -415,11 +422,14 @@ function renderRecords() {
       const type = Object.assign(document.createElement('span'), { className: 'type', textContent: 'A' });
       const code = Object.assign(document.createElement('code'), { textContent: name, title: name, className: 'grow' });
       const to = Object.assign(document.createElement('span'), { className: 'to', textContent: ip });
-      const copy = Object.assign(document.createElement('button'), { className: 'secondary', type: 'button', textContent: 'Копировать' });
+      // A round icon, not a word: a long name needs the row's width.
+      const copy = Object.assign(document.createElement('button'), { className: 'secondary icon', type: 'button', title: 'Копировать' });
+      copy.setAttribute('aria-label', 'Копировать');
+      copy.innerHTML = COPY_ICON;
       copy.addEventListener('click', async () => {
         await navigator.clipboard.writeText(name).catch(() => undefined);
-        copy.textContent = 'Готово';
-        setTimeout(() => (copy.textContent = 'Копировать'), 1200);
+        copy.innerHTML = DONE_ICON;
+        setTimeout(() => (copy.innerHTML = COPY_ICON), 1200);
       });
       row.append(type, code, to, copy);
       return row;
@@ -485,6 +495,8 @@ function renderTasks() {
   ).join('');
   Object.keys(live).forEach((id) => delete live[id]);
   running = null;
+  current(TASKS[0][0]);
+  $('task-fill').style.setProperty('--fill', '0');
   // A fresh run: the install screen as it was before any line came in.
   document.querySelectorAll('[data-screen="install"]').forEach((ui) => (ui.innerHTML = SCREENS.install()));
   Object.entries(bound).forEach(([name, value]) => bind(name, value));
@@ -506,13 +518,21 @@ function logLine(text, took) {
   frame(document.querySelector('.scene[data-scene="install"]'));
 }
 
+/** The one line on screen: the step that is on (or failed), the others stay out of sight. */
+function current(id) {
+  const row = document.querySelector(`.task[data-task="${id}"]`);
+  if (!row || row.classList.contains('current')) return;
+  document.querySelectorAll('.task.current').forEach((el) => el.classList.remove('current'));
+  row.classList.add('current');
+}
+
 /** Draws what's under the task's line from what has come in. */
 function showSubs(id) {
   const row = document.querySelector(`.task[data-task="${id}"]`);
   const view = live[id];
   if (!row || !view) return;
   const long = view.out && Date.now() - view.since > OUT_AFTER;
-  const texts = long ? [...view.subs.slice(-1), view.out] : view.subs.slice(-2);
+  const texts = long ? [view.out] : view.subs.slice(-1);
   const box = row.querySelector('.lines');
   const key = texts.join('\n');
   if (box.dataset.key === key) return;
@@ -556,7 +576,9 @@ function startInstall() {
     const took = s < 60 ? `${s} с` : `${Math.floor(s / 60)} мин`;
     row.querySelector('.took').textContent = took;
     logLine(TASKS.find(([task]) => task === id)?.[2] ?? '', took);
-    progress((PLACE.install + document.querySelectorAll('.task[data-state="done"]').length / TASKS.length) / 5);
+    const done = document.querySelectorAll('.task[data-state="done"]').length / TASKS.length;
+    $('task-fill').style.setProperty('--fill', String(done));
+    progress((PLACE.install + done) / 5);
   };
   // The installer reports its own steps; a line here starts with the first of its steps and is done once a later
   // line's step starts (a step the server didn't need just never shows up).
@@ -574,6 +596,7 @@ function startInstall() {
           live[id] = { subs: [], out: '', since: started[id] };
         }
         running = id;
+        current(id);
         // Another step of the same line: the last output was the step before's.
         if (live[id]) live[id].out = '';
       } else if (event.state === 'sub') {
@@ -584,6 +607,7 @@ function startInstall() {
         showSubs(id);
       } else if (event.state === 'fail') {
         document.querySelector(`.task[data-task="${id}"]`).dataset.state = 'fail';
+        current(id);
       }
       return;
     }
@@ -599,6 +623,10 @@ function startInstall() {
     }
     if (event.state === 'ready') {
       TASKS.forEach(([task]) => finish(task));
+      // The last line becomes the end of it all.
+      const last = document.querySelector(`.task[data-task="${TASKS.at(-1)[0]}"]`);
+      last.querySelector('.label').textContent = 'Всё установлено';
+      current(last.dataset.task);
       clearInterval(clock);
       state.installing = false;
       state.done = event;
