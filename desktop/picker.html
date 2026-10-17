@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; font-src 'self'; img-src data:; script-src 'self'" />
+    <title>Демонстрация экрана</title>
+    <link rel="stylesheet" href="picker.css" />
+  </head>
+  <body>
+    <header>
+      <div class="tabs" role="tablist">
+        <button class="tab" id="tab-window" type="button" role="tab" aria-selected="true">Окна</button>
+        <button class="tab" id="tab-screen" type="button" role="tab" aria-selected="false">Экраны</button>
+      </div>
+    </header>
+    <main>
+      <div class="grid" id="window" role="listbox" aria-labelledby="tab-window"></div>
+      <div class="grid" id="screen" role="listbox" aria-labelledby="tab-screen" hidden></div>
+      <p class="note" id="note" hidden></p>
+      <span class="spinner" id="wait" role="status" aria-label="Загрузка"></span>
+    </main>
+    <footer>
+      <!-- Only Windows can share the computer's sound with the screen. -->
+      <button class="switch" id="sound" type="button" role="switch" aria-checked="true" hidden>
+        <i class="track"></i>
+        <span>Звук</span>
+      </button>
+      <span class="spacer"></span>
+      <button class="quiet" id="cancel" type="button">Отмена</button>
+      <button class="primary" id="show" type="button" disabled>Показать</button>
+    </footer>
+    <script src="picker.js"></script>
+  </body>
+</html>

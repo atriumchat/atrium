@@ -1,4 +1,4 @@
-import { createLocalVideoTrack, DisconnectReason, LocalVideoTrack, Room, RoomEvent, ScreenSharePresets, Track, VideoPresets } from 'livekit-client';
+import { createLocalVideoTrack, type AudioCaptureOptions, DisconnectReason, LocalVideoTrack, Room, RoomEvent, ScreenSharePresets, Track, VideoPresets } from 'livekit-client';
 import { api } from '../api';
 import { getSocket, MOVED } from '../socket';
 import { isDmId, openDm, selectChannel, selfEntry, showError, useStore } from '../store';
@@ -6,6 +6,7 @@ import { playSound } from './sounds';
 import { applyNoise, micTrack, suspendNoise } from './noise';
 import { applyVolume, getPreferredDevice } from './devices';
 import { savePrefs, type VoicePrefs } from '../prefs';
+import { desktop } from '../desktop';
 // Push-to-talk listens from the moment the call code loads; it calls back into applyMic() below.
 import './ptt';
 
@@ -240,6 +241,10 @@ export async function toggleDeafen() {
   await applyMic();
 }
 
+// The shared system sound without Gomex's own: otherwise everyone in the call hears their own voice back. Chrome and
+// the desktop app honour it on Windows 11 (elsewhere it is ignored); livekit's types don't list it yet.
+const sharedSound: AudioCaptureOptions & { restrictOwnAudio: boolean } = { restrictOwnAudio: true };
+
 export async function toggleScreenShare() {
   const { room } = get();
   if (!room) return;
@@ -248,7 +253,7 @@ export async function toggleScreenShare() {
     await room.localParticipant.setScreenShareEnabled(
       enable,
       {
-        audio: true,
+        audio: sharedSound,
         systemAudio: 'include',
         selfBrowserSurface: 'exclude',
         contentHint: 'motion',
@@ -257,8 +262,10 @@ export async function toggleScreenShare() {
       { screenShareEncoding: ScreenSharePresets.h720fps30.encoding, screenShareSimulcastLayers: [ScreenSharePresets.h360fps15] },
     );
   } catch (e) {
-    // Closing the screen picker throws NotAllowedError; that's a cancel, not an error.
-    if (!(e instanceof Error && e.name === 'NotAllowedError')) {
+    // Closing the screen picker throws NotAllowedError; that's a cancel, not an error. The desktop app's own picker
+    // says it with an AbortError ("Invalid capture constraints"): Electron has no way to deny from there.
+    const cancelled = e instanceof Error && (e.name === 'NotAllowedError' || (desktop && e.name === 'AbortError'));
+    if (!cancelled) {
       showError(`Не удалось включить демонстрацию: ${e instanceof Error ? e.message : e}`);
     }
   }

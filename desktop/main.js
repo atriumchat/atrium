@@ -7,7 +7,6 @@ const {
   Menu,
   Notification,
   Tray,
-  desktopCapturer,
   ipcMain,
   nativeImage,
   powerMonitor,
@@ -28,6 +27,7 @@ if (devEnv('GOMEX_USER_DATA')) app.setPath('userData', devEnv('GOMEX_USER_DATA')
 const updater = require('./updater');
 const ptt = require('./ptt');
 const serverSetup = require('./server-setup');
+const screenPicker = require('./screen-picker');
 
 // The server address can be changed from the tray ("Адрес сервера…") if Gomex ever has to move to a
 // new domain — no reinstall. Stored in the app's settings folder.
@@ -192,18 +192,22 @@ function setUpPermissions() {
     return allowed.has(permission) && fromGomex(requestingOrigin);
   });
 
-  // Screen sharing: the system picker where the OS has one (macOS); otherwise the whole main screen,
-  // with the computer's sound on Windows. Only Gomex itself may ask. (With the macOS system picker the person
-  // picks what to share in the OS's own window. Windows has no picker yet: it always shares the main screen.)
+  // Screen sharing: the system picker where the OS has one (macOS); everywhere else Gomex's own (screen-picker.js),
+  // with the computer's sound as a switch on Windows. Only Gomex itself may ask. GOMEX_PICKER=1 (development)
+  // turns the system picker off to try Gomex's on a Mac.
+  const ownPickerForced = Boolean(devEnv('GOMEX_PICKER'));
   session.defaultSession.setDisplayMediaRequestHandler(
     (request, callback) => {
-      if (!fromGomex(request.securityOrigin || request.frame?.url || '')) return callback({});
-      desktopCapturer
-        .getSources({ types: ['screen'] })
-        .then((sources) => callback({ video: sources[0], audio: process.platform === 'win32' ? 'loopback' : undefined }))
-        .catch(() => callback({}));
+      if (!fromGomex(request.securityOrigin || request.frame?.url || '')) return callback(null);
+      screenPicker
+        .choose(win, { sound: process.platform === 'win32' || ownPickerForced })
+        .then((choice) =>
+          // Nothing chosen: the page's getDisplayMedia rejects.
+          callback(choice ? { video: choice.source, audio: choice.sound && process.platform === 'win32' ? 'loopback' : undefined } : null),
+        )
+        .catch(() => callback(null));
     },
-    { useSystemPicker: true },
+    { useSystemPicker: !ownPickerForced },
   );
 }
 

@@ -1,0 +1,303 @@
+/* The screen-share picker: tones and shapes of onboarding.css (the setup window), only more compact. */
+
+@font-face {
+  font-family: "Onest";
+  src: url(assets/fonts/onest-cyrillic-wght-normal.woff2) format("woff2");
+  font-weight: 100 900;
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: "Onest";
+  src: url(assets/fonts/onest-latin-ext-wght-normal.woff2) format("woff2");
+  font-weight: 100 900;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Onest";
+  src: url(assets/fonts/onest-latin-wght-normal.woff2) format("woff2");
+  font-weight: 100 900;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  color-scheme: dark;
+  --window: #0c0c0e;
+  --field: #141417;
+  --default: #1e1e22;
+  --default-hover: #26262b;
+  --line: #ffffff12;
+  --fg: #f2f2f4;
+  --muted: #8f8f99;
+  --faint: #5c5c66;
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+}
+body {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  overflow: hidden;
+  background: var(--window);
+  color: var(--fg);
+  font: 14px/1.45 "Onest", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
+  user-select: none;
+}
+[hidden] {
+  display: none !important;
+}
+button {
+  font: inherit;
+  color: inherit;
+}
+button:focus-visible {
+  outline: 2px solid #ffffff66;
+  outline-offset: 2px;
+}
+
+/* ---------- tabs ---------- */
+
+header {
+  flex: none;
+  padding: 14px 20px 0;
+  border-bottom: 1px solid var(--line);
+}
+.tabs {
+  display: flex;
+  gap: 24px;
+}
+.tab {
+  position: relative;
+  padding: 6px 0 12px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.tab:hover,
+.tab[aria-selected="true"] {
+  color: var(--fg);
+}
+/* The mark sits on the hairline under the tabs. */
+.tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--fg);
+}
+
+/* ---------- what can be shared ---------- */
+
+main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  padding: 18px 20px;
+  overflow-y: auto;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  gap: 18px 14px;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  outline: none;
+  cursor: pointer;
+}
+.thumb {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--field);
+}
+.thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+/* The ring is drawn over the picture, so a thumbnail never covers it. */
+.thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: box-shadow 0.15s;
+  pointer-events: none;
+}
+.card:hover .thumb::after {
+  box-shadow: inset 0 0 0 1px #ffffff33;
+}
+.card:focus-visible .thumb::after {
+  box-shadow: inset 0 0 0 1px #ffffff66;
+}
+.card[aria-selected="true"] .thumb::after {
+  box-shadow: inset 0 0 0 2px var(--fg);
+}
+.label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+  transition: color 0.15s;
+}
+.card:hover .label,
+.card[aria-selected="true"] .label {
+  color: var(--fg);
+}
+.label img {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.label span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.note {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--muted);
+}
+.spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 999px;
+  border: 2px solid #ffffff26;
+  border-top-color: var(--fg);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- buttons ---------- */
+
+footer {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line);
+}
+.spacer {
+  flex: 1;
+}
+.primary,
+.quiet {
+  height: 36px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.primary {
+  background: var(--fg);
+  color: var(--window);
+}
+.primary:hover {
+  background: #fff;
+}
+.primary:disabled {
+  background: var(--default);
+  color: var(--faint);
+  cursor: default;
+}
+.quiet {
+  background: none;
+  color: var(--muted);
+}
+.quiet:hover {
+  color: var(--fg);
+}
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.switch:hover,
+.switch[aria-checked="true"] {
+  color: var(--fg);
+}
+.track {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--default-hover);
+  transition: background 0.2s var(--ease);
+}
+.track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--muted);
+  transition: transform 0.2s var(--ease), background 0.2s var(--ease);
+}
+.switch[aria-checked="true"] .track {
+  background: var(--fg);
+}
+.switch[aria-checked="true"] .track::after {
+  background: var(--window);
+  transform: translateX(14px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track,
+  .track::after,
+  .thumb::after {
+    transition: none;
+  }
+}
