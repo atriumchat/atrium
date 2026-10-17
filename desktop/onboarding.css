@@ -491,6 +491,8 @@ h1 {
   height: 20px;
   border-radius: 999px;
   box-shadow: inset 0 0 0 1.5px #ffffff26;
+  /* Onest's words sit a little above their box's middle: the icon follows them, not the box. */
+  top: -2px;
   transform-origin: left center;
   transition: background 0.3s, box-shadow 0.3s, transform 0.8s var(--ease);
 }
@@ -536,12 +538,11 @@ h1 {
   background: var(--danger);
   box-shadow: none;
 }
-/* The install's title with its clock at the right, on one line. */
+/* The install's title with its clock right after it. */
 .head {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 10px;
 }
 .elapsed {
   color: var(--faint);
