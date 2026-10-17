@@ -3,25 +3,98 @@
   <head>
     <meta charset="UTF-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'self'" />
-    <title>Адрес сервера</title>
+    <title>Gomex</title>
     <style>
       :root {
         color-scheme: dark;
       }
       body {
         margin: 0;
-        padding: 20px;
+        padding: 22px;
         background: #0b0b0d;
         color: #f2f2f4;
         font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      [hidden] {
+        display: none !important;
       }
       h1 {
         margin: 0 0 4px;
         font-size: 17px;
+        font-weight: 600;
       }
       p {
         margin: 0 0 14px;
         color: #9a9aa3;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+      .brand svg {
+        width: 28px;
+        height: 28px;
+      }
+      .brand b {
+        font-size: 17px;
+        font-weight: 600;
+      }
+      /* First start: two ways in, the invite one first and filled, because most people arrive with a link. */
+      .cards {
+        display: grid;
+        gap: 10px;
+      }
+      .card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        width: 100%;
+        padding: 14px 16px;
+        border: 0;
+        border-radius: 18px;
+        background: #18181b;
+        box-shadow: inset 0 0 0 1px #ffffff14;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+      .card:hover {
+        background: #1f1f23;
+      }
+      .card.primary {
+        background: #f2f2f4;
+        color: #0b0b0d;
+        box-shadow: none;
+      }
+      .card.primary:hover {
+        background: #ffffff;
+      }
+      .card svg {
+        flex: none;
+        width: 22px;
+        height: 22px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .card span {
+        display: grid;
+        gap: 1px;
+      }
+      .card b {
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .card small {
+        font-size: 12.5px;
+        opacity: 0.65;
       }
       form {
         display: flex;
@@ -38,19 +111,34 @@
         color: inherit;
         font: inherit;
         outline: none;
+        -webkit-user-select: text;
+        user-select: text;
       }
       input:focus {
-        box-shadow: 0 0 0 2px #0052ff;
+        box-shadow: 0 0 0 2px #5b5b66;
       }
-      button {
+      button.go {
         height: 38px;
         padding: 0 16px;
         border: 0;
         border-radius: 999px;
-        background: #0052ff;
-        color: #fff;
+        background: #f2f2f4;
+        color: #0b0b0d;
         font: inherit;
         font-weight: 600;
+        cursor: pointer;
+      }
+      .back {
+        margin-top: 4px;
+        padding: 6px 0;
+        border: 0;
+        background: none;
+        color: #9a9aa3;
+        font: inherit;
+        cursor: pointer;
+      }
+      .back:hover {
+        color: #f2f2f4;
       }
       #error {
         margin-top: 10px;
@@ -60,13 +148,36 @@
     </style>
   </head>
   <body>
-    <h1>Адрес сервера</h1>
-    <p id="hint">Если Gomex переехал на другой адрес — вставь новый. Приложение перезапустится.</p>
-    <form id="form">
-      <input id="url" type="text" required placeholder="https://app.example.com" spellcheck="false" autocapitalize="off" />
-      <button id="save" type="submit">Сохранить</button>
-    </form>
-    <div id="error"></div>
+    <section id="start" hidden>
+      <div class="brand">
+        <svg viewBox="0 0 164 164" aria-hidden="true">
+          <circle cx="82" cy="82" r="71.97" fill="none" stroke="currentColor" stroke-width="13.7" />
+          <path fill="currentColor" d="M116.1 78V120.9H107.1L105 111.3Q95.4 122.8 80 122.8Q63.1 122.8 52.5 111.3Q42 99.8 42 81.3Q42 63.2 52.6 51.1Q63.2 39 81.2 39Q94.3 39 104 46.3Q113.7 53.6 115.1 66.3H101.5Q100.2 59 94.8 54.9Q89.3 50.8 81.1 50.8Q69.5 50.8 62.8 58.9Q56.2 67 56.2 81.1Q56.2 95.3 62.9 103.4Q69.6 111.4 81.5 111.4Q92 111.4 97.7 104.9Q103.4 98.4 103.4 88.8H81.8V78Z" />
+        </svg>
+        <b>Gomex</b>
+      </div>
+      <div class="cards">
+        <button class="card primary" id="invite" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L12 5.6" /><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2" /></svg>
+          <span><b>Есть приглашение</b><small>Ссылка от друга</small></span>
+        </button>
+        <button class="card" id="own" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3.5" width="18" height="7" rx="2.5" /><rect x="3" y="13.5" width="18" height="7" rx="2.5" /><path d="M7 7h.01M7 17h.01" stroke-width="3" /></svg>
+          <span><b>Свой сервер</b><small>Для своей компании. Нужен VPS и домен</small></span>
+        </button>
+      </div>
+    </section>
+
+    <section id="enter" hidden>
+      <h1 id="title">Адрес сервера</h1>
+      <p id="hint">Новый адрес сервера. Приложение перезапустится.</p>
+      <form id="form">
+        <input id="url" type="text" required placeholder="https://app.example.com" spellcheck="false" autocapitalize="off" />
+        <button class="go" id="save" type="submit">Сохранить</button>
+      </form>
+      <div id="error"></div>
+      <button class="back" id="back" type="button" hidden>← Назад</button>
+    </section>
     <script src="address.js"></script>
   </body>
 </html>

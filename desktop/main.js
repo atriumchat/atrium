@@ -43,6 +43,20 @@ function readConfig() {
 const DEFAULT_URL = require('./package.json').gomexDefaultUrl || '';
 const APP_URL = devEnv('GOMEX_URL') || readConfig().url || DEFAULT_URL;
 const ORIGIN = APP_URL ? new URL(APP_URL).origin : '';
+// An invite link pasted on first start (address:save): its path and query are opened once, so sign-up comes with
+// the invite in place, then forgotten.
+const PENDING = readConfig().open;
+const START_URL = ORIGIN && typeof PENDING === 'string' && PENDING.startsWith('/') ? ORIGIN + PENDING : APP_URL;
+if (PENDING !== undefined) {
+  const { open: _open, ...rest } = readConfig();
+  try {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(rest, null, 2));
+  } catch {
+    // Not fatal: the invite would just open again next time.
+  }
+}
+// Where "Свой сервер" on the first start leads.
+const SERVER_GUIDE = 'https://gomex.party/server-install';
 // The app's own updates come from the project's GitHub Releases whatever server it talks to, and only signed ones
 // install (updater.js). release-desktop.sh puts the manifest's address into package.json, like the server's; a build
 // without it never updates.
@@ -103,7 +117,7 @@ function createWindow() {
     },
   });
 
-  win.loadURL(APP_URL);
+  win.loadURL(START_URL);
   win.once('ready-to-show', () => win?.show());
 
   // Closing the window only hides it: Gomex keeps running in the menu bar / tray so calls still come in.
@@ -216,12 +230,12 @@ let addressWindow = null;
 function openAddressWindow({ firstRun = false } = {}) {
   if (addressWindow) return addressWindow.focus();
   addressWindow = new BrowserWindow({
-    width: 460,
-    height: 210,
+    width: firstRun ? 480 : 460,
+    height: firstRun ? 300 : 210,
     resizable: false,
     minimizable: false,
     maximizable: false,
-    title: 'Адрес сервера',
+    title: firstRun ? 'Gomex' : 'Адрес сервера',
     backgroundColor: '#0b0b0d',
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'address-preload.js'), contextIsolation: true, sandbox: true },
@@ -247,10 +261,18 @@ ipcMain.handle('address:save', (event, value) => {
   }
   if (url.protocol !== 'https:') return 'Адрес должен начинаться с https://';
   fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true });
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify({ url: url.origin }, null, 2));
+  // A pasted invite link (…/?invite=CODE) is opened once on the next start; a bare address just opens the app.
+  const rest = url.pathname + url.search;
+  const config = rest === '/' ? { url: url.origin } : { url: url.origin, open: rest };
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
   quitting = true;
   app.relaunch();
   app.exit(0);
+});
+
+ipcMain.handle('address:guide', (event) => {
+  if (!event.senderFrame?.url.startsWith('file://')) return;
+  shell.openExternal(SERVER_GUIDE);
 });
 
 /** IPC from the page; only the Gomex page itself may send these. */
