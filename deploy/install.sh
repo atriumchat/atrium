@@ -5,7 +5,9 @@
 #   curl -fsSL …/install.sh | DOMAIN=chat.example.com GOMEX_YES=1 sh       # no questions at all
 # Each installer takes its own release's tarball from that GitHub Release, checked against the SHA-256 pinned
 # below. The npm package @gomex.llc/install mirrors both files, so the same works without GitHub:
-#   curl -fsSL https://cdn.jsdelivr.net/npm/@gomex.llc/install@latest/install.sh | sh
+#   curl -fsSL https://cdn.jsdelivr.net/npm/@gomex.llc/install/install.sh | sh
+# Where Node is already installed, the same package runs with npx (its bin is gomex-install):
+#   npx @gomex.llc/install            # update: npx @gomex.llc/install update
 # Re-running is an update: .env (all the secrets) and the data stay.
 # More knobs, all optional: SERVER_NAME, TURN_HOST, GOMEX_DIR (/opt/gomex), GOMEX_NO_GUM=1 (plain prompts),
 # GOMEX_FIREWALL=0 and GOMEX_SSH=0 (leave ufw / sshd alone), GOMEX_TARBALL + GOMEX_TARBALL_SHA256 (a local or

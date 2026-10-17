@@ -219,6 +219,8 @@ fi
 
 # == The npm mirror: the same two files as the npm package RELEASE_NPM names, at this version, which jsDelivr and
 # unpkg serve. install.sh falls back to it when GitHub can't be reached, and checks the same SHA-256 there.
+# The package also has a bin, so `npx @gomex.llc/install` runs the installer where Node is already installed. The bin is
+# named gomex-install, never "install": a global `npm i -g` would otherwise put a second `install` in front of coreutils'.
 npm_cdn=https://cdn.jsdelivr.net/npm/$npm_package@$version
 if [[ ${GOMEX_SKIP_NPM:-} == 1 ]]; then
   say "Skipping the npm mirror (GOMEX_SKIP_NPM=1)"
@@ -232,19 +234,28 @@ else
 {
   "name": "$npm_package",
   "version": "$version",
-  "description": "Gomex release files, not a Node package: curl -fsSL https://cdn.jsdelivr.net/npm/$npm_package@latest/install.sh | sh",
+  "description": "Gomex installer and release files: npx $npm_package, or curl -fsSL https://cdn.jsdelivr.net/npm/$npm_package/install.sh | sh",
   "homepage": "https://github.com/$repo",
   "repository": { "type": "git", "url": "git+https://github.com/$repo.git" },
   "license": "UNLICENSED",
+  "bin": { "gomex-install": "install.sh" },
   "files": ["install.sh", "$tarball"]
 }
 EOF
     cat >"$pkg/README.md" <<EOF
 # Gomex $version
 
-Зеркало релиза Gomex: установщик и архив, который он распаковывает. Это не пакет для Node.
+Установщик Gomex и архив релиза, который он распаковывает.
 
-Установка на свежий VPS (Ubuntu или Debian, root):
+Установка на свежий VPS (Ubuntu или Debian, root).
+
+С Node:
+
+${fence}sh
+npx $npm_package
+${fence}
+
+Без Node:
 
 ${fence}sh
 curl -fsSL https://cdn.jsdelivr.net/npm/$npm_package@$version/install.sh | sh
