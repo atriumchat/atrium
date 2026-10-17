@@ -120,6 +120,10 @@ curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.s
 [`deploy/install.sh`](deploy/install.sh): `SERVER_NAME`, `TURN_HOST`, `GOMEX_DIR` (по умолчанию `/opt/gomex`),
 `GOMEX_NO_GUM=1`, `GOMEX_FIREWALL=0`, `GOMEX_SSH=0`, свой архив релиза или реестр образов.
 
+Обложку на самом домене установщик пишет заново при каждом обновлении. Свой сайт кладётся в
+`/opt/gomex/landing/site` вместе с пустым файлом `.custom`: тогда установщик его не трогает. Страницы открываются
+без `.html`: `/about` — это `about.html`.
+
 ### Локальная разработка
 
 Нужны Python 3.13, Node 22 и [LiveKit](https://docs.livekit.io/home/self-hosting/local/). Три процесса в трёх

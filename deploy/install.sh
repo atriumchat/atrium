@@ -975,8 +975,9 @@ step_up() {
     (( i == 90 )) && { docker compose ps; docker compose logs --tail 30 app; return 1; }
     sleep 1
   done
-  # Once the app answers: the cover page carries the name it has.
-  write_landing "$(env_get .env LANDING_SEED)"
+  # Once the app answers: the cover page carries the name it has. A site of one's own in landing/site, marked by a
+  # file named .custom there, stays as it is.
+  [[ -e $GOMEX_DIR/landing/site/.custom ]] || write_landing "$(env_get .env LANDING_SEED)"
   # Images of earlier releases.
   docker image prune -f
 }

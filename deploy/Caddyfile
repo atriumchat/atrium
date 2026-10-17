@@ -116,6 +116,10 @@ http://app.{$DOMAIN} {
 				-Server
 			}
 			root * /srv/landing
+			# Pages of a site of one's own (landing/site/.custom) open without .html: /about is about.html.
+			try_files {path} {path}.html
+			# Browsers check back every time (an ETag makes that a 304), so a new page shows up at once.
+			header Cache-Control "no-cache"
 			file_server
 		}
 	}
