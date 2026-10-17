@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import type { Attachment } from '../types';
 import { DownloadIcon, XIcon } from '../ui/icons';
+import { useAttachmentMenu } from './AttachmentMenu';
 
 const SINGLE_MAX_W = 420;
 const SINGLE_MAX_H = 360;
@@ -34,25 +35,31 @@ export function fileSize(bytes = 0) {
 /** Any non-picture file: its type in a circle, name, size, and the whole card downloads it. */
 function FileCard({ file }: { file: Attachment }) {
   const ext = (file.name ?? '').split('.').pop()?.slice(0, 4).toUpperCase() || 'ФАЙЛ';
+  const { open, menu } = useAttachmentMenu();
   return (
-    <a
-      href={file.url}
-      download={file.name}
-      className="flex w-full max-w-[420px] items-center gap-3 rounded-full bg-default py-2 pl-2 pr-4 transition-colors hover:bg-surface-tertiary"
-    >
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-[10px] font-semibold text-black">{ext}</span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[14px] text-foreground">{file.name}</span>
-        <span className="block text-[12px] text-muted">{fileSize(file.size)}</span>
-      </span>
-      <DownloadIcon size={18} className="shrink-0 text-muted" />
-    </a>
+    <>
+      <a
+        href={file.url}
+        download={file.name}
+        onContextMenu={open(file)}
+        className="flex w-full max-w-[420px] items-center gap-3 rounded-full bg-default py-2 pl-2 pr-4 transition-colors hover:bg-surface-tertiary"
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-[10px] font-semibold text-black">{ext}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[14px] text-foreground">{file.name}</span>
+          <span className="block text-[12px] text-muted">{fileSize(file.size)}</span>
+        </span>
+        <DownloadIcon size={18} className="shrink-0 text-muted" />
+      </a>
+      {menu}
+    </>
   );
 }
 
 /** Images under a message. Space is reserved from the stored size so the chat doesn't jump while they load. */
 function MessageImages({ attachments }: { attachments: Attachment[] }) {
   const [open, setOpen] = useState<Attachment | null>(null);
+  const { open: openMenu, menu } = useAttachmentMenu();
   if (attachments.length === 0) return null;
   const single = attachments.length === 1;
 
@@ -69,6 +76,7 @@ function MessageImages({ attachments }: { attachments: Attachment[] }) {
               key={a.url}
               type="button"
               onClick={() => setOpen(a)}
+              onContextMenu={openMenu(a)}
               aria-label="Открыть картинку"
               className="max-w-full cursor-zoom-in overflow-hidden rounded-[12px] bg-default outline-none focus-visible:ring-2 focus-visible:ring-accent"
               style={{ width, aspectRatio: `${width} / ${height}` }}
@@ -79,12 +87,13 @@ function MessageImages({ attachments }: { attachments: Attachment[] }) {
           );
         })}
       </div>
-      {open && <Lightbox image={open} onClose={() => setOpen(null)} />}
+      {open && <Lightbox image={open} onClose={() => setOpen(null)} onContextMenu={openMenu(open)} />}
+      {menu}
     </>
   );
 }
 
-function Lightbox({ image, onClose }: { image: Attachment; onClose: () => void }) {
+function Lightbox({ image, onClose, onContextMenu }: { image: Attachment; onClose: () => void; onContextMenu: (e: MouseEvent<HTMLElement>) => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -109,7 +118,7 @@ function Lightbox({ image, onClose }: { image: Attachment; onClose: () => void }
       >
         <XIcon size={20} />
       </button>
-      <img src={image.url} alt="" className="max-h-[calc(100vh-96px)] max-w-full rounded-[8px] object-contain" />
+      <img src={image.url} alt="" onContextMenu={onContextMenu} className="max-h-[calc(100vh-96px)] max-w-full rounded-[8px] object-contain" />
       <a
         href={image.url}
         target="_blank"

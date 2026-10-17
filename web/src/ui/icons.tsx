@@ -197,6 +197,24 @@ export const UserPlusIcon = icon(
   </>,
 );
 export const DownloadIcon = icon(<path d="M12 4v11m-5-5 5 5 5-5M5 20h14" />);
+export const CopyIcon = icon(
+  <>
+    <rect x="8.5" y="8.5" width="12" height="12" rx="3" />
+    <path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5" />
+  </>,
+);
+export const LinkIcon = icon(
+  <>
+    <path d="M10 13.5a4.5 4.5 0 0 0 6.4.3l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4l-1.8 1.8" />
+    <path d="M14 10.5a4.5 4.5 0 0 0-6.4-.3l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.8-1.8" />
+  </>,
+);
+export const ExternalLinkIcon = icon(
+  <>
+    <path d="M14.5 3.5h6v6M20.5 3.5 11 13" />
+    <path d="M18.5 14v4a2.5 2.5 0 0 1-2.5 2.5H6A2.5 2.5 0 0 1 3.5 18V8A2.5 2.5 0 0 1 6 5.5h4" />
+  </>,
+);
 export const RefreshIcon = icon(<path d="M20 11a8 8 0 0 0-14.6-4.5M4 4v3.5h3.5M4 13a8 8 0 0 0 14.6 4.5M20 20v-3.5h-3.5" />);
 export const ExpandIcon = icon(<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />);
 export const LogoutIcon = icon(
