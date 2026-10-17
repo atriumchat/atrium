@@ -422,9 +422,18 @@ h1 {
 
 /* The install: what's done, what's on, what's next. */
 .task {
-  min-height: 48px;
+  /* Seven lines and what's under the running one have to fit the window: the icon sits at the label, not the middle. */
+  align-items: flex-start;
+  min-height: 44px;
+  padding: 11px 0;
   color: var(--faint);
   transition: color 0.3s;
+}
+[data-step="install"] .sub {
+  margin-bottom: 20px;
+}
+[data-step="install"] .actions {
+  margin-top: 20px;
 }
 .task .state {
   position: relative;
@@ -482,6 +491,38 @@ h1 {
 .task[data-state="fail"] .state {
   background: var(--danger);
   box-shadow: none;
+}
+/* Under the line: a quiet note that is always there, and what the installer is doing now, which comes and goes. */
+.task .label {
+  display: block;
+}
+.task small {
+  color: var(--faint);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.task .note {
+  margin-top: 1px;
+}
+.task[data-state="done"] .note {
+  display: none;
+}
+.task .subs {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s var(--ease);
+}
+.task .subs.on {
+  grid-template-rows: 1fr;
+}
+.task .lines {
+  display: block;
+  min-height: 0;
+  overflow: hidden;
+}
+/* The newest one a little clearer than the one before. */
+.task[data-state="run"] .lines small:last-child {
+  color: var(--muted);
 }
 .task .took {
   flex: none;

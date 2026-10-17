@@ -28,6 +28,7 @@ const updater = require('./updater');
 const ptt = require('./ptt');
 const serverSetup = require('./server-setup');
 const screenPicker = require('./screen-picker');
+const reachable = require('./reachable');
 
 // The server address can be changed from the tray ("Адрес сервера…") if Gomex ever has to move to a
 // new domain — no reinstall. Stored in the app's settings folder.
@@ -120,7 +121,8 @@ function createWindow() {
   });
 
   win.webContents.on('context-menu', (_event, params) => showTextMenu(params));
-  win.loadURL(START_URL);
+  // A server that doesn't open (yet) shows a page that says so and retries, not a black window (reachable.js).
+  reachable.open(win, START_URL);
   win.once('ready-to-show', () => win?.show());
 
   // Closing the window only hides it: Gomex keeps running in the menu bar / tray so calls still come in.
@@ -318,6 +320,8 @@ ipcMain.handle('address:guide', (event) => {
 
 /** @type {BrowserWindow | null} */
 let setupWindow = null;
+/** The wait for the new address to answer (watchAddress); replaced or dropped, it stops. */
+let addressWatch = null;
 
 function openSetupWindow() {
   if (setupWindow) return setupWindow.focus();
@@ -334,6 +338,7 @@ function openSetupWindow() {
   setupWindow.loadFile(path.join(__dirname, 'onboarding.html'));
   setupWindow.on('closed', () => {
     setupWindow = null;
+    addressWatch = null;
     serverSetup.cancelMail();
     serverSetup.close();
   });
@@ -373,7 +378,6 @@ setupCall('open-external', (url) => {
   if (/^https:\/\/[^/]+/.test(url)) shell.openExternal(url);
 });
 setupCall('connect', (login) => serverSetup.connect(login));
-setupCall('check-name', ({ name }) => serverSetup.checkName({ name }));
 setupCall('register', (form) => serverSetup.register(form));
 setupCall('wait-mail', async (where) => {
   const answer = await serverSetup.waitMail(where);
@@ -406,13 +410,31 @@ function callBack(title, body) {
 setupCall('cancel-mail', () => serverSetup.cancelMail());
 setupCall('check-domain', (domain) => serverSetup.checkDomain(domain));
 setupCall('connect-drive', () => ({ error: 'Google Диск появится в следующей версии, пока можно без бэкапов' }));
+
+/**
+ * After the install: tells the setup window when the new address answers from this computer. A name made minutes ago
+ * may not have reached the provider's DNS yet, and opening it too early left the main window black.
+ */
+async function watchAddress(url) {
+  const me = (addressWatch = {});
+  while (addressWatch === me && setupWindow) {
+    if (await reachable.answers(url)) {
+      if (addressWatch !== me || !setupWindow) return;
+      setupWindow.webContents.send('setup:event', { state: 'open' });
+      // The install takes minutes and the window may be away: it comes back when there's something to press.
+      callBack('Сервер готов', 'Gomex установлен');
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+}
+
 setupCall('install', ({ domain, turn }) =>
   serverSetup.install(
     { domain, turn, installer: devEnv('GOMEX_INSTALLER') },
     (data) => {
       setupWindow?.webContents.send('setup:event', data);
-      // The install takes minutes and the window may be away: it comes back when it's over, either way.
-      if (data.state === 'ready') callBack('Сервер готов', 'Gomex установлен');
+      if (data.state === 'ready') watchAddress(data.url);
       if (data.state === 'fail' && !data.step) callBack('Установка остановилась', data.why ?? '');
     },
     ({ privateKey, ...server }) => {

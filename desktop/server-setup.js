@@ -141,19 +141,6 @@ async function lookup(name, type) {
   return JSON.parse(tail.join('\n'));
 }
 
-/** Whether name.dedyn.io is still free: no such name in the DNS at all. */
-async function checkName({ name }) {
-  name = String(name).toLowerCase();
-  if (!NAME.test(name)) return { error: 'Латиница, цифры и дефис, от 3 символов' };
-  try {
-    const answer = await lookup(`${name}.dedyn.io`, 'SOA');
-    return answer.Status === 3 ? { ok: true } : { error: 'Имя занято, нужно другое' };
-  } catch {
-    // Can't tell: deSEC will say so at sign-up if it's taken.
-    return { ok: true };
-  }
-}
-
 async function api(path, { method = 'GET', body, token } = {}) {
   const response = await fetch(`${DESEC}${path}`, {
     method,
@@ -173,10 +160,12 @@ async function api(path, { method = 'GET', body, token } = {}) {
 /**
  * Makes the deSEC account with the name in it. The password is the app's own; deSEC mails the link. No captcha
  * here: for a name under dedyn.io deSEC refuses one at sign-up and asks for it on the page the link opens.
+ * Whether the name is free is deSEC's answer to this very request: asking the DNS beforehand made Google remember
+ * "no such name" and the installer's own lookups then waited it out.
  */
 async function register({ name, email }) {
   name = String(name).toLowerCase();
-  if (!NAME.test(name)) return { error: 'Имя не подходит' };
+  if (!NAME.test(name)) return { error: 'Латиница, цифры и дефис, от 3 символов' };
   const password = crypto.randomBytes(24).toString('base64url');
   let answer;
   try {
@@ -202,6 +191,10 @@ async function register({ name, email }) {
   console.log('deSEC sign-up refused:', answer.status, answer.text.slice(0, 400));
   if (answer.status === 429) return { error: 'Слишком часто, подождите минуту' };
   if (json.email) return { error: `Почта не подходит. deSEC: ${said('email')}` };
+  // 400 {"domain": ["This domain name conflicts with an existing domain, or is disallowed by policy."]}
+  if (json.domain && /conflicts with an existing domain|disallowed by policy/i.test(said('domain'))) {
+    return { error: 'Имя занято, нужно другое' };
+  }
   if (json.domain) return { error: `Имя не подходит. deSEC: ${said('domain')}` };
   if (json.code === 'registration_denied') return { error: 'deSEC отказал в регистрации' };
   return { error: `deSEC: ${JSON.stringify(json).slice(0, 160)}` };
@@ -297,21 +290,41 @@ async function install({ domain, turn, installer }, report, save) {
   ].join(' ');
   let ready = null;
   let why = null;
+  let current = null; // the installer's step that is running
+  // The installer's own output (not its "::gomex" lines): the last line of it, for a step that takes long. Sent
+  // once a second at most; a line of an earlier step is not this step's.
+  let last = '';
+  let sent = '';
+  const ticker = setInterval(() => {
+    if (last && last !== sent) report({ state: 'out', text: (sent = last) });
+  }, 1000);
+  const plain = (text) => {
+    // Progress bars redraw their line with \r, and colours are noise here.
+    const clean = text.split('\r').pop().replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, '').trim();
+    // The installer's own status lines ("… Docker", "✓ Docker 12 с") say what the list already does.
+    if (clean && !/^[…✓✗!•]/.test(clean)) last = clean.slice(0, 160);
+  };
   const { code, tail } = await exec(conn, `${env} sh /root/gomex-install.sh`, {
     onLine: (line) => {
+      const sub = line.match(/^::gomex sub (.+)$/);
+      if (sub) return report({ step: current, state: 'sub', text: sub[1].slice(0, 120) });
       const m = line.match(/^::gomex (run|done|fail|ready) ?(\S*) ?(.*)$/);
-      if (!m) return;
+      if (!m) return plain(line);
       const [, state, step, rest] = m;
       if (state === 'ready') {
         ready = step;
         return;
       }
+      if (state === 'run') {
+        current = step;
+        last = sent = '';
+      }
       if (state === 'fail') why = rest || step;
       report({ step, state, ...(state === 'done' && rest ? { took: Number(rest) } : {}), ...(state === 'fail' ? { why: rest } : {}) });
     },
-  });
+  }).finally(() => clearInterval(ticker));
   if (ready) return report({ state: 'ready', url: ready });
   report({ state: 'fail', why: why || `Установщик остановился (код ${code})`, tail });
 }
 
-module.exports = { connect, close, checkName, register, waitMail, cancelMail, checkDomain, install };
+module.exports = { connect, close, register, waitMail, cancelMail, checkDomain, install };

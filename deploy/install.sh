@@ -2,6 +2,7 @@
 # Gomex installer, for a fresh VPS (Ubuntu or Debian), as root:
 #   curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh   # the wizard
 #   curl -fsSL …/install.sh | sh -s update                                 # update, no questions
+#   curl -fsSL …/install.sh | sh -s uninstall                              # take Gomex off the server again
 #   curl -fsSL …/install.sh | DOMAIN=chat.example.com GOMEX_YES=1 sh       # no questions at all
 # Each installer takes its own release's tarball from that GitHub Release, checked against the SHA-256 pinned
 # below. The npm package @gomex.llc/install mirrors both files, so the same works without GitHub:
@@ -9,6 +10,11 @@
 # Where Node is already installed, the same package runs with npx (its bin is gomex-install):
 #   npx @gomex.llc/install            # update: npx @gomex.llc/install update
 # Re-running is an update: .env (all the secrets) and the data stay.
+# uninstall asks first (GOMEX_YES=1 skips the question), then removes: the containers and their images, GOMEX_DIR
+# (/opt/gomex: .env, the data, the files), /root/gomex-backups, the nightly backup service and timer, this installer's
+# copy (/root/gomex-install.sh) and log (/var/log/gomex-install.log), and what it changed for SSH: its key-only
+# drop-in (password login is back as it was) and the desktop app's key (the line with the comment gomex-app).
+# Docker and ufw stay. Nothing of it can be brought back, backups included.
 # More knobs, all optional: SERVER_NAME, TURN_HOST, GOMEX_DIR (/opt/gomex), GOMEX_NO_GUM=1 (plain prompts),
 # GOMEX_FIREWALL=0 and GOMEX_SSH=0 (leave ufw / sshd alone), GOMEX_TARBALL + GOMEX_TARBALL_SHA256 (a local or
 # mirrored release), GOMEX_REGISTRY + GOMEX_APP_DIGEST + GOMEX_CADDY_DIGEST (another image registry).
@@ -104,8 +110,22 @@ bad() { line "${C_RED}✗${C_RESET} $*"; }
 bullet() { line "• $*"; }
 dim() { line "${C_DIM}$*${C_RESET}"; }
 log() { printf '%s %s\n' "$(date '+%F %T')" "$*" >>"$LOG" 2>/dev/null || true; }
-# For the desktop app (GOMEX_PROGRESS=1): "::gomex run|done|fail STEP [seconds|why]", "::gomex ready URL".
+# For the desktop app (GOMEX_PROGRESS=1): "::gomex run|done|fail STEP [seconds|why]", "::gomex sub TEXT" (what the
+# running step is doing now), "::gomex ready URL".
 progress() { if [[ ${GOMEX_PROGRESS:-} == 1 ]]; then printf '::gomex %s\n' "$*"; fi; }
+# What a step prints, into the log and on to the desktop app a line at a time (indented, so it is plain output next to
+# the "::gomex" lines, which go through as they are): the app shows the last one when a step takes long.
+relay_output() {
+  local text
+  while IFS= read -r text || [[ -n $text ]]; do
+    if [[ $text == '::gomex '* ]]; then
+      printf '%s\n' "$text"
+    else
+      printf '%s\n' "$text" >>"$LOG"
+      printf '    %s\n' "$text"
+    fi
+  done
+}
 DIED=0
 die() {
   DIED=1
@@ -272,6 +292,8 @@ cloudflare_ip() {
 check_add() {
   CHECK_LINES+=("$1|$2")
   [[ $1 == bad ]] && CHECK_FATAL=1
+  # Each check as it's made, so the desktop app shows where the server check is.
+  progress sub "$2"
   return 0
 }
 
@@ -376,6 +398,7 @@ add_app_key() {
   local key=${GOMEX_AUTHORIZED_KEY:-}
   [[ -n $key ]] || return 0
   [[ $key =~ ^ssh-ed25519\ [A-Za-z0-9+/]+=*(\ [A-Za-z0-9@._-]+)?$ ]] || die "GOMEX_AUTHORIZED_KEY: это не ключ ssh-ed25519"
+  progress sub "Ключ приложения для входа"
   mkdir -p /root/.ssh
   chmod 700 /root/.ssh
   touch /root/.ssh/authorized_keys
@@ -392,6 +415,7 @@ wait_dns() {
   progress run address
   for i in $(seq 1 60); do
     check_dns
+    progress sub "Записей на месте: $DNS_HITS из 3"
     (( DNS_OK )) && break
     sleep 3
   done
@@ -410,11 +434,11 @@ print_checks() {
   done
 }
 
-# DNS_ROWS: "host|now" per name that must point here; DNS_OK=1 when all do.
+# DNS_ROWS: "host|now" per name that must point here; DNS_OK=1 when all do (DNS_HITS of them so far).
 check_dns() {
   local host got status want_ips
   want_ips="${SERVER_IP:-} $(local_ips)"
-  DNS_ROWS=() DNS_OK=1
+  DNS_ROWS=() DNS_OK=1 DNS_HITS=0
   for host in "$DOMAIN" "app.$DOMAIN" "$TURN_HOST.$DOMAIN"; do
     got=$(resolve4 "$host")
     got=${got% }
@@ -423,6 +447,7 @@ check_dns() {
       DNS_OK=0
     elif [[ -n ${SERVER_IP:-} && " $want_ips " == *" ${got%% *} "* && $got != *" "* ]]; then
       status="${C_GREEN}✓${C_RESET}"
+      DNS_HITS=$((DNS_HITS + 1))
     elif cloudflare_ip "${got%% *}"; then
       status="${C_RED}✗${C_RESET} прокси Cloudflare"
       DNS_OK=0
@@ -722,10 +747,13 @@ screen_summary() {
 step_docker() {
   command -v curl >/dev/null || apt_install curl ca-certificates
   if ! command -v docker >/dev/null; then
+    progress sub "Скачиваем установщик Docker"
     fetch https://get.docker.com "$GOMEX_TMP/get-docker.sh" 60
+    progress sub "Ставим пакеты Docker"
     # Without systemd it starts dockerd itself, which must not inherit the lock (main) and hold it for good.
     sh "$GOMEX_TMP/get-docker.sh" 9>&-
   fi
+  progress sub "Запускаем Docker"
   systemctl enable --now docker 2>/dev/null || true
   docker compose version >/dev/null 2>&1 || apt_install docker-compose-plugin || apt_install docker-compose-v2
   docker compose version
@@ -734,19 +762,22 @@ step_docker() {
 # Web, TURN over TLS and UDP on 443, LiveKit's TCP fallback and media ports;
 # SSH rate-limited ("limit": the 6th new connection within 30 s is refused) on whatever port sshd listens on.
 step_firewall() {
-  command -v ufw >/dev/null || apt_install ufw
+  command -v ufw >/dev/null || { progress sub "Ставим ufw"; apt_install ufw; }
   ufw default deny incoming
   ufw default allow outgoing
   local rule port ports
+  progress sub "Открываем порты 80, 443 и для звонков"
   for rule in 80/tcp 443/tcp 443/udp 7881/tcp 50000:60000/udp; do ufw allow "$rule"; done
   mkdir -p /run/sshd
   ports=$(sshd -T 2>/dev/null | awk '$1 == "port" { print $2 }' || true)
+  progress sub "Ограничиваем частоту входов по SSH"
   for port in ${ports:-22}; do
     ufw limit "$port/tcp"
     ufw delete allow "$port/tcp" >/dev/null 2>&1 || true
     ufw delete allow "$port" >/dev/null 2>&1 || true
   done
   ufw delete allow OpenSSH >/dev/null 2>&1 || true
+  progress sub "Включаем файрвол"
   ufw --force enable
 }
 
@@ -754,9 +785,11 @@ step_firewall() {
 # Its own file in sshd_config.d: no other file's settings get overwritten.
 step_ssh() {
   local conf=/etc/ssh/sshd_config.d/00-gomex-key-only.conf
+  progress sub "Выключаем вход по паролю"
   mkdir -p /run/sshd
   printf '%s\n' '# Written by the Gomex installer: log in with an SSH key only.' \
     'PasswordAuthentication no' 'KbdInteractiveAuthentication no' 'PermitRootLogin prohibit-password' >"$conf"
+  progress sub "Проверяем настройки sshd"
   if ! sshd -t; then
     rm -f "$conf"
     return 1
@@ -772,12 +805,14 @@ step_files() {
   else
     # The first source that gives the pinned bytes; a mirror can't slip anything else in.
     for src in "$TARBALL_SRC" ${TARBALL_MIRRORS[@]+"${TARBALL_MIRRORS[@]}"}; do
+      progress sub "Скачиваем Gomex $RELEASE_VERSION"
       echo "Tarball from $src"
       if fetch "$src" "$tgz" 300 && sha256_ok "$tgz" "$TARBALL_SHA256"; then got=1; break; fi
       echo "Not usable: $src"
     done
   fi
   (( got )) || { echo "No source gave the release's tarball with SHA-256 $TARBALL_SHA256"; return 1; }
+  progress sub "Раскладываем файлы"
   mkdir -p "$stage"
   tar -xzf "$tgz" -C "$stage" --strip-components=1 --no-same-owner
   for f in deploy/docker-compose.yml deploy/Caddyfile deploy/backup.sh deploy/livekit.yaml.tmpl; do
@@ -928,6 +963,7 @@ EOF
 
 step_config() {
   cd "$GOMEX_DIR/deploy"
+  progress sub "Секреты и настройки"
   if [[ ! -f .env ]]; then
     (umask 077 && cat >.env <<EOF
 DOMAIN=$DOMAIN
@@ -953,6 +989,7 @@ EOF
 
   # LiveKit's config comes from .env, so its keys always match the app's.
   local s key
+  progress sub "Настройки звонков"
   s=$(<livekit.yaml.tmpl)
   for key in DOMAIN TURN_HOST LIVEKIT_API_KEY LIVEKIT_API_SECRET; do
     s=${s//"{{$key}}"/$(env_get .env "$key")}
@@ -974,6 +1011,7 @@ EOF
 
 # Nightly backup at 04:30 server time, a systemd timer (a fresh server may have no cron). Log: journalctl -u gomex-backup
 step_backups() {
+  progress sub "Служба и таймер на 04:30"
   cat >/etc/systemd/system/gomex-backup.service <<EOF
 [Unit]
 Description=Gomex nightly backup
@@ -999,17 +1037,21 @@ EOF
 
 step_pull() {
   cd "$GOMEX_DIR/deploy"
-  docker compose pull --quiet
+  progress sub "Образы приложения, звонков и веб-сервера"
+  # The desktop app shows the last line of this; the plain installer keeps it quiet.
+  if [[ ${GOMEX_PROGRESS:-} == 1 ]]; then docker compose pull; else docker compose pull --quiet; fi
 }
 
 step_up() {
   cd "$GOMEX_DIR/deploy"
+  progress sub "Запускаем контейнеры"
   docker compose up -d --remove-orphans
   # Bind-mounted single files: an update swaps in new files the running containers never see.
   [[ -f $GOMEX_TMP/caddyfile-changed ]] && docker compose up -d --force-recreate --no-deps caddy
   # Restarting LiveKit drops calls in progress, so only when its config changed.
   [[ -f $GOMEX_TMP/livekit-changed ]] && docker compose up -d --force-recreate --no-deps livekit
   local i
+  progress sub "Ждём ответ приложения"
   for i in $(seq 1 90); do
     curl -fsS --max-time 3 -o /dev/null http://127.0.0.1:8000/api/setup && break
     (( i == 90 )) && { docker compose ps; docker compose logs --tail 30 app; return 1; }
@@ -1017,6 +1059,7 @@ step_up() {
   done
   # Once the app answers: the cover page carries the name it has. A site of one's own in landing/site, marked by a
   # file named .custom there, stays as it is.
+  progress sub "Пишем обложку сайта"
   [[ -e $GOMEX_DIR/landing/site/.custom ]] || write_landing "$(env_get .env LANDING_SEED)"
   # Images of earlier releases.
   docker image prune -f
@@ -1024,6 +1067,7 @@ step_up() {
 
 step_https() {
   local i
+  progress sub "Ждём сертификат от Let's Encrypt"
   for i in $(seq 1 30); do
     curl -fsS --max-time 5 -o /dev/null --resolve "app.$DOMAIN:443:127.0.0.1" "https://app.$DOMAIN/api/setup" && return 0
     sleep 3
@@ -1039,6 +1083,10 @@ run() {
   start=$SECONDS
   if (( TTY )); then
     spin "$title" "$fn" || rc=$?
+  elif [[ ${GOMEX_PROGRESS:-} == 1 ]]; then
+    # The log as always, and the output on to the desktop app, which shows its last line when a step takes long.
+    line "… $title"
+    "$fn" 2>&1 | relay_output || rc=$?
   else
     line "… $title"
     "$fn" >>"$LOG" 2>&1 || rc=$?
@@ -1115,6 +1163,74 @@ screen_done() {
   say
 }
 
+# ---------------------------------------------------------------------------------------------- uninstall
+
+# `uninstall`: Gomex off this server, back to what it was before the installer (Docker and ufw stay).
+uninstall_all() {
+  (( EUID == 0 )) || die "Нужен root: sudo sh install.sh uninstall"
+  [[ $GOMEX_DIR == /?* && $GOMEX_DIR != *..* ]] || die "GOMEX_DIR: нужен полный путь, например /opt/gomex"
+  case ${GOMEX_DIR%/} in
+    /bin | /boot | /dev | /etc | /home | /lib | /lib64 | /mnt | /opt | /proc | /root | /run | /sbin | /srv | /sys | /tmp | /usr | /var)
+      die "GOMEX_DIR: $GOMEX_DIR — системная папка, не Gomex" ;;
+  esac
+  # The folder is deleted whole, so it must be Gomex's: it has the compose file the installer puts there.
+  [[ ! -e $GOMEX_DIR || -f $GOMEX_DIR/deploy/docker-compose.yml ]] || die "В $GOMEX_DIR нет Gomex: ничего не трогаю"
+
+  [[ ${GOMEX_YES:-} == 1 ]] || (( TTY )) || die "Нет терминала. Без вопросов: GOMEX_YES=1 sh install.sh uninstall"
+
+  say
+  title "Удалить Gomex с этого сервера?"
+  bullet "Контейнеры и образы Gomex"
+  bullet "Папка $GOMEX_DIR: настройки, переписка, файлы"
+  bullet "Бэкапы в /root/gomex-backups и ночной таймер"
+  bullet "Установщик в /root и его лог"
+  bullet "Вход по паролю: как было до установки"
+  say
+  dim "Docker и файрвол останутся. Вернуть удалённое нельзя, бэкапы тоже."
+  say
+  if [[ ${GOMEX_YES:-} != 1 ]]; then
+    ESC_MEANS=выход
+    choose "Отмена" "Удалить Gomex" || exit 0
+    if (( CHOICE != 1 )); then dim "Ничего не удалено."; exit 0; fi
+    say
+  fi
+
+  # The stack first, while its folder and .env are still there.
+  if [[ -f $GOMEX_DIR/deploy/docker-compose.yml ]] && command -v docker >/dev/null; then
+    (cd "$GOMEX_DIR/deploy" && docker compose down --rmi all --volumes --remove-orphans) >>"$LOG" 2>&1 ||
+      die "Не остановить контейнеры. Смотри лог и запусти снова."
+    ok "Контейнеры и образы"
+  fi
+  if [[ -d /run/systemd/system ]]; then
+    systemctl disable --now gomex-backup.timer >/dev/null 2>&1 || true
+    systemctl stop gomex-backup.service >/dev/null 2>&1 || true
+  fi
+  rm -f /etc/systemd/system/gomex-backup.service /etc/systemd/system/gomex-backup.timer
+  if [[ -d /run/systemd/system ]]; then
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    systemctl reset-failed gomex-backup.service >/dev/null 2>&1 || true
+  fi
+  ok "Ночной бэкап"
+
+  # The log goes with the rest: from here nothing may write it again.
+  local log_file=$LOG
+  LOG=/dev/null
+  rm -rf -- "$GOMEX_DIR" /root/gomex-backups
+  rm -f -- /root/gomex-install.sh "$log_file"
+  ok "Файлы и бэкапы"
+
+  # SSH as before: our key-only file goes, and the desktop app's key with it.
+  rm -f /etc/ssh/sshd_config.d/00-gomex-key-only.conf
+  if [[ -f /root/.ssh/authorized_keys ]]; then sed -i '/[[:space:]]gomex-app[[:space:]]*$/d' /root/.ssh/authorized_keys; fi
+  if command -v sshd >/dev/null && sshd -t 2>/dev/null; then
+    systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true
+  fi
+  ok "Вход по SSH"
+  say
+  line "Gomex удалён."
+  say
+}
+
 # ---------------------------------------------------------------------------------------------- main
 
 usage() {
@@ -1122,6 +1238,7 @@ usage() {
 Gomex $RELEASE_VERSION — установка на этот сервер.
   sh install.sh            мастер установки (повторный запуск — обновление)
   sh install.sh update     обновить без вопросов
+  sh install.sh uninstall  снять Gomex с сервера: контейнеры, данные, бэкапы (GOMEX_YES=1 — без вопроса)
   DOMAIN=chat.example.com GOMEX_YES=1 sh install.sh   без вопросов
 EOF
 }
@@ -1157,8 +1274,9 @@ run_quiet() {
   valid_domain "$DOMAIN" || die "Не похоже на домен: $DOMAIN"
   valid_name "$SERVER_NAME" || die "Имя сервера: до 40 символов, без кавычек, \\, \$ и \`"
   [[ -n ${GOMEX_SERVER_NAME_SET:-} ]] && NAME_SET=1
-  SERVER_IP=$(detect_ip)
   progress run check
+  progress sub "Определяем внешний IP"
+  SERVER_IP=$(detect_ip)
   add_app_key
   run_checks
   print_checks
@@ -1223,6 +1341,7 @@ main() {
   case ${1:-} in
     '' | install) MODE=install ;;
     update) MODE=update ;;
+    uninstall) MODE=uninstall ;;
     -h | --help | help) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;
   esac
@@ -1238,6 +1357,11 @@ main() {
   if ! { : >>"$LOG"; } 2>/dev/null; then LOG=$GOMEX_TMP/install.log; fi
   chmod 600 "$LOG" 2>/dev/null || true
   log "Gomex installer $RELEASE_VERSION, mode $MODE"
+  if [[ $MODE == uninstall ]]; then
+    detect_install
+    uninstall_all
+    return
+  fi
   pick_release
   detect_install
   DNS_OK=0 DOCKER_OK=0 SSH_PLAN=none NAME_SET=0

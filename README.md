@@ -118,6 +118,17 @@ curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.s
 curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh -s update
 ```
 
+Снять Gomex с сервера:
+
+```bash
+curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh -s uninstall
+```
+
+Установщик спросит подтверждение (`GOMEX_YES=1` — без вопроса), остановит контейнеры и удалит их образы, папку
+`/opt/gomex` (`.env`, переписка, файлы), бэкапы в `/root/gomex-backups`, ночной таймер, свой файл и лог в `/root` и
+`/var/log`. Вход по SSH вернётся к тому, что было: уберётся файл `00-gomex-key-only.conf` и ключ приложения (строка с
+комментарием `gomex-app`). Docker и ufw остаются. Вернуть удалённое нельзя, бэкапы тоже.
+
 `.env` и данные при обновлении не трогаются. Дополнительные переменные установщика описаны в шапке
 [`deploy/install.sh`](deploy/install.sh): `SERVER_NAME`, `TURN_HOST`, `GOMEX_DIR` (по умолчанию `/opt/gomex`),
 `GOMEX_NO_GUM=1`, `GOMEX_FIREWALL=0`, `GOMEX_SSH=0`, свой архив релиза или реестр образов.

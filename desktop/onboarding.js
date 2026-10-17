@@ -7,11 +7,11 @@
 const $ = (id) => document.getElementById(id);
 const setup = window.gomexSetup ?? fakeSetup();
 
-// [id, the line in the list, the installer's own line it leaves in the picture]
 // [id, the line in the list, the installer's own line it leaves in the picture, the installer's steps it covers
-// (install.sh, "::gomex run|done STEP"), in the order they run]
+// (install.sh, "::gomex run|done STEP"), in the order they run, and a quiet second line under it, if it needs one]
 const TASKS = [
-  ['check', 'Проверяем сервер', 'Проверка сервера', ['check', 'address']],
+  ['check', 'Проверяем сервер', 'Проверка сервера', ['check']],
+  ['address', 'Ждём адрес', 'Адрес в DNS', ['address'], 'до пары минут'],
   ['docker', 'Ставим Docker', 'Docker', ['docker']],
   ['secure', 'Закрываем вход по паролю', 'SSH только по ключу', ['firewall', 'ssh']],
   ['pull', 'Скачиваем Gomex', 'Файлы Gomex', ['files', 'config', 'backups', 'pull']],
@@ -327,7 +327,7 @@ bind('turn', state.turn);
 // 2a. A free name on deSEC. First the name (checked free at once) and the e-mail; the account is made right then.
 const freeName = () => $('free-name').value.trim().toLowerCase().replace(/\.dedyn\.io$/, '');
 const freeEmail = () => $('free-email').value.trim();
-// dedyn.io takes letters, digits and inner dashes; a few characters at least, so it isn't taken already.
+// dedyn.io takes letters, digits and inner dashes, and not too short a name.
 const freeNameOk = () => /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])$/.test(freeName());
 const emailOk = () => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(freeEmail());
 ['free-name', 'free-email'].forEach((id) =>
@@ -337,10 +337,10 @@ const emailOk = () => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(freeEmail());
     if (id === 'free-name') bind('host', `${freeName() || 'podval'}.dedyn.io`);
   }),
 );
+// Whether the name is free is deSEC's answer to the sign-up itself.
 $('go-free-name').addEventListener('click', async () => {
   busy($('go-free-name'), true);
-  const checked = await setup.checkName({ name: freeName() });
-  const answer = checked.error ? checked : await setup.register({ name: freeName(), email: freeEmail() });
+  const answer = await setup.register({ name: freeName(), email: freeEmail() });
   busy($('go-free-name'), false);
   if (answer.error) {
     $('e-free-name').textContent = answer.error;
@@ -472,10 +472,19 @@ $('skip-backup').addEventListener('click', () => {
 
 const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
+// Under a running line: what the installer is doing now (its "::gomex sub" lines, the latest two), and, once the line
+// has run this long, the installer's last line of output instead of the older one.
+const OUT_AFTER = 20000;
+const live = {}; // task id → { subs, out, since }
+let running = null; // the task that is running
+
 function renderTasks() {
   $('tasks').innerHTML = TASKS.map(
-    ([id, label]) => `<li class="row task" data-task="${id}" data-state="wait"><span class="state">${CHECK}</span><span class="grow">${label}</span><span class="took"></span></li>`,
+    ([id, label, , , note]) =>
+      `<li class="row task" data-task="${id}" data-state="wait"><span class="state">${CHECK}</span><span class="grow"><span class="label">${label}</span>${note ? `<small class="note">${note}</small>` : ''}<span class="subs"><span class="lines"></span></span></span><span class="took"></span></li>`,
   ).join('');
+  Object.keys(live).forEach((id) => delete live[id]);
+  running = null;
   // A fresh run: the install screen as it was before any line came in.
   document.querySelectorAll('[data-screen="install"]').forEach((ui) => (ui.innerHTML = SCREENS.install()));
   Object.entries(bound).forEach(([name, value]) => bind(name, value));
@@ -497,6 +506,22 @@ function logLine(text, took) {
   frame(document.querySelector('.scene[data-scene="install"]'));
 }
 
+/** Draws what's under the task's line from what has come in. */
+function showSubs(id) {
+  const row = document.querySelector(`.task[data-task="${id}"]`);
+  const view = live[id];
+  if (!row || !view) return;
+  const long = view.out && Date.now() - view.since > OUT_AFTER;
+  const texts = long ? [...view.subs.slice(-1), view.out] : view.subs.slice(-2);
+  const box = row.querySelector('.lines');
+  const key = texts.join('\n');
+  if (box.dataset.key === key) return;
+  box.dataset.key = key;
+  box.replaceChildren(...texts.map((text) => Object.assign(document.createElement('small'), { textContent: text, title: text })));
+  row.querySelector('.subs').classList.toggle('on', texts.length > 0);
+}
+
+let opening = null; // the wait for the new address, as long as the button is held back
 let clock = null;
 function startClock() {
   const started = Date.now();
@@ -505,11 +530,13 @@ function startClock() {
   clock = setInterval(() => {
     const s = Math.floor((Date.now() - started) / 1000);
     $('elapsed').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    if (running) showSubs(running);
   }, 250);
 }
 
 function startInstall() {
   state.installing = true;
+  clearTimeout(opening);
   renderTasks();
   $('e-install').textContent = '';
   $('retry').hidden = true;
@@ -523,6 +550,8 @@ function startInstall() {
     const row = document.querySelector(`.task[data-task="${id}"]`);
     if (!row || row.dataset.state === 'done') return;
     row.dataset.state = 'done';
+    row.querySelector('.subs').classList.remove('on');
+    if (running === id) running = null;
     const s = Math.max(1, Math.round((Date.now() - (started[id] ?? Date.now())) / 1000));
     const took = s < 60 ? `${s} с` : `${Math.floor(s / 60)} мин`;
     row.querySelector('.took').textContent = took;
@@ -542,10 +571,24 @@ function startInstall() {
         if (row.dataset.state === 'wait') {
           started[id] = Date.now();
           row.dataset.state = 'run';
+          live[id] = { subs: [], out: '', since: started[id] };
         }
+        running = id;
+        // Another step of the same line: the last output was the step before's.
+        if (live[id]) live[id].out = '';
+      } else if (event.state === 'sub') {
+        const view = live[id];
+        const text = String(event.text ?? '').trim();
+        // The same thing said again (a wait that checks every few seconds) isn't news.
+        if (view && text && view.subs.at(-1) !== text) view.subs.push(text);
+        showSubs(id);
       } else if (event.state === 'fail') {
         document.querySelector(`.task[data-task="${id}"]`).dataset.state = 'fail';
       }
+      return;
+    }
+    if (event.state === 'out') {
+      if (running && live[running]) live[running].out = event.text;
       return;
     }
     if (event.state === 'fail') {
@@ -568,8 +611,21 @@ function startInstall() {
         log.append(line);
       }
       frame(document.querySelector('.scene[data-scene="install"]'));
+      state.done.shown = shown;
       $('install-title').textContent = 'Сервер готов';
-      $('install-sub').textContent = shown;
+      // A name made minutes ago may not have reached this computer's DNS yet; the app checks it and says when it does
+      // ({ state: 'open' }). The main window shows its own page if it's opened too early, so a name that stays away
+      // doesn't lock the button for good.
+      $('install-sub').textContent = 'Адрес ещё расходится, минута-две';
+      clearTimeout(opening);
+      opening = setTimeout(() => {
+        $('install-sub').textContent = `${shown}: пока не открывается`;
+        $('go-install').disabled = false;
+      }, 4 * 60 * 1000);
+    }
+    if (event.state === 'open') {
+      clearTimeout(opening);
+      $('install-sub').textContent = state.done?.shown ?? '';
       $('go-install').disabled = false;
       $('go-install').focus({ preventScroll: true });
     }
@@ -591,13 +647,9 @@ function fakeSetup() {
       if (host.startsWith('10.')) return { error: 'Сервер не отвечает', field: 'host' };
       return { facts: { ip: host, os: 'Ubuntu 24.04 LTS · x86_64', size: 'Память 2 ГБ · диск 18 ГБ' } };
     },
-    async checkName({ name }) {
-      await wait(600);
-      return name === 'taken' ? { error: 'Имя занято, нужно другое' } : { ok: true };
-    },
-    async register() {
+    async register({ name }) {
       await wait(900);
-      return { ok: true };
+      return name === 'taken' ? { error: 'Имя занято, нужно другое' } : { ok: true };
     },
     waitMail: () => wait(6000).then(() => ({ ok: true })),
     cancelMail() {},
@@ -609,15 +661,36 @@ function fakeSetup() {
       await wait(1400);
       return { email: 'admin@gmail.com' };
     },
-    // The installer's own steps, as install.sh reports them, at a quicker pace.
+    // The installer's own steps, as install.sh reports them, at a quicker pace: [step, how long it takes, what it says
+    // on the way ("::gomex sub")]. The image download is long enough to show the installer's last output line too.
     async install(_options, onEvent) {
-      const steps = [['check', 1200], ['address', 800], ['docker', 2600], ['firewall', 500], ['ssh', 500], ['files', 600], ['config', 400], ['pull', 2600], ['up', 1400], ['https', 1600]];
-      for (const [step, ms] of steps) {
+      const steps = [
+        ['check', 2400, ['Права root', 'Ubuntu 24.04 · x86_64', 'Порты 80 и 443 свободны', 'Docker: поставим', 'Память 2.0 ГБ · диск 18 ГБ свободно', 'IP 2.27.52.78']],
+        ['address', 7000, ['Записей на месте: 0 из 3', 'Записей на месте: 1 из 3', 'Записей на месте: 3 из 3']],
+        ['docker', 4000, ['Скачиваем установщик Docker', 'Ставим пакеты Docker', 'Запускаем Docker']],
+        ['firewall', 1200, ['Открываем порты 80, 443 и для звонков', 'Включаем файрвол']],
+        ['ssh', 900, ['Выключаем вход по паролю', 'Проверяем настройки sshd']],
+        ['files', 1800, ['Скачиваем Gomex 0.2.2', 'Раскладываем файлы']],
+        ['config', 900, ['Секреты и настройки', 'Настройки звонков']],
+        ['pull', 26000, ['Образы приложения, звонков и веб-сервера']],
+        ['up', 3000, ['Запускаем контейнеры', 'Ждём ответ приложения', 'Пишем обложку сайта']],
+        ['https', 2400, ['Ждём сертификат от Let\'s Encrypt']],
+      ];
+      const layers = ['a3f8c1e2b9d4', '5be01d7f6a21', '9c4e7a30d1f8', '21d6b8f4e0a7', 'f07a3c95b2e1', '6d1e48a9c3b0'];
+      for (const [step, ms, says] of steps) {
         onEvent({ step, state: 'run' });
-        await wait(ms);
+        const at = Date.now();
+        for (let i = 0; Date.now() - at < ms; i++) {
+          if (says[i]) onEvent({ step, state: 'sub', text: says[i] });
+          if (step === 'pull' && i > 0) onEvent({ state: 'out', text: `${layers[i % layers.length]} ${i % 3 ? 'Downloading' : 'Pull complete'}` });
+          await wait(step === 'pull' ? 1200 : ms / (says.length + 1));
+        }
         onEvent({ step, state: 'done' });
       }
       onEvent({ state: 'ready', url: 'https://app.podval.dedyn.io/?setup=demo' });
+      // The new name reaches this computer a little later.
+      await wait(5000);
+      onEvent({ state: 'open' });
     },
     openServer: (url) => alert(`Дальше: ${url}, мастер сервера`),
   };
