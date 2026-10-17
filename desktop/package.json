@@ -26,10 +26,17 @@
       "address.html",
       "address.js",
       "address-preload.js",
+      "onboarding.html",
+      "onboarding.css",
+      "onboarding.js",
+      "onboarding-preload.js",
+      "server-setup.js",
       "assets/**",
       "ptt.js",
       "update-key.pem",
-      "!node_modules/uiohook-napi/build/**"
+      "!node_modules/uiohook-napi/build/**",
+      "!node_modules/cpu-features/**",
+      "!node_modules/nan/**"
     ],
     "npmRebuild": false,
     "electronFuses": {
@@ -82,6 +89,7 @@
     "electron-builder": "26.15.3"
   },
   "dependencies": {
+    "ssh2": "^1.17.0",
     "uiohook-napi": "^1.5.5"
   }
 }

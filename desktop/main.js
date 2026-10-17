@@ -11,6 +11,7 @@ const {
   ipcMain,
   nativeImage,
   powerMonitor,
+  safeStorage,
   session,
   shell,
   systemPreferences,
@@ -26,6 +27,7 @@ const devEnv = (name) => (app.isPackaged ? undefined : process.env[name]);
 if (devEnv('GOMEX_USER_DATA')) app.setPath('userData', devEnv('GOMEX_USER_DATA'));
 const updater = require('./updater');
 const ptt = require('./ptt');
+const serverSetup = require('./server-setup');
 
 // The server address can be changed from the tray ("Адрес сервера…") if Gomex ever has to move to a
 // new domain — no reinstall. Stored in the app's settings folder.
@@ -275,6 +277,103 @@ ipcMain.handle('address:guide', (event) => {
   shell.openExternal(SERVER_GUIDE);
 });
 
+/* ---------- "Свой сервер": setting up a server from the app (onboarding.html, server-setup.js) ---------- */
+
+/** @type {BrowserWindow | null} */
+let setupWindow = null;
+
+function openSetupWindow() {
+  if (setupWindow) return setupWindow.focus();
+  setupWindow = new BrowserWindow({
+    width: 1040,
+    height: 680,
+    minWidth: 420,
+    minHeight: 600,
+    title: 'Свой сервер',
+    backgroundColor: '#0c0c0e',
+    autoHideMenuBar: true,
+    webPreferences: { preload: path.join(__dirname, 'onboarding-preload.js'), contextIsolation: true, sandbox: true },
+  });
+  setupWindow.loadFile(path.join(__dirname, 'onboarding.html'));
+  setupWindow.on('closed', () => {
+    setupWindow = null;
+    serverSetup.cancelMail();
+    serverSetup.close();
+  });
+}
+
+// "Свой сервер" on the first start: the setup window takes the place of the small one.
+ipcMain.handle('address:setup', (event) => {
+  if (!event.senderFrame?.url.startsWith('file://')) return;
+  openSetupWindow();
+  addressWindow?.close();
+});
+
+// What the app keeps for each server it set up: its SSH key (so it can update the server later) and the deSEC
+// account behind a free name. Encrypted with the system's keychain where there is one.
+const SERVERS_FILE = path.join(app.getPath('userData'), 'servers.json');
+const seal = (text) =>
+  safeStorage.isEncryptionAvailable() ? { sealed: safeStorage.encryptString(text).toString('base64') } : { plain: text };
+function remember(domain, fields) {
+  let all = {};
+  try {
+    all = JSON.parse(fs.readFileSync(SERVERS_FILE, 'utf8'));
+  } catch {
+    // First server.
+  }
+  all[domain] = { ...all[domain], ...fields, at: new Date().toISOString() };
+  fs.mkdirSync(path.dirname(SERVERS_FILE), { recursive: true });
+  fs.writeFileSync(SERVERS_FILE, JSON.stringify(all, null, 2), { mode: 0o600 });
+}
+
+/** The setup window's calls; nothing else may make them. */
+const fromSetup = (event) => setupWindow && event.sender === setupWindow.webContents;
+const setupCall = (name, fn) =>
+  ipcMain.handle(`setup:${name}`, (event, ...args) => (fromSetup(event) ? fn(...args) : { error: 'Нельзя' }));
+
+let freeAccount = null;
+setupCall('open-external', (url) => {
+  if (/^https:\/\/[^/]+/.test(url)) shell.openExternal(url);
+});
+setupCall('connect', (login) => serverSetup.connect(login));
+setupCall('check-name', ({ name }) => serverSetup.checkName({ name }));
+setupCall('captcha', () => serverSetup.captcha());
+setupCall('register', (form) => serverSetup.register(form));
+setupCall('wait-mail', async (where) => {
+  const answer = await serverSetup.waitMail(where);
+  if (answer.ok) freeAccount = { domain: answer.domain, account: answer.account };
+  return answer.ok ? { ok: true } : answer;
+});
+setupCall('cancel-mail', () => serverSetup.cancelMail());
+setupCall('check-domain', (domain) => serverSetup.checkDomain(domain));
+setupCall('connect-drive', () => ({ error: 'Google Диск появится в следующей версии, пока можно без бэкапов' }));
+setupCall('install', ({ domain, turn }) =>
+  serverSetup.install(
+    { domain, turn, installer: devEnv('GOMEX_INSTALLER') },
+    (data) => setupWindow?.webContents.send('setup:event', data),
+    ({ privateKey, ...server }) => {
+      const account = freeAccount?.domain === server.domain ? seal(JSON.stringify(freeAccount.account)) : undefined;
+      remember(server.domain, { ...server, key: seal(privateKey), ...(account ? { desec: account } : {}) });
+    },
+  ),
+);
+// The new server becomes the app's server: its first-run wizard opens in the main window.
+setupCall('open-server', (value) => {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return { error: 'Нет адреса' };
+  }
+  if (url.protocol !== 'https:') return { error: 'Нет адреса' };
+  const rest = url.pathname + url.search;
+  fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true });
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(rest === '/' ? { url: url.origin } : { url: url.origin, open: rest }, null, 2));
+  quitting = true;
+  app.relaunch();
+  app.exit(0);
+});
+
 /** IPC from the page; only the Gomex page itself may send these. */
 function listenToPage() {
   const trusted = (event) => fromGomex(event.senderFrame?.url ?? '');
@@ -347,7 +446,7 @@ function listenToPage() {
   });
 }
 
-app.on('second-instance', () => (win ? showWindow() : addressWindow?.focus()));
+app.on('second-instance', () => (win ? showWindow() : (setupWindow ?? addressWindow)?.focus()));
 app.on('before-quit', () => {
   quitting = true;
   ptt.stop();

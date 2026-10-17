@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; font-src 'self'; script-src 'self'; img-src data:" />
+    <title>Свой сервер</title>
+    <link rel="stylesheet" href="onboarding.css" />
+  </head>
+  <body>
+    <div class="left">
+      <svg class="mark" viewBox="0 0 164 164" aria-label="Gomex">
+        <circle cx="82" cy="82" r="71.97" fill="none" stroke="currentColor" stroke-width="13.7" />
+        <path fill="currentColor" d="M116.1 78V120.9H107.1L105 111.3Q95.4 122.8 80 122.8Q63.1 122.8 52.5 111.3Q42 99.8 42 81.3Q42 63.2 52.6 51.1Q63.2 39 81.2 39Q94.3 39 104 46.3Q113.7 53.6 115.1 66.3H101.5Q100.2 59 94.8 54.9Q89.3 50.8 81.1 50.8Q69.5 50.8 62.8 58.9Q56.2 67 56.2 81.1Q56.2 95.3 62.9 103.4Q69.6 111.4 81.5 111.4Q92 111.4 97.7 104.9Q103.4 98.4 103.4 88.8H81.8V78Z" />
+      </svg>
+
+      <main id="steps">
+        <!-- 1. Getting in: the address and password the hosting company e-mailed. -->
+        <form class="step" data-step="server" id="f-server" autocomplete="off" hidden>
+          <h1>Подключить сервер</h1>
+          <p class="sub">IP и пароль из письма хостера</p>
+          <label class="label" for="ip">IP-адрес</label>
+          <input class="input" id="ip" placeholder="203.0.113.10" spellcheck="false" autocapitalize="off" />
+          <!-- The login is almost always root, so it's filled in; it's in plain sight, next to the password. -->
+          <div class="pair-fields">
+            <span>
+              <label class="label" for="user">Логин</label>
+              <input class="input" id="user" value="root" spellcheck="false" autocapitalize="off" />
+            </span>
+            <span>
+              <label class="label" for="pass">Пароль</label>
+              <span class="with-eye">
+                <input class="input" id="pass" type="password" spellcheck="false" />
+                <button class="eye" id="eye" type="button" aria-label="Показать пароль">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
+                </button>
+              </span>
+            </span>
+          </div>
+          <p class="error" id="e-server" role="alert"></p>
+          <div class="actions">
+            <button class="primary" type="submit" id="go-server" disabled>Подключить</button>
+          </div>
+        </form>
+
+        <!-- 2. The address people will open: a free DuckDNS name, or a domain of one's own. -->
+        <section class="step" data-step="address" hidden>
+          <h1>Адрес сервера</h1>
+          <p class="sub">По нему друзья будут заходить</p>
+          <div class="rows" role="radiogroup" aria-label="Адрес">
+            <button class="row choice" type="button" role="radio" aria-checked="true" data-pick="free">
+              <span><b>Бесплатный адрес</b><small>имя.dedyn.io, пара минут</small></span>
+              <span class="radio"></span>
+            </button>
+            <button class="row choice" type="button" role="radio" aria-checked="false" data-pick="own">
+              <span><b>Свой домен</b><small>Если уже есть</small></span>
+              <span class="radio"></span>
+            </button>
+          </div>
+          <div class="actions">
+            <button class="quiet back" type="button">Назад</button>
+            <button class="primary" type="button" id="go-address">Дальше</button>
+          </div>
+        </section>
+
+        <!-- 2a. A free address on deSEC (name.dedyn.io), without leaving the app: name and e-mail, the captcha, the
+             letter. The app makes the deSEC account (its password stays in the app) and points the name here. -->
+        <section class="step" data-step="free-name" hidden>
+          <h1>Бесплатный адрес</h1>
+          <p class="sub">Имя на dedyn.io и почта для письма</p>
+          <label class="label" for="free-name">Имя</label>
+          <span class="with-suffix"><input class="input" id="free-name" placeholder="podval" spellcheck="false" autocapitalize="off" /><span class="suffix">.dedyn.io</span></span>
+          <label class="label" for="free-email">Почта</label>
+          <input class="input" id="free-email" type="email" placeholder="you@gmail.com" spellcheck="false" autocapitalize="off" />
+          <p class="error" id="e-free-name" role="alert"></p>
+          <div class="actions">
+            <button class="quiet back" type="button">Назад</button>
+            <button class="primary" type="button" id="go-free-name" disabled>Дальше</button>
+          </div>
+        </section>
+
+        <section class="step" data-step="free-captcha" hidden>
+          <h1>Символы с картинки</h1>
+          <p class="sub">Защита от ботов у deSEC</p>
+          <div class="captcha"><img id="captcha-img" alt="" hidden /><span class="spinner" id="captcha-wait"></span></div>
+          <button class="quiet more" type="button" id="captcha-new">Другая картинка</button>
+          <label class="label" for="captcha-text">Символы</label>
+          <input class="input mono caps" id="captcha-text" placeholder="AB12C" spellcheck="false" autocapitalize="characters" autocomplete="off" />
+          <p class="error" id="e-captcha" role="alert"></p>
+          <div class="actions">
+            <button class="quiet back" type="button">Назад</button>
+            <button class="primary" type="button" id="go-captcha" disabled>Отправить</button>
+          </div>
+        </section>
+
+        <section class="step" data-step="free-mail" hidden>
+          <h1>Письмо на почте</h1>
+          <p class="sub">Нажать ссылку в письме от deSEC</p>
+          <div class="rows">
+            <div class="row">
+              <span class="grow"><b id="mail-to">you@gmail.com</b><small>Не видно? Папка «Спам»</small></span>
+              <button class="secondary" type="button" id="open-mail" hidden>
+                <span id="open-mail-label">Открыть почту</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8" /></svg>
+              </button>
+            </div>
+            <div class="row wait" id="mail-wait"><span class="spinner"></span><span class="grow" id="mail-state">Ждём подтверждение</span></div>
+          </div>
+          <p class="error" id="e-mail" role="alert"></p>
+          <div class="actions">
+            <button class="quiet" type="button" id="other-mail">Другая почта</button>
+          </div>
+        </section>
+
+        <!-- 2b. A domain of one's own: the three records to add at the registrar, checked before going on. -->
+        <section class="step" data-step="own" hidden>
+          <h1>Свой домен</h1>
+          <p class="sub">Три записи у регистратора</p>
+          <label class="label" for="domain">Домен</label>
+          <input class="input" id="domain" placeholder="chat.example.com" spellcheck="false" autocapitalize="off" />
+          <div class="rows records" id="records" hidden></div>
+          <p class="error" id="e-own" role="alert"></p>
+          <div class="actions">
+            <button class="quiet back" type="button">Назад</button>
+            <button class="primary" type="button" id="go-own" disabled>Проверить</button>
+          </div>
+        </section>
+
+        <!-- 3. Backups away from the server: a nightly encrypted copy on the admin's Google Drive. -->
+        <section class="step" data-step="backup" hidden>
+          <h1>Бэкапы</h1>
+          <p class="sub">Каждую ночь копия переписки и файлов</p>
+          <div class="rows">
+            <div class="row">
+              <span class="logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8.6 3h6.8l6.1 10.5-3.4 6H5.9l-3.4-6z" /><path d="M8.6 3l6.4 10.5H2.5M15.4 3L9 13.5l-3.1 6M21.5 13.5H15l3.1 6" /></svg>
+              </span>
+              <span class="grow"><b>Google Диск</b><small id="drive-sub">15 ГБ бесплатно</small></span>
+              <button class="secondary" type="button" id="drive-connect">Подключить</button>
+              <span class="on" id="drive-on" hidden>Подключён</span>
+            </div>
+            <div class="row"><span><b>Зашифрованы</b><small>Ключ только у админа</small></span></div>
+            <div class="row"><span><b>14 дней</b><small>Старые удаляются сами</small></span></div>
+          </div>
+          <p class="error" id="e-backup" role="alert"></p>
+          <div class="actions">
+            <button class="quiet back" type="button">Назад</button>
+            <span class="pair">
+              <button class="quiet" type="button" id="skip-backup">Без бэкапов</button>
+              <button class="primary" type="button" id="go-backup" disabled>Дальше</button>
+            </span>
+          </div>
+        </section>
+
+        <!-- 4. The install itself, step by step; nothing to press. -->
+        <section class="step" data-step="install" hidden>
+          <h1 id="install-title">Ставим Gomex</h1>
+          <p class="sub" id="install-sub">Пара минут, окно можно свернуть</p>
+          <ol class="rows tasks" id="tasks"></ol>
+          <p class="error" id="e-install" role="alert"></p>
+          <div class="actions">
+            <span class="elapsed" id="elapsed">0:00</span>
+            <span class="pair">
+              <button class="quiet" type="button" id="retry" hidden>Повторить</button>
+              <button class="primary" type="button" id="go-install" disabled>Открыть сервер</button>
+            </span>
+          </div>
+        </section>
+      </main>
+
+      <!-- The whole setup in three short bars: the server here; the account and friends on the server's own wizard. -->
+      <nav class="progress" aria-label="Шаги">
+        <span class="part" data-part="server"><span class="track"><i></i></span><span class="name">Сервер</span></span>
+        <span class="part" data-part="account"><span class="track"><i></i></span><span class="name">Аккаунт</span></span>
+        <span class="part" data-part="friends"><span class="track"><i></i></span><span class="name">Друзья</span></span>
+      </nav>
+    </div>
+
+    <!-- What the step is about, filmed like Linear's onboarding: a camera close over a whole screen of Gomex at work
+         (the server's terminal, the browser on the new address, the backups on the Drive), never showing its edges.
+         onboarding.js fills each screen with the person's own answers and films it from two angles. -->
+    <aside class="right" aria-hidden="true">
+      <div class="scene" data-scene="server"><div class="ui term" data-screen="server"></div></div>
+      <div class="scene" data-scene="address"><div class="ui browser" data-screen="address"></div></div>
+      <div class="scene" data-scene="mail"><div class="ui browser" data-screen="mail"></div></div>
+      <div class="scene" data-scene="backup"><div class="ui drive" data-screen="backup"></div></div>
+      <div class="scene" data-scene="install"><div class="ui term" data-screen="install"></div></div>
+    </aside>
+    <script src="onboarding.js"></script>
+  </body>
+</html>

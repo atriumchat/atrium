@@ -1,0 +1,1039 @@
+/* "Свой сервер": the first part of setting up a server from the app, before the server exists. The rest (name,
+   admin, recovery key, invites, done) is the server's own wizard in the same window and the same look.
+   Proportions after Linear's onboarding: content on the left in a narrow column, the step's own picture on the right. */
+
+@font-face {
+  font-family: "Onest";
+  src: url(assets/fonts/onest-cyrillic-wght-normal.woff2) format("woff2");
+  font-weight: 100 900;
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: "Onest";
+  src: url(assets/fonts/onest-latin-ext-wght-normal.woff2) format("woff2");
+  font-weight: 100 900;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Onest";
+  src: url(assets/fonts/onest-latin-wght-normal.woff2) format("woff2");
+  font-weight: 100 900;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* The app's own tones (web/src/index.css, theme.css). */
+:root {
+  color-scheme: dark;
+  --window: #0c0c0e;
+  --field: #141417;
+  --default: #1e1e22;
+  --default-hover: #26262b;
+  --line: #ffffff12;
+  --fg: #f2f2f4;
+  --muted: #8f8f99;
+  --faint: #5c5c66;
+  --danger: #ff453a;
+  --here: #93e06b;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+}
+body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  margin: 0;
+  background: var(--window);
+  color: var(--fg);
+  font: 14px/1.45 "Onest", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
+  user-select: none;
+}
+[hidden] {
+  display: none !important;
+}
+button {
+  font: inherit;
+  color: inherit;
+}
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ---------- left: the step ---------- */
+
+.left {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 28px 40px 32px;
+}
+.mark {
+  width: 26px;
+  height: 26px;
+  flex: none;
+}
+main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.step {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: safe center;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 24px 0;
+  overflow-y: auto;
+  /* In only once the step before has gone, so the two never show at once. */
+  animation: enter 0.42s var(--ease) 0.13s both;
+}
+/* A tall step scrolls; nothing in it gets squeezed. */
+.step > * {
+  flex-shrink: 0;
+}
+.step.leaving {
+  animation: leave 0.13s ease-in both;
+  pointer-events: none;
+}
+.step.back-in {
+  animation-name: enter-back;
+}
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes enter-back {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+@keyframes leave {
+  to {
+    opacity: 0;
+  }
+}
+
+h1 {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.sub {
+  margin: 6px 0 28px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.label {
+  display: block;
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.label.gap {
+  margin-top: 24px;
+}
+.input {
+  display: block;
+  width: 100%;
+  height: 46px;
+  margin: 0 0 18px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--field);
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+  -webkit-user-select: text;
+  user-select: text;
+}
+/* The ring is the border itself, inside the box: nothing to clip. */
+.input:focus {
+  border-color: #ffffff66;
+  background: #17171a;
+}
+.input.bad {
+  border-color: #ff453a99;
+}
+.input::placeholder {
+  color: var(--faint);
+}
+.input.mono {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+/* Login and password side by side: the login short, the password taking the rest. */
+.pair-fields {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: 12px;
+}
+.with-eye,
+.with-suffix {
+  position: relative;
+  display: block;
+}
+.with-eye .input {
+  padding-right: 46px;
+}
+.eye {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--faint);
+  cursor: pointer;
+}
+.eye:hover {
+  color: var(--fg);
+}
+.eye svg {
+  width: 17px;
+  height: 17px;
+}
+.with-suffix .input {
+  padding-right: 120px;
+}
+.suffix {
+  position: absolute;
+  top: 0;
+  right: 14px;
+  line-height: 46px;
+  color: var(--muted);
+  font-size: 15px;
+  pointer-events: none;
+}
+
+.error {
+  min-height: 18px;
+  margin: -6px 0 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+/* Rows between hairlines: choices, how-tos, facts, the install's tasks. */
+.rows {
+  display: grid;
+  border-top: 1px solid var(--line);
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 64px;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  text-align: left;
+}
+/* Whatever text a row holds takes the room; icons, radios and buttons keep their size. */
+.row > .grow,
+.row > span:not([class]) {
+  flex: 1;
+  min-width: 0;
+}
+.row b {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+}
+.row small {
+  display: block;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.choice {
+  cursor: pointer;
+}
+.choice:hover b {
+  color: #fff;
+}
+.radio {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1.5px #ffffff40;
+  transition: box-shadow 0.2s var(--ease);
+}
+.choice[aria-checked="true"] .radio {
+  box-shadow: inset 0 0 0 5.5px var(--fg);
+}
+.howto {
+  counter-reset: how;
+}
+.howto .row {
+  min-height: 52px;
+  padding: 8px 0;
+  counter-increment: how;
+}
+.howto .row::before {
+  content: counter(how);
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--default);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.logo {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--default);
+}
+.logo svg {
+  width: 18px;
+  height: 18px;
+}
+/* Sign-in services: a row each; the one opened gets a tick instead of the arrow. */
+.provider {
+  min-height: 58px;
+}
+.provider .out {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--faint);
+  transition: color 0.15s;
+}
+.provider:hover .out {
+  color: var(--fg);
+}
+.provider.opened .out {
+  color: var(--here);
+}
+.on {
+  color: var(--here);
+  font-size: 13px;
+}
+.records {
+  margin: 4px 0 18px;
+}
+.records .row {
+  min-height: 50px;
+}
+.records code {
+  overflow: hidden;
+  font: 13px var(--mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.records .to {
+  color: var(--muted);
+  font: 12px var(--mono);
+}
+.records .type {
+  width: 14px;
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* deSEC's captcha: their picture on a light card, as they draw it. */
+.captcha {
+  display: grid;
+  place-items: center;
+  height: 96px;
+  margin-bottom: 4px;
+  border-radius: 12px;
+  background: #f4f1ea;
+}
+.captcha img {
+  max-width: 100%;
+  max-height: 88px;
+}
+.captcha .spinner {
+  border-color: #0c0c0e26;
+  border-top-color: #0c0c0e;
+}
+.quiet.more {
+  align-self: flex-start;
+  height: 34px;
+  margin: 0 0 14px -12px;
+  font-size: 13px;
+}
+.input.caps {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.spinner {
+  display: inline-block;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid #ffffff26;
+  border-top-color: var(--fg);
+  animation: spin 0.8s linear infinite;
+}
+.row.wait {
+  min-height: 52px;
+  color: var(--muted);
+}
+.row.wait.done .spinner {
+  border-color: var(--here);
+  animation: none;
+}
+.row.wait.done {
+  color: var(--here);
+}
+
+/* The install: what's done, what's on, what's next. */
+.task {
+  min-height: 48px;
+  color: var(--faint);
+  transition: color 0.3s;
+}
+.task .state {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1.5px #ffffff26;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+.task[data-state="run"] {
+  color: var(--fg);
+}
+.task[data-state="run"] .state {
+  box-shadow: none;
+}
+.task[data-state="run"] .state::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 1.5px solid #ffffff2e;
+  border-top-color: var(--fg);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.task[data-state="done"] {
+  color: var(--muted);
+}
+.task[data-state="done"] .state {
+  background: var(--fg);
+  box-shadow: none;
+  color: var(--window);
+}
+.task .state svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.2s, transform 0.3s var(--ease);
+}
+.task[data-state="done"] .state svg {
+  opacity: 1;
+  transform: none;
+}
+.task[data-state="fail"] {
+  color: var(--fg);
+}
+.task[data-state="fail"] .state {
+  background: var(--danger);
+  box-shadow: none;
+}
+.task .took {
+  flex: none;
+  color: var(--faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.elapsed {
+  color: var(--faint);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* One row of buttons under the step: back on the left, the way on at the right. */
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 28px;
+}
+.actions > :last-child {
+  margin-left: auto;
+}
+.pair {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.primary,
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 42px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.primary {
+  background: var(--fg);
+  color: var(--window);
+}
+.primary:hover {
+  background: #fff;
+}
+.primary:disabled {
+  background: var(--default);
+  color: var(--faint);
+  cursor: default;
+}
+.secondary {
+  flex: none;
+  height: 34px;
+  padding: 0 14px;
+  background: var(--default);
+  font-size: 13px;
+}
+.secondary:hover {
+  background: var(--default-hover);
+}
+.primary svg,
+.secondary svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.primary,
+.secondary,
+.quiet {
+  white-space: nowrap;
+}
+.busy {
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
+}
+.busy::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 999px;
+  border: 2px solid #0c0c0e33;
+  border-top-color: var(--window);
+  animation: spin 0.8s linear infinite;
+}
+.secondary.busy::after {
+  border-color: #ffffff33;
+  border-top-color: var(--fg);
+}
+.quiet {
+  height: 42px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+.actions > .quiet:first-child {
+  margin-left: -12px;
+}
+.quiet:hover {
+  color: var(--fg);
+}
+
+/* Three short bars at the bottom, one per part of the setup, each filling as its steps go by. */
+.progress {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+.part {
+  display: grid;
+  gap: 8px;
+  width: 64px;
+}
+.track {
+  position: relative;
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #ffffff1f;
+}
+.track i {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--fg);
+  transform: scaleX(var(--fill, 0));
+  transform-origin: left;
+  transition: transform 0.6s var(--ease);
+}
+.part .name {
+  color: var(--faint);
+  font-size: 11px;
+  text-align: center;
+  transition: color 0.3s;
+}
+.part.now .name {
+  color: var(--muted);
+}
+
+/* ---------- right: the step's picture, made of the person's own answers ---------- */
+
+.right {
+  position: relative;
+  overflow: hidden;
+  border-left: 1px solid #ffffff0b;
+  background: radial-gradient(70% 55% at 45% 50%, #ffffff08, transparent 75%) #09090b;
+}
+.scene {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+  /* Dark at the edges, like a lens. */
+  -webkit-mask-image: radial-gradient(64% 56% at 50% 50%, #000 35%, transparent 100%);
+  mask-image: radial-gradient(64% 56% at 50% 50%, #000 35%, transparent 100%);
+}
+.scene.on {
+  opacity: 1;
+}
+/* The template stays out of sight; the cameras film copies of it. */
+.scene > .ui {
+  display: none;
+}
+
+/* ---------- a whole screen of Gomex at work, as the cameras film it ---------- */
+
+/* Big and full to the edges, with no frame of its own: the camera is always closer than its borders. */
+.ui {
+  width: 1280px;
+  color: #d9d9df;
+  font: 17px/1.75 var(--mono);
+}
+.ui p {
+  margin: 0;
+  white-space: nowrap;
+}
+.ui .dim {
+  color: #ffffff4d;
+}
+.ui .k {
+  color: #e4a0ea;
+}
+.ui .ok {
+  color: var(--here);
+}
+.ui .hl-green {
+  background: #93e06b1c;
+  box-shadow: inset 4px 0 #93e06b;
+}
+.ui .hl-pink {
+  background: #e4a0ea1c;
+  box-shadow: inset 4px 0 #e4a0ea;
+}
+
+/* Alive: highlights glide from line to line, and what isn't reached yet waits, dim (onboarding.js, LIVE). */
+.ui .ln,
+.ui .row,
+.ui .msg {
+  transition: background 0.6s ease, box-shadow 0.6s ease, opacity 0.6s ease, transform 0.6s var(--ease);
+}
+.ui .ln.later,
+.ui .row.later {
+  opacity: 0.3;
+}
+.ui .msg.later {
+  opacity: 0;
+  transform: translateY(10px);
+}
+/* The installer's cursor, waiting at the end of its output. */
+.ui .log::after {
+  content: "▍";
+  display: block;
+  padding: 1px 40px 1px 94px;
+  color: #fff;
+  animation: blink 1.1s steps(1) infinite;
+}
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* The server's terminal. */
+.term {
+  padding: 30px 0;
+}
+.term .ln {
+  display: flex;
+  gap: 26px;
+  padding: 1px 40px;
+}
+.term .ln i {
+  width: 28px;
+  flex: none;
+  color: #ffffff2e;
+  font-style: normal;
+  text-align: right;
+}
+.term .box {
+  display: inline-block;
+  margin: 10px 0;
+  padding: 10px 22px;
+  border: 1.5px solid var(--here);
+  border-radius: 12px;
+  color: #fff;
+}
+
+/* The browser on the new address, Gomex open in it. */
+.browser {
+  font-family: "Onest", sans-serif;
+}
+.browser .tabs {
+  display: flex;
+  gap: 8px;
+  padding: 16px 24px 0;
+  background: #17171b;
+}
+.browser .tab {
+  padding: 10px 22px;
+  border-radius: 12px 12px 0 0;
+  color: #ffffff59;
+  font-size: 15px;
+}
+.browser .tab.on {
+  background: #1f1f24;
+  color: #e7e7ea;
+}
+.browser .bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 24px;
+  background: #1f1f24;
+}
+.browser .nav {
+  color: #ffffff40;
+  font-size: 20px;
+}
+.browser .url {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 18px;
+  border-radius: 999px;
+  background: #ffffff0d;
+  font-size: 18px;
+}
+.browser .url svg {
+  width: 17px;
+  height: 17px;
+  color: var(--here);
+}
+.browser .app {
+  display: grid;
+  grid-template-columns: 76px 280px 1fr;
+  height: 760px;
+  background: #0c0c0e;
+}
+.browser .rail {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 18px 14px;
+}
+.browser .rail i,
+.browser .msg i {
+  display: block;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  background: #1e1e22;
+}
+.browser .rail i.on {
+  background: #f2f2f4;
+}
+.browser .list {
+  padding: 18px 14px;
+  color: #ffffff8c;
+  font-size: 16px;
+}
+.browser .list p {
+  padding: 10px 16px;
+  border-radius: 14px;
+}
+.browser .list p.on {
+  background: #1e1e22;
+  color: #fff;
+}
+.browser .chat {
+  padding: 22px 30px;
+}
+.browser .msg {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+.browser .msg b {
+  display: block;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+}
+.browser .msg span {
+  color: #ffffffa6;
+  font-size: 16px;
+}
+
+/* The person's inbox, deSEC's letter waiting on top. */
+.browser .inbox {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 780px;
+  background: #0f0f12;
+  font-size: 16px;
+}
+.inbox .folders {
+  padding: 22px 14px;
+  color: #ffffff80;
+}
+.inbox .folders p {
+  padding: 10px 18px;
+  border-radius: 999px;
+}
+.inbox .folders p.on {
+  background: #ffffff10;
+  color: #fff;
+}
+.inbox .letter {
+  display: grid;
+  grid-template-columns: 180px 1fr 110px;
+  gap: 18px;
+  padding: 15px 26px;
+  border-bottom: 1px solid #ffffff0d;
+}
+.inbox .letter b {
+  color: #fff;
+}
+.inbox .letter span {
+  color: #ffffffa6;
+}
+.inbox em {
+  color: #ffffff59;
+  font-style: normal;
+  text-align: right;
+}
+.inbox .focus {
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  50% {
+    background-color: #e4a0ea33;
+  }
+}
+
+/* The backups on the Drive. */
+.drive {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  font-family: "Onest", sans-serif;
+  font-size: 16px;
+}
+.drive .side {
+  padding: 26px 18px;
+  color: #ffffff80;
+}
+.drive .side p {
+  padding: 11px 18px;
+  border-radius: 999px;
+}
+.drive .side p.on {
+  background: #ffffff10;
+  color: #fff;
+}
+.drive .main {
+  padding: 26px 0;
+}
+.drive .path {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 30px 18px;
+  font-size: 22px;
+}
+.drive .path svg {
+  width: 22px;
+  height: 22px;
+}
+.drive .row,
+.drive .head {
+  display: grid;
+  grid-template-columns: 1fr 160px 200px 120px;
+  gap: 18px;
+  padding: 13px 30px;
+  border-top: 1px solid #ffffff0d;
+}
+.drive .head {
+  color: #ffffff59;
+  font-size: 14px;
+}
+.drive .row span:first-child {
+  font-family: var(--mono);
+}
+.drive em {
+  color: #ffffff66;
+  font-style: normal;
+}
+
+/* ---------- the cameras ---------- */
+
+/* Each scene is filmed from two angles, 5 s each, cut straight from one to the other on a 10 s loop: A from above, drifting
+   up the screen; B close and low on the highlighted spot, drifting sideways. Like Linear's onboarding videos. The
+   highlighted spot (--fx, --fy, set by onboarding.js) sits in the middle of the frame. */
+.shot {
+  position: absolute;
+  top: calc(50% - var(--fy, 0px));
+  left: calc(50% - var(--fx, 0px));
+  transform-origin: var(--fx, 50%) var(--fy, 50%);
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: shot-a 10s linear infinite;
+}
+.shot.b {
+  animation-name: shot-b;
+}
+.scene:not(.on) .shot {
+  animation-play-state: paused;
+}
+/* Depth of field: a soft copy underneath, the sharp one only around the focus. */
+.shot .ui {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.shot .soft {
+  filter: blur(3px);
+  opacity: 0.8;
+}
+.shot .sharp {
+  -webkit-mask-image: radial-gradient(360px 150px at var(--fx, 50%) var(--fy, 50%), #000 30%, transparent 100%);
+  mask-image: radial-gradient(360px 150px at var(--fx, 50%) var(--fy, 50%), #000 30%, transparent 100%);
+}
+.shot.b .sharp {
+  -webkit-mask-image: radial-gradient(220px 70px at var(--fx, 50%) var(--fy, 50%), #000 35%, transparent 100%);
+  mask-image: radial-gradient(220px 70px at var(--fx, 50%) var(--fy, 50%), #000 35%, transparent 100%);
+}
+/* Hard cuts between the angles, as in Linear's videos: A for the first half, B for the second. Dim, like theirs. */
+@keyframes shot-a {
+  0% {
+    opacity: 0.32;
+    transform: perspective(1000px) rotateX(36deg) rotateZ(-9deg) scale(1.05) translate3d(30px, 70px, 0);
+  }
+  49.9% {
+    opacity: 0.32;
+    transform: perspective(1000px) rotateX(36deg) rotateZ(-9deg) scale(1.05) translate3d(-10px, -50px, 0);
+  }
+  50%,
+  99.9% {
+    opacity: 0;
+    transform: perspective(1000px) rotateX(36deg) rotateZ(-9deg) scale(1.05) translate3d(30px, 70px, 0);
+  }
+}
+@keyframes shot-b {
+  0%,
+  49.9% {
+    opacity: 0;
+    transform: perspective(700px) rotateY(-30deg) rotateX(10deg) rotateZ(-3deg) scale(1.75) translate3d(50px, 4px, 0);
+  }
+  50% {
+    opacity: 0.32;
+    transform: perspective(700px) rotateY(-30deg) rotateX(10deg) rotateZ(-3deg) scale(1.75) translate3d(50px, 4px, 0);
+  }
+  100% {
+    opacity: 0.32;
+    transform: perspective(700px) rotateY(-30deg) rotateX(10deg) rotateZ(-3deg) scale(1.75) translate3d(-50px, -6px, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shot {
+    animation: none;
+    opacity: 0.32;
+    transform: perspective(1000px) rotateX(36deg) rotateZ(-9deg) scale(1.05);
+  }
+  .shot.b {
+    display: none;
+  }
+}
+
+/* A narrow window: the step alone. */
+@media (max-width: 820px) {
+  body {
+    grid-template-columns: 1fr;
+  }
+  .right {
+    display: none;
+  }
+}
+
+/* In the install list the circle stays its size and the label takes the room. */
+

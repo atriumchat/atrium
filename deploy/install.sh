@@ -12,6 +12,8 @@
 # More knobs, all optional: SERVER_NAME, TURN_HOST, GOMEX_DIR (/opt/gomex), GOMEX_NO_GUM=1 (plain prompts),
 # GOMEX_FIREWALL=0 and GOMEX_SSH=0 (leave ufw / sshd alone), GOMEX_TARBALL + GOMEX_TARBALL_SHA256 (a local or
 # mirrored release), GOMEX_REGISTRY + GOMEX_APP_DIGEST + GOMEX_CADDY_DIGEST (another image registry).
+# For the desktop app, which installs over SSH: GOMEX_AUTHORIZED_KEY (its public key, added for root, so password
+# login can go) and GOMEX_PROGRESS=1 (machine-readable "::gomex …" lines next to the usual output).
 #
 # This POSIX part only gets the program below onto bash with the terminal on stdin. Under `curl | sh` stdin is the
 # script itself, so no prompt could ever read an answer: the bash program is saved to a temporary file and run
@@ -102,6 +104,8 @@ bad() { line "${C_RED}✗${C_RESET} $*"; }
 bullet() { line "• $*"; }
 dim() { line "${C_DIM}$*${C_RESET}"; }
 log() { printf '%s %s\n' "$(date '+%F %T')" "$*" >>"$LOG" 2>/dev/null || true; }
+# For the desktop app (GOMEX_PROGRESS=1): "::gomex run|done|fail STEP [seconds|why]", "::gomex ready URL".
+progress() { if [[ ${GOMEX_PROGRESS:-} == 1 ]]; then printf '::gomex %s\n' "$*"; fi; }
 DIED=0
 die() {
   DIED=1
@@ -356,6 +360,42 @@ has_ssh_key() {
     grep -Eqs '^[^#]*(ssh-(ed25519|rsa|dss)|ecdsa-sha2-|sk-(ssh|ecdsa))' "$home/.ssh/authorized_keys" && return 0
   fi
   return 1
+}
+
+# The first fatal check, for the desktop app to show.
+first_bad_check() {
+  local item
+  for item in "${CHECK_LINES[@]}"; do
+    [[ ${item%%|*} == bad ]] && { printf '%s' "${item#*|}"; return; }
+  done
+}
+
+# GOMEX_AUTHORIZED_KEY: the desktop app's own SSH key, for root. With a key in place the install switches password
+# login off (step_ssh), and the app keeps coming in with its key for updates.
+add_app_key() {
+  local key=${GOMEX_AUTHORIZED_KEY:-}
+  [[ -n $key ]] || return 0
+  [[ $key =~ ^ssh-ed25519\ [A-Za-z0-9+/]+=*(\ [A-Za-z0-9@._-]+)?$ ]] || die "GOMEX_AUTHORIZED_KEY: это не ключ ssh-ed25519"
+  mkdir -p /root/.ssh
+  chmod 700 /root/.ssh
+  touch /root/.ssh/authorized_keys
+  chmod 600 /root/.ssh/authorized_keys
+  grep -qxF "$key" /root/.ssh/authorized_keys || printf '%s\n' "$key" >>/root/.ssh/authorized_keys
+  log "desktop app key added for root"
+}
+
+# The desktop app sets the address up just before it installs (a free name on dedyn.io, or the person's own
+# records), so the installer waits for the names to answer here: the certificates can then come at once.
+wait_dns() {
+  [[ ${GOMEX_PROGRESS:-} == 1 ]] || return 0
+  local i
+  progress run address
+  for i in $(seq 1 60); do
+    check_dns
+    (( DNS_OK )) && break
+    sleep 3
+  done
+  progress "done" address
 }
 
 print_checks() {
@@ -995,6 +1035,7 @@ step_https() {
 run() {
   local title=$1 fn=$2 soft=${3:-} start rc=0 took=''
   log "== $title"
+  progress run "${fn#step_}"
   start=$SECONDS
   if (( TTY )); then
     spin "$title" "$fn" || rc=$?
@@ -1005,13 +1046,16 @@ run() {
   (( SECONDS - start >= 3 )) && took=" ${C_DIM}$((SECONDS - start)) с${C_RESET}"
   if (( rc == 0 )); then
     ok "$title$took"
+    progress "done" "${fn#step_}" "$((SECONDS - start))"
     return 0
   fi
   if [[ -n $soft ]]; then
     warn "$soft"
+    progress "done" "${fn#step_}" "$((SECONDS - start))"
     return 1
   fi
   bad "$title"
+  progress fail "${fn#step_}" "$title"
   say
   tail -n 12 "$LOG" | sed "s/^/    ${C_DIM}/; s/\$/${C_RESET}/"
   die "Не получилось. Исправь и запусти установку снова — данные не пропадут."
@@ -1019,12 +1063,13 @@ run() {
 
 install_all() {
   [[ -n ${WIZARD:-} ]] || say
-  if (( DOCKER_OK )); then ok "Docker уже есть"; else run "Docker" step_docker; fi
+  if (( DOCKER_OK )); then ok "Docker уже есть"; progress "done" docker 0; else run "Docker" step_docker; fi
   if [[ ${GOMEX_FIREWALL:-1} != 0 ]]; then run "Файрвол" step_firewall; fi
   case $SSH_PLAN in
     keys) run "SSH только по ключу" step_ssh ;;
-    nokey) warn "SSH: пароль остаётся, ключа нет" ;;
-    noinclude) warn "SSH: не трогаем, старый sshd без sshd_config.d" ;;
+    nokey) warn "SSH: пароль остаётся, ключа нет"; progress "done" ssh 0 ;;
+    noinclude) warn "SSH: не трогаем, старый sshd без sshd_config.d"; progress "done" ssh 0 ;;
+    *) progress "done" ssh 0 ;;
   esac
   run "Файлы Gomex $RELEASE_VERSION" step_files
   run "Настройки и ключи" step_config
@@ -1061,6 +1106,7 @@ screen_done() {
   fi
   say
   line "$next"
+  progress ready "$url"
   if (( ! DNS_OK )); then
     dim "Ссылка заработает, когда DNS обновится: сертификаты придут сами."
   elif (( ! ${HTTPS_OK:-0} )); then
@@ -1112,9 +1158,16 @@ run_quiet() {
   valid_name "$SERVER_NAME" || die "Имя сервера: до 40 символов, без кавычек, \\, \$ и \`"
   [[ -n ${GOMEX_SERVER_NAME_SET:-} ]] && NAME_SET=1
   SERVER_IP=$(detect_ip)
+  progress run check
+  add_app_key
   run_checks
   print_checks
-  (( CHECK_FATAL )) && die "Сервер не готов."
+  if (( CHECK_FATAL )); then
+    progress fail check "$(first_bad_check)"
+    die "Сервер не готов."
+  fi
+  progress "done" check
+  wait_dns
   check_dns
   if (( ! DNS_OK )); then
     say

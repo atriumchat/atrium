@@ -34,10 +34,8 @@ $('invite').addEventListener('click', () => {
   enter({ title: 'Ссылка-приглашение', hint: '', hold: `${placeholder}/?invite=…`, button: 'Открыть', back: true });
 });
 
-$('own').addEventListener('click', () => {
-  window.gomexAddress.guide();
-  enter({ title: 'Адрес сервера', hint: 'Инструкция открыта в браузере', hold: placeholder, button: 'Открыть', back: true });
-});
+// One's own server is set up right from the app, in its own window.
+$('own').addEventListener('click', () => window.gomexAddress.setup());
 
 $('back').addEventListener('click', () => {
   $('enter').hidden = true;
