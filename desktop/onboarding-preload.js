@@ -8,7 +8,6 @@ contextBridge.exposeInMainWorld('gomexSetup', {
   /** { host, user, password } → { facts: { ip, os, size } } or { error, field? }. */
   connect: (login) => call('connect', login),
   checkName: (name) => call('check-name', name),
-  captcha: () => call('captcha'),
   register: (form) => call('register', form),
   /** Resolves once the link in deSEC's letter is pressed and the name points at the server. */
   waitMail: (where) => call('wait-mail', where),

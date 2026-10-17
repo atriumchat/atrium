@@ -337,7 +337,6 @@ setupCall('open-external', (url) => {
 });
 setupCall('connect', (login) => serverSetup.connect(login));
 setupCall('check-name', ({ name }) => serverSetup.checkName({ name }));
-setupCall('captcha', () => serverSetup.captcha());
 setupCall('register', (form) => serverSetup.register(form));
 setupCall('wait-mail', async (where) => {
   const answer = await serverSetup.waitMail(where);

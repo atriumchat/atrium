@@ -2,7 +2,7 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; font-src 'self'; script-src 'self'; img-src data:" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; font-src 'self'; script-src 'self'" />
     <title>Свой сервер</title>
     <link rel="stylesheet" href="onboarding.css" />
   </head>
@@ -62,8 +62,9 @@
           </div>
         </section>
 
-        <!-- 2a. A free address on deSEC (name.dedyn.io), without leaving the app: name and e-mail, the captcha, the
-             letter. The app makes the deSEC account (its password stays in the app) and points the name here. -->
+        <!-- 2a. A free address on deSEC (name.dedyn.io): name and e-mail here, then the letter. The app makes the deSEC
+             account (its password stays in the app); deSEC's page behind the link asks the captcha and activates it;
+             the app sees that and points the name here. -->
         <section class="step" data-step="free-name" hidden>
           <h1>Бесплатный адрес</h1>
           <p class="sub">Имя на dedyn.io и почта для письма</p>
@@ -78,23 +79,9 @@
           </div>
         </section>
 
-        <section class="step" data-step="free-captcha" hidden>
-          <h1>Символы с картинки</h1>
-          <p class="sub">Защита от ботов у deSEC</p>
-          <div class="captcha"><img id="captcha-img" alt="" hidden /><span class="spinner" id="captcha-wait"></span></div>
-          <button class="quiet more" type="button" id="captcha-new">Другая картинка</button>
-          <label class="label" for="captcha-text">Символы</label>
-          <input class="input mono caps" id="captcha-text" placeholder="AB12C" spellcheck="false" autocapitalize="characters" autocomplete="off" />
-          <p class="error" id="e-captcha" role="alert"></p>
-          <div class="actions">
-            <button class="quiet back" type="button">Назад</button>
-            <button class="primary" type="button" id="go-captcha" disabled>Отправить</button>
-          </div>
-        </section>
-
         <section class="step" data-step="free-mail" hidden>
           <h1>Письмо на почте</h1>
-          <p class="sub">Нажать ссылку в письме от deSEC</p>
+          <p class="sub">В письме от deSEC ссылка. На её странице символы с картинки и кнопка</p>
           <div class="rows">
             <div class="row">
               <span class="grow"><b id="mail-to">you@gmail.com</b><small>Не видно? Папка «Спам»</small></span>

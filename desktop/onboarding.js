@@ -199,12 +199,11 @@ const state = {
 
 // How far each step is into the "Сервер" part, out of five (the free-… steps and 'own' are the two ways on from 'address';
 // one is walked), and the picture it shows on the right.
-const PLACE = { server: 0, address: 1, 'free-name': 2, 'free-captcha': 2.33, 'free-mail': 2.66, own: 2, backup: 3, install: 4 };
+const PLACE = { server: 0, address: 1, 'free-name': 2, 'free-mail': 2.5, own: 2, backup: 3, install: 4 };
 const SCENE = {
   server: 'server',
   address: 'address',
   'free-name': 'address',
-  'free-captcha': 'address',
   'free-mail': 'mail',
   own: 'address',
   backup: 'backup',
@@ -214,7 +213,6 @@ const SCENE = {
 const PREVIOUS = {
   address: 'server',
   'free-name': 'address',
-  'free-captcha': 'free-name',
   'free-mail': 'free-name',
   own: 'address',
   backup: () => (state.pick === 'free' ? 'free-name' : 'own'),
@@ -326,7 +324,7 @@ document.querySelectorAll('.choice').forEach((choice) => {
 $('go-address').addEventListener('click', () => show(state.pick === 'free' ? 'free-name' : 'own'));
 bind('turn', state.turn);
 
-// 2a. A free name on deSEC, all from here. First the name (checked free at once) and the e-mail for the letter.
+// 2a. A free name on deSEC. First the name (checked free at once) and the e-mail; the account is made right then.
 const freeName = () => $('free-name').value.trim().toLowerCase().replace(/\.dedyn\.io$/, '');
 const freeEmail = () => $('free-email').value.trim();
 // dedyn.io takes letters, digits and inner dashes; a few characters at least, so it isn't taken already.
@@ -341,68 +339,18 @@ const emailOk = () => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(freeEmail());
 );
 $('go-free-name').addEventListener('click', async () => {
   busy($('go-free-name'), true);
-  const answer = await setup.checkName({ name: freeName() });
+  const checked = await setup.checkName({ name: freeName() });
+  const answer = checked.error ? checked : await setup.register({ name: freeName(), email: freeEmail() });
   busy($('go-free-name'), false);
   if (answer.error) {
     $('e-free-name').textContent = answer.error;
     return;
   }
-  show('free-captcha');
-  newCaptcha();
-});
-
-// Then deSEC's captcha, shown here; a wrong answer brings a fresh picture.
-let captchaId = null;
-async function newCaptcha() {
-  captchaId = null;
-  $('captcha-img').hidden = true;
-  $('captcha-wait').hidden = false;
-  $('captcha-text').value = '';
-  $('go-captcha').disabled = true;
-  const answer = await setup.captcha();
-  $('captcha-wait').hidden = true;
-  if (answer.error) {
-    $('e-captcha').textContent = answer.error;
-    return;
-  }
-  captchaId = answer.id;
-  $('captcha-img').src = answer.image;
-  $('captcha-img').hidden = false;
-  $('captcha-text').focus({ preventScroll: true });
-}
-$('captcha-new').addEventListener('click', () => {
-  $('e-captcha').textContent = '';
-  newCaptcha();
-});
-$('captcha-text').addEventListener('input', () => {
-  $('e-captcha').textContent = '';
-  $('go-captcha').disabled = !captchaId || $('captcha-text').value.trim().length < 3;
-});
-$('captcha-text').addEventListener('keydown', (event) => {
-  if (event.key === 'Enter' && !$('go-captcha').disabled) $('go-captcha').click();
-});
-$('go-captcha').addEventListener('click', async () => {
-  busy($('go-captcha'), true);
-  const answer = await setup.register({ name: freeName(), email: freeEmail(), captchaId, solution: $('captcha-text').value.trim() });
-  busy($('go-captcha'), false);
-  if (answer.error) {
-    // The name refused: back to it, with deSEC's reason under the field (the next try gets a fresh picture).
-    if (answer.name) {
-      show('free-name', { back: true });
-      $('e-free-name').textContent = answer.error;
-      $('free-name').focus({ preventScroll: true });
-      $('free-name').select();
-      return;
-    }
-    $('e-captcha').textContent = answer.error;
-    if (answer.captcha) newCaptcha();
-    return;
-  }
   waitForMail();
 });
 
-// Last the letter: a button straight into the person's mailbox, and the app waiting for the link to be pressed.
-// Once it is, the app signs in to deSEC and points the name at the server by itself.
+// Then the letter: a button straight into the person's mailbox, and the app waiting for the link to be pressed and
+// deSEC's captcha on its page solved. Once it is, the app signs in to deSEC and points the name at the server itself.
 const MAILBOXES = [
   [/^(gmail|googlemail)\.com$/, 'Открыть Gmail', 'https://mail.google.com/'],
   [/^(yandex\.(ru|com|by|kz)|ya\.ru)$/, 'Открыть Яндекс Почту', 'https://mail.yandex.ru/'],
@@ -647,14 +595,9 @@ function fakeSetup() {
       await wait(600);
       return name === 'taken' ? { error: 'Имя занято, нужно другое' } : { ok: true };
     },
-    async captcha() {
-      await wait(500);
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="80"><rect width="240" height="80" fill="#f4f1ea"/><text x="34" y="54" font-family="monospace" font-size="38" fill="#333" transform="rotate(-4 120 40)">K7Q2M</text></svg>`;
-      return { id: 'demo', image: `data:image/svg+xml;base64,${btoa(svg)}` };
-    },
-    async register({ solution }) {
+    async register() {
       await wait(900);
-      return solution.toUpperCase() === 'WRONG' ? { error: 'Символы не совпали, вот новая картинка', captcha: true } : { ok: true };
+      return { ok: true };
     },
     waitMail: () => wait(6000).then(() => ({ ok: true })),
     cancelMail() {},
@@ -683,7 +626,7 @@ function fakeSetup() {
 show('server');
 checkServerForm();
 
-// Design work in a browser: #step=address (or free-name, free-captcha, free-mail, own, backup, install, done) opens that step with made-up answers.
+// Design work in a browser: #step=address (or free-name, free-mail, own, backup, install, done) opens that step with made-up answers.
 const jump = !window.gomexSetup && location.hash.match(/step=([\w-]+)/)?.[1];
 if (jump) {
   const fill = (id, value) => {
@@ -697,7 +640,6 @@ if (jump) {
   fill('free-email', 'you@gmail.com');
   if (jump === 'own') fill('domain', 'chat.podval.ru');
   state.address = { domain: 'podval.dedyn.io' };
-  if (jump === 'free-captcha') newCaptcha();
   if (jump === 'free-mail') waitForMail();
   if (jump === 'install' || jump === 'done') {
     startInstall();

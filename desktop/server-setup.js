@@ -170,18 +170,11 @@ async function api(path, { method = 'GET', body, token } = {}) {
   return { status: response.status, json, text };
 }
 
-async function captcha() {
-  try {
-    const { status, json } = await api('/captcha/', { method: 'POST', body: { kind: 'image' } });
-    if (status !== 201 && status !== 200) return { error: 'deSEC не отвечает, попробуйте ещё раз' };
-    return { id: json.id, image: `data:image/png;base64,${json.challenge}` };
-  } catch {
-    return { error: 'deSEC не отвечает, попробуйте ещё раз' };
-  }
-}
-
-/** Makes the deSEC account with the name in it. The password is the app's own; deSEC mails the link. */
-async function register({ name, email, captchaId, solution }) {
+/**
+ * Makes the deSEC account with the name in it. The password is the app's own; deSEC mails the link. No captcha
+ * here: for a name under dedyn.io deSEC refuses one at sign-up and asks for it on the page the link opens.
+ */
+async function register({ name, email }) {
   name = String(name).toLowerCase();
   if (!NAME.test(name)) return { error: 'Имя не подходит' };
   const password = crypto.randomBytes(24).toString('base64url');
@@ -192,7 +185,6 @@ async function register({ name, email, captchaId, solution }) {
       body: {
         email: String(email).trim(),
         password,
-        captcha: { id: captchaId, solution: String(solution).trim().toUpperCase() },
         domain: `${name}.dedyn.io`,
         outreach_preference: false,
       },
@@ -209,11 +201,10 @@ async function register({ name, email, captchaId, solution }) {
   const said = (field) => [json[field]].flat(2).filter((x) => typeof x === 'string').join(' ');
   console.log('deSEC sign-up refused:', answer.status, answer.text.slice(0, 400));
   if (answer.status === 429) return { error: 'Слишком часто, подождите минуту' };
-  if (json.captcha) return { error: 'Символы не совпали, вот новая картинка', captcha: true };
-  if (json.email) return { error: `Почта не подходит. deSEC: ${said('email')}`, captcha: true };
-  if (json.domain) return { error: `Имя не подходит. deSEC: ${said('domain')}`, name: true };
+  if (json.email) return { error: `Почта не подходит. deSEC: ${said('email')}` };
+  if (json.domain) return { error: `Имя не подходит. deSEC: ${said('domain')}` };
   if (json.code === 'registration_denied') return { error: 'deSEC отказал в регистрации' };
-  return { error: `deSEC: ${JSON.stringify(json).slice(0, 160)}`, captcha: true };
+  return { error: `deSEC: ${JSON.stringify(json).slice(0, 160)}` };
 }
 
 /**
@@ -323,4 +314,4 @@ async function install({ domain, turn, installer }, report, save) {
   report({ state: 'fail', why: why || `Установщик остановился (код ${code})`, tail });
 }
 
-module.exports = { connect, close, checkName, captcha, register, waitMail, cancelMail, checkDomain, install };
+module.exports = { connect, close, checkName, register, waitMail, cancelMail, checkDomain, install };
