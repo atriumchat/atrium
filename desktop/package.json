@@ -28,8 +28,10 @@
       "address-preload.js",
       "assets/**",
       "ptt.js",
-      "update-key.pem"
+      "update-key.pem",
+      "!node_modules/uiohook-napi/build/**"
     ],
+    "npmRebuild": false,
     "electronFuses": {
       "runAsNode": false,
       "enableNodeOptionsEnvironmentVariable": false,
