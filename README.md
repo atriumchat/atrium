@@ -47,12 +47,14 @@ flowchart LR
   subgraph vps["VPS, host network"]
     l4["Caddy :443<br/>layer4, разбор по SNI"]
     site["Caddy :8443<br/>сайты, TLS"]
+    cover["Caddy :8081<br/>обложка, только 127.0.0.1"]
     app["Приложение :8000<br/>FastAPI + Socket.IO"]
     lk["LiveKit :7880<br/>SFU + TURN"]
     db[("SQLite, файлы<br/>deploy/data")]
   end
   client -- "TCP 443" --> l4
-  l4 -- "SNI = TURN-хост → TCP :5349" --> lk
+  l4 -- "SNI = TURN-хост, звонок → TCP :5349" --> lk
+  l4 -- "SNI = TURN-хост, веб-запрос" --> cover
   l4 -- "остальное, PROXY protocol" --> site
   site -- "/rtc" --> lk
   site -- "/api, /socket.io, веб" --> app
@@ -228,6 +230,7 @@ deploy/release.sh lint      # bash -n и shellcheck на всех скрипта
 | 8000/tcp | нет, 127.0.0.1 | приложение | API, Socket.IO, веб-клиент |
 | 7880/tcp | нет, 127.0.0.1 | LiveKit | Сигналинг, наружу через `/rtc` |
 | 5349/tcp | нет | LiveKit | TURN TLS, сюда шлёт layer4 после TLS |
+| 8081/tcp | нет, 127.0.0.1 | Caddy | Обложка для имени ретранслятора: сюда layer4 шлёт его веб-запросы после TLS |
 
 ## Обслуживание сервера
 

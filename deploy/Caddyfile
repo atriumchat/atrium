@@ -1,7 +1,8 @@
 # Public port 443 is shared (layer4 app, see caddy/Dockerfile):
-#   - TLS for TURN_HOST.DOMAIN ("turn" on older installs, a neutral name on new ones) ends here and
-#     goes on as plain TCP to LiveKit's TURN server (calls that can't use UDP still get through,
-#     looking like ordinary HTTPS);
+#   - TLS for TURN_HOST.DOMAIN ("turn" on older installs, a neutral name on new ones) ends here, and the first
+#     bytes after it decide: a call (STUN) goes on as plain TCP to LiveKit's TURN server (calls that can't use
+#     UDP still get through, looking like ordinary HTTPS), a web request (a browser, a scanner) gets the cover
+#     page from 127.0.0.1:8081 below, so the name answers like any small site instead of breaking;
 #   - everything else passes through untouched to the website below on 127.0.0.1:8443, with the
 #     PROXY protocol so the app still sees each visitor's real IP (needed for the login rate limits).
 # UDP 443 belongs to LiveKit's TURN, so HTTP/3 is off.
@@ -11,7 +12,20 @@
 			@turn tls sni {$TURN_HOST}.{$DOMAIN}
 			route @turn {
 				tls
-				proxy 127.0.0.1:5349
+				# A web request opens with its method in capitals (GET, POST, PRI for HTTP/2), a call with a STUN
+				# message, whose first byte is 0x00-0x03: three bytes tell them apart. caddy-l4's own http matcher
+				# isn't used: it waits for a whole request line, which a STUN message often never has (the call
+				# would be cut off after 3 s), and it drops a request that arrives in pieces. Anything that is not
+				# a web request goes to LiveKit as before.
+				subroute {
+					@web regexp ^[A-Z][A-Z][A-Z] 3
+					route @web {
+						proxy 127.0.0.1:8081
+					}
+					route {
+						proxy 127.0.0.1:5349
+					}
+				}
 			}
 			route {
 				proxy {
@@ -98,8 +112,25 @@ http://app.{$DOMAIN} {
 	@desktop header_regexp User-Agent \bGomex/[0-9]\S*\s.*\bElectron/
 }
 
-# The root domain: the cover page as a plain static site (its own few headers, a 404 for any other path).
-# No www: install.sh asks for no DNS record for it.
+# The cover page as a plain static site (its own few headers, a 404 for any other path): the root domain
+# answers with it, and so does the TURN name (see the internal listener below).
+(cover) {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		defer
+		-Server
+	}
+	root * /srv/landing
+	# Pages of a site of one's own (landing/site/.custom) open without .html: /about is about.html.
+	try_files {path} {path}.html
+	# Browsers check back every time (an ETag makes that a 304), so a new page shows up at once.
+	header Cache-Control "no-cache"
+	file_server
+}
+
+# The root domain: the cover page. No www: install.sh asks for no DNS record for it.
 {$DOMAIN} {
 	route {
 		import desktop
@@ -108,19 +139,7 @@ http://app.{$DOMAIN} {
 			import app
 		}
 		handle {
-			encode zstd gzip
-			header {
-				Strict-Transport-Security "max-age=31536000; includeSubDomains"
-				X-Content-Type-Options nosniff
-				defer
-				-Server
-			}
-			root * /srv/landing
-			# Pages of a site of one's own (landing/site/.custom) open without .html: /about is about.html.
-			try_files {path} {path}.html
-			# Browsers check back every time (an ETag makes that a 304), so a new page shows up at once.
-			header Cache-Control "no-cache"
-			file_server
+			import cover
 		}
 	}
 }
@@ -137,7 +156,8 @@ app.{$DOMAIN} {
 }
 
 # Only here so Caddy keeps a certificate for the TURN name; its connections never reach this block
-# (layer4 above hands them to LiveKit). HTTP-01 only: the TLS-ALPN challenge would land on TURN.
+# (layer4 above hands them to LiveKit or to the listener below). HTTP-01 only: the TLS-ALPN challenge would land
+# on TURN.
 {$TURN_HOST}.{$DOMAIN} {
 	tls {
 		issuer acme {
@@ -145,6 +165,14 @@ app.{$DOMAIN} {
 		}
 	}
 	respond 404
+}
+
+# The TURN name's web requests: layer4 ends the TLS and hands the plain request over here, so whoever opens
+# https://TURN_HOST.DOMAIN sees the same cover page, with the same headers, as on the root domain. Loopback only,
+# whatever Host the request names.
+http://:8081 {
+	bind 127.0.0.1
+	import cover
 }
 
 # Sites of one's own beside Gomex, such as www.DOMAIN sent on to DOMAIN: deploy/sites/*.caddy, which updates keep.
