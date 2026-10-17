@@ -229,7 +229,7 @@ else
     say "npm already has $npm_package@$version"
   else
     pkg=$(mktemp -d)
-    cp "$out/$tarball" "$out/install.sh" "$pkg/"
+    cp "$out/$tarball" "$out/install.sh" "$ROOT/LICENSE" "$pkg/"
     cat >"$pkg/package.json" <<EOF
 {
   "name": "$npm_package",
@@ -237,9 +237,9 @@ else
   "description": "Gomex installer and release files: npx $npm_package, or curl -fsSL https://cdn.jsdelivr.net/npm/$npm_package/install.sh | sh",
   "homepage": "https://github.com/$repo",
   "repository": { "type": "git", "url": "git+https://github.com/$repo.git" },
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0-only",
   "bin": { "gomex-install": "install.sh" },
-  "files": ["install.sh", "$tarball"]
+  "files": ["install.sh", "$tarball", "LICENSE"]
 }
 EOF
     cat >"$pkg/README.md" <<EOF
