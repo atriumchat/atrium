@@ -4,8 +4,8 @@ import { api } from '../api';
 import { showError, useStore } from '../store';
 import { expectNewToken, switchToken } from '../socket';
 import { Avatar } from '../ui/Avatar';
-import { CheckIcon } from '../ui/icons';
-import { ChoiceRow, Primary, Row, RowValue, Rows, Secondary, SubPage, field, fieldArea, fieldLabel, useSub } from '../ui/settings';
+import { CheckIcon, GlobeIcon } from '../ui/icons';
+import { ChoiceRow, Primary, RowIcon, Row, RowValue, Rows, Secondary, SubPage, field, fieldArea, fieldLabel, useSub } from '../ui/settings';
 import { AvatarPicker, BioEditor } from '../people/UserProfile';
 import { downloadKey } from './RecoveryKey';
 import { CopyButton } from '../ui/CopyButton';
@@ -18,13 +18,19 @@ import { LANGS, setLang, useT, type Lang } from '../i18n';
  */
 /** Per device (not part of the account), so it is shown by the phone's "You" tab too. */
 export function LanguageRow() {
-  const { t, lang } = useT();
+  const { t, choice } = useT();
+  const options: [Lang | 'system', string][] = [['system', t('account.language.system')], ...LANGS.map((l): [Lang, string] => [l.id, l.label])];
   return (
-    <ChoiceRow<Lang>
+    <ChoiceRow<Lang | 'system'>
+      icon={
+        <RowIcon>
+          <GlobeIcon />
+        </RowIcon>
+      }
       title={t('account.language')}
-      value={lang}
-      options={LANGS.map((l): [Lang, string] => [l.id, l.label])}
-      onChange={setLang}
+      value={choice ?? 'system'}
+      options={options}
+      onChange={(v) => setLang(v === 'system' ? null : v)}
     />
   );
 }

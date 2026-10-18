@@ -105,4 +105,5 @@ export const account = {
   'account.app.offline': 'Сервер недоступен',
   'account.app.retry': 'Попробовать снова',
   'account.language': 'Язык',
+  'account.language.system': 'Как в системе',
 } as const;
