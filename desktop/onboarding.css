@@ -1106,6 +1106,11 @@ h1 {
   .right {
     display: none;
   }
+  /* One column: the three bars share its whole width. */
+  .part {
+    flex: 1;
+    width: auto;
+  }
 }
 
 /* In the install list the circle stays its size and the label takes the room. */
