@@ -1,110 +1,83 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { setVoicePrefs } from './voice';
 import { keyLabel, type NoiseMode } from '../prefs';
 import { desktop } from '../desktop';
 import { BypassSwitch } from './Bypass';
 import { ConnectionCheck } from './ConnectionCheck';
+import { ChoiceRow, Row, RowFrame, Rows, Secondary } from '../ui/settings';
 
 /** The "Голос" page of the settings, for this device: noise suppression, push-to-talk, the bypass, a check. */
 export function VoiceSettings() {
   const prefs = useStore((s) => s.voicePrefs);
-  const [checking, setChecking] = useState(false);
+  const isMobile = useStore((s) => s.isMobile);
 
   return (
-    <>
-            <Section title="Шумоподавление" hint={NOISE_HINT[prefs.noise]}>
-              <Segmented<NoiseMode>
-                value={prefs.noise}
-                onChange={(noise) => setVoicePrefs({ noise })}
-                options={[
-                  ['off', 'Выкл'],
-                  ['browser', 'Обычное'],
-                  ['rnnoise', 'Сильное'],
-                ]}
-              />
-            </Section>
-
-            <Section
-              title="Микрофон"
-              hint={
-                prefs.ptt
-                  ? desktop?.ptt
-                    ? 'Микрофон работает, пока клавиша зажата, даже когда Gomex в фоне'
-                    : 'Микрофон работает, пока клавиша зажата и окно Gomex открыто. В приложении для компьютера — и в фоне'
-                  : 'Микрофон включён постоянно'
-              }
-            >
-              <Segmented<'voice' | 'ptt'>
-                value={prefs.ptt ? 'ptt' : 'voice'}
-                onChange={(mode) => setVoicePrefs({ ptt: mode === 'ptt' })}
-                options={[
-                  ['voice', 'Всегда включён'],
-                  ['ptt', 'По клавише'],
-                ]}
-              />
-              {prefs.ptt && <KeyPicker value={prefs.pttKey} onChange={(pttKey) => setVoicePrefs({ pttKey })} />}
-            </Section>
-
-            <section className="mt-6">
-              <BypassSwitch />
-            </section>
-
-            <section className="mt-6">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-[15px] font-medium">Проверка связи</h3>
-                {!checking && (
-                  <button onClick={() => setChecking(true)} className="h-9 rounded-full bg-white/10 px-4 text-[14px] hover:bg-white/15">
-                    Проверить
-                  </button>
-                )}
-              </div>
-              {checking && (
-                <div className="mt-3">
-                  <ConnectionCheck />
-                </div>
-              )}
-            </section>
-    </>
+    <Rows title="Голос" className="mt-6">
+      <NoiseRow />
+      {/* In the browser the key only works while Gomex's window is open; the desktop app hears it from anywhere. */}
+      <ChoiceRow<'voice' | 'ptt'>
+        title="Микрофон"
+        value={prefs.ptt ? 'ptt' : 'voice'}
+        onChange={(mode) => setVoicePrefs({ ptt: mode === 'ptt' })}
+        options={[
+          // Every choice says something under the row, so switching doesn't make the page jump.
+          ['voice', 'Всегда включён', 'Слышно всё время'],
+          [
+            'ptt',
+            'По клавише',
+            // On the computer the key itself sits under the row, so no row of its own drops in when it's chosen.
+            isMobile || !prefs.ptt ? (
+              desktop?.ptt ? 'Работает и в фоне' : 'Пока окно открыто'
+            ) : (
+              <KeyHint value={prefs.pttKey} onChange={(pttKey) => setVoicePrefs({ pttKey })} />
+            ),
+          ],
+        ]}
+      />
+      {isMobile && prefs.ptt && <KeyRow value={prefs.pttKey} onChange={(pttKey) => setVoicePrefs({ pttKey })} />}
+      <RowFrame>
+        <BypassSwitch />
+      </RowFrame>
+      <CheckRow />
+    </Rows>
   );
 }
 
-const NOISE_HINT: Record<NoiseMode, string> = {
-  off: 'Звук как есть. Для хорошего микрофона в тихой комнате.',
-  browser: 'Встроенное в браузер: убирает ровный шум вроде вентилятора.',
-  rnnoise: 'Нейросеть RNNoise: глушит клавиатуру, улицу, детей. Чуть больше нагрузка на процессор.',
-};
-
-function Section({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
+/**
+ * The phone's «Звонки» group on the "Вы" tab: what's touched when friends hear noise or the call stutters. No
+ * push-to-talk there: without a keyboard it's a computer's setting.
+ */
+export function CallsGroup({ className = '' }: { className?: string }) {
   return (
-    <section className="mt-6">
-      <h3 className="text-[15px] font-medium">{title}</h3>
-      <p className="mb-3 mt-0.5 text-[13px] leading-snug text-muted">{hint}</p>
-      <div className="flex flex-col gap-2">{children}</div>
-    </section>
+    <Rows title="Звонки" className={className}>
+      <NoiseRow />
+      <RowFrame>
+        <BypassSwitch />
+      </RowFrame>
+      <CheckRow />
+    </Rows>
   );
 }
 
-function Segmented<T extends string>(props: { value: T; onChange: (v: T) => void; options: [T, string][]; disabled?: boolean }) {
+function NoiseRow() {
+  const noise = useStore((s) => s.voicePrefs.noise);
   return (
-    <div className={`flex gap-1 rounded-full bg-surface-tertiary p-1 ${props.disabled ? 'opacity-50' : ''}`}>
-      {props.options.map(([id, label]) => (
-        <button
-          key={id}
-          disabled={props.disabled}
-          onClick={() => props.onChange(id)}
-          aria-pressed={props.value === id}
-          className={`h-9 flex-1 rounded-full text-[14px] transition-colors ${props.value === id ? 'bg-white font-medium text-black' : 'text-muted enabled:hover:text-foreground'}`}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
+    <ChoiceRow<NoiseMode>
+      title="Шумоподавление"
+      value={noise}
+      onChange={(value) => setVoicePrefs({ noise: value })}
+      options={[
+        ['off', 'Выкл', 'Звук как есть'],
+        ['browser', 'Обычное', 'Убирает ровный шум'],
+        ['rnnoise', 'Сильное', 'Убирает клавиатуру и улицу'],
+      ]}
+    />
   );
 }
 
-/** "Press a key": takes the next key or side mouse button. Escape cancels. */
-function KeyPicker({ value, onChange }: { value: string; onChange: (code: string) => void }) {
+/** Waits for the next key or side mouse button while `listening`; Escape cancels. */
+function useKeyCatch(onChange: (code: string) => void) {
   const [listening, setListening] = useState(false);
 
   useEffect(() => {
@@ -127,18 +100,74 @@ function KeyPicker({ value, onChange }: { value: string; onChange: (code: string
       window.removeEventListener('mousedown', mouse, true);
     };
   }, [listening, onChange]);
+  return [listening, setListening] as const;
+}
 
-  return (
-    <div className="flex items-center gap-3 rounded-full bg-surface-tertiary py-1.5 pl-4 pr-1.5">
-      <span className="flex-1 text-[14px] text-muted">
-        Клавиша: <span className="font-mono text-foreground">{listening ? '…' : keyLabel(value)}</span>
+// A key cap, so a short label like ` still reads as a key.
+const KEY_CAP = 'inline-block min-w-5 rounded-[6px] border border-white/[0.12] px-1.5 text-center font-mono text-[12px] leading-[18px] text-foreground';
+
+/** The key under the "Микрофон" row on the computer: the cap, then «Сменить» (and where it works, in the browser). */
+function KeyHint({ value, onChange }: { value: string; onChange: (code: string) => void }) {
+  const [listening, setListening] = useKeyCatch(onChange);
+  if (listening) {
+    return (
+      <span>
+        Клавиша или кнопка мыши…{' '}
+        <button type="button" onClick={() => setListening(false)} className="text-foreground hover:underline">
+          Отмена
+        </button>
       </span>
-      <button
-        onClick={() => setListening((v) => !v)}
-        className={`h-9 rounded-full px-4 text-[14px] ${listening ? 'bg-white text-black' : 'bg-white/10 hover:bg-white/15'}`}
-      >
-        {listening ? 'Ожидание клавиши или кнопки мыши…' : 'Сменить'}
+    );
+  }
+  return (
+    <span className="flex items-center gap-1.5">
+      <kbd className={KEY_CAP}>{keyLabel(value)}</kbd>
+      <span>·</span>
+      <button type="button" onClick={() => setListening(true)} className="text-foreground hover:underline">
+        Сменить
       </button>
-    </div>
+      {!desktop?.ptt && <span>· пока окно открыто</span>}
+    </span>
+  );
+}
+
+/** The push-to-talk key as a row of its own, on the phone. */
+function KeyRow({ value, onChange }: { value: string; onChange: (code: string) => void }) {
+  const [listening, setListening] = useKeyCatch(onChange);
+  return (
+    <Row
+      title="Клавиша"
+      value={
+        listening ? (
+          'Клавиша или кнопка мыши…'
+        ) : (
+          <kbd className={KEY_CAP}>{keyLabel(value)}</kbd>
+        )
+      }
+    >
+      <Secondary onPress={() => setListening((v) => !v)}>{listening ? 'Отмена' : 'Сменить'}</Secondary>
+    </Row>
+  );
+}
+
+/** Calls tried from here on demand: the two tries show up as rows of their own under this one. */
+function CheckRow() {
+  const [run, setRun] = useState(0);
+  const [busy, setBusy] = useState(false);
+  return (
+    <>
+      <Row title="Проверка связи">
+        <Secondary
+          isPending={busy}
+          onPress={() => {
+            setRun((n) => n + 1);
+            setBusy(true);
+          }}
+        >
+          {run ? 'Ещё раз' : 'Проверить'}
+        </Secondary>
+      </Row>
+      {run > 0 && <ConnectionCheck key={run} onDone={() => setBusy(false)} />}
+    </>
   );
 }

@@ -9,7 +9,7 @@ import { ChevronRightIcon, PencilIcon, PlusIcon } from '../ui/icons';
 
 export const STATUS_LABEL: Record<MyStatus, string> = { online: 'В сети', dnd: 'Не беспокоить', invisible: 'Невидимка' };
 
-const DURATIONS: [number, string][] = [
+export const DURATIONS: [number, string][] = [
   [15, '15 минут'],
   [60, '1 час'],
   [8 * 60, '8 часов'],
@@ -18,7 +18,7 @@ const DURATIONS: [number, string][] = [
   [0, 'Навсегда'],
 ];
 
-async function saveStatus(status: MyStatus, text: string, minutes?: number) {
+export async function saveStatus(status: MyStatus, text: string, minutes?: number) {
   try {
     const r = await api.setStatus(status, text.trim(), minutes);
     useStore.setState({ myStatus: r.status, myStatusText: r.text, myStatusUntil: r.until });
@@ -28,7 +28,7 @@ async function saveStatus(status: MyStatus, text: string, minutes?: number) {
 }
 
 /** "до 18:30", or with the day when it isn't today. */
-function untilText(until: number) {
+export function untilText(until: number) {
   const d = new Date(until);
   const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   if (d.toDateString() === new Date().toDateString()) return `до ${time}`;
@@ -105,7 +105,7 @@ function Row({ icon, children, onPress }: { icon: ReactNode; children: ReactNode
 }
 
 /** Discord's status dots: green, red with a bar, grey ring. */
-function StatusDot({ status }: { status: MyStatus }) {
+export function StatusDot({ status }: { status: MyStatus }) {
   if (status === 'invisible') return <span className="block h-3 w-3 shrink-0 rounded-full border-[3px] border-[#8e8e93]" />;
   if (status === 'dnd')
     return (

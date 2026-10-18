@@ -170,6 +170,9 @@ def init_db() -> None:
     with connect_db() as conn:
         conn.execute("PRAGMA journal_mode = WAL")
         conn.executescript(SCHEMA)
+        if "deleted_at" not in {row[1] for row in conn.execute("PRAGMA table_info(channels)")}:
+            # A deleted channel waits in the trash (messages and all) until it is brought back or the week is out.
+            conn.execute("ALTER TABLE channels ADD COLUMN deleted_at INTEGER")
         user_columns = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
         if "bio" not in user_columns:
             conn.execute("ALTER TABLE users ADD COLUMN bio TEXT NOT NULL DEFAULT ''")

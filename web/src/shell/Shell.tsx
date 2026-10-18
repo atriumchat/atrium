@@ -11,6 +11,7 @@ import { Sidebar } from './Sidebar';
 import { HomeSidebar } from './HomeSidebar';
 import { HomeFilledIcon, HomeIcon } from '../ui/icons';
 import { DownloadRailButton } from './Downloads';
+import { whereToUseNeeded } from '../account/WhereToUse';
 import { UserPanel } from './UserPanel';
 import { HomeContent, homeBadgeCount, serverBadgeCount, ServerContent } from './Content';
 import { MobileShell } from './MobileShell';
@@ -168,7 +169,7 @@ function ServerRail({ className }: { className: string }) {
         )}
       </RailItem>
       {/* In a browser: get the app, at the foot of the rail as in Discord. */}
-      {!desktop && (
+      {whereToUseNeeded() && (
         <div className="mt-auto pb-3">
           <DownloadRailButton />
         </div>

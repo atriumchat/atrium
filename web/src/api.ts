@@ -1,4 +1,4 @@
-import type { Bootstrap, Channel, Dm, Friend, InboxItem, Message, MyInvite, MyStatus, Session, Upload, User } from './types';
+import type { Bootstrap, Channel, DeletedChannel, Dm, Friend, InboxItem, Message, MyInvite, MyStatus, Session, Upload, User } from './types';
 
 type ServerInfo = { serverName: string; serverIcon: string | null };
 
@@ -97,6 +97,8 @@ export const api = {
   reorderChannels: (ids: string[]) => request<Channel[]>('/api/channels/order', { method: 'PUT', body: JSON.stringify({ ids }) }),
   muteChannel: (id: string, muted: boolean) =>
     request<string[]>(`/api/channels/${id}/mute`, { method: 'PUT', body: JSON.stringify({ muted }) }),
+  deletedChannels: () => request<DeletedChannel[]>('/api/channels/deleted'),
+  restoreChannel: (id: string) => request<Channel[]>(`/api/channels/${id}/restore`, { method: 'POST' }),
   deleteChannel: (id: string) => request<Channel[]>(`/api/channels/${id}`, { method: 'DELETE' }),
   setStatus: (status: MyStatus, text: string, minutes?: number) =>
     request<{ status: MyStatus; text: string; until: number | null }>('/api/me/status', {
@@ -125,5 +127,6 @@ export const api = {
   checkToken: () => request<{ token: string; url: string }>('/api/check-token', post()),
   markRead: (conversationId: string, at: number) => request<{ ok: boolean }>('/api/read', post({ conversationId, at })),
   inbox: (before?: number) => request<InboxItem[]>(`/api/inbox${before ? `?before=${before}` : ''}`),
+  callQuality: (report: Record<string, unknown>) => request<{ ok: boolean }>('/api/call-quality', post(report)),
   voiceToken: (channelId: string) => request<{ token: string; url: string }>('/api/voice-token', post({ channelId })),
 };

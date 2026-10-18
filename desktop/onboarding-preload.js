@@ -11,6 +11,10 @@ contextBridge.exposeInMainWorld('gomexSetup', {
   /** Resolves once the link in deSEC's letter is pressed and the name points at the server. */
   waitMail: (where) => call('wait-mail', where),
   cancelMail: () => call('cancel-mail'),
+  /** { domain } of the free address an earlier server here left, or { domain: null }. */
+  savedAddress: () => call('saved-address'),
+  /** Points that saved address at the new server: { ok, domain } or { error }. */
+  useSaved: (where) => call('use-saved', where),
   checkDomain: (domain) => call('check-domain', domain),
   connectDrive: () => call('connect-drive'),
   /**

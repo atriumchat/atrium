@@ -253,10 +253,12 @@ async def housekeeping() -> None:
     while True:
         try:
             await run_in_threadpool(sweep_unsent_uploads)
+            await run_in_threadpool(purge_deleted_channels)
         except Exception as e:  # never let a bad hour stop the loop
             print(f"housekeeping failed: {e!r}", flush=True)
         await asyncio.sleep(3600)
 
 
 # The other gomex modules import this one too: they come last, once everything above is defined.
+from .channels import purge_deleted_channels
 from .dms import dm_for
