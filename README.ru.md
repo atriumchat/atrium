@@ -183,6 +183,19 @@ www.{$DOMAIN}, http://www.{$DOMAIN} {
 }
 ```
 
+Свои маршруты внутри приложения (`app.DOMAIN`) кладутся файлами `*.caddy` в `/opt/gomex/deploy/routes/app`, раньше
+маршрутов самого приложения; обновления их не трогают, по умолчанию их нет. Каждая страница приложения загружает
+`/owner.js`, в Gomex он пустой; свой скрипт отдаётся маршрутом оттуда же:
+
+```caddy
+handle /owner.js {
+	root * /etc/caddy/routes/app
+	file_server
+}
+```
+
+CSP приложения разрешает только его собственный адрес, поэтому всё, куда ходит такой скрипт, тоже идёт через маршрут.
+
 После правки, без обрыва звонков:
 `cd /opt/gomex/deploy && docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile`.
 

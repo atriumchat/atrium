@@ -63,6 +63,7 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./sites:/etc/caddy/sites:ro
+      - ./routes:/etc/caddy/routes:ro
       - ../landing/site:/srv/landing:ro
       - ./caddy-data:/data
       - ./caddy-config:/config

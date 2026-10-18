@@ -1006,7 +1006,7 @@ EOF
   if [[ -f livekit.yaml ]] && [[ $(<livekit.yaml) != "$s" ]]; then touch "$GOMEX_TMP/livekit-changed"; fi
   (umask 077 && printf '%s\n' "$s" >livekit.yaml)
 
-  mkdir -p data caddy-data caddy-config sites
+  mkdir -p data caddy-data caddy-config sites routes/app
   # The app runs as uid 10001 in its container; only it may touch the data.
   chown -R 10001:10001 data
   chmod 700 data

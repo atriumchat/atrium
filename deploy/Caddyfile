@@ -144,11 +144,13 @@ http://app.{$DOMAIN} {
 	}
 }
 
-# The app itself, with its API, socket and LiveKit signalling.
+# The app itself, with its API, socket and LiveKit signalling. Routes of the server's owner come first:
+# deploy/routes/app/*.caddy (none by default, updates keep them), e.g. to serve their own /owner.js.
 app.{$DOMAIN} {
 	import common
 	route {
 		import downloads
+		import /etc/caddy/routes/app/*.caddy
 		handle {
 			import app
 		}

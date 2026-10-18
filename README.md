@@ -186,6 +186,19 @@ www.{$DOMAIN}, http://www.{$DOMAIN} {
 }
 ```
 
+Own routes inside the app (`app.DOMAIN`) go in `*.caddy` files in `/opt/gomex/deploy/routes/app`, ahead of the
+app's own; updates leave them alone, and there are none by default. Every page of the app loads `/owner.js`, empty in
+Gomex; to run a script of one's own, serve it from a route there:
+
+```caddy
+handle /owner.js {
+	root * /etc/caddy/routes/app
+	file_server
+}
+```
+
+The app's CSP allows only its own address, so whatever that script talks to goes through a route of the same kind.
+
 After editing, without dropping calls:
 `cd /opt/gomex/deploy && docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile`.
 
