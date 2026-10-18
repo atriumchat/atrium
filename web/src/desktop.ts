@@ -30,6 +30,12 @@ type DesktopBridge = {
    * Push-to-talk held anywhere, even with the window in the background (a system-wide key hook). `watch` takes
    * a KeyboardEvent.code or "Mouse4"/"Mouse5", or null to stop listening.
    */
+  /** The language chosen in the app (the tray menu); null follows the system. */
+  language?: {
+    get(): Promise<'ru' | 'en' | null>;
+    set(lang: 'ru' | 'en' | null): Promise<void>;
+  };
+  onLanguage?(callback: (lang: 'ru' | 'en' | null) => void): void;
   ptt?: {
     watch(key: string | null): void;
     onChange(callback: (down: boolean) => void): void;

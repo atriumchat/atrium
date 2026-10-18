@@ -157,11 +157,13 @@ export function RowValue({ children }: { children: ReactNode }) {
  * under the name; on the phone the row shows the choice and opens a page of the options, as in iOS.
  */
 export function ChoiceRow<T extends string>({
+  icon,
   title,
   value,
   options,
   onChange,
 }: {
+  icon?: ReactNode;
   title: string;
   value: T;
   options: [T, string, ReactNode?][];
@@ -172,7 +174,7 @@ export function ChoiceRow<T extends string>({
   const current = options.find((o) => o[0] === value);
   if (!isMobile) {
     return (
-      <Row title={title} value={current?.[2]}>
+      <Row icon={icon} title={title} value={current?.[2]}>
         <div className="flex shrink-0 gap-0.5 rounded-full border border-white/[0.07] bg-white/[0.03] p-[3px]">
           {options.map(([id, label]) => (
             <button
@@ -190,7 +192,7 @@ export function ChoiceRow<T extends string>({
   }
   return (
     <>
-      <Row title={title} onPress={sub.show}>
+      <Row icon={icon} title={title} onPress={sub.show}>
         <RowValue>{current?.[1]}</RowValue>
       </Row>
       <SubPage open={sub.open} title={title} onClose={sub.hide}>

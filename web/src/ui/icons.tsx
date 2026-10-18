@@ -241,6 +241,15 @@ export const AtIcon = icon(
     <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
   </>,
 );
+export const GlobeIcon = icon(
+  <>
+    <circle cx="12" cy="12" r="9" />
+    <ellipse cx="12" cy="12" rx="4" ry="9" />
+    <path d="M3 12h18" />
+    <path d="M4.5 7.5h15" />
+    <path d="M4.5 16.5h15" />
+  </>,
+);
 export const UserIcon = icon(
   <>
     <circle cx="12" cy="8" r="4" />

@@ -109,4 +109,5 @@ export const account = {
   'account.app.offline': 'Server unreachable',
   'account.app.retry': 'Try again',
   'account.language': 'Language',
+  'account.language.system': 'System',
 } satisfies Record<keyof typeof source, Entry>;

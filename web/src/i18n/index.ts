@@ -1,4 +1,5 @@
 import { useCallback, useSyncExternalStore } from 'react';
+import { desktop } from '../desktop';
 import { en } from './en';
 import { ru } from './ru';
 
@@ -22,34 +23,54 @@ function detect(): Lang {
   return langs[0]?.toLowerCase().startsWith('ru') ? 'ru' : 'en';
 }
 
-function load(): Lang {
+/** What the person picked on this device; null = follow the system. */
+function load(): Lang | null {
   try {
     const saved = localStorage.getItem(KEY);
     if (saved === 'ru' || saved === 'en') return saved;
   } catch {
-    // Storage unavailable: fall back to the system language.
+    // Storage unavailable: follow the system.
   }
-  return detect();
+  return null;
 }
 
-let current: Lang = load();
+let choice: Lang | null = load();
+let current: Lang = choice ?? detect();
 const listeners = new Set<() => void>();
+/** Bumped on every change, so a switch from "system" to the same language still re-renders the settings. */
+let version = 0;
+const getVersion = () => version;
 if (typeof document !== 'undefined') document.documentElement.lang = current;
 
 export const getLang = () => current;
+export const getChoice = () => choice;
 
-/** Per device; applied at once, no reload. */
-export function setLang(lang: Lang) {
-  if (lang === current) return;
-  current = lang;
+function apply(next: Lang | null) {
+  choice = next;
   try {
-    localStorage.setItem(KEY, lang);
+    if (next) localStorage.setItem(KEY, next);
+    else localStorage.removeItem(KEY);
   } catch {
     // Not remembered; still applied for this session.
   }
-  document.documentElement.lang = lang;
+  current = next ?? detect();
+  document.documentElement.lang = current;
+  version++;
   listeners.forEach((l) => l());
 }
+
+/** The person's pick in the settings (null = as in the system): per device, applied at once, and told to the desktop app. */
+export function setLang(next: Lang | null) {
+  apply(next);
+  desktop?.language?.set(next).catch(() => undefined);
+}
+
+// In the desktop app the choice is shared with its tray menu: the app's value wins on start, and its changes
+// (the tray, or another window) arrive as a callback and as a DOM event. None of it exists in a browser.
+const fromDesktop = (lang: unknown) => apply(lang === 'ru' || lang === 'en' ? lang : null);
+desktop?.language?.get().then((lang) => lang && fromDesktop(lang), () => undefined);
+desktop?.onLanguage?.(fromDesktop);
+if (typeof window !== 'undefined') window.addEventListener('gomex-language', (e) => fromDesktop((e as CustomEvent).detail));
 
 const subscribe = (cb: () => void) => {
   listeners.add(cb);
@@ -82,9 +103,10 @@ export type TFn = typeof t;
 
 /** Subscribes the component to the language and hands back a t bound to it. */
 export function useT() {
-  const lang = useSyncExternalStore(subscribe, getLang);
+  useSyncExternalStore(subscribe, getVersion);
+  const lang = getLang();
   const bound = useCallback<TFn>((key, params) => translate(lang, key, params), [lang]);
-  return { t: bound, lang, setLang };
+  return { t: bound, lang, choice: getChoice(), setLang };
 }
 
 /** The server sends a stable `code` next to its Russian text; show our own translation when we know the code. */
