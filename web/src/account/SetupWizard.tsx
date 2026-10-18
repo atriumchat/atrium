@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type R
 import { InputOTP, REGEXP_ONLY_DIGITS_AND_CHARS } from '@heroui/react';
 import { api, setToken } from '../api';
 import { inviteLink } from '../people/invite';
+import { CopyButton } from '../ui/CopyButton';
 import { GomexMark } from '../ui/Logo';
 import { CheckIcon, UserPlusIcon } from '../ui/icons';
 import { IconCropper, centred, cropToBlob, cropToUrl, loadImage, type Crop } from '../ui/IconCropper';
@@ -40,23 +41,6 @@ function codeFrom(text: string) {
     // Not a link: the code itself.
   }
   return value.replace(/[^a-zA-Z0-9]/g, '').slice(0, CODE_LENGTH);
-}
-
-/** The clipboard, or the old way where it's refused (a window without focus, an older webview). */
-async function copyText(text: string) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return;
-  } catch {
-    // Below.
-  }
-  const area = Object.assign(document.createElement('textarea'), { value: text, readOnly: true });
-  area.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
-  document.body.append(area);
-  area.select();
-  const copied = document.execCommand('copy');
-  area.remove();
-  if (!copied) throw new Error('Не получилось скопировать');
 }
 
 const letter = (name: string) => name.trim().charAt(0).toUpperCase() || '?';
@@ -298,16 +282,6 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
 
   /* ---------- 4. recovery key ---------- */
 
-  async function copyKey() {
-    await copyText(key).then(
-      () => {
-        setError('');
-        setKeyKept('copied');
-      },
-      (e: Error) => setError(e.message),
-    );
-  }
-
   function downloadKey() {
     const text = [`Gomex · ${name}`, window.location.origin, `Ник: ${nick.trim()}`, `Ключ восстановления: ${key}`, ''].join('\n');
     const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
@@ -328,16 +302,6 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   }, [step.id, link]);
 
   const canShare = typeof navigator.share === 'function';
-
-  async function copyLink() {
-    await copyText(link).then(
-      () => {
-        setError('');
-        setLinkSent('copied');
-      },
-      (e: Error) => setError(e.message),
-    );
-  }
 
   async function shareLink() {
     try {
@@ -571,18 +535,17 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
           >
             <h1>Ключ восстановления</h1>
             <p className="sub">Вернёт доступ, если пароль забыт</p>
-            <p className="key">
-              {keyLines(key).map((line) => (
-                <span key={line} className="block">
-                  {line}
-                </span>
-              ))}
-            </p>
+            <div className="relative">
+              <p className="key pr-12">
+                {keyLines(key).map((line) => (
+                  <span key={line} className="block">
+                    {line}
+                  </span>
+                ))}
+              </p>
+              <CopyButton text={key} onCopied={() => setKeyKept((k) => k ?? 'copied')} className="absolute right-2 top-2" />
+            </div>
             <div className="tools">
-              <button type="button" className={`secondary${keyKept === 'copied' ? ' did' : ''}`} onClick={copyKey}>
-                {keyKept === 'copied' && DONE}
-                {keyKept === 'copied' ? 'Скопирован' : 'Скопировать'}
-              </button>
               <button type="button" className={`secondary${keyKept === 'downloaded' ? ' did' : ''}`} onClick={downloadKey}>
                 {keyKept === 'downloaded' && DONE}
                 {keyKept === 'downloaded' ? 'Скачан' : 'Скачать'}
@@ -591,20 +554,13 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             <p className="error" role="alert" style={{ marginTop: 10 }}>
               {error}
             </p>
+            {/* Ticked by itself once the key is copied or downloaded; "Дальше" waits for it. */}
+            <label className="check">
+              <input type="checkbox" checked={!!keyKept} onChange={(e) => setKeyKept(e.target.checked ? 'kept' : null)} />
+              <span>Ключ сохранён</span>
+            </label>
             <div className="actions">
               <span className="pair">
-                {!keyKept && (
-                  <button
-                    type="button"
-                    className="quiet"
-                    onClick={() => {
-                      setKeyKept('kept');
-                      go('invite');
-                    }}
-                  >
-                    Сохранил
-                  </button>
-                )}
                 <Primary type="submit" disabled={!keyKept}>
                   Дальше
                 </Primary>
@@ -626,18 +582,17 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             <label className="field-label" htmlFor="setup-link">
               Ссылка
             </label>
-            <input
-              id="setup-link"
-              className="field"
-              readOnly
-              value={link.replace(/^https?:\/\//, '') || 'Загружаем…'}
-              onFocus={(e) => e.currentTarget.select()}
-            />
+            <div className="relative">
+              <input
+                id="setup-link"
+                className="field pr-12"
+                readOnly
+                value={link.replace(/^https?:\/\//, '') || 'Загружаем…'}
+                onFocus={(e) => e.currentTarget.select()}
+              />
+              <CopyButton text={link} onCopied={() => setLinkSent('copied')} className="absolute right-[5px] top-[5px]" />
+            </div>
             <div className="tools">
-              <button type="button" className={`secondary${linkSent === 'copied' ? ' did' : ''}`} disabled={!link} onClick={copyLink}>
-                {linkSent === 'copied' && DONE}
-                {linkSent === 'copied' ? 'Скопирована' : 'Скопировать'}
-              </button>
               {canShare && (
                 <button type="button" className={`secondary${linkSent === 'shared' ? ' did' : ''}`} disabled={!link} onClick={shareLink}>
                   {linkSent === 'shared' && DONE}

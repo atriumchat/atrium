@@ -8,6 +8,7 @@ import type { MyInvite } from '../types';
 import { Avatar } from '../ui/Avatar';
 import { ConfirmDialog, Window } from '../ui/Dialog';
 import { Row, RowIcon } from '../ui/settings';
+import { CopyButton } from '../ui/CopyButton';
 import { CheckIcon, UserPlusIcon, XIcon } from '../ui/icons';
 
 const BANNER_HIDDEN = 'gomex_invite_banner_hidden';
@@ -184,14 +185,19 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
           <div className="pb-2 text-[14px] text-muted">Ссылка-приглашение</div>
           <div className="flex h-12 items-center gap-2 rounded-full bg-surface-tertiary pl-4 pr-1.5">
             <span className={`min-w-0 flex-1 truncate text-[14px] ${full ? 'text-faint' : ''}`}>{link.replace(/^https?:\/\//, '')}</span>
-            <Button
-              isDisabled={!invite || full}
-              onPress={shareOrCopy}
-              className="h-9 shrink-0 rounded-full px-4 text-[14px] [--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]"
-            >
-              {copied && <CheckIcon size={16} strokeWidth={2.5} />}
-              {copied ? 'Скопировано' : isMobile ? 'Поделиться' : 'Скопировать'}
-            </Button>
+            {/* On the computer copying is an icon in the field; on the phone the share sheet is the way, a button. */}
+            {isMobile ? (
+              <Button
+                isDisabled={!invite || full}
+                onPress={shareOrCopy}
+                className="h-9 shrink-0 rounded-full px-4 text-[14px] [--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]"
+              >
+                {copied && <CheckIcon size={16} strokeWidth={2.5} />}
+                {copied ? 'Скопировано' : 'Поделиться'}
+              </Button>
+            ) : (
+              <CopyButton text={invite && !full ? link : ''} />
+            )}
           </div>
           {invite && (
             <p className="mt-2 px-1 text-[12px] leading-5 text-faint">

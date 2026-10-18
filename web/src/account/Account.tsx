@@ -8,6 +8,7 @@ import { CheckIcon } from '../ui/icons';
 import { Primary, Row, RowValue, Rows, Secondary, SubPage, field, fieldArea, fieldLabel, useSub } from '../ui/settings';
 import { AvatarPicker, BioEditor } from '../people/UserProfile';
 import { downloadKey } from './RecoveryKey';
+import { CopyButton } from '../ui/CopyButton';
 
 /**
  * The "Аккаунт" page of the settings: photo and about, the nick, then a row each for the password, the recovery key
@@ -224,7 +225,7 @@ function RecoveryPage({ open, onClose }: { open: boolean; onClose: () => void })
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [key, setKey] = useState<string | null>(null);
-  const [kept, setKept] = useState<'copied' | 'downloaded' | null>(null);
+  const [kept, setKept] = useState<'downloaded' | null>(null);
 
   async function make(e: FormEvent) {
     e.preventDefault();
@@ -238,15 +239,6 @@ function RecoveryPage({ open, onClose }: { open: boolean; onClose: () => void })
       showError(err instanceof Error ? err.message : 'Не удалось создать ключ');
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function copy(value: string) {
-    try {
-      await navigator.clipboard.writeText(value);
-      setKept('copied');
-    } catch {
-      showError('Не получилось скопировать — ключ можно выделить вручную');
     }
   }
 
@@ -268,14 +260,11 @@ function RecoveryPage({ open, onClose }: { open: boolean; onClose: () => void })
     >
       {key ? (
         <div className="max-md:mt-2">
-          <p className="select-all break-all rounded-[12px] border border-white/[0.07] bg-white/[0.03] px-4 py-3.5 text-center font-mono text-[17px] font-medium leading-[1.7] tracking-[0.04em]">
-            {key}
-          </p>
+          <div className="flex items-center rounded-[12px] border border-white/[0.07] bg-white/[0.03] py-1.5 pl-11 pr-1.5">
+            <p className="flex-1 select-all break-all py-2 text-center font-mono text-[17px] font-medium leading-[1.7] tracking-[0.04em]">{key}</p>
+            <CopyButton text={key} />
+          </div>
           <div className="mt-3 flex gap-2">
-            <Secondary onPress={() => copy(key)} className={`max-md:h-11 max-md:flex-1 ${kept === 'copied' ? KEPT : ''}`}>
-              {kept === 'copied' && done}
-              {kept === 'copied' ? 'Скопирован' : 'Скопировать'}
-            </Secondary>
             <Secondary
               onPress={() => {
                 downloadKey({ key, name, serverName });

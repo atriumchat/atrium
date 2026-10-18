@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, Checkbox, Label } from '@heroui/react';
-import { showError } from '../store';
+import { CopyButton } from '../ui/CopyButton';
 import { GomexMark } from '../ui/Logo';
 
 /** A recovery key on its way to the person: the key itself and what the saved file should say. */
@@ -49,17 +49,6 @@ const white = 'h-11 flex-1 rounded-full px-5 text-[15px] [--button-bg:white] [--
  */
 export function RecoveryKeyScreen({ value, onDone }: { value: NewKey; onDone: () => void }) {
   const [saved, setSaved] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(value.key);
-      setCopied(true);
-      setSaved(true);
-    } catch {
-      showError('Не получилось скопировать — ключ можно выделить вручную');
-    }
-  }
 
   return (
     <div className="flex h-full overflow-y-auto bg-background">
@@ -69,13 +58,11 @@ export function RecoveryKeyScreen({ value, onDone }: { value: NewKey; onDone: ()
           <h1 className="text-[24px] font-medium leading-tight">Ключ восстановления</h1>
           <p className="mt-1.5 text-balance text-[14px] leading-snug text-muted">Нужен, если забудется пароль. Показывается один раз.</p>
         </div>
-        <div className="w-full select-all rounded-[18px] bg-surface-tertiary px-4 py-4 text-center font-mono text-[20px] tracking-wider">
-          {value.key}
+        <div className="flex w-full items-center rounded-[18px] bg-surface-tertiary py-2 pl-12 pr-2">
+          <span className="flex-1 select-all py-2 text-center font-mono text-[20px] tracking-wider">{value.key}</span>
+          <CopyButton text={value.key} onCopied={() => setSaved(true)} />
         </div>
         <div className="flex w-full gap-2">
-          <Button onPress={copy} className={white}>
-            {copied ? 'Скопировано' : 'Скопировать'}
-          </Button>
           <Button
             onPress={() => {
               downloadKey(value);

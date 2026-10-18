@@ -54,7 +54,7 @@ function DownloadDialog({ onClose }: { onClose: () => void }) {
   return (
     <Window label="Где пользоваться Gomex" onClose={onClose} className="overflow-hidden p-0">
       <div className="h-[min(640px,88vh)]">
-        <WhereToUse onDone={onClose} />
+        <WhereToUse onDone={onClose} inWindow />
       </div>
     </Window>
   );

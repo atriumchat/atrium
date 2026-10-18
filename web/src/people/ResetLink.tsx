@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Button } from '@heroui/react';
 import { api } from '../api';
 import { resetLink } from '../account/resetLink';
 import { showError } from '../store';
+import { CopyButton } from '../ui/CopyButton';
 import { Dialog } from '../ui/Dialog';
 
 /**
@@ -39,29 +39,16 @@ export function ResetLinkButton({ userId, name }: { userId: string; name: string
 }
 
 function ResetLinkDialog({ name, link, onClose }: { name: string; link: string; onClose: () => void }) {
-  const [copied, setCopied] = useState(false);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(link);
-      setCopied(true);
-    } catch {
-      showError('Не получилось скопировать — ссылку можно выделить вручную');
-    }
-  }
-
   return (
     <Dialog
       title="Ссылка для сброса пароля"
       subtitle={`Для ${name}. Действует 24 часа, открывается один раз.`}
       onClose={onClose}
-      footer={
-        <Button onPress={copy} className="rounded-full">
-          {copied ? 'Скопировано' : 'Скопировать'}
-        </Button>
-      }
     >
-      <p className="select-all break-all rounded-[18px] bg-surface-tertiary px-4 py-3 font-mono text-[13px] leading-snug">{link}</p>
+      <div className="flex items-center gap-1 rounded-[18px] bg-surface-tertiary py-1.5 pl-4 pr-1.5">
+        <p className="min-w-0 flex-1 select-all break-all py-1.5 font-mono text-[13px] leading-snug">{link}</p>
+        <CopyButton text={link} />
+      </div>
     </Dialog>
   );
 }

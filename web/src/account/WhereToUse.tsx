@@ -79,10 +79,11 @@ const quiet = 'flex h-[46px] w-full items-center justify-center rounded-full tex
  * "Where to use Gomex", shown once after signing up: the desktop app on a computer, the Home Screen on an
  * iPhone, installing on Android, or simply carrying on in the browser.
  */
-export function WhereToUse({ onDone, platform = detectPlatform() }: { onDone: () => void; platform?: Platform }) {
+/** `inWindow`: opened from the rail, where the window's own close is the way out, so no «Остаться в браузере». */
+export function WhereToUse({ onDone, platform = detectPlatform(), inWindow = false }: { onDone: () => void; platform?: Platform; inWindow?: boolean }) {
   if (platform === 'ios') return <OnIPhone onDone={onDone} />;
   if (platform === 'android') return <OnAndroid onDone={onDone} />;
-  return <OnComputer onDone={onDone} platform={platform} />;
+  return <OnComputer onDone={onDone} platform={platform} inWindow={inWindow} />;
 }
 
 function Column({ art, title, text, children }: { art: ArtName; title: string; text?: string; children: ReactNode }) {
@@ -100,7 +101,7 @@ function Column({ art, title, text, children }: { art: ArtName; title: string; t
   );
 }
 
-function OnComputer({ onDone, platform }: { onDone: () => void; platform: Platform }) {
+function OnComputer({ onDone, platform, inWindow }: { onDone: () => void; platform: Platform; inWindow: boolean }) {
   const [mac] = useState<'mac-intel' | 'mac-arm64'>(() => (platform === 'mac' && intelMac() ? 'mac-intel' : 'mac-arm64'));
   const [started, setStarted] = useState(false);
   const known = platform === 'mac' || platform === 'windows';
@@ -126,9 +127,11 @@ function OnComputer({ onDone, platform }: { onDone: () => void; platform: Platfo
               {platform === 'mac' ? 'Скачать для Mac' : 'Скачать для Windows'}
             </a>
           )}
-          <button onClick={onDone} className={known ? quiet : primary}>
-            Остаться в браузере
-          </button>
+          {!inWindow && (
+            <button onClick={onDone} className={known ? quiet : primary}>
+              Остаться в браузере
+            </button>
+          )}
         </>
       )}
       <p className="mt-3 flex justify-center gap-4 text-[13px] text-faint">
