@@ -95,7 +95,7 @@ function NameField({ onSaved, className = '' }: { onSaved?: () => void; classNam
       <label htmlFor={id} className={`${fieldLabel} max-md:sr-only`}>
         Ник
       </label>
-      <input id={id} value={name} maxLength={32} onChange={(e) => setName(e.target.value)} className={field} autoComplete="username" />
+      <input id={id} value={name} maxLength={32} onChange={(e) => setName(e.target.value)} className={field} autoComplete="username" autoFocus={!!onSaved} />
       {/* A new nick is confirmed with the password, right under it. */}
       {changed && (
         <div className="mt-2 flex gap-2 max-md:flex-col">
@@ -160,7 +160,7 @@ function PasswordPage({ open, onClose }: { open: boolean; onClose: () => void })
       onClose={onClose}
       footer={
         <Primary type="submit" form={form} isPending={busy} isDisabled={!current || !next || next !== repeat}>
-          Сменить пароль
+          {isMobile ? 'Готово' : 'Сменить пароль'}
         </Primary>
       }
     >
@@ -173,7 +173,7 @@ function PasswordPage({ open, onClose }: { open: boolean; onClose: () => void })
           aria-label="Текущий пароль"
           className={field}
           autoComplete="current-password"
-          autoFocus={!isMobile}
+          autoFocus
         />
         <input
           type="password"
@@ -218,7 +218,6 @@ const KEPT = 'text-here [--button-fg:var(--room-here)] [&_svg]:size-3.5';
 
 /** Asks for the password, then shows the new key to copy or download: the old one stops working at that moment. */
 function RecoveryPage({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const isMobile = useStore((s) => s.isMobile);
   const name = useStore((s) => s.me?.name ?? '');
   const serverName = useStore((s) => s.serverName);
   const form = useId();
@@ -299,7 +298,7 @@ function RecoveryPage({ open, onClose }: { open: boolean; onClose: () => void })
             aria-label="Пароль"
             className={field}
             autoComplete="current-password"
-            autoFocus={!isMobile}
+            autoFocus
           />
         </form>
       )}

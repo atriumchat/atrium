@@ -232,9 +232,8 @@ export function SubPage({ open, title, onClose, children, footer }: { open: bool
   const isMobile = useStore((s) => s.isMobile);
   if (isMobile) {
     return (
-      <PushPage open={open} title={title} onBack={onClose}>
+      <PushPage open={open} title={title} onBack={onClose} action={footer}>
         {children}
-        {footer && <div className="mt-6 flex flex-col gap-2">{footer}</div>}
       </PushPage>
     );
   }

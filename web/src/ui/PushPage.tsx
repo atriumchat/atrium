@@ -92,7 +92,20 @@ export function usePush(open: boolean, onBack: () => void) {
  * A page of its own on the phone (a settings section, the password form): over the whole app, tab bar
  * included, with the way back on the left of its title. Keep it rendered and flip `open`, so it can slide out.
  */
-export function PushPage({ open, title, onBack, children }: { open: boolean; title: string; onBack: () => void; children: ReactNode }) {
+export function PushPage({
+  open,
+  title,
+  onBack,
+  action,
+  children,
+}: {
+  open: boolean;
+  title: string;
+  onBack: () => void;
+  /** The page's one action at the right of its title, as iOS has «Готово»: above the keyboard, never under it. */
+  action?: ReactNode;
+  children: ReactNode;
+}) {
   const push = usePush(open, onBack);
   if (!push.mounted) return null;
   // On the body, after the app: above the shell and its conversation layer, under menus and toasts opened later.
@@ -110,7 +123,8 @@ export function PushPage({ open, title, onBack, children }: { open: boolean; tit
           <RoundButton tone="ghost" label="Назад" onPress={onBack} className="[&_svg]:size-6">
             <ChevronLeftIcon />
           </RoundButton>
-          <h1 className="min-w-0 truncate text-[17px] font-semibold">{title}</h1>
+          <h1 className="min-w-0 flex-1 truncate text-[17px] font-semibold">{title}</h1>
+          {action && <div className="shrink-0 pr-2 [&_button]:!h-9 [&_button]:!w-auto [&_button]:!px-4 [&_button]:!text-[15px]">{action}</div>}
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[max(24px,env(safe-area-inset-bottom))]">{children}</div>
       </div>
