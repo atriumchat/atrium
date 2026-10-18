@@ -181,7 +181,7 @@ function PasswordPage({ open, onClose }: { open: boolean; onClose: () => void })
           onChange={(e) => setNext(e.target.value)}
           placeholder="Новый пароль, от 8 символов"
           aria-label="Новый пароль"
-          className={`${field} mt-2`}
+          className={field}
           autoComplete="new-password"
         />
         <input
@@ -193,7 +193,7 @@ function PasswordPage({ open, onClose }: { open: boolean; onClose: () => void })
           className={field}
           autoComplete="new-password"
         />
-        <p className={`px-0.5 pt-1 text-[13px] ${mismatch ? 'text-danger' : 'text-muted'}`}>
+        <p className={`pt-1 text-[13px] ${mismatch ? 'text-danger' : 'text-muted'}`}>
           {mismatch ? 'Пароли не совпадают' : 'Остальные устройства выйдут из аккаунта'}
         </p>
       </form>

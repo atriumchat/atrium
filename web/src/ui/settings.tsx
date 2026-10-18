@@ -242,7 +242,7 @@ export function SubPage({ open, title, onClose, children, footer }: { open: bool
     <div
       aria-label={title}
       role="group"
-      className="border-b border-white/[0.07] pb-4 pt-1"
+      className="border-b border-white/[0.07] pb-5 pt-3"
       onKeyDown={(e) => {
         if (e.key !== 'Escape') return;
         // Esc folds the section, not the whole settings window.
@@ -251,7 +251,7 @@ export function SubPage({ open, title, onClose, children, footer }: { open: bool
       }}
     >
       {children}
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-4 flex items-center gap-2">
         {footer}
         <Quiet onClick={onClose}>{footer ? 'Отмена' : 'Свернуть'}</Quiet>
       </div>
