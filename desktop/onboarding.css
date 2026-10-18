@@ -671,8 +671,11 @@ h1 {
 /* Three short bars at the bottom, one per part of the setup, each filling as its steps go by. */
 .progress {
   display: flex;
-  justify-content: center;
   gap: 10px;
+  /* Under the steps' column, from its left edge, like everything above it. */
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
 }
 .part {
   display: grid;
