@@ -8,7 +8,7 @@ import { InviteRow } from '../people/Invites';
 import { Avatar } from '../ui/Avatar';
 import { PushPage } from '../ui/PushPage';
 import { Primary, Row, RowIcon, RowValue, Rows, field, fieldArea, fieldLabel } from '../ui/settings';
-import { CheckIcon, LogoutIcon, PencilIcon } from '../ui/icons';
+import { CheckIcon, ChevronRightIcon, LogoutIcon, PencilIcon } from '../ui/icons';
 import { DURATIONS, STATUS_LABEL, StatusDot, saveStatus, untilText } from './MeCard';
 import { useSettingsPages } from './SettingsDialog';
 
@@ -30,14 +30,19 @@ export function YouTab() {
 
   return (
     <div className="flex min-h-full flex-1 flex-col overflow-y-auto px-4 pb-6 pt-4">
-      <Rows>
-        <Row
-          icon={<Avatar user={me} size={44} />}
-          title={<span className="text-[17px] font-semibold">{me.name}</span>}
-          value={me.bio || 'Фото и о себе'}
-          onPress={() => setPage('profile')}
-        />
-      </Rows>
+      {/* The profile as a card of its own, roomier than the rows under it, as in Discord's and iOS's settings. */}
+      <button
+        type="button"
+        onClick={() => setPage('profile')}
+        className="flex w-full items-center gap-3.5 rounded-[20px] bg-default px-4 py-3.5 text-left active:bg-white/[0.05]"
+      >
+        <Avatar user={me} size={48} ringBg="var(--default)" />
+        <span className="min-w-0 flex-1">
+          <b className="block truncate text-[17px] font-semibold">{me.name}</b>
+          <small className="mt-0.5 block truncate text-[14px] text-muted">{me.bio || 'Фото и о себе'}</small>
+        </span>
+        <ChevronRightIcon size={18} className="shrink-0 text-faint" />
+      </button>
       <Rows className="mt-4">
         <Row
           icon={
