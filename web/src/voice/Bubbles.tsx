@@ -488,8 +488,8 @@ class SpeakerPicker {
   }
 }
 
-  const { t } = useT();
 export function BubblePeanut({ people, speaking, live }: Props) {
+  const { t } = useT();
   const box = useRef<HTMLDivElement>(null);
   const { w, h } = useBox(box);
   const { els, refFor } = useNodeRefs();
