@@ -1,4 +1,4 @@
-// The "Адрес сервера" window. On the very first start of a build with no server built in it is the whole app: two
+// The "Server address" window. On the very first start of a build with no server built in it is the whole app: two
 // ways in (an invite from a friend, or setting up one's own server), then one field for the link or address. From
 // the tray later it is just the field, to move the app to a new address.
 const params = new URLSearchParams(location.search);
@@ -24,14 +24,14 @@ function enter({ title, hint, hold, button, back }) {
 if (first) {
   $('start').hidden = false;
 } else {
-  enter({ title: 'Адрес сервера', hint: 'Новый адрес сервера. Приложение перезапустится.', hold: placeholder, button: 'Сохранить', back: false });
+  enter({ title: t('address.title'), hint: t('address.hint'), hold: placeholder, button: t('address.save'), back: false });
   input.value = params.get('current') ?? '';
   input.select();
 }
 
 $('invite').addEventListener('click', () => {
   // The whole invite link is welcome here: the app opens it, so sign-up comes with the invite already in place.
-  enter({ title: 'Ссылка-приглашение', hint: '', hold: `${placeholder}/?invite=…`, button: 'Открыть', back: true });
+  enter({ title: t('address.inviteTitle'), hint: '', hold: `${placeholder}/?invite=…`, button: t('address.open'), back: true });
 });
 
 // One's own server is set up right from the app, in its own window.

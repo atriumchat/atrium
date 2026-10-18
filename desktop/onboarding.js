@@ -1,4 +1,4 @@
-// "Свой сервер": a fresh VPS becomes a Gomex server from here, without a terminal. The app logs in over SSH with
+// "Your own server": a fresh VPS becomes a Gomex server from here, without a terminal. The app logs in over SSH with
 // the address and password from the hosting company's e-mail, asks for an address and backups, runs the installer
 // and then opens the server's own wizard (name, admin, recovery key, invites) in the same window.
 //
@@ -10,17 +10,17 @@ const setup = window.gomexSetup ?? fakeSetup();
 // The drum's rows, one per installer step (install.sh, "::gomex run|done STEP"), in the order they run:
 // [step, the row's words, the installer's own line it leaves in the picture, the installer's steps it covers]
 const TASKS = [
-  ['check', 'Проверяем сервер', 'Проверка сервера', ['check']],
-  ['address', 'Ждём адрес', 'Адрес в DNS', ['address']],
-  ['docker', 'Ставим Docker', 'Docker', ['docker']],
-  ['firewall', 'Настраиваем файрвол', 'Файрвол', ['firewall']],
-  ['ssh', 'Закрываем вход по паролю', 'SSH только по ключу', ['ssh']],
-  ['files', 'Скачиваем Gomex', 'Файлы Gomex', ['files']],
-  ['config', 'Создаём ключи', 'Настройки и ключи', ['config']],
-  ['backups', 'Включаем бэкапы', 'Ночные бэкапы', ['backups']],
-  ['pull', 'Скачиваем приложение', 'Образы', ['pull']],
-  ['up', 'Запускаем', 'Запуск', ['up']],
-  ['https', 'Получаем сертификаты', 'HTTPS-сертификаты', ['https']],
+  ['check', t('ob.task.check'), t('ob.task.checkLog'), ['check']],
+  ['address', t('ob.task.address'), t('ob.task.addressLog'), ['address']],
+  ['docker', t('ob.task.docker'), t('ob.task.dockerLog'), ['docker']],
+  ['firewall', t('ob.task.firewall'), t('ob.task.firewallLog'), ['firewall']],
+  ['ssh', t('ob.task.ssh'), t('ob.task.sshLog'), ['ssh']],
+  ['files', t('ob.task.files'), t('ob.task.filesLog'), ['files']],
+  ['config', t('ob.task.config'), t('ob.task.configLog'), ['config']],
+  ['backups', t('ob.task.backups'), t('ob.task.backupsLog'), ['backups']],
+  ['pull', t('ob.task.pull'), t('ob.task.pullLog'), ['pull']],
+  ['up', t('ob.task.up'), t('ob.task.upLog'), ['up']],
+  ['https', t('ob.task.https'), t('ob.task.httpsLog'), ['https']],
 ];
 const TASK_OF = Object.fromEntries(TASKS.flatMap(([id, , , steps]) => steps.map((step) => [step, id])));
 
@@ -48,20 +48,20 @@ const LOGIN = [
   ['Gomex 0.2.2'],
 ];
 const CHECKS = [
-  ['<b class="ok">✓</b> Права root'],
+  [`<b class="ok">✓</b> ${t('sc.root')}`],
   ['<b class="ok">✓</b> <span data-bind="os">Ubuntu 24.04 LTS · x86_64</span>'],
-  ['<b class="ok">✓</b> Порты 80 и 443 свободны'],
-  ['<b class="ok">✓</b> Docker: поставим'],
-  ['<b class="ok">✓</b> <span data-bind="size">Память 2 ГБ · диск 18 ГБ</span> свободно'],
-  ['<b class="ok">✓</b> SSH-ключ есть: вход по паролю выключим'],
+  [`<b class="ok">✓</b> ${t('sc.ports')}`],
+  [`<b class="ok">✓</b> ${t('sc.dockerWill')}`],
+  [`<b class="ok">✓</b> <span data-bind="size">${t('ssh.size', { memory: 2, disk: 18 })}</span> ${t('sc.free')}`],
+  [`<b class="ok">✓</b> ${t('sc.sshKey')}`],
   [`<b class="ok">✓</b> IP ${IP}`],
   [`<b class="ok">✓</b> DNS: app.${HOST} → ${IP}`],
 ];
-const STEPS_AHEAD = ['Файрвол', 'SSH только по ключу', 'Файлы Gomex 0.2.2', 'Настройки и ключи', 'Ночные бэкапы', 'Скачиваем образы', 'Запуск', 'HTTPS-сертификаты'];
+const STEPS_AHEAD = [t('ob.task.firewallLog'), t('ob.task.sshLog'), `${t('ob.task.filesLog')} 0.2.2`, t('ob.task.configLog'), t('ob.task.backupsLog'), t('sc.pulling'), t('ob.task.upLog'), t('ob.task.httpsLog')];
 
 const SCREENS = {
   server: () =>
-    lines([...LOGIN, ...CHECKS.map(([html], i) => [html, i === 2 ? 'check focus' : 'check']), ...STEPS_AHEAD.map((t) => [`… ${t}`, 'dim'])]),
+    lines([...LOGIN, ...CHECKS.map(([html], i) => [html, i === 2 ? 'check focus' : 'check']), ...STEPS_AHEAD.map((text) => [`… ${text}`, 'dim'])]),
   // The installer's run: the checks done, then its steps as they finish (logLine adds them).
   install: () =>
     lines([...LOGIN, ...CHECKS.map(([html], i) => [html, i === CHECKS.length - 1 ? 'focus' : ''])]) +
@@ -71,50 +71,50 @@ const SCREENS = {
     lines([['', ''], ['', ''], ['', ''], ['', ''], ['', ''], ['', '']], 0).replace(/<i>\d+<\/i>/g, '<i></i>'),
   // The browser on the new address: Gomex open in it, a friend just shared the invite link.
   address: () => `
-    <div class="tabs"><span class="tab on">Gomex</span><span class="tab">Почта</span><span class="tab">Новая вкладка</span></div>
+    <div class="tabs"><span class="tab on">Gomex</span><span class="tab">${t('sc.mail')}</span><span class="tab">${t('sc.newTab')}</span></div>
     <div class="bar"><span class="nav">‹ ›</span><span class="url">${LOCK}app.${HOST}</span><span class="nav">⋯</span></div>
     <div class="app">
       <div class="rail"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="list"><p class="on"># общий</p><p># игры</p><p># мемы</p><p># кино</p><p>🔊 Общий</p><p>🔊 Катка</p><p>🔊 Тихая</p></div>
+      <div class="list"><p class="on"># ${t('sc.general')}</p><p># ${t('sc.games')}</p><p># ${t('sc.memes')}</p><p># ${t('sc.movies')}</p><p>🔊 ${t('sc.voiceGeneral')}</p><p>🔊 ${t('sc.voiceMatch')}</p><p>🔊 ${t('sc.voiceQuiet')}</p></div>
       <div class="chat">
-        <div class="msg"><i></i><p><b>Тимур</b><span>ну что, сегодня в 9?</span></p></div>
-        <div class="msg"><i></i><p><b>Аня</b><span>я за, только ссылку киньте</span></p></div>
-        <div class="msg"><i></i><p><b>Дима</b><span>держи</span></p></div>
-        <div class="msg focus hl-pink"><i></i><p><b>Дима</b><span>app.${HOST}/?invite=7f3k9q</span></p></div>
-        <div class="msg"><i></i><p><b>Аня</b><span>зашла 🔥</span></p></div>
-        <div class="msg"><i></i><p><b>Тимур</b><span>го в Катку</span></p></div>
-        <div class="msg"><i></i><p><b>Лёша</b><span>через 5 мин</span></p></div>
+        <div class="msg"><i></i><p><b>${t('sc.tim')}</b><span>${t('sc.m1')}</span></p></div>
+        <div class="msg"><i></i><p><b>${t('sc.anna')}</b><span>${t('sc.m2')}</span></p></div>
+        <div class="msg"><i></i><p><b>${t('sc.dan')}</b><span>${t('sc.m3')}</span></p></div>
+        <div class="msg focus hl-pink"><i></i><p><b>${t('sc.dan')}</b><span>app.${HOST}/?invite=7f3k9q</span></p></div>
+        <div class="msg"><i></i><p><b>${t('sc.anna')}</b><span>${t('sc.m4')}</span></p></div>
+        <div class="msg"><i></i><p><b>${t('sc.tim')}</b><span>${t('sc.m5')}</span></p></div>
+        <div class="msg"><i></i><p><b>${t('sc.alex')}</b><span>${t('sc.m6')}</span></p></div>
       </div>
     </div>`,
   // The person's inbox: deSEC's letter at the top, waiting for its link to be pressed.
   mail: () => `
-    <div class="tabs"><span class="tab">Gomex</span><span class="tab on">Почта</span><span class="tab">Новая вкладка</span></div>
+    <div class="tabs"><span class="tab">Gomex</span><span class="tab on">${t('sc.mail')}</span><span class="tab">${t('sc.newTab')}</span></div>
     <div class="bar"><span class="nav">‹ ›</span><span class="url">${LOCK}<span data-bind="mailhost">mail.google.com</span></span><span class="nav">⋯</span></div>
     <div class="inbox">
-      <div class="folders"><p class="on">Входящие</p><p>Отмеченные</p><p>Отправленные</p><p>Спам</p><p>Корзина</p></div>
+      <div class="folders"><p class="on">${t('sc.inbox')}</p><p>${t('sc.starred')}</p><p>${t('sc.sent')}</p><p>${t('sc.spam')}</p><p>${t('sc.trash')}</p></div>
       <div class="letters">
-        <p class="letter"><b>Тимур</b><span>ссылка на игру, заходи</span><em>22:41</em></p>
-        <p class="letter focus hl-pink"><b>deSEC</b><span>Activate your account: <span data-bind="host">podval.dedyn.io</span></span><em>сейчас</em></p>
-        <p class="letter"><b>Аня</b><span>фотки с выходных</span><em>21:07</em></p>
-        <p class="letter"><b>Рассылка</b><span>новое за неделю</span><em>вчера</em></p>
-        <p class="letter"><b>Лёша</b><span>в субботу в 8?</span><em>вчера</em></p>
-        <p class="letter"><b>Тимур</b><span>скинь адрес сервера</span><em>16 окт.</em></p>
-        <p class="letter"><b>Аня</b><span>спасибо!</span><em>15 окт.</em></p>
+        <p class="letter"><b>${t('sc.tim')}</b><span>${t('sc.l1')}</span><em>22:41</em></p>
+        <p class="letter focus hl-pink"><b>deSEC</b><span>Activate your account: <span data-bind="host">podval.dedyn.io</span></span><em>${t('sc.now')}</em></p>
+        <p class="letter"><b>${t('sc.anna')}</b><span>${t('sc.l3')}</span><em>21:07</em></p>
+        <p class="letter"><b>${t('sc.l4')}</b><span>${t('sc.l4s')}</span><em>${t('sc.yesterday')}</em></p>
+        <p class="letter"><b>${t('sc.alex')}</b><span>${t('sc.l5')}</span><em>${t('sc.yesterday')}</em></p>
+        <p class="letter"><b>${t('sc.tim')}</b><span>${t('sc.l6')}</span><em>${t('sc.oct16')}</em></p>
+        <p class="letter"><b>${t('sc.anna')}</b><span>${t('sc.l7')}</span><em>${t('sc.oct15')}</em></p>
       </div>
     </div>`,
-  // The backups on the Drive: other folders up top,  // The backups on the Drive: other folders up top, then a nightly file each, the newest highlighted.
+  // The backups on the Drive: other folders up top, then a nightly file each, the newest highlighted.
   backup: () => {
     const rows = Array.from({ length: 14 }, (_, i) => {
       const size = [12, 12, 11, 11, 10, 10, 9, 9, 8, 8, 7, 7, 6, 6][i];
-      return `<p class="row file${i === 2 ? ' focus' : ''}"><span><span data-bind="day${i}">gomex</span>.age</span><em>я</em><em>сегодня, 04:30</em><em>${size} МБ</em></p>`;
+      return `<p class="row file${i === 2 ? ' focus' : ''}"><span><span data-bind="day${i}">gomex</span>.age</span><em>${t('sc.me')}</em><em>${t('sc.todayAt')}</em><em>${t('sc.mb', { n: size })}</em></p>`;
     }).join('');
     return `
-      <div class="side"><p class="on">Мой диск</p><p>Компьютеры</p><p>Доступные мне</p><p>Недавние</p><p>Помеченные</p><p>Корзина</p><p>Хранилище</p><p>1,2 ГБ из 15 ГБ</p></div>
+      <div class="side"><p class="on">${t('sc.myDrive')}</p><p>${t('sc.computers')}</p><p>${t('sc.shared')}</p><p>${t('sc.recent')}</p><p>${t('sc.marked')}</p><p>${t('sc.trash')}</p><p>${t('sc.storage')}</p><p>${t('sc.quota')}</p></div>
       <div class="main">
-        <p class="path">${DRIVE} Мой диск <span class="dim">/</span> Gomex</p>
-        <p class="head"><span>Название</span><span>Владелец</span><span>Изменено</span><span>Размер</span></p>
-        <p class="row"><span>Документы</span><em>я</em><em>12 сент.</em><em>—</em></p>
-        <p class="row"><span>Фото</span><em>я</em><em>3 окт.</em><em>—</em></p>
+        <p class="path">${DRIVE} ${t('sc.myDrive')} <span class="dim">/</span> Gomex</p>
+        <p class="head"><span>${t('sc.colName')}</span><span>${t('sc.colOwner')}</span><span>${t('sc.colModified')}</span><span>${t('sc.colSize')}</span></p>
+        <p class="row"><span>${t('sc.docs')}</span><em>${t('sc.me')}</em><em>${t('sc.sep12')}</em><em>—</em></p>
+        <p class="row"><span>${t('sc.photos')}</span><em>${t('sc.me')}</em><em>${t('sc.oct3')}</em><em>—</em></p>
         ${rows}
       </div>`;
   },
@@ -201,7 +201,7 @@ const state = {
 
 /* ---------- moving between steps ---------- */
 
-// How far each step is into the "Сервер" part, out of five (the free-… steps and 'own' are the two ways on from 'address';
+// How far each step is into the "Server" part, out of five (the free-… steps and 'own' are the two ways on from 'address';
 // one is walked), and the picture it shows on the right.
 const PLACE = { server: 0, address: 1, 'free-name': 2, 'free-mail': 2.5, own: 2, backup: 3, install: 4 };
 const SCENE = {
@@ -249,7 +249,7 @@ function show(name, { back = false } = {}) {
   setTimeout(() => to.querySelector('.input:not([disabled])')?.focus({ preventScroll: true }), 560);
 }
 
-/** The "Сервер" bar, filled to `part` (0..1). The other two fill on the server's own wizard. */
+/** The "Server" bar, filled to `part` (0..1). The other two fill on the server's own wizard. */
 function progress(part) {
   document.querySelector('.part[data-part="server"] .track i').style.setProperty('--fill', String(Math.min(1, part)));
   document.querySelectorAll('.part').forEach((p) => p.classList.toggle('now', p.dataset.part === 'server'));
@@ -360,7 +360,7 @@ async function offerSaved() {
   $('e-saved').textContent = '';
   const { domain } = await setup.savedAddress();
   $('saved').hidden = !domain;
-  if (domain) $('saved-name').textContent = `Есть адрес ${domain}`;
+  if (domain) $('saved-name').textContent = t('ob.savedName', { domain });
 }
 $('use-saved').addEventListener('click', async () => {
   busy($('use-saved'), true);
@@ -377,12 +377,12 @@ $('use-saved').addEventListener('click', async () => {
 // Then the letter: a button straight into the person's mailbox, and the app waiting for the link to be pressed and
 // deSEC's captcha on its page solved. Once it is, the app signs in to deSEC and points the name at the server itself.
 const MAILBOXES = [
-  [/^(gmail|googlemail)\.com$/, 'Открыть Gmail', 'https://mail.google.com/'],
-  [/^(yandex\.(ru|com|by|kz)|ya\.ru)$/, 'Открыть Яндекс Почту', 'https://mail.yandex.ru/'],
-  [/^(mail|bk|list|inbox|internet)\.ru$/, 'Открыть Почту Mail.ru', 'https://e.mail.ru/'],
-  [/^(outlook|hotmail|live)\.com$/, 'Открыть Outlook', 'https://outlook.live.com/mail/'],
-  [/^(icloud|me|mac)\.com$/, 'Открыть iCloud Почту', 'https://www.icloud.com/mail'],
-  [/^(proton\.me|protonmail\.com)$/, 'Открыть Proton Mail', 'https://mail.proton.me/'],
+  [/^(gmail|googlemail)\.com$/, t('ob.mail.gmail'), 'https://mail.google.com/'],
+  [/^(yandex\.(ru|com|by|kz)|ya\.ru)$/, t('ob.mail.yandex'), 'https://mail.yandex.ru/'],
+  [/^(mail|bk|list|inbox|internet)\.ru$/, t('ob.mail.mailru'), 'https://e.mail.ru/'],
+  [/^(outlook|hotmail|live)\.com$/, t('ob.mail.outlook'), 'https://outlook.live.com/mail/'],
+  [/^(icloud|me|mac)\.com$/, t('ob.mail.icloud'), 'https://www.icloud.com/mail'],
+  [/^(proton\.me|protonmail\.com)$/, t('ob.mail.proton'), 'https://mail.proton.me/'],
 ];
 let lateTimer = null;
 function waitForMail() {
@@ -397,7 +397,7 @@ function waitForMail() {
   }
   $('mail-wait').hidden = false;
   $('mail-wait').classList.remove('done');
-  $('mail-state').textContent = 'Ждём подтверждение';
+  $('mail-state').textContent = t('ob.mail.waiting');
   $('e-mail').textContent = '';
   $('mail-late').hidden = true;
   $('own-instead').hidden = true;
@@ -420,7 +420,7 @@ function waitForMail() {
     clearTimeout(lateTimer);
     $('mail-late').hidden = true;
     $('own-instead').hidden = true;
-    $('mail-state').textContent = 'Подтверждено';
+    $('mail-state').textContent = t('ob.mail.confirmed');
     $('mail-wait').classList.add('done');
     state.address = { domain: `${freeName()}.dedyn.io` };
     setTimeout(() => show('backup'), 900);
@@ -467,8 +467,8 @@ function renderRecords() {
       const code = Object.assign(document.createElement('code'), { textContent: name, title: name, className: 'grow' });
       const to = Object.assign(document.createElement('span'), { className: 'to', textContent: ip });
       // A round icon, not a word: a long name needs the row's width.
-      const copy = Object.assign(document.createElement('button'), { className: 'secondary icon', type: 'button', title: 'Копировать' });
-      copy.setAttribute('aria-label', 'Копировать');
+      const copy = Object.assign(document.createElement('button'), { className: 'secondary icon', type: 'button', title: t('ob.copy') });
+      copy.setAttribute('aria-label', t('ob.copy'));
       copy.innerHTML = COPY_ICON;
       copy.addEventListener('click', async () => {
         await navigator.clipboard.writeText(name).catch(() => undefined);
@@ -584,8 +584,8 @@ function startInstall() {
   $('retry').hidden = true;
   $('go-install').hidden = false;
   $('go-install').disabled = true;
-  $('install-title').textContent = 'Ставим Gomex';
-  $('install-sub').textContent = 'Пара минут, окно можно свернуть';
+  $('install-title').textContent = t('ob.install.title');
+  $('install-sub').textContent = t('ob.install.sub');
   show('install');
   startClock();
   const started = {};
@@ -594,7 +594,7 @@ function startInstall() {
     if (!row || row.dataset.state === 'done') return;
     row.dataset.state = 'done';
     const s = Math.max(1, Math.round((Date.now() - (started[id] ?? Date.now())) / 1000));
-    const took = s < 60 ? `${s} с` : `${Math.floor(s / 60)} мин`;
+    const took = s < 60 ? t('ob.seconds', { n: s }) : t('ob.minutes', { n: Math.floor(s / 60) });
     logLine(TASKS.find(([task]) => task === id)?.[2] ?? '', took);
     progress((PLACE.install + document.querySelectorAll('.task[data-state="done"]').length / TASKS.length) / 5);
   };
@@ -622,7 +622,7 @@ function startInstall() {
     if (event.state === 'fail') {
       clearInterval(clock);
       state.installing = false;
-      $('e-install').textContent = event.why ?? 'Не получилось';
+      $('e-install').textContent = event.why ?? t('ob.install.failed');
       // A failed install has one way on, again: the server's button only gets in its way.
       $('go-install').hidden = true;
       $('retry').hidden = false;
@@ -631,7 +631,7 @@ function startInstall() {
       TASKS.forEach(([task]) => finish(task));
       // The last line becomes the end of it all.
       const last = document.querySelector(`.task[data-task="${TASKS.at(-1)[0]}"]`);
-      last.querySelector('.label').textContent = 'Всё установлено';
+      last.querySelector('.label').textContent = t('ob.install.all');
       current(last.dataset.task);
       clearInterval(clock);
       state.installing = false;
@@ -646,14 +646,14 @@ function startInstall() {
       }
       frame(document.querySelector('.scene[data-scene="install"]'));
       state.done.shown = shown;
-      $('install-title').textContent = 'Сервер готов';
+      $('install-title').textContent = t('ob.install.ready');
       // A name made minutes ago may not have reached this computer's DNS yet; the app checks it and says when it does
       // ({ state: 'open' }). The main window shows its own page if it's opened too early, so a name that stays away
       // doesn't lock the button for good.
-      $('install-sub').textContent = 'Адрес ещё расходится, минута-две';
+      $('install-sub').textContent = t('ob.install.spreading');
       clearTimeout(opening);
       opening = setTimeout(() => {
-        $('install-sub').textContent = `${shown}: пока не открывается`;
+        $('install-sub').textContent = t('ob.install.notOpening', { shown });
         $('go-install').disabled = false;
       }, 4 * 60 * 1000);
     }
@@ -677,13 +677,13 @@ function fakeSetup() {
     openExternal: (url) => window.open(url, '_blank'),
     async connect({ host, password }) {
       await wait(1100);
-      if (password === 'wrong') return { error: 'Неверный пароль' };
-      if (host.startsWith('10.')) return { error: 'Сервер не отвечает', field: 'host' };
-      return { facts: { ip: host, os: 'Ubuntu 24.04 LTS · x86_64', size: 'Память 2 ГБ · диск 18 ГБ' } };
+      if (password === 'wrong') return { error: t('ssh.badLogin') };
+      if (host.startsWith('10.')) return { error: t('ssh.noReply'), field: 'host' };
+      return { facts: { ip: host, os: 'Ubuntu 24.04 LTS · x86_64', size: t('ssh.size', { memory: 2, disk: 18 }) } };
     },
     async register({ name }) {
       await wait(900);
-      return name === 'taken' ? { error: 'Имя занято, нужно другое' } : { ok: true };
+      return name === 'taken' ? { error: t('desec.nameTaken') } : { ok: true };
     },
     // #slowmail: the letter never comes (a late confirmation arrives after a minute).
     waitMail: () => wait(location.hash.includes('slowmail') ? 60000 : 6000).then(() => ({ ok: true })),
@@ -694,7 +694,7 @@ function fakeSetup() {
     },
     async useSaved() {
       await wait(900);
-      return location.hash.includes('deaddesec') ? { error: 'deSEC не принял сохранённый вход' } : { ok: true, domain: 'podval.dedyn.io' };
+      return location.hash.includes('deaddesec') ? { error: t('desec.savedRejected') } : { ok: true, domain: 'podval.dedyn.io' };
     },
     async checkDomain() {
       await wait(800);
@@ -708,16 +708,16 @@ function fakeSetup() {
     // on the way ("::gomex sub")]. The image download is long enough to show the installer's last output line too.
     async install(_options, onEvent) {
       const steps = [
-        ['check', 2400, ['Права root', 'Ubuntu 24.04 · x86_64', 'Порты 80 и 443 свободны', 'Docker: поставим', 'Память 2.0 ГБ · диск 18 ГБ свободно', 'IP 2.27.52.78']],
-        ['address', 7000, ['Записей на месте: 0 из 3', 'Записей на месте: 1 из 3', 'Записей на месте: 3 из 3']],
-        ['docker', 4000, ['Скачиваем установщик Docker', 'Ставим пакеты Docker', 'Запускаем Docker']],
-        ['firewall', 1200, ['Открываем порты 80, 443 и для звонков', 'Включаем файрвол']],
-        ['ssh', 900, ['Выключаем вход по паролю', 'Проверяем настройки sshd']],
-        ['files', 1800, ['Скачиваем Gomex 0.2.2', 'Раскладываем файлы']],
-        ['config', 900, ['Секреты и настройки', 'Настройки звонков']],
-        ['pull', 26000, ['Образы приложения, звонков и веб-сервера']],
-        ['up', 3000, ['Запускаем контейнеры', 'Ждём ответ приложения', 'Пишем обложку сайта']],
-        ['https', 2400, ['Ждём сертификат от Let\'s Encrypt']],
+        ['check', 2400, ['Root access', 'Ubuntu 24.04 · x86_64', 'Ports 80 and 443 free', 'Docker: will install', 'Memory 2.0 GB · disk 18 GB free', 'IP 2.27.52.78']],
+        ['address', 7000, ['Records in place: 0 of 3', 'Records in place: 1 of 3', 'Records in place: 3 of 3']],
+        ['docker', 4000, ['Downloading the Docker installer', 'Installing Docker packages', 'Starting Docker']],
+        ['firewall', 1200, ['Opening ports 80, 443 and the call ports', 'Enabling the firewall']],
+        ['ssh', 900, ['Disabling password login', 'Checking sshd settings']],
+        ['files', 1800, ['Downloading Gomex 0.2.2', 'Unpacking files']],
+        ['config', 900, ['Secrets and settings', 'Call settings']],
+        ['pull', 26000, ['Images for the app, calls and web server']],
+        ['up', 3000, ['Starting containers', 'Waiting for the app to answer', 'Writing the site cover']],
+        ['https', 2400, ['Waiting for the Let\'s Encrypt certificate']],
       ];
       const layers = ['a3f8c1e2b9d4', '5be01d7f6a21', '9c4e7a30d1f8', '21d6b8f4e0a7', 'f07a3c95b2e1', '6d1e48a9c3b0'];
       for (const [step, ms, says] of steps) {
@@ -735,21 +735,21 @@ function fakeSetup() {
       await wait(5000);
       onEvent({ state: 'open' });
     },
-    openServer: (url) => alert(`Дальше: ${url}, мастер сервера`),
+    openServer: (url) => alert(`Next: ${url}, server wizard`),
   };
 }
 
 show('server');
 checkServerForm();
 
-// Design work in a browser: #step=address (or free-name, free-mail, own, backup, install, done) opens that step with made-up answers.
+// Design work in a browser: #lang=en (or ru) picks the language; #step=address (or free-name, free-mail, own, backup, install, done) opens that step with made-up answers.
 const jump = !window.gomexSetup && location.hash.match(/step=([\w-]+)/)?.[1];
 if (jump) {
   const fill = (id, value) => {
     $(id).value = value;
     $(id).dispatchEvent(new Event('input'));
   };
-  state.facts = { ip: '2.27.52.78', os: 'Ubuntu 24.04 LTS · x86_64', size: 'Память 2 ГБ · диск 18 ГБ' };
+  state.facts = { ip: '2.27.52.78', os: 'Ubuntu 24.04 LTS · x86_64', size: t('ssh.size', { memory: 2, disk: 18 }) };
   fill('ip', state.facts.ip);
   fill('pass', 'secret');
   fill('free-name', 'podval');

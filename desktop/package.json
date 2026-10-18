@@ -2,13 +2,14 @@
   "name": "gomex-desktop",
   "productName": "Gomex",
   "version": "1.5.0",
-  "description": "Gomex для компьютера: чат и звонки, которые приходят, даже когда окно закрыто",
+  "description": "Gomex for desktop: chat and calls that arrive even when the window is closed",
   "main": "main.js",
   "license": "AGPL-3.0-only",
   "private": true,
   "scripts": {
     "start": "electron .",
     "dev": "GOMEX_URL=http://localhost:5180 electron .",
+    "check:i18n": "node check-i18n.js",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win"
   },
@@ -21,6 +22,8 @@
     },
     "files": [
       "main.js",
+      "i18n.js",
+      "i18n-page.js",
       "preload.js",
       "updater.js",
       "address.html",
@@ -69,8 +72,8 @@
       "category": "public.app-category.social-networking",
       "icon": "build/icon.png",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Gomex использует микрофон для звонков.",
-        "NSCameraUsageDescription": "Gomex использует камеру для видеозвонков."
+        "NSMicrophoneUsageDescription": "Gomex uses the microphone for calls.",
+        "NSCameraUsageDescription": "Gomex uses the camera for video calls."
       },
       "identity": "-",
       "hardenedRuntime": false

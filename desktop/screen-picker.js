@@ -2,6 +2,7 @@
 // windows and screens, one to be chosen. choose() answers with the pick, or null when the person cancelled.
 const { BrowserWindow, desktopCapturer, ipcMain, screen } = require('electron');
 const path = require('node:path');
+const i18n = require('./i18n');
 
 // Twice the size a card shows, so the thumbnails stay sharp on a dense screen.
 const THUMBNAIL = { width: 480, height: 300 };
@@ -15,7 +16,7 @@ const offered = new Map();
 
 const fromPicker = (event) => picker !== null && event.sender === picker.webContents;
 
-/** "Экран 1" is the main display, the rest follow left to right; the only one is "Весь экран". */
+/** "Screen 1" is the main display, the rest follow left to right; the only one is "Entire screen". */
 function nameScreens(sources) {
   const primary = screen.getPrimaryDisplay().id;
   const rank = new Map(
@@ -26,7 +27,7 @@ function nameScreens(sources) {
   );
   // Where the system doesn't say which display a source is, they keep the order they came in (the sort is stable).
   const ordered = [...sources].sort((a, b) => (rank.get(a.display_id) ?? Infinity) - (rank.get(b.display_id) ?? Infinity));
-  return ordered.map((source, index) => ({ source, name: ordered.length === 1 ? 'Весь экран' : `Экран ${index + 1}` }));
+  return ordered.map((source, index) => ({ source, name: ordered.length === 1 ? i18n.t('picker.wholeScreen') : i18n.t('picker.screenN', { n: index + 1 }) }));
 }
 
 async function list(kind) {
@@ -73,7 +74,7 @@ ipcMain.on('picker:cancel', (event) => {
   if (fromPicker(event)) settle?.(null);
 });
 
-/** sound: whether the picker offers the "Звук" switch. A second request while one is open is cancelled at once. */
+/** sound: whether the picker offers the "Sound" switch. A second request while one is open is cancelled at once. */
 function choose(parent, { sound }) {
   if (picker) return Promise.resolve(null);
   return new Promise((resolve) => {
@@ -85,7 +86,7 @@ function choose(parent, { sound }) {
       height: 560,
       minWidth: 480,
       minHeight: 400,
-      title: 'Демонстрация экрана',
+      title: i18n.t('picker.title'),
       backgroundColor: '#0c0c0e',
       show: false,
       minimizable: false,
@@ -95,7 +96,7 @@ function choose(parent, { sound }) {
       webPreferences: { preload: path.join(__dirname, 'picker-preload.js'), contextIsolation: true, sandbox: true },
     });
     picker.removeMenu();
-    picker.loadFile(path.join(__dirname, 'picker.html'), { query: { sound: sound ? '1' : '' } });
+    picker.loadFile(path.join(__dirname, 'picker.html'), { query: { lang: i18n.getLang(), sound: sound ? '1' : '' } });
     picker.once('ready-to-show', () => picker?.show());
     settle = (answer) => {
       settle = null;

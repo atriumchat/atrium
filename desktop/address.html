@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'self'" />
@@ -159,25 +159,27 @@
       <div class="cards">
         <button class="card primary" id="invite" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L12 5.6" /><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2" /></svg>
-          <span><b>Есть приглашение</b><small>Ссылка от друга</small></span>
+          <span><b data-i18n="address.haveInvite"></b><small data-i18n="address.haveInviteSub"></small></span>
         </button>
         <button class="card" id="own" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3.5" width="18" height="7" rx="2.5" /><rect x="3" y="13.5" width="18" height="7" rx="2.5" /><path d="M7 7h.01M7 17h.01" stroke-width="3" /></svg>
-          <span><b>Свой сервер</b><small>Для своей компании. Нужен VPS</small></span>
+          <span><b data-i18n="address.own"></b><small data-i18n="address.ownSub"></small></span>
         </button>
       </div>
     </section>
 
     <section id="enter" hidden>
-      <h1 id="title">Адрес сервера</h1>
-      <p id="hint">Новый адрес сервера. Приложение перезапустится.</p>
+      <h1 id="title" data-i18n="address.title"></h1>
+      <p id="hint" data-i18n="address.hint"></p>
       <form id="form">
         <input id="url" type="text" required placeholder="https://app.example.com" spellcheck="false" autocapitalize="off" />
-        <button class="go" id="save" type="submit">Сохранить</button>
+        <button class="go" id="save" type="submit" data-i18n="address.save"></button>
       </form>
       <div id="error"></div>
-      <button class="back" id="back" type="button" hidden>← Назад</button>
+      <button class="back" id="back" type="button" hidden data-i18n="address.back"></button>
     </section>
+    <script src="i18n.js"></script>
+    <script src="i18n-page.js"></script>
     <script src="address.js"></script>
   </body>
 </html>

@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; font-src 'self'; script-src 'self'" />
-    <title>Свой сервер</title>
+    <title data-i18n="setup.title"></title>
     <link rel="stylesheet" href="onboarding.css" />
   </head>
   <body>
@@ -16,21 +16,21 @@
       <main id="steps">
         <!-- 1. Getting in: the address and password the hosting company e-mailed. -->
         <form class="step" data-step="server" id="f-server" autocomplete="off" hidden>
-          <h1>Подключить сервер</h1>
-          <p class="sub">IP и пароль из письма хостера</p>
-          <label class="label" for="ip">IP-адрес</label>
+          <h1 data-i18n="ob.server.h"></h1>
+          <p class="sub" data-i18n="ob.server.sub"></p>
+          <label class="label" for="ip" data-i18n="ob.ip"></label>
           <input class="input" id="ip" placeholder="203.0.113.10" spellcheck="false" autocapitalize="off" />
           <!-- The login is almost always root, so it's filled in; it's in plain sight, next to the password. -->
           <div class="pair-fields">
             <span>
-              <label class="label" for="user">Логин</label>
+              <label class="label" for="user" data-i18n="ob.login"></label>
               <input class="input" id="user" value="root" spellcheck="false" autocapitalize="off" />
             </span>
             <span>
-              <label class="label" for="pass">Пароль</label>
+              <label class="label" for="pass" data-i18n="ob.password"></label>
               <span class="with-eye">
                 <input class="input" id="pass" type="password" spellcheck="false" />
-                <button class="eye" id="eye" type="button" aria-label="Показать пароль">
+                <button class="eye" id="eye" type="button" data-i18n-attr="aria-label:ob.showPassword">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
                 </button>
               </span>
@@ -38,27 +38,27 @@
           </div>
           <p class="error" id="e-server" role="alert"></p>
           <div class="actions">
-            <button class="primary" type="submit" id="go-server" disabled>Подключить</button>
+            <button class="primary" type="submit" id="go-server" disabled data-i18n="ob.connect"></button>
           </div>
         </form>
 
         <!-- 2. The address people will open: a free DuckDNS name, or a domain of one's own. -->
         <section class="step" data-step="address" hidden>
-          <h1>Адрес сервера</h1>
-          <p class="sub">По нему друзья будут заходить</p>
-          <div class="rows" role="radiogroup" aria-label="Адрес">
+          <h1 data-i18n="ob.address.h"></h1>
+          <p class="sub" data-i18n="ob.address.sub"></p>
+          <div class="rows" role="radiogroup" data-i18n-attr="aria-label:ob.address.aria">
             <button class="row choice" type="button" role="radio" aria-checked="true" data-pick="free">
-              <span><b>Бесплатный адрес</b><small>имя.dedyn.io, пара минут</small></span>
+              <span><b data-i18n="ob.free"></b><small data-i18n="ob.freeSub"></small></span>
               <span class="radio"></span>
             </button>
             <button class="row choice" type="button" role="radio" aria-checked="false" data-pick="own">
-              <span><b>Свой домен</b><small>Если уже есть</small></span>
+              <span><b data-i18n="ob.own"></b><small data-i18n="ob.ownSub"></small></span>
               <span class="radio"></span>
             </button>
           </div>
           <div class="actions">
-            <button class="quiet back" type="button">Назад</button>
-            <button class="primary" type="button" id="go-address">Дальше</button>
+            <button class="quiet back" type="button" data-i18n="ob.back"></button>
+            <button class="primary" type="button" id="go-address" data-i18n="ob.next"></button>
           </div>
         </section>
 
@@ -66,85 +66,85 @@
              account (its password stays in the app); deSEC's page behind the link asks the captcha and activates it;
              the app sees that and points the name here. -->
         <section class="step" data-step="free-name" hidden>
-          <h1>Бесплатный адрес</h1>
-          <p class="sub">Имя на dedyn.io и почта для письма</p>
+          <h1 data-i18n="ob.free"></h1>
+          <p class="sub" data-i18n="ob.free.sub"></p>
           <div class="rows saved" id="saved" hidden>
             <div class="row">
-              <span class="grow"><b id="saved-name">Есть адрес podval.dedyn.io</b></span>
-              <button class="secondary" type="button" id="use-saved">Использовать</button>
+              <span class="grow"><b id="saved-name"></b></span>
+              <button class="secondary" type="button" id="use-saved" data-i18n="ob.useSaved"></button>
             </div>
           </div>
           <p class="error" id="e-saved" role="alert"></p>
-          <label class="label" for="free-name">Имя</label>
+          <label class="label" for="free-name" data-i18n="ob.name"></label>
           <span class="with-suffix"><input class="input" id="free-name" placeholder="podval" spellcheck="false" autocapitalize="off" /><span class="suffix">.dedyn.io</span></span>
-          <label class="label" for="free-email">Почта</label>
+          <label class="label" for="free-email" data-i18n="ob.email"></label>
           <input class="input" id="free-email" type="email" placeholder="you@gmail.com" spellcheck="false" autocapitalize="off" />
           <p class="error" id="e-free-name" role="alert"></p>
           <div class="actions">
-            <button class="quiet back" type="button">Назад</button>
-            <button class="primary" type="button" id="go-free-name" disabled>Дальше</button>
+            <button class="quiet back" type="button" data-i18n="ob.back"></button>
+            <button class="primary" type="button" id="go-free-name" disabled data-i18n="ob.next"></button>
           </div>
         </section>
 
         <section class="step" data-step="free-mail" hidden>
-          <h1>Письмо на почте</h1>
-          <p class="sub">В письме от deSEC ссылка. На её странице символы с картинки и кнопка</p>
+          <h1 data-i18n="ob.mail.h"></h1>
+          <p class="sub" data-i18n="ob.mail.sub"></p>
           <div class="rows">
             <div class="row">
-              <span class="grow"><b id="mail-to">you@gmail.com</b><small>Не видно? Папка «Спам»</small></span>
+              <span class="grow"><b id="mail-to">you@gmail.com</b><small data-i18n="ob.mail.spam"></small></span>
               <button class="secondary" type="button" id="open-mail" hidden>
-                <span id="open-mail-label">Открыть почту</span>
+                <span id="open-mail-label" data-i18n="ob.mail.open"></span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8" /></svg>
               </button>
             </div>
-            <div class="row wait" id="mail-wait"><span class="spinner"></span><span class="grow" id="mail-state">Ждём подтверждение</span></div>
-            <div class="row" id="mail-late" hidden><span class="grow"><b>Письмо не пришло</b></span></div>
+            <div class="row wait" id="mail-wait"><span class="spinner"></span><span class="grow" id="mail-state" data-i18n="ob.mail.waiting"></span></div>
+            <div class="row" id="mail-late" hidden><span class="grow"><b data-i18n="ob.mail.late"></b></span></div>
           </div>
           <p class="error" id="e-mail" role="alert"></p>
           <div class="actions">
-            <button class="quiet" type="button" id="other-mail">Другая почта</button>
-            <button class="quiet" type="button" id="own-instead" hidden>Свой домен</button>
+            <button class="quiet" type="button" id="other-mail" data-i18n="ob.mail.other"></button>
+            <button class="quiet" type="button" id="own-instead" hidden data-i18n="ob.own"></button>
           </div>
         </section>
 
         <!-- 2b. A domain of one's own: the three records to add at the registrar, checked before going on. -->
         <section class="step" data-step="own" hidden>
-          <h1>Свой домен</h1>
-          <p class="sub">Три записи у регистратора</p>
-          <label class="label" for="domain">Домен</label>
+          <h1 data-i18n="ob.own"></h1>
+          <p class="sub" data-i18n="ob.own.sub"></p>
+          <label class="label" for="domain" data-i18n="ob.domain"></label>
           <input class="input" id="domain" placeholder="chat.example.com" spellcheck="false" autocapitalize="off" />
           <div class="rows records" id="records" hidden></div>
           <p class="error" id="e-own" role="alert"></p>
           <div class="actions">
-            <button class="quiet back" type="button">Назад</button>
-            <button class="primary" type="button" id="go-own" disabled>Проверить</button>
+            <button class="quiet back" type="button" data-i18n="ob.back"></button>
+            <button class="primary" type="button" id="go-own" disabled data-i18n="ob.check"></button>
           </div>
         </section>
 
         <!-- 3. Backups away from the server: a nightly encrypted copy on the admin's Google Drive. -->
         <section class="step" data-step="backup" hidden>
-          <h1>Резервная копия</h1>
-          <p class="sub">Переписки и фото сохранятся, что бы ни случилось с сервером</p>
+          <h1 data-i18n="ob.backup.h"></h1>
+          <p class="sub" data-i18n="ob.backup.sub"></p>
           <div class="rows">
             <div class="row">
               <span class="logo">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8.6 3h6.8l6.1 10.5-3.4 6H5.9l-3.4-6z" /><path d="M8.6 3l6.4 10.5H2.5M15.4 3L9 13.5l-3.1 6M21.5 13.5H15l3.1 6" /></svg>
               </span>
-              <span class="grow"><b>Google Диск</b><small id="drive-sub">15 ГБ бесплатно</small></span>
-              <button class="secondary" type="button" id="drive-connect">Подключить</button>
-              <span class="on" id="drive-on" hidden>Подключён</span>
+              <span class="grow"><b data-i18n="ob.drive"></b><small id="drive-sub" data-i18n="ob.driveSub"></small></span>
+              <button class="secondary" type="button" id="drive-connect" data-i18n="ob.connect"></button>
+              <span class="on" id="drive-on" hidden data-i18n="ob.driveOn"></span>
             </div>
             <!-- What a copy saves you from, not what it is. -->
-            <div class="row"><span><b>Сервер сломался или хостер закрылся</b><small>Всё вернётся на новом</small></span></div>
-            <div class="row"><span><b>Канал удалили по ошибке</b><small>Переписку можно вернуть</small></span></div>
-            <div class="row"><span><b>Копия зашифрована</b><small>Google её не прочитает</small></span></div>
+            <div class="row"><span><b data-i18n="ob.backup.b1"></b><small data-i18n="ob.backup.b1sub"></small></span></div>
+            <div class="row"><span><b data-i18n="ob.backup.b2"></b><small data-i18n="ob.backup.b2sub"></small></span></div>
+            <div class="row"><span><b data-i18n="ob.backup.b3"></b><small data-i18n="ob.backup.b3sub"></small></span></div>
           </div>
           <p class="error" id="e-backup" role="alert"></p>
           <div class="actions">
-            <button class="quiet back" type="button">Назад</button>
+            <button class="quiet back" type="button" data-i18n="ob.back"></button>
             <span class="pair">
-              <button class="quiet" type="button" id="skip-backup">Без копии</button>
-              <button class="primary" type="button" id="go-backup" disabled>Дальше</button>
+              <button class="quiet" type="button" id="skip-backup" data-i18n="ob.backup.skip"></button>
+              <button class="primary" type="button" id="go-backup" disabled data-i18n="ob.next"></button>
             </span>
           </div>
         </section>
@@ -152,25 +152,25 @@
         <!-- 4. The install itself, step by step; nothing to press. -->
         <section class="step" data-step="install" hidden>
           <div class="head">
-            <h1 id="install-title">Ставим Gomex</h1>
+            <h1 id="install-title" data-i18n="ob.install.title"></h1>
             <span class="elapsed" id="elapsed">0:00</span>
           </div>
-          <p class="sub" id="install-sub">Пара минут, окно можно свернуть</p>
+          <p class="sub" id="install-sub" data-i18n="ob.install.sub"></p>
           <!-- The installer's steps on a drum: the one that is on in the middle, the one done above, the next below. -->
           <div class="wheel"><ol class="tasks" id="tasks"></ol></div>
           <p class="error" id="e-install" role="alert"></p>
           <div class="actions start">
-            <button class="primary" type="button" id="go-install" disabled>Открыть сервер</button>
-            <button class="quiet" type="button" id="retry" hidden>Повторить</button>
+            <button class="primary" type="button" id="go-install" disabled data-i18n="ob.install.open"></button>
+            <button class="quiet" type="button" id="retry" hidden data-i18n="ob.install.retry"></button>
           </div>
         </section>
       </main>
 
       <!-- The whole setup in three short bars: the server here; the account and friends on the server's own wizard. -->
-      <nav class="progress" aria-label="Шаги">
-        <span class="part" data-part="server"><span class="track"><i></i></span><span class="name">Сервер</span></span>
-        <span class="part" data-part="account"><span class="track"><i></i></span><span class="name">Аккаунт</span></span>
-        <span class="part" data-part="friends"><span class="track"><i></i></span><span class="name">Друзья</span></span>
+      <nav class="progress" data-i18n-attr="aria-label:ob.steps">
+        <span class="part" data-part="server"><span class="track"><i></i></span><span class="name" data-i18n="ob.part.server"></span></span>
+        <span class="part" data-part="account"><span class="track"><i></i></span><span class="name" data-i18n="ob.part.account"></span></span>
+        <span class="part" data-part="friends"><span class="track"><i></i></span><span class="name" data-i18n="ob.part.friends"></span></span>
       </nav>
     </div>
 
@@ -184,6 +184,8 @@
       <div class="scene" data-scene="backup"><div class="ui drive" data-screen="backup"></div></div>
       <div class="scene" data-scene="install"><div class="ui term" data-screen="install"></div></div>
     </aside>
+    <script src="i18n.js"></script>
+    <script src="i18n-page.js"></script>
     <script src="onboarding.js"></script>
   </body>
 </html>
