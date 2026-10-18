@@ -1,7 +1,6 @@
 import { useCallback, useState, type ComponentProps, type ReactNode } from 'react';
 import { Button } from '@heroui/react';
 import { useStore } from '../store';
-import { Dialog } from './Dialog';
 import { PushPage } from './PushPage';
 import { CheckIcon, ChevronRightIcon } from './icons';
 
@@ -218,14 +217,16 @@ export function ChoiceRow<T extends string>({
 /** Open or closed for a SubPage, with a fresh key for each opening so its form starts empty. */
 export function useSub() {
   const [state, setState] = useState({ open: false, key: 0 });
-  const show = useCallback(() => setState((s) => ({ open: true, key: s.key + 1 })), []);
+  // Pressing the row's button again folds an open section back up (on the computer it opens in place).
+  const show = useCallback(() => setState((s) => (s.open ? { ...s, open: false } : { open: true, key: s.key + 1 })), []);
   const hide = useCallback(() => setState((s) => ({ ...s, open: false })), []);
   return { open: state.open, key: state.key, show, hide };
 }
 
 /**
- * What a settings row opens (the password form, the blocked list): a window on the computer; on the phone a page
- * of its own, with the main button at the foot of it. Keep it rendered and flip `open`, so the page can slide out.
+ * What a settings row opens (the password form, the blocked list). On the phone a page of its own, with the main
+ * button at the foot of it, as iOS does: the keyboard fills the rest. On the computer it opens right under its row,
+ * no window over the settings and no page with one field. Keep it rendered and flip `open`, so the page can slide out.
  */
 export function SubPage({ open, title, onClose, children, footer }: { open: boolean; title: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
   const isMobile = useStore((s) => s.isMobile);
@@ -238,8 +239,22 @@ export function SubPage({ open, title, onClose, children, footer }: { open: bool
     );
   }
   return open ? (
-    <Dialog title={title} onClose={onClose} footer={footer}>
+    <div
+      aria-label={title}
+      role="group"
+      className="border-b border-white/[0.07] pb-4 pt-1"
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape') return;
+        // Esc folds the section, not the whole settings window.
+        e.stopPropagation();
+        onClose();
+      }}
+    >
       {children}
-    </Dialog>
+      <div className="mt-3 flex items-center gap-2">
+        {footer}
+        <Quiet onClick={onClose}>{footer ? 'Отмена' : 'Свернуть'}</Quiet>
+      </div>
+    </div>
   ) : null;
 }
