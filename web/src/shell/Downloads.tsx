@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Modal, Tooltip } from '@heroui/react';
+import { Tooltip } from '@heroui/react';
 import { WhereToUse } from '../account/WhereToUse';
 import { DownloadIcon } from '../ui/icons';
+import { Window } from '../ui/Dialog';
 
 export function AppleLogo({ size = 22 }: { size?: number }) {
   return (
@@ -51,15 +52,10 @@ export function DownloadRailButton() {
 /** The same "where to use Gomex" screen as after sign-up, in a window; it brings its own title and buttons. */
 function DownloadDialog({ onClose }: { onClose: () => void }) {
   return (
-    <Modal.Backdrop isOpen onOpenChange={(o) => !o && onClose()}>
-      <Modal.Container size="md" placement="center">
-        <Modal.Dialog aria-label="Где пользоваться Gomex" className="overflow-hidden p-0">
-          <Modal.CloseTrigger />
-          <div className="h-[min(640px,88vh)]">
-            <WhereToUse onDone={onClose} />
-          </div>
-        </Modal.Dialog>
-      </Modal.Container>
-    </Modal.Backdrop>
+    <Window label="Где пользоваться Gomex" onClose={onClose} className="overflow-hidden p-0">
+      <div className="h-[min(640px,88vh)]">
+        <WhereToUse onDone={onClose} />
+      </div>
+    </Window>
   );
 }

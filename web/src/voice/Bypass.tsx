@@ -46,6 +46,7 @@ export function BypassSwitch() {
   const [busy, setBusy] = useState(false);
   return (
     <Switch
+      className="w-full"
       isSelected={on}
       isDisabled={forced || busy}
       onChange={async (value) => {
@@ -54,14 +55,15 @@ export function BypassSwitch() {
         setBusy(false);
       }}
     >
-      <Switch.Content className="flex w-full items-start justify-between gap-3">
+      <Switch.Content className="flex w-full items-center justify-between gap-3">
         <span className="min-w-0">
-          <Label className="text-[14px] font-medium">Антилаг</Label>
-          <span className="block text-[12px] leading-snug text-muted">
+          <Label className="text-[14px] font-medium max-md:text-[16px] max-md:font-normal">Антилаг</Label>
+          <span className="block text-[13px] leading-snug text-muted">
             {forced ? 'Включён на сервере' : 'Звонок через сервер, меньше обрывов'}
           </span>
         </span>
-        <Switch.Control className="mt-0.5 shrink-0">
+        {/* Off, the track is a white tint: graphite would vanish in the phone's graphite cards. */}
+        <Switch.Control className="shrink-0 [--switch-control-bg:rgb(255_255_255/0.16)]">
           <Switch.Thumb />
         </Switch.Control>
       </Switch.Content>

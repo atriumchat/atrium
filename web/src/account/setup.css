@@ -319,40 +319,9 @@
 .setup .crop:focus-visible {
   border-color: #ffffff66;
 }
+/* The zoom under it is drawn in index.css, the same as in the settings. */
 .setup .icon-zoom {
   margin: 10px 0 0;
-}
-.setup .icon-zoom .slider__track {
-  height: 20px;
-  border-color: transparent !important;
-  background: transparent;
-}
-.setup .icon-zoom .slider__track::before {
-  content: "";
-  position: absolute;
-  inset: 50% 0 auto;
-  height: 3px;
-  margin-top: -1.5px;
-  border-radius: 999px;
-  background: #ffffff1f;
-}
-.setup .icon-zoom .slider__fill {
-  top: 50%;
-  height: 3px;
-  margin-top: -1.5px;
-  border-radius: 999px;
-  background: var(--fg);
-}
-.setup .icon-zoom .slider__thumb {
-  width: 20px;
-  background: transparent;
-}
-.setup .icon-zoom .slider__thumb::after {
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  background: var(--fg);
-  box-shadow: none;
 }
 
 /* The recovery key: big and selectable, in two lines of four groups. */

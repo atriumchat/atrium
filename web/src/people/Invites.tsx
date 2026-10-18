@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Button, Modal } from '@heroui/react';
+import { Button } from '@heroui/react';
 import { api } from '../api';
 import { showError, useStore } from '../store';
 import { plural } from '../chat/format';
 import { inviteLink, prettyCode } from './invite';
 import type { MyInvite } from '../types';
 import { Avatar } from '../ui/Avatar';
-import { ConfirmDialog } from '../ui/Dialog';
+import { ConfirmDialog, Window } from '../ui/Dialog';
+import { Row, RowIcon } from '../ui/settings';
 import { CheckIcon, UserPlusIcon, XIcon } from '../ui/icons';
 
 const BANNER_HIDDEN = 'gomex_invite_banner_hidden';
@@ -112,23 +113,20 @@ export function InviteBanner() {
   );
 }
 
-/** A full-width "invite friends" card, for the phone's You tab. */
-export function InviteCardButton() {
+/** "Пригласить друзей" as a row of the phone's "Вы" tab: opens the invite window. */
+export function InviteRow() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="mt-4 flex w-full items-center gap-4 overflow-hidden rounded-[24px] bg-default p-4 text-left active:bg-default/70"
-      >
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-black">
-          <UserPlusIcon size={22} />
-        </span>
-        <span className="min-w-0">
-          <span className="block text-[16px] font-medium">Пригласить друзей</span>
-          <span className="block text-[13px] text-muted">Gomex — только по приглашениям</span>
-        </span>
-      </button>
+      <Row
+        icon={
+          <RowIcon>
+            <UserPlusIcon />
+          </RowIcon>
+        }
+        title="Пригласить друзей"
+        onPress={() => setOpen(true)}
+      />
       {open && <InviteDialog onClose={() => setOpen(false)} />}
     </>
   );
@@ -176,74 +174,75 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal.Backdrop isOpen onOpenChange={(open) => !open && onClose()}>
-      <Modal.Container size={isMobile ? 'full' : 'sm'} placement={isMobile ? 'top' : 'center'}>
-        <Modal.Dialog aria-label="Пригласить друзей" className="max-w-[440px] p-0 max-md:max-w-none max-md:pt-[env(safe-area-inset-top)]">
-          <Modal.CloseTrigger className="z-10 max-md:top-[max(16px,env(safe-area-inset-top))]" />
-
-          <div className="px-6 pr-14 pt-6">
-            <h2 className="text-[20px] font-medium leading-7">Пригласить друзей</h2>
-            <p className="mt-1 text-[14px] leading-snug text-muted">
-              {limit === null
-                ? 'Gomex — только по приглашениям. Ссылка админа без лимита.'
-                : `Gomex — только по приглашениям. По ссылке зарегистрируются ${limit} ${plural(limit, ['человек', 'человека', 'человек'])} и сразу попадут в друзья.`}
+    // On the phone the link sits at the sheet's foot, under the thumb.
+    <Window
+      label="Пригласить друзей"
+      onClose={onClose}
+      className="max-w-[440px] p-0"
+      footer={
+        <div className="px-6 pb-6 pt-5">
+          <div className="pb-2 text-[14px] text-muted">Ссылка-приглашение</div>
+          <div className="flex h-12 items-center gap-2 rounded-full bg-surface-tertiary pl-4 pr-1.5">
+            <span className={`min-w-0 flex-1 truncate text-[14px] ${full ? 'text-faint' : ''}`}>{link.replace(/^https?:\/\//, '')}</span>
+            <Button
+              isDisabled={!invite || full}
+              onPress={shareOrCopy}
+              className="h-9 shrink-0 rounded-full px-4 text-[14px] [--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]"
+            >
+              {copied && <CheckIcon size={16} strokeWidth={2.5} />}
+              {copied ? 'Скопировано' : isMobile ? 'Поделиться' : 'Скопировать'}
+            </Button>
+          </div>
+          {invite && (
+            <p className="mt-2 px-1 text-[12px] leading-5 text-faint">
+              {full ? `Все ${limit} ${plural(limit ?? 0, ['место занято', 'места заняты', 'мест заняты'])}. ` : left !== null ? `Осталось ${left} ${plural(left, ['место', 'места', 'мест'])}. ` : ''}
+              Код для входа: <span className="font-mono text-muted">{prettyCode(invite.code)}</span> ·{' '}
+              <button onClick={() => setResetting(true)} className="text-muted hover:text-foreground hover:underline">
+                Сбросить ссылку
+              </button>
             </p>
-          </div>
+          )}
+        </div>
+      }
+    >
+      <div className="px-6 pr-14 pt-6 max-md:pt-3">
+        <h2 className="text-[20px] font-medium leading-7">Пригласить друзей</h2>
+        <p className="mt-1 text-[14px] leading-snug text-muted">
+          {limit === null
+            ? 'Gomex — только по приглашениям. Ссылка админа без лимита.'
+            : `Gomex — только по приглашениям. По ссылке зарегистрируются ${limit} ${plural(limit, ['человек', 'человека', 'человек'])} и сразу попадут в друзья.`}
+        </p>
+      </div>
 
-          <div className="px-6 pt-5">
-            <div className="flex items-center justify-between pb-1">
-              <span className="text-[12px] text-faint">Пришли по ссылке</span>
-              {invite && limit !== null && (
-                <span className="text-[12px] tabular-nums text-faint">
-                  {used} из {limit}
-                </span>
-              )}
-            </div>
-            {!invite ? (
-              <p className="py-8 text-center text-[14px] text-muted">Загружаем…</p>
-            ) : used === 0 ? (
-              <div className="flex items-center gap-3 py-3">
-                <EmptySeats count={Math.min(left ?? 3, 5)} />
-                <span className="text-[14px] text-muted">Пока никто не пришёл</span>
-              </div>
-            ) : (
-              <ul className="-mx-2 max-h-[240px] overflow-y-auto">
-                {invite.invited.map((id) => (
-                  <li key={id} className="flex h-12 items-center gap-3 rounded-full px-2">
-                    <Avatar user={users[id]} size={32} ringBg="var(--overlay)" />
-                    <span className="min-w-0 flex-1 truncate text-[15px]">{users[id]?.name ?? '…'}</span>
-                    <span className="text-[13px] text-faint">в друзьях</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+      <div className="px-6 pt-5">
+        <div className="flex items-center justify-between pb-1">
+          <span className="text-[12px] text-faint">Пришли по ссылке</span>
+          {invite && limit !== null && (
+            <span className="text-[12px] tabular-nums text-faint">
+              {used} из {limit}
+            </span>
+          )}
+        </div>
+        {!invite ? (
+          <p className="py-8 text-center text-[14px] text-muted">Загружаем…</p>
+        ) : used === 0 ? (
+          <div className="flex items-center gap-3 py-3">
+            <EmptySeats count={Math.min(left ?? 3, 5)} />
+            <span className="text-[14px] text-muted">Пока никто не пришёл</span>
           </div>
-
-          <div className="px-6 pb-6 pt-5 max-md:pb-[max(24px,env(safe-area-inset-bottom))]">
-            <div className="pb-2 text-[14px] text-muted">Ссылка-приглашение</div>
-            <div className="flex h-12 items-center gap-2 rounded-full bg-surface-tertiary pl-4 pr-1.5">
-              <span className={`min-w-0 flex-1 truncate text-[14px] ${full ? 'text-faint' : ''}`}>{link.replace(/^https?:\/\//, '')}</span>
-              <Button
-                isDisabled={!invite || full}
-                onPress={shareOrCopy}
-                className="h-9 shrink-0 rounded-full px-4 text-[14px] [--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]"
-              >
-                {copied && <CheckIcon size={16} strokeWidth={2.5} />}
-                {copied ? 'Скопировано' : isMobile ? 'Поделиться' : 'Скопировать'}
-              </Button>
-            </div>
-            {invite && (
-              <p className="mt-2 px-1 text-[12px] leading-5 text-faint">
-                {full ? `Все ${limit} ${plural(limit ?? 0, ['место занято', 'места заняты', 'мест заняты'])}. ` : left !== null ? `Осталось ${left} ${plural(left, ['место', 'места', 'мест'])}. ` : ''}
-                Код для входа: <span className="font-mono text-muted">{prettyCode(invite.code)}</span> ·{' '}
-                <button onClick={() => setResetting(true)} className="text-muted hover:text-foreground hover:underline">
-                  Сбросить ссылку
-                </button>
-              </p>
-            )}
-          </div>
-        </Modal.Dialog>
-      </Modal.Container>
+        ) : (
+          // The sheet scrolls as a whole on the phone; the window keeps the list short on the computer.
+          <ul className="-mx-2 md:max-h-[240px] md:overflow-y-auto">
+            {invite.invited.map((id) => (
+              <li key={id} className="flex h-12 items-center gap-3 rounded-full px-2">
+                <Avatar user={users[id]} size={32} ringBg="var(--overlay)" />
+                <span className="min-w-0 flex-1 truncate text-[15px]">{users[id]?.name ?? '…'}</span>
+                <span className="text-[13px] text-faint">в друзьях</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       {resetting && (
         <ConfirmDialog
           title="Сбросить ссылку?"
@@ -253,7 +252,7 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
           onClose={() => setResetting(false)}
         />
       )}
-    </Modal.Backdrop>
+    </Window>
   );
 }
 
