@@ -9,7 +9,7 @@ import uuid
 
 import jwt
 import socketio
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
@@ -23,6 +23,7 @@ from .config import (
     RING_SECONDS,
     VOICE_TOKEN_TTL,
 )
+from .errors import ApiError, Rejected, socket_error, socket_rejected
 from .db import connect_db, execute, now_ms, query
 from .auth import MESSAGES_BY_USER, RateLimit, current_user, is_admin, user_from_token
 
@@ -184,17 +185,17 @@ async def message_send(sid, data):
     user = (await sio.get_session(sid))["user"]
     channel_id = str((data or {}).get("channelId", ""))
     if MESSAGES_BY_USER.wait(user["id"]):
-        return {"ok": False, "error": "Слишком часто, пауза пару секунд"}
+        return socket_error("tooFast", "Слишком часто, пауза пару секунд")
     try:
         content, attachments, upload_ids = message_body(user["id"], data)
-    except ValueError as e:
-        return {"ok": False, "error": str(e)}
+    except Rejected as e:
+        return socket_rejected(e)
     if not query("SELECT 1 FROM channels WHERE id = ? AND kind = 'text' AND deleted_at IS NULL", (channel_id,)):
         return {"ok": False, "error": "Нет такого канала"}
     try:
         reply_to = reply_target("messages", "channel_id", channel_id, data)
-    except ValueError as e:
-        return {"ok": False, "error": str(e)}
+    except Rejected as e:
+        return socket_rejected(e)
     row = {
         "id": uuid.uuid4().hex,
         "channel_id": channel_id,
@@ -221,17 +222,17 @@ async def dm_send(sid, data):
     if not dm:
         return {"ok": False, "error": "Нет такой переписки"}
     if dm["kind"] == "dm" and any(blocked_between(user["id"], m) for m in dm_member_ids(dm["id"]) if m != user["id"]):
-        return {"ok": False, "error": "Написать нельзя: один из вас заблокировал другого"}
+        return socket_error("dmBlocked", "Написать нельзя: один из вас заблокировал другого")
     if MESSAGES_BY_USER.wait(user["id"]):
-        return {"ok": False, "error": "Слишком часто, пауза пару секунд"}
+        return socket_error("tooFast", "Слишком часто, пауза пару секунд")
     try:
         content, attachments, upload_ids = message_body(user["id"], data)
-    except ValueError as e:
-        return {"ok": False, "error": str(e)}
+    except Rejected as e:
+        return socket_rejected(e)
     try:
         reply_to = reply_target("dm_messages", "dm_id", dm["id"], data)
-    except ValueError as e:
-        return {"ok": False, "error": str(e)}
+    except Rejected as e:
+        return socket_rejected(e)
     row = {
         "id": uuid.uuid4().hex,
         "dm_id": dm["id"],
@@ -272,15 +273,15 @@ async def message_edit(sid, data):
     found = find_message(str((data or {}).get("id", "")))
     # Readable as well as yours: someone who left a group mustn't keep rewriting what they said there.
     if not found or not can_read_message(user["id"], *found):
-        return {"ok": False, "error": "Нет такого сообщения"}
+        return socket_error("noMessage", "Нет такого сообщения")
     table, row = found
     if row["user_id"] != user["id"]:
-        return {"ok": False, "error": "Можно менять только свои сообщения"}
+        return socket_error("ownEditOnly", "Можно менять только свои сообщения")
     content = str((data or {}).get("content", "")).strip()
     if len(content) > MAX_MESSAGE_LEN or (not content and row["attachments"] == "[]"):
-        return {"ok": False, "error": "Пустое или слишком длинное сообщение"}
+        return socket_error("badMessage", "Пустое или слишком длинное сообщение")
     if MESSAGES_BY_USER.wait(user["id"]):
-        return {"ok": False, "error": "Слишком часто, пауза пару секунд"}
+        return socket_error("tooFast", "Слишком часто, пауза пару секунд")
     edited_at = now_ms()
     execute(f"UPDATE {table} SET content = ?, edited_at = ? WHERE id = ?", (content, edited_at, row["id"]))
     message = messages_out([{**row, "content": content, "edited_at": edited_at}], table)[0]
@@ -294,10 +295,10 @@ async def message_delete(sid, data):
     user = (await sio.get_session(sid))["user"]
     found = find_message(str((data or {}).get("id", "")))
     if not found or not can_read_message(user["id"], *found):
-        return {"ok": False, "error": "Нет такого сообщения"}
+        return socket_error("noMessage", "Нет такого сообщения")
     table, row = found
     if row["user_id"] != user["id"] and not (table == "messages" and is_admin(user)):
-        return {"ok": False, "error": "Можно удалять только свои сообщения"}
+        return socket_error("ownDeleteOnly", "Можно удалять только свои сообщения")
     upload_ids = [a["url"].rsplit("/", 1)[-1] for a in json.loads(row["attachments"])]
     with connect_db() as conn:
         conn.execute(f"DELETE FROM {table} WHERE id = ?", (row["id"],))
@@ -327,12 +328,12 @@ async def reaction_toggle(sid, data):
     emoji = str((data or {}).get("emoji", "")).strip()
     found = find_message(str((data or {}).get("messageId", "")))
     if not found or not can_read_message(user["id"], *found):
-        return {"ok": False, "error": "Нет такого сообщения"}
+        return socket_error("noMessage", "Нет такого сообщения")
     # One emoji (with skin tone / ZWJ joins), never arbitrary text.
     if not emoji or len(emoji) > MAX_EMOJI_LEN or not re.search(r"[\u2190-\u2bff\U0001f000-\U0001faff]", emoji) or re.search(r"[\w\s]", emoji):
-        return {"ok": False, "error": "Это не эмодзи"}
+        return socket_error("notEmoji", "Это не эмодзи")
     if REACTIONS_BY_USER.wait(user["id"]):
-        return {"ok": False, "error": "Не так быстро"}
+        return socket_error("slowDown", "Не так быстро")
     table, row = found
     with connect_db() as conn:
         removed = conn.execute(
@@ -340,7 +341,7 @@ async def reaction_toggle(sid, data):
         ).rowcount
         if not removed:
             if conn.execute("SELECT COUNT(DISTINCT emoji) FROM reactions WHERE message_id = ?", (row["id"],)).fetchone()[0] >= 20:
-                return {"ok": False, "error": "На сообщении уже 20 разных реакций"}
+                return socket_error("reactionLimit", "На сообщении уже 20 разных реакций")
             conn.execute(
                 "INSERT INTO reactions (message_id, user_id, emoji, created_at) VALUES (?, ?, ?, ?)",
                 (row["id"], user["id"], emoji, now_ms()),
@@ -482,7 +483,7 @@ async def read_socket(sid, data):
     """Read marks ride the open socket: no HTTP request per message read."""
     user = (await sio.get_session(sid))["user"]
     if READS_BY_USER.wait(user["id"]):
-        return {"ok": False, "error": "Не так быстро"}
+        return socket_error("slowDown", "Не так быстро")
     try:
         conversation_id, at = str((data or {})["conversationId"])[:64], int(data["at"])
     except (KeyError, TypeError, ValueError):
@@ -496,7 +497,7 @@ async def read_socket(sid, data):
 def voice_token(body: VoiceTokenIn, user: dict = Depends(current_user)):
     kind = voice_target(user["id"], body.channelId)
     if not kind:
-        raise HTTPException(status_code=404, detail="Нет такого звонка")
+        raise ApiError(404, "noCall", "Нет такого звонка")
     return {"token": livekit_token(user, livekit_room(kind, body.channelId)), "url": LIVEKIT_URL}
 
 
@@ -526,7 +527,7 @@ def call_quality(body: CallQualityIn, user: dict = Depends(current_user)):
     """One log line per report from a call (nothing is stored), so a bad call can be looked at afterwards."""
     CALL_QUALITY_BY_USER.check(user["id"])
     if not voice_target(user["id"], body.channelId):
-        raise HTTPException(status_code=404, detail="Нет такого звонка")
+        raise ApiError(404, "noCall", "Нет такого звонка")
     # The transport is free text from the browser: only a short word like "relay/turn-tls" gets into the log.
     transport = body.transport if re.fullmatch(r"[a-z0-9/-]{1,24}", body.transport) else "?"
     when = "leave" if body.when == "leave" else "tick"

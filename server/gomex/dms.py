@@ -4,11 +4,12 @@ import json
 import sqlite3
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 from .config import MAX_GROUP_MEMBERS
+from .errors import ApiError
 from .db import connect_db, execute, now_ms, query
 from .auth import GROUPS_BY_USER, current_user
 
@@ -114,7 +115,7 @@ def list_dms(user: dict = Depends(current_user)):
 @router.post("/api/dms")
 def open_dm(body: DmIn, user: dict = Depends(current_user)):
     if body.userId == user["id"] or not query("SELECT 1 FROM users WHERE id = ?", (body.userId,)):
-        raise HTTPException(status_code=404, detail="Нет такого пользователя")
+        raise ApiError(404, "noUser", "Нет такого пользователя")
     pair_key = ":".join(ordered_pair(user["id"], body.userId))
     rows = query("SELECT * FROM dms WHERE pair_key = ?", (pair_key,))
     if not rows:
@@ -135,14 +136,14 @@ def open_dm(body: DmIn, user: dict = Depends(current_user)):
 def group_for(user_id: str, group_id: str) -> dict:
     dm = dm_for(user_id, group_id)
     if not dm or dm["kind"] != "group":
-        raise HTTPException(status_code=404, detail="Нет такой группы")
+        raise ApiError(404, "noGroup", "Нет такой группы")
     return dm
 
 
 def check_can_add(user_id: str, others: set[str]) -> None:
     """Only your friends can be put in a group, so strangers can't pull people into chats."""
     if not others <= friend_ids(user_id):
-        raise HTTPException(status_code=400, detail="В группу можно добавить только друзей")
+        raise ApiError(400, "groupFriendsOnly", "В группу можно добавить только друзей")
 
 
 @router.post("/api/groups")
@@ -150,7 +151,7 @@ async def create_group(body: GroupIn, user: dict = Depends(current_user)):
     GROUPS_BY_USER.check(user["id"])
     others = set(body.userIds) - {user["id"]}
     if len(others) < 2:
-        raise HTTPException(status_code=400, detail="Для группы нужно хотя бы два друга")
+        raise ApiError(400, "groupNeedsTwo", "Для группы нужно хотя бы два друга")
     check_can_add(user["id"], others)
     group_id, now = uuid.uuid4().hex, now_ms()
     with connect_db() as conn:
@@ -172,10 +173,10 @@ async def add_group_members(group_id: str, body: GroupMembersIn, user: dict = De
     members = set(dm_member_ids(group_id))
     new = set(body.userIds) - members
     if not new:
-        raise HTTPException(status_code=400, detail="Они уже в группе")
+        raise ApiError(400, "alreadyInGroup", "Они уже в группе")
     check_can_add(user["id"], new)
     if len(members) + len(new) > MAX_GROUP_MEMBERS:
-        raise HTTPException(status_code=400, detail=f"В группе может быть не больше {MAX_GROUP_MEMBERS} человек")
+        raise ApiError(400, "groupFull", f"В группе может быть не больше {MAX_GROUP_MEMBERS} человек", n=MAX_GROUP_MEMBERS)
     now = now_ms()
     with connect_db() as conn:
         conn.executemany("INSERT INTO dm_members (dm_id, user_id, joined_at) VALUES (?, ?, ?)", [(group_id, m, now) for m in new])
@@ -222,7 +223,7 @@ async def leave_group(group_id: str, user: dict = Depends(current_user)):
 @router.get("/api/dms/{dm_id}/messages")
 def dm_messages(dm_id: str, before: int | None = None, limit: int = 50, user: dict = Depends(current_user)):
     if not dm_for(user["id"], dm_id):
-        raise HTTPException(status_code=404, detail="Нет такой переписки")
+        raise ApiError(404, "noDm", "Нет такой переписки")
     limit = max(1, min(limit, 100))
     rows = query(
         "SELECT * FROM dm_messages WHERE dm_id = ? AND created_at < ? ORDER BY created_at DESC LIMIT ?",

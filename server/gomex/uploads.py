@@ -28,6 +28,7 @@ from .config import (
     UPLOAD_BYTES_PER_DAY,
     UPLOAD_DIR,
 )
+from .errors import ApiError
 from .db import connect_db, execute, now_ms, query
 from .auth import UPLOADS_BY_USER, current_user, media_user
 
@@ -46,7 +47,7 @@ def open_checked(data: bytes, shrink_to: int) -> Image.Image:
     img = Image.open(io.BytesIO(data))
     if img.width * img.height > MAX_IMAGE_PIXELS:
         img.close()
-        raise HTTPException(status_code=413, detail="Картинка слишком большая")
+        raise ApiError(413, "imageTooBig", "Картинка слишком большая")
     img.draft("RGB", (shrink_to, shrink_to))
     return img
 
@@ -72,7 +73,7 @@ def make_avatar(data: bytes, size: int = AVATAR_SIZE) -> bytes:
             img.save(out, format="WEBP", quality=85)
             return out.getvalue()
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
-        raise HTTPException(status_code=400, detail="Это не похоже на картинку")
+        raise ApiError(400, "notAnImage", "Это не похоже на картинку")
 
 
 def make_image(data: bytes) -> tuple[bytes, int, int, bytes | None]:
@@ -88,7 +89,7 @@ def make_image(data: bytes) -> tuple[bytes, int, int, bytes | None]:
                 scale = min(1.0, ANIMATION_MAX_SIDE / max(img.size))
                 size = (max(1, round(img.width * scale)), max(1, round(img.height * scale)))
                 if size[0] * size[1] * img.n_frames > ANIMATION_PIXEL_BUDGET:
-                    raise HTTPException(status_code=413, detail="Гифка слишком длинная или большая")
+                    raise ApiError(413, "gifTooBig", "Гифка слишком длинная или большая")
                 frames, durations = [], []
                 for frame in ImageSequence.Iterator(img):
                     frames.append(frame.convert("RGBA").resize(size, Image.Resampling.LANCZOS))
@@ -111,7 +112,7 @@ def make_image(data: bytes) -> tuple[bytes, int, int, bytes | None]:
                 preview = preview_out.getvalue()
             return out.getvalue(), img.width, img.height, preview
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
-        raise HTTPException(status_code=400, detail="Не получилось открыть картинку: нужен JPG, PNG, WebP или GIF")
+        raise ApiError(400, "imageFormat", "Не получилось открыть картинку: нужен JPG, PNG, WebP или GIF")
 
 
 UPLOAD_NAME = re.compile(r"([0-9a-f]{32})(\.p)?\.(webp|bin)")
@@ -159,13 +160,13 @@ PRIVATE_IMAGE_HEADERS = {"Cache-Control": "private, max-age=31536000, immutable"
 def check_upload_room(user_id: str, size: int) -> None:
     """Refuse an upload that would fill the disk or go over the person's daily allowance."""
     if shutil.disk_usage(UPLOAD_DIR).free - size < MIN_FREE_DISK:
-        raise HTTPException(status_code=507, detail="На сервере кончается место, загрузки пока закрыты")
+        raise ApiError(507, "diskFull", "На сервере кончается место, загрузки пока закрыты")
     used = query(
         "SELECT COALESCE(SUM(file_size), 0) AS n FROM uploads WHERE user_id = ? AND created_at > ?",
         (user_id, now_ms() - 24 * 3600 * 1000),
     )[0]["n"]
     if used + size > UPLOAD_BYTES_PER_DAY:
-        raise HTTPException(status_code=413, detail=f"Лимит загрузок на сутки: {UPLOAD_BYTES_PER_DAY // 1024 // 1024} МБ")
+        raise ApiError(413, "uploadQuota", f"Лимит загрузок на сутки: {UPLOAD_BYTES_PER_DAY // 1024 // 1024} МБ", mb=UPLOAD_BYTES_PER_DAY // 1024 // 1024)
 
 
 @router.post("/api/uploads")
@@ -177,10 +178,10 @@ async def upload_file_or_image(request: Request, name: str = "", user: dict = De
     """
     UPLOADS_BY_USER.check(user["id"])
     if int(request.headers.get("content-length") or 0) > MAX_FILE_UPLOAD:
-        raise HTTPException(status_code=413, detail="Файл больше 25 МБ")
+        raise ApiError(413, "fileOver25", "Файл больше 25 МБ")
     data = await request.body()
     if not data:
-        raise HTTPException(status_code=400, detail="Пустой файл")
+        raise ApiError(400, "emptyFile", "Пустой файл")
     check_upload_room(user["id"], len(data))
     content_type = request.headers.get("content-type", "")
     if content_type.startswith("image/") and content_type != "image/svg+xml" and len(data) <= MAX_IMAGE_UPLOAD:
@@ -203,7 +204,7 @@ async def upload_file_or_image(request: Request, name: str = "", user: dict = De
             upload = {"id": image_id, "width": width, "height": height}
             return {"id": image_id, **attachment_out(upload)}
     if len(data) > MAX_FILE_UPLOAD:
-        raise HTTPException(status_code=413, detail="Файл больше 25 МБ")
+        raise ApiError(413, "fileOver25", "Файл больше 25 МБ")
     file_name = " ".join(Path(name.replace("\\", "/")).name.split())[:MAX_FILE_NAME] or "файл"
     if not all(ch.isprintable() for ch in file_name):
         file_name = "файл"

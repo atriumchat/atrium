@@ -3,10 +3,11 @@
 import json
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from .config import MAX_ATTACHMENTS, MAX_MESSAGE_LEN, MENTION
+from .errors import ApiError, Rejected
 from .db import connect_db, execute, now_ms, query
 from .auth import current_user, is_admin
 
@@ -112,7 +113,7 @@ def message_body(user_id: str, data) -> tuple[str, str, list[str]]:
     content = str(data.get("content", "")).strip()
     ids = data.get("attachments") or []
     if not isinstance(ids, list) or len(ids) > MAX_ATTACHMENTS:
-        raise ValueError(f"Не больше {MAX_ATTACHMENTS} картинок в одном сообщении")
+        raise Rejected("tooManyImages", f"Не больше {MAX_ATTACHMENTS} картинок в одном сообщении", n=MAX_ATTACHMENTS)
     ids = list(dict.fromkeys(str(i) for i in ids))
     uploads = {}
     if ids:
@@ -122,9 +123,9 @@ def message_body(user_id: str, data) -> tuple[str, str, list[str]]:
             for r in query(f"SELECT * FROM uploads WHERE user_id = ? AND scope IS NULL AND id IN ({marks})", (user_id, *ids))
         }
     if len(uploads) != len(ids):
-        raise ValueError("Файл не найден, прикрепи его ещё раз")
+        raise Rejected("fileMissing", "Файл не найден, прикрепи его ещё раз")
     if len(content) > MAX_MESSAGE_LEN or (not content and not ids):
-        raise ValueError("Пустое или слишком длинное сообщение")
+        raise Rejected("badMessage", "Пустое или слишком длинное сообщение")
     attachments = [attachment_out(uploads[i]) for i in ids]
     return content, json.dumps(attachments), ids
 
@@ -135,7 +136,7 @@ def reply_target(table: str, conversation_column: str, conversation_id: str, dat
     if not reply_to:
         return None
     if not query(f"SELECT 1 FROM {table} WHERE id = ? AND {conversation_column} = ?", (reply_to, conversation_id)):
-        raise ValueError("Сообщение для ответа уже удалено")
+        raise Rejected("replyGone", "Сообщение для ответа уже удалено")
     return reply_to
 
 
@@ -212,7 +213,7 @@ async def save_read(user: dict, conversation_id: str, at: int) -> bool:
 async def mark_read(body: ReadIn, user: dict = Depends(current_user)):
     """The same as the socket's "read", for when the socket is down."""
     if not await save_read(user, body.conversationId, body.at):
-        raise HTTPException(status_code=404, detail="Нет такого разговора")
+        raise ApiError(404, "noConversation", "Нет такого разговора")
     return {"ok": True}
 
 
@@ -249,7 +250,7 @@ def inbox(before: int | None = None, user: dict = Depends(current_user)):
 def channel_messages(channel_id: str, before: int | None = None, limit: int = 50, user: dict = Depends(current_user)):
     limit = max(1, min(limit, 100))
     if not query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NULL", (channel_id,)):
-        raise HTTPException(status_code=404, detail="Нет такого канала")
+        raise ApiError(404, "noChannel", "Нет такого канала")
     rows = query(
         "SELECT * FROM messages WHERE channel_id = ? AND created_at < ? ORDER BY created_at DESC LIMIT ?",
         (channel_id, before or now_ms() + 1, limit),
@@ -263,14 +264,14 @@ def channel_name(raw: str, kind: str) -> str:
     if kind == "text":
         name = name.lower().replace(" ", "-")
     if not name:
-        raise HTTPException(status_code=400, detail="Пустое название")
+        raise ApiError(400, "emptyName", "Пустое название")
     return name
 
 
 def channel_or_404(channel_id: str) -> dict:
     rows = query("SELECT * FROM channels WHERE id = ? AND deleted_at IS NULL", (channel_id,))
     if not rows:
-        raise HTTPException(status_code=404, detail="Нет такого канала")
+        raise ApiError(404, "noChannel", "Нет такого канала")
     return rows[0]
 
 
@@ -281,7 +282,7 @@ def muted_channels(user_id: str) -> list[str]:
 @router.post("/api/channels")
 async def create_channel(body: ChannelIn, user: dict = Depends(current_user)):
     if not is_admin(user):
-        raise HTTPException(status_code=403, detail="Каналы создаёт только админ")
+        raise ApiError(403, "adminCreateChannels", "Каналы создаёт только админ")
     name = channel_name(body.name, body.kind)
     position = query("SELECT COALESCE(MAX(position), 0) + 1 AS p FROM channels WHERE deleted_at IS NULL")[0]["p"]
     execute(
@@ -296,7 +297,7 @@ async def create_channel(body: ChannelIn, user: dict = Depends(current_user)):
 @router.patch("/api/channels/{channel_id}")
 async def rename_channel(channel_id: str, body: ChannelRenameIn, user: dict = Depends(current_user)):
     if not is_admin(user):
-        raise HTTPException(status_code=403, detail="Каналы переименовывает только админ")
+        raise ApiError(403, "adminRenameChannels", "Каналы переименовывает только админ")
     channel = channel_or_404(channel_id)
     execute("UPDATE channels SET name = ? WHERE id = ?", (channel_name(body.name, channel["kind"]), channel_id))
     channels = list_channels()
@@ -308,16 +309,16 @@ async def rename_channel(channel_id: str, body: ChannelRenameIn, user: dict = De
 async def reorder_channels(body: ChannelOrderIn, user: dict = Depends(current_user)):
     """The new order of one kind of channel (dragged in the list); the other kind keeps its places."""
     if not is_admin(user):
-        raise HTTPException(status_code=403, detail="Каналы двигает только админ")
+        raise ApiError(403, "adminMoveChannels", "Каналы двигает только админ")
     current = list_channels()
     by_id = {c["id"]: c for c in current}
     kinds = {by_id[i]["kind"] for i in body.ids if i in by_id}
     if len(kinds) != 1:
-        raise HTTPException(status_code=400, detail="Не тот список")
+        raise ApiError(400, "wrongList", "Не тот список")
     kind = kinds.pop()
     same = [c["id"] for c in current if c["kind"] == kind]
     if sorted(body.ids) != sorted(same):
-        raise HTTPException(status_code=409, detail="Список каналов изменился")
+        raise ApiError(409, "channelsChanged", "Список каналов изменился")
     moved = iter(body.ids)
     order = [next(moved) if c["kind"] == kind else c["id"] for c in current]
     with connect_db() as conn:
@@ -372,7 +373,7 @@ def purge_deleted_channels() -> int:
 @router.get("/api/channels/deleted")
 def deleted_channels(user: dict = Depends(current_user)):
     if not is_admin(user):
-        raise HTTPException(status_code=403, detail="Удалённые каналы видит только админ")
+        raise ApiError(403, "adminSeeDeleted", "Удалённые каналы видит только админ")
     return query(
         """SELECT c.id, c.name, c.kind, c.deleted_at AS deletedAt,
                   (SELECT COUNT(*) FROM messages m WHERE m.channel_id = c.id) AS messages
@@ -383,9 +384,9 @@ def deleted_channels(user: dict = Depends(current_user)):
 @router.post("/api/channels/{channel_id}/restore")
 async def restore_channel(channel_id: str, user: dict = Depends(current_user)):
     if not is_admin(user):
-        raise HTTPException(status_code=403, detail="Каналы возвращает только админ")
+        raise ApiError(403, "adminRestoreChannels", "Каналы возвращает только админ")
     if not query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NOT NULL", (channel_id,)):
-        raise HTTPException(status_code=404, detail="Нет такого канала")
+        raise ApiError(404, "noChannel", "Нет такого канала")
     execute("UPDATE channels SET deleted_at = NULL WHERE id = ?", (channel_id,))
     channels = list_channels()
     await sio.emit("channels", channels)
@@ -395,9 +396,9 @@ async def restore_channel(channel_id: str, user: dict = Depends(current_user)):
 @router.delete("/api/channels/{channel_id}")
 async def delete_channel(channel_id: str, user: dict = Depends(current_user)):
     if not is_admin(user):
-        raise HTTPException(status_code=403, detail="Каналы удаляет только админ")
+        raise ApiError(403, "adminDeleteChannels", "Каналы удаляет только админ")
     if channel_or_404(channel_id)["kind"] == "text" and query("SELECT COUNT(*) AS n FROM channels WHERE kind = 'text' AND deleted_at IS NULL")[0]["n"] <= 1:
-        raise HTTPException(status_code=400, detail="Последний текстовый канал удалить нельзя")
+        raise ApiError(400, "lastTextChannel", "Последний текстовый канал удалить нельзя")
     execute("UPDATE channels SET deleted_at = ? WHERE id = ?", (now_ms(), channel_id))
     purge_deleted_channels()
     channels = list_channels()

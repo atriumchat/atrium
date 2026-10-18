@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from .config import AVATAR_DIR, MAX_AVATAR_UPLOAD, SERVER_ICON_SIZE, WEB_DIST
+from .errors import ApiError
 from .db import execute, query
 from .auth import AVATARS_BY_USER, current_user, is_admin
 
@@ -44,7 +45,7 @@ async def announce() -> None:
 
 def check_admin(user: dict) -> None:
     if not is_admin(user):
-        raise HTTPException(status_code=403, detail="Сервер настраивает только админ")
+        raise ApiError(403, "adminServerSettings", "Сервер настраивает только админ")
 
 
 @router.get("/api/server/icon")
@@ -63,12 +64,12 @@ async def upload_server_icon(request: Request, user: dict = Depends(current_user
     """Raw image bytes in the body, as for avatars; stored as a square WebP big enough for a home-screen icon."""
     check_admin(user)
     if int(request.headers.get("content-length") or 0) > MAX_AVATAR_UPLOAD:
-        raise HTTPException(status_code=413, detail="Картинка больше 8 МБ")
+        raise ApiError(413, "imageOver8", "Картинка больше 8 МБ")
     data = await request.body()
     if not data:
-        raise HTTPException(status_code=400, detail="Пустой файл")
+        raise ApiError(400, "emptyFile", "Пустой файл")
     if len(data) > MAX_AVATAR_UPLOAD:
-        raise HTTPException(status_code=413, detail="Картинка больше 8 МБ")
+        raise ApiError(413, "imageOver8", "Картинка больше 8 МБ")
     AVATARS_BY_USER.check(user["id"])
     webp = await process_image(make_avatar, data, SERVER_ICON_SIZE)
     name = f"server-{secrets.token_hex(8)}.webp"
@@ -99,7 +100,7 @@ async def rename_server(body: ServerIn, user: dict = Depends(current_user)):
     check_admin(user)
     title = " ".join(body.name.split())
     if not title:
-        raise HTTPException(status_code=400, detail="Пустое название сервера")
+        raise ApiError(400, "emptyServerName", "Пустое название сервера")
     execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('server_name', ?)", (title,))
     await announce()
     return server_info()

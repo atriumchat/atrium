@@ -12,6 +12,7 @@ from fastapi import Header, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
 
 from .config import ADMINS, APP_SECRET, MEDIA_COOKIE, TOKEN_TTL
+from .errors import ApiError
 from .db import query
 
 
@@ -81,7 +82,9 @@ class RateLimit:
     def check(self, key: str) -> None:
         if seconds := self.wait(key):
             wait = f"{seconds} с" if seconds < 60 else f"{-(-seconds // 60)} мин"
-            raise HTTPException(status_code=429, detail=f"Слишком много попыток, повтор через {wait}")
+            raise ApiError(
+                429, "tooManyTries", f"Слишком много попыток, повтор через {wait}", minutes=-(-seconds // 60), seconds=seconds
+            )
 
 
 LOGIN_BY_IP = RateLimit(20, 600)
@@ -146,7 +149,7 @@ def current_user(authorization: str = Header(default="")) -> dict:
     token = authorization.removeprefix("Bearer ").strip()
     user = user_from_token(token)
     if not user:
-        raise HTTPException(status_code=401, detail="Нужно войти заново")
+        raise ApiError(401, "sessionExpired", "Нужно войти заново")
     return user
 
 

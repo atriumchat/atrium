@@ -24,6 +24,7 @@ from .config import (
     SERVER_NAME,
     USER_COLORS,
 )
+from .errors import ApiError
 from .db import connect_db, execute, now_ms, query, seed_admins
 from .auth import (
     AVATARS_BY_USER,
@@ -68,11 +69,11 @@ def check_nick(name: str) -> None:
     """Refuse empty nicks, invisible characters, and Latin mixed with Cyrillic in one word: "Bаla" with a Cyrillic
     "а" looks exactly like "Bala" and is how someone would pose as another person."""
     if not name or not all(ch.isprintable() for ch in name):
-        raise HTTPException(status_code=400, detail="Пустой ник или невидимые символы")
+        raise ApiError(400, "badNick", "Пустой ник или невидимые символы")
     for word in name.split():
         letters = [ch for ch in word if ch.isalpha()]
         if any(is_cyrillic(ch) for ch in letters) and any(ch.isascii() for ch in letters):
-            raise HTTPException(status_code=400, detail="В одном слове ника смешаны русские и латинские буквы")
+            raise ApiError(400, "mixedScripts", "В одном слове ника смешаны русские и латинские буквы")
 
 
 def find_user_by_name(name: str) -> dict | None:
@@ -199,11 +200,11 @@ async def register(body: RegisterIn, request: Request, response: Response):
         inviter = rows[0] if rows else None
         limit = inviter and invite_limit(inviter)
         if not inviter or (limit is not None and invited_count(inviter["id"]) >= limit):
-            raise HTTPException(status_code=403, detail=INVITE_GONE)
+            raise ApiError(403, "inviteGone", INVITE_GONE)
     name = " ".join(body.name.split())
     check_nick(name)
     if find_user_by_name(name):
-        raise HTTPException(status_code=409, detail="Этот ник уже занят")
+        raise ApiError(409, "nickTaken", "Этот ник уже занят")
 
     created_at = now_ms()
     user_id = uuid.uuid4().hex
@@ -231,9 +232,9 @@ async def register(body: RegisterIn, request: Request, response: Response):
                 )
     except sqlite3.IntegrityError:
         # Someone registered the same nick a moment ago.
-        raise HTTPException(status_code=409, detail="Этот ник только что заняли")
+        raise ApiError(409, "nickJustTaken", "Этот ник только что заняли")
     except InviteFull:
-        raise HTTPException(status_code=403, detail=INVITE_GONE)
+        raise ApiError(403, "inviteGone", INVITE_GONE)
     user = public_user(query("SELECT * FROM users WHERE id = ?", (user_id,))[0])
     await sio.emit("user:new", user)
     if inviter:
@@ -251,7 +252,7 @@ async def login(body: LoginIn, request: Request, response: Response):
     row = find_user_by_name(body.name)
     valid = await password_work(verify_password, body.password, row["password_hash"] if row else DUMMY_HASH)
     if not row or not valid:
-        raise HTTPException(status_code=401, detail="Неверный ник или пароль")
+        raise ApiError(401, "badCredentials", "Неверный ник или пароль")
     if password_outdated(row["password_hash"]):
         password_hash = await password_work(hash_password, body.password)
         execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, row["id"]))
@@ -298,11 +299,11 @@ def check_invite(code: str, request: Request):
     normalized = normalize_invite(code)
     rows = query("SELECT * FROM users WHERE invite_code = ?", (normalized,)) if normalized else []
     if not rows:
-        raise HTTPException(status_code=404, detail=INVITE_GONE)
+        raise ApiError(404, "inviteGone", INVITE_GONE)
     limit = invite_limit(rows[0])
     left = None if limit is None else limit - invited_count(rows[0]["id"])
     if left is not None and left <= 0:
-        raise HTTPException(status_code=404, detail=INVITE_GONE)
+        raise ApiError(404, "inviteGone", INVITE_GONE)
     return {"inviter": rows[0]["name"], "left": left}
 
 
@@ -368,12 +369,12 @@ async def change_name(body: NameChangeIn, request: Request, user: dict = Depends
     LOGIN_BY_NAME.check(f"change:{user['id']}")
     row = query("SELECT * FROM users WHERE id = ?", (user["id"],))[0]
     if not await password_work(verify_password, body.password, row["password_hash"]):
-        raise HTTPException(status_code=403, detail="Неверный пароль")
+        raise ApiError(403, "badPassword", "Неверный пароль")
     name = " ".join(body.name.split())
     check_nick(name)
     taken = find_user_by_name(name)
     if taken and taken["id"] != user["id"]:
-        raise HTTPException(status_code=409, detail="Этот ник уже занят")
+        raise ApiError(409, "nickTaken", "Этот ник уже занят")
     execute("UPDATE users SET name = ?, name_key = ? WHERE id = ?", (name, name.casefold(), user["id"]))
     updated = public_user(query("SELECT * FROM users WHERE id = ?", (user["id"],))[0])
     await sio.emit("user:updated", updated)
@@ -391,7 +392,7 @@ async def change_password(body: PasswordChangeIn, request: Request, response: Re
     LOGIN_BY_NAME.check(f"change:{user['id']}")
     row = query("SELECT * FROM users WHERE id = ?", (user["id"],))[0]
     if not await password_work(verify_password, body.current, row["password_hash"]):
-        raise HTTPException(status_code=403, detail="Неверный текущий пароль")
+        raise ApiError(403, "badCurrentPassword", "Неверный текущий пароль")
     password_hash = await password_work(hash_password, body.new)
     execute("UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE id = ?", (password_hash, user["id"]))
     await disconnect_user(user["id"])
@@ -430,7 +431,7 @@ async def make_recovery_key(body: RecoveryKeyIn, user: dict = Depends(current_us
     LOGIN_BY_NAME.check(f"change:{user['id']}")
     row = query("SELECT * FROM users WHERE id = ?", (user["id"],))[0]
     if not await password_work(verify_password, body.password, row["password_hash"]):
-        raise HTTPException(status_code=403, detail="Неверный пароль")
+        raise ApiError(403, "badPassword", "Неверный пароль")
     key, key_hash = await fresh_recovery_key()
     execute("UPDATE users SET recovery_hash = ? WHERE id = ?", (key_hash, user["id"]))
     return {"key": key}
@@ -452,7 +453,7 @@ async def recover(body: RecoverIn, request: Request, response: Response):
     stored = row["recovery_hash"] if row and row["recovery_hash"] else DUMMY_HASH
     valid = await password_work(verify_password, normalize_key(body.key), stored)
     if not row or not row["recovery_hash"] or not valid:
-        raise HTTPException(status_code=401, detail="Неверный ник или ключ восстановления")
+        raise ApiError(401, "badRecovery", "Неверный ник или ключ восстановления")
     password_hash = await password_work(hash_password, body.password)
     recovery_key, recovery_hash = await fresh_recovery_key()
     execute(
@@ -481,14 +482,14 @@ def make_reset_link(user_id: str, user: dict = Depends(current_user)):
     """A one-time token for a new password, to be put in a link the admin passes on. It lives 24 hours and a newer
     one replaces it. Only the hash is kept, so it is shown here and never again."""
     if not is_account_admin(user["id"]):
-        raise HTTPException(status_code=403, detail="Это может только админ")
+        raise ApiError(403, "adminOnly", "Это может только админ")
     RESET_LINKS_BY_USER.check(user["id"])
     rows = query("SELECT id, is_admin FROM users WHERE id = ?", (user_id,))
     if not rows:
-        raise HTTPException(status_code=404, detail="Нет такого пользователя")
+        raise ApiError(404, "noUser", "Нет такого пользователя")
     if rows[0]["is_admin"] and user_id != user["id"]:
         # Servers have one admin; with several (ADMINS), one must not be able to take another's account.
-        raise HTTPException(status_code=403, detail="Для другого админа ссылку сделать нельзя")
+        raise ApiError(403, "noAdminReset", "Для другого админа ссылку сделать нельзя")
     token = secrets.token_urlsafe(32)
     expires_at = now_ms() + RESET_TTL_MS
     execute(
@@ -522,7 +523,7 @@ def check_reset(body: ResetCheckIn, request: Request):
     RESET_BY_IP.check(client_ip(request))
     reset = find_reset(token_digest(body.token))
     if not reset:
-        raise HTTPException(status_code=404, detail=RESET_GONE)
+        raise ApiError(404, "resetGone", RESET_GONE)
     return {"name": reset["name"]}
 
 
@@ -534,14 +535,14 @@ async def reset_password(body: ResetIn, request: Request, response: Response):
     digest = token_digest(body.token)
     if not find_reset(digest):
         # Before the two scrypt runs below: a wrong token costs next to nothing.
-        raise HTTPException(status_code=404, detail=RESET_GONE)
+        raise ApiError(404, "resetGone", RESET_GONE)
     password_hash = await password_work(hash_password, body.password)
     recovery_key, recovery_hash = await fresh_recovery_key()
     with connect_db() as conn:
         # Whoever deletes the row owns the link, so two requests with the same token can't both set a password.
         reset = find_reset(digest)
         if not reset or not conn.execute("DELETE FROM password_resets WHERE token_hash = ?", (digest,)).rowcount:
-            raise HTTPException(status_code=404, detail=RESET_GONE)
+            raise ApiError(404, "resetGone", RESET_GONE)
         conn.execute(
             "UPDATE users SET password_hash = ?, recovery_hash = ?, token_version = token_version + 1 WHERE id = ?",
             (password_hash, recovery_hash, reset["user_id"]),
@@ -561,7 +562,7 @@ def blocked_ids(user_id: str) -> list[str]:
 async def block(other_id: str, user: dict = Depends(current_user)):
     """Block someone: the friendship (or request) goes, and you stop hearing from them."""
     if other_id == user["id"] or not query("SELECT 1 FROM users WHERE id = ?", (other_id,)):
-        raise HTTPException(status_code=404, detail="Нет такого пользователя")
+        raise ApiError(404, "noUser", "Нет такого пользователя")
     execute("INSERT OR IGNORE INTO blocks (user_id, blocked_id, created_at) VALUES (?, ?, ?)", (user["id"], other_id, now_ms()))
     execute("DELETE FROM friendships WHERE user_a = ? AND user_b = ?", ordered_pair(user["id"], other_id))
     await notify_friends_changed(user["id"], other_id)
@@ -580,12 +581,12 @@ async def unblock(other_id: str, user: dict = Depends(current_user)):
 async def upload_avatar(request: Request, user: dict = Depends(current_user)):
     """Raw image bytes in the body (any common format); stored as a 256px WebP."""
     if int(request.headers.get("content-length") or 0) > MAX_AVATAR_UPLOAD:
-        raise HTTPException(status_code=413, detail="Картинка больше 8 МБ")
+        raise ApiError(413, "imageOver8", "Картинка больше 8 МБ")
     data = await request.body()
     if not data:
-        raise HTTPException(status_code=400, detail="Пустой файл")
+        raise ApiError(400, "emptyFile", "Пустой файл")
     if len(data) > MAX_AVATAR_UPLOAD:
-        raise HTTPException(status_code=413, detail="Картинка больше 8 МБ")
+        raise ApiError(413, "imageOver8", "Картинка больше 8 МБ")
     AVATARS_BY_USER.check(user["id"])
     webp = await process_image(make_avatar, data)
     # A fresh random name per upload so browsers never show a cached old picture.
@@ -630,16 +631,16 @@ async def add_friend(body: FriendRequestIn, user: dict = Depends(current_user)):
     FRIEND_REQUESTS_BY_USER.check(user["id"])
     other = find_user_by_name(body.name)
     if not other:
-        raise HTTPException(status_code=404, detail="Нет пользователя с таким ником")
+        raise ApiError(404, "noUserByNick", "Нет пользователя с таким ником")
     if other["id"] == user["id"]:
-        raise HTTPException(status_code=400, detail="Себя добавить нельзя")
+        raise ApiError(400, "selfFriend", "Себя добавить нельзя")
     if blocked_between(user["id"], other["id"]):
-        raise HTTPException(status_code=403, detail="Нельзя: один из вас заблокировал другого")
+        raise ApiError(403, "blocked", "Нельзя: один из вас заблокировал другого")
     existing = friendship(user["id"], other["id"])
     if existing and existing["status"] == "accepted":
-        raise HTTPException(status_code=409, detail="Вы уже друзья")
+        raise ApiError(409, "alreadyFriends", "Вы уже друзья")
     if existing and existing["requested_by"] == user["id"]:
-        raise HTTPException(status_code=409, detail="Заявка уже отправлена")
+        raise ApiError(409, "requestSent", "Заявка уже отправлена")
     if existing:
         # They already asked us: sending a request back means accepting it.
         execute("UPDATE friendships SET status = 'accepted' WHERE user_a = ? AND user_b = ?", ordered_pair(user["id"], other["id"]))
@@ -657,7 +658,7 @@ async def add_friend(body: FriendRequestIn, user: dict = Depends(current_user)):
 async def accept_friend(other_id: str, user: dict = Depends(current_user)):
     existing = friendship(user["id"], other_id)
     if not existing or existing["status"] != "pending" or existing["requested_by"] == user["id"]:
-        raise HTTPException(status_code=404, detail="Нет такой заявки")
+        raise ApiError(404, "noRequest", "Нет такой заявки")
     execute("UPDATE friendships SET status = 'accepted' WHERE user_a = ? AND user_b = ?", ordered_pair(user["id"], other_id))
     await notify_friends_changed(user["id"], other_id)
     return friends_of(user["id"])
@@ -691,9 +692,9 @@ class SetupCodeIn(BaseModel):
 def check_setup_code(code: str, request: Request) -> None:
     SETUP_BY_IP.check(client_ip(request))
     if not setup_needed():
-        raise HTTPException(status_code=409, detail="Сервер уже настроен")
+        raise ApiError(409, "alreadySetup", "Сервер уже настроен")
     if not hmac.compare_digest(code.strip().encode(), INVITE_CODE.encode()):
-        raise HTTPException(status_code=403, detail="Код не подходит. Он в файле .env на сервере, строка INVITE_CODE")
+        raise ApiError(403, "badSetupCode", "Код не подходит. Он в файле .env на сервере, строка INVITE_CODE")
 
 
 @router.post("/api/setup/check")
@@ -717,21 +718,21 @@ async def setup(body: SetupIn, request: Request, response: Response):
     title = " ".join(body.serverName.split())
     check_nick(name)
     if not title:
-        raise HTTPException(status_code=400, detail="Пустое название сервера")
+        raise ApiError(400, "emptyServerName", "Пустое название сервера")
     user_id = uuid.uuid4().hex
     password_hash = await password_work(hash_password, body.password)
     try:
         with connect_db() as conn:
             # Inside the transaction: two tabs racing through setup can't both make an admin.
             if conn.execute("SELECT 1 FROM users LIMIT 1").fetchone():
-                raise HTTPException(status_code=409, detail="Сервер уже настроен")
+                raise ApiError(409, "alreadySetup", "Сервер уже настроен")
             conn.execute(
                 "INSERT INTO users (id, name, name_key, password_hash, color, created_at, is_admin) VALUES (?, ?, ?, ?, ?, ?, 1)",
                 (user_id, name, name.casefold(), password_hash, secrets.choice(USER_COLORS), now_ms()),
             )
             conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('server_name', ?)", (title,))
     except sqlite3.IntegrityError:
-        raise HTTPException(status_code=409, detail="Сервер уже настроен")
+        raise ApiError(409, "alreadySetup", "Сервер уже настроен")
     user = public_user(query("SELECT * FROM users WHERE id = ?", (user_id,))[0])
     set_media_cookie(request, response, user_id)
     await sio.emit("user:new", user)
