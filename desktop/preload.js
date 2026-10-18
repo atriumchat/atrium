@@ -24,6 +24,11 @@ contextBridge.exposeInMainWorld('gomexDesktop', {
       ipcRenderer.on('ptt:state', (_event, down) => callback(Boolean(down)));
     },
   },
+  /** The language choice shared with the desktop's tray menu: 'ru', 'en' or null (follow the system). A change made in the tray reaches the page as a `gomex-language` event on window, detail = the new choice. */
+  language: {
+    get: () => ipcRenderer.invoke('language:get'),
+    set: (lang) => ipcRenderer.invoke('language:set', lang === 'ru' || lang === 'en' ? lang : null),
+  },
   /** The app updating itself (since 1.2.0): its state, a check now, and restart-to-install. */
   update: {
     get: () => ipcRenderer.invoke('update:get'),

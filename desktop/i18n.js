@@ -16,6 +16,8 @@
       'tray.updateCheck': 'Проверить обновления',
       'tray.version': 'Версия {version}',
       'tray.quit': 'Выйти из Gomex',
+      'tray.language': 'Язык',
+      'tray.langSystem': 'Как в системе',
 
       // Context menu
       'menu.noSuggestions': 'Нет вариантов',
@@ -282,6 +284,8 @@
       'tray.updateCheck': 'Check for updates',
       'tray.version': 'Version {version}',
       'tray.quit': 'Quit Gomex',
+      'tray.language': 'Language',
+      'tray.langSystem': 'System',
 
       'menu.noSuggestions': 'No suggestions',
       'menu.addWord': 'Add to dictionary',

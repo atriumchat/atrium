@@ -113,4 +113,13 @@ ipcMain.handle('unreachable:retry', async (event) => {
   if (current?.cover && event.sender === current.cover.webContents) await current.retry();
 });
 
-module.exports = { answers, open };
+/** The language changed: the "Server unreachable" page, if it's up, reloads in it. */
+function relocalize() {
+  const contents = current?.cover?.webContents;
+  if (!contents || contents.isDestroyed()) return;
+  const url = new URL(contents.getURL());
+  url.searchParams.set('lang', i18n.getLang());
+  contents.loadURL(url.href);
+}
+
+module.exports = { answers, open, relocalize };
