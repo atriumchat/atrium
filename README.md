@@ -30,7 +30,6 @@ IP and root password.
 ## Features
 
 - Text channels, direct messages and group chats; replies, mentions, reactions, files by drag and drop.
-- Search through the whole history (SQLite FTS5).
 - Voice rooms, camera and screen share. A room shows who is in it; joining takes one click.
 - Push-to-talk on any key or mouse button, also while the window is minimized.
 - Noise suppression with three levels: off, the browser's own, and strong (RNNoise, a small neural network that runs
@@ -88,7 +87,7 @@ flowchart LR
 
 - `DOMAIN` is the cover page, `app.DOMAIN` the app, `<turn>.DOMAIN` the call relay with a neutral name (`media`,
   `cdn`, `static`…) that the installer picks at random.
-- Constraints kept: SQLite, one Python process, no new services. Search is FTS5 in SQLite, files live on disk.
+- Constraints kept: SQLite, one Python process, no new services. Files live on disk.
 
 | Path | What's there |
 |---|---|
