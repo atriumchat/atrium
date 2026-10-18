@@ -4,6 +4,7 @@
 // Main process only.
 const { app, ipcMain, net, session, WebContentsView } = require('electron');
 const path = require('node:path');
+const i18n = require('./i18n');
 
 const EVERY = 5000;
 
@@ -58,7 +59,7 @@ function open(win, url) {
       cover.setBackgroundColor('#0b0b0d');
       win.contentView.addChildView(cover);
       fit();
-      cover.webContents.loadFile(path.join(__dirname, 'unreachable.html'), { query: { host: new URL(url).host } });
+      cover.webContents.loadFile(path.join(__dirname, 'unreachable.html'), { query: { lang: i18n.getLang(), host: new URL(url).host } });
       current.cover = cover;
     }
     later();
@@ -107,7 +108,7 @@ app.on('certificate-error', (event, contents, url, _error, _certificate, callbac
   if (current?.contents === contents && url.startsWith(current.origin)) current.show(url);
 });
 
-// «Повторить» on the page.
+// "Retry" on the page.
 ipcMain.handle('unreachable:retry', async (event) => {
   if (current?.cover && event.sender === current.cover.webContents) await current.retry();
 });

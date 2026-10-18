@@ -1,4 +1,4 @@
-// Bridge for the "Сервер не открывается" page only.
+// Bridge for the "Server unreachable" page only.
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('gomexUnreachable', {

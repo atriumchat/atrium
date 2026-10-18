@@ -8,7 +8,7 @@
 // inside the app: neither the server, a "new server address" nor whoever serves update.json can make us run
 // anything the release key didn't sign.
 // deploy/release-desktop.sh builds, signs and publishes it. We check at start and every few hours, download this
-// platform's file in the background and check its SHA-256, then install on "Перезапустить" or when the app quits:
+// platform's file in the background and check its SHA-256, then install on "Restart" or when the app quits:
 // - macOS: the new Gomex.app is copied out of the DMG next to the running one, and a small script swaps the two
 //   once we've exited. (Electron's built-in updater, Squirrel, only accepts a paid Developer ID signature.)
 // - Windows: the installer runs silently and starts the new version.
@@ -19,6 +19,7 @@ const { once } = require('node:events');
 const fs = require('node:fs');
 const path = require('node:path');
 const { promisify } = require('node:util');
+const { t } = require('./i18n');
 
 const run = promisify(execFile);
 const CHECK_EVERY = 4 * 60 * 60 * 1000;
@@ -39,7 +40,7 @@ const MANIFEST_TIMEOUT = 30 * 1000;
  * this build has no update-key.pem and so can never update, which the page shows for good, not just on a check)
  */
 let state = { status: 'idle', current: app.getVersion() };
-const NO_KEY = { status: 'error', code: 'no-key', error: 'Нет ключа для проверки обновлений' };
+const noKey = () => ({ status: 'error', code: 'no-key', error: t('update.noKey') });
 let manifestUrl = '';
 let onChange = () => {};
 /**
@@ -81,15 +82,15 @@ function releaseKey() {
 
 /** update.json → the manifest it carries, if its signature checks out with `key`; throws otherwise. */
 function verifyManifest(body, key) {
-  if (!key) throw new Error('Нет ключа для проверки обновлений');
-  if (typeof body?.signed !== 'string' || typeof body?.signature !== 'string') throw new Error('Обновление без подписи');
+  if (!key) throw new Error(t('update.noKey'));
+  if (typeof body?.signed !== 'string' || typeof body?.signature !== 'string') throw new Error(t('update.unsigned'));
   let ok = false;
   try {
     ok = verify(null, Buffer.from(body.signed, 'utf8'), key, Buffer.from(body.signature, 'base64'));
   } catch {
     ok = false;
   }
-  if (!ok) throw new Error('Подпись обновления не сошлась');
+  if (!ok) throw new Error(t('update.badSignature'));
   return JSON.parse(body.signed);
 }
 
@@ -99,21 +100,21 @@ function verifyManifest(body, key) {
  */
 function pickUpdate(manifest, manifestUrl, platform, current) {
   const version = manifest?.version;
-  if (typeof version !== 'string' || !/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Неверная версия обновления');
+  if (typeof version !== 'string' || !/^\d+\.\d+\.\d+$/.test(version)) throw new Error(t('update.badVersion'));
   const file = manifest.files?.[platform];
   if (!isNewer(version, current) || !file) return null;
   const url = new URL(String(file.url), manifestUrl);
   // Only next to the manifest: …/releases/download/desktop/update.json lists files under …/releases/download/.
   const base = new URL('..', manifestUrl);
   if (url.protocol !== 'https:' || url.origin !== base.origin || !url.pathname.startsWith(base.pathname)) {
-    throw new Error('Чужой адрес обновления');
+    throw new Error(t('update.foreignUrl'));
   }
   const ext = path.extname(url.pathname).toLowerCase();
-  if (!ext || ext !== EXTENSIONS[platform.split('-')[0]]) throw new Error('Неверный тип файла обновления');
+  if (!ext || ext !== EXTENSIONS[platform.split('-')[0]]) throw new Error(t('update.badType'));
   const sha256 = String(file.sha256).toLowerCase();
   const size = Number(file.size);
   if (!/^[0-9a-f]{64}$/.test(sha256) || !Number.isSafeInteger(size) || size <= 0 || size > MAX_SIZE) {
-    throw new Error('Неверное описание файла обновления');
+    throw new Error(t('update.badFile'));
   }
   return { version, downloadUrl: url.href, ext, sha256, size };
 }
@@ -147,8 +148,8 @@ async function sha256(file) {
 
 async function download(url, dest, expected) {
   if (fs.existsSync(dest) && (await sha256(dest)) === expected.sha256) return; // fetched on an earlier run
-  const idle = deadline(IDLE_TIMEOUT, 'Сервер перестал отдавать обновление', true);
-  const overall = deadline(DOWNLOAD_CAP, 'Обновление скачивается слишком долго');
+  const idle = deadline(IDLE_TIMEOUT, t('update.stalled'), true);
+  const overall = deadline(DOWNLOAD_CAP, t('update.tooLong'));
   const signal = AbortSignal.any([idle.signal, overall.signal]);
   const part = `${dest}.part`;
   let reader = null;
@@ -157,7 +158,7 @@ async function download(url, dest, expected) {
   const aborted = whenAborted(signal);
   try {
     const response = await Promise.race([net.fetch(url, { cache: 'no-store', signal }), aborted]);
-    if (!response.ok || !response.body) throw new Error(`Сервер ответил ${response.status}`);
+    if (!response.ok || !response.body) throw new Error(t('update.status', { status: response.status }));
     reader = response.body.getReader();
     const out = fs.createWriteStream(part);
     let writeError = null;
@@ -173,7 +174,7 @@ async function download(url, dest, expected) {
         if (done) break;
         idle.touch();
         got += value.length;
-        if (got > expected.size) throw new Error('Файл обновления больше, чем должен быть');
+        if (got > expected.size) throw new Error(t('update.tooBig'));
         hash.update(value);
         if (writeError) throw writeError;
         if (!out.write(value)) await once(out, 'drain');
@@ -189,7 +190,7 @@ async function download(url, dest, expected) {
     }
     if (signal.aborted) throw signal.reason;
     if (writeError) throw writeError;
-    if (got !== expected.size || hash.digest('hex') !== expected.sha256) throw new Error('Файл обновления пришёл повреждённым');
+    if (got !== expected.size || hash.digest('hex') !== expected.sha256) throw new Error(t('update.corrupt'));
     fs.renameSync(part, dest);
   } catch (e) {
     fs.rmSync(part, { force: true });
@@ -235,7 +236,7 @@ async function stageMac(dmg, version, bundle) {
   await attach(dmg, mount);
   try {
     const inner = fs.readdirSync(mount).find((name) => name.endsWith('.app'));
-    if (!inner) throw new Error('В образе нет приложения');
+    if (!inner) throw new Error(t('update.noApp'));
     fs.rmSync(staged, { recursive: true, force: true });
     await run('ditto', [path.join(mount, inner), staged]);
   } finally {
@@ -245,7 +246,7 @@ async function stageMac(dmg, version, bundle) {
   const plist = path.join(staged, 'Contents', 'Info.plist');
   const { stdout } = await run('plutil', ['-extract', 'CFBundleShortVersionString', 'raw', '-o', '-', plist]);
   try {
-    if (stdout.trim() !== version) throw new Error(`В образе версия ${stdout.trim()}, а не ${version}`);
+    if (stdout.trim() !== version) throw new Error(t('update.wrongVersion', { found: stdout.trim(), expected: version }));
     await run('codesign', ['--verify', '--deep', staged]); // a damaged copy fails here
   } catch (e) {
     fs.rmSync(staged, { recursive: true, force: true });
@@ -260,11 +261,11 @@ function readyState() {
 }
 
 async function fetchManifest() {
-  const timeout = deadline(MANIFEST_TIMEOUT, 'Сервер обновлений не отвечает');
+  const timeout = deadline(MANIFEST_TIMEOUT, t('update.manifestSilent'));
   const aborted = whenAborted(timeout.signal);
   try {
     const response = await Promise.race([net.fetch(manifestUrl, { cache: 'no-store', signal: timeout.signal }), aborted]);
-    if (!response.ok) throw new Error(`Сервер ответил ${response.status}`);
+    if (!response.ok) throw new Error(t('update.status', { status: response.status }));
     return await Promise.race([response.json(), aborted]);
   } finally {
     timeout.clear();
@@ -274,7 +275,7 @@ async function fetchManifest() {
 async function checkNow() {
   // Built without the release key (electron-builder run by hand, not release-desktop.sh): nothing could ever
   // verify, so don't fetch at all and keep saying why.
-  if (!releaseKey()) return set(NO_KEY);
+  if (!releaseKey()) return set(noKey());
   // An update that's already waiting stays on screen while we look for a newer one.
   if (!ready) set({ status: 'checking' });
   const manifest = verifyManifest(await fetchManifest(), releaseKey());
@@ -348,7 +349,7 @@ function startInstall(relaunch) {
   return true;
 }
 
-/** "Перезапустить": install and reopen, or open the download when this copy can't update itself. */
+/** "Restart": install and reopen, or open the download when this copy can't update itself. */
 function install() {
   if (ready?.manual) {
     if (ready.downloadUrl.startsWith('https://')) shell.openExternal(ready.downloadUrl);
@@ -367,7 +368,7 @@ function init(options) {
   onChange = options.onChange;
   if (!app.isPackaged) return;
   // Known at once, no need to wait for the first check: the page shows it from the start.
-  if (!releaseKey()) set(NO_KEY);
+  if (!releaseKey()) set(noKey());
   setTimeout(check, 15_000);
   setInterval(check, CHECK_EVERY);
 }

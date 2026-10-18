@@ -4,7 +4,7 @@ const REFRESH = 2000;
 const $ = (id) => document.getElementById(id);
 const picker = window.gomexPicker;
 
-const NOTES = { window: 'Нет окон для показа', screen: 'Нет экранов', error: 'Не удалось получить список' };
+const NOTES = { window: t('picker.noWindows'), screen: t('picker.noScreens'), error: t('picker.failed') };
 
 // One list per tab. A card is made once and then only updated, so a refresh never moves what the pointer is on.
 const views = {

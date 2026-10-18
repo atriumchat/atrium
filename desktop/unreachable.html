@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'self'" />
@@ -95,11 +95,13 @@
         <circle cx="82" cy="82" r="71.97" fill="none" stroke="currentColor" stroke-width="13.7" />
         <path fill="currentColor" d="M116.1 78V120.9H107.1L105 111.3Q95.4 122.8 80 122.8Q63.1 122.8 52.5 111.3Q42 99.8 42 81.3Q42 63.2 52.6 51.1Q63.2 39 81.2 39Q94.3 39 104 46.3Q113.7 53.6 115.1 66.3H101.5Q100.2 59 94.8 54.9Q89.3 50.8 81.1 50.8Q69.5 50.8 62.8 58.9Q56.2 67 56.2 81.1Q56.2 95.3 62.9 103.4Q69.6 111.4 81.5 111.4Q92 111.4 97.7 104.9Q103.4 98.4 103.4 88.8H81.8V78Z" />
       </svg>
-      <h1>Сервер не открывается</h1>
+      <h1 data-i18n="unreachable.title"></h1>
       <span id="host"></span>
-      <span class="again"><span class="spinner"></span>Пробуем снова каждые 5 секунд</span>
-      <button id="retry" type="button">Повторить</button>
+      <span class="again"><span class="spinner"></span><span data-i18n="unreachable.again"></span></span>
+      <button id="retry" type="button" data-i18n="unreachable.retry"></button>
     </main>
+    <script src="i18n.js"></script>
+    <script src="i18n-page.js"></script>
     <script src="unreachable.js"></script>
   </body>
 </html>

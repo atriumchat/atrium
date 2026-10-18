@@ -1,4 +1,4 @@
-// Bridge for the "Адрес сервера" window only.
+// Bridge for the "Server address" window only.
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('gomexAddress', {
@@ -6,6 +6,6 @@ contextBridge.exposeInMainWorld('gomexAddress', {
   save: (url) => ipcRenderer.invoke('address:save', String(url)),
   /** Opens the server install guide in the browser. */
   guide: () => ipcRenderer.invoke('address:guide'),
-  /** "Свой сервер": opens the window that sets one up from here. */
+  /** "Your own server": opens the window that sets one up from here. */
   setup: () => ipcRenderer.invoke('address:setup'),
 });

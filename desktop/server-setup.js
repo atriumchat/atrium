@@ -1,4 +1,4 @@
-// "Свой сервер": a fresh VPS becomes a Gomex server from the app (onboarding.html), with no terminal.
+// "Your own server": a fresh VPS becomes a Gomex server from the app (onboarding.html), with no terminal.
 //   - SSH in with the address and root password from the hosting company's e-mail; the password is only kept in
 //     memory for this window. The installer then switches password login off, and the app keeps its own key.
 //   - The address: a free name on deSEC (name.dedyn.io), registered and pointed here through deSEC's API, or the
@@ -9,6 +9,7 @@ const { Client, utils } = require('ssh2');
 const crypto = require('node:crypto');
 const dns = require('node:dns');
 const fs = require('node:fs');
+const { t } = require('./i18n');
 
 const DESEC = 'https://desec.io/api/v1';
 const INSTALLER_URL = 'https://github.com/gomex-inc/gomex/releases/latest/download/install.sh';
@@ -28,12 +29,12 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 /* ---------- SSH ---------- */
 
 function sshError(error) {
-  if (error?.level === 'client-authentication') return { error: 'Неверный логин или пароль' };
-  if (['ENOTFOUND', 'EAI_AGAIN'].includes(error?.code)) return { error: 'Такого адреса нет', field: 'host' };
+  if (error?.level === 'client-authentication') return { error: t('ssh.badLogin') };
+  if (['ENOTFOUND', 'EAI_AGAIN'].includes(error?.code)) return { error: t('ssh.noHost'), field: 'host' };
   if (['ECONNREFUSED', 'ETIMEDOUT', 'EHOSTUNREACH', 'ENETUNREACH'].includes(error?.code) || /timed out/i.test(error?.message ?? '')) {
-    return { error: 'Сервер не отвечает', field: 'host' };
+    return { error: t('ssh.noReply'), field: 'host' };
   }
-  return { error: `Не подключиться: ${error?.message ?? error}` };
+  return { error: t('ssh.cantConnect', { message: error?.message ?? error }) };
 }
 
 /** Runs a command; streams its output lines to `onLine` and resolves with the exit code and the output's tail. */
@@ -108,7 +109,7 @@ async function connect({ host, user, password }) {
   const facts = Object.fromEntries(tail.map((line) => line.split(/=(.*)/s).slice(0, 2)));
   if (facts.UID !== '0') {
     conn.end();
-    return { error: 'Нужен вход под root' };
+    return { error: t('ssh.needRoot') };
   }
   const memory = Number(facts.MEM) / 1024;
   const disk = Number(facts.DISK) / 1024;
@@ -117,7 +118,7 @@ async function connect({ host, user, password }) {
     facts: {
       ip: address,
       os: [facts.OS, facts.ARCH].filter(Boolean).join(' · '),
-      size: `Память ${memory.toFixed(memory < 10 ? 1 : 0)} ГБ · диск ${Math.round(disk)} ГБ`,
+      size: t('ssh.size', { memory: memory.toFixed(memory < 10 ? 1 : 0), disk: Math.round(disk) }),
     },
   };
 }
@@ -165,7 +166,7 @@ async function api(path, { method = 'GET', body, token } = {}) {
  */
 async function register({ name, email }) {
   name = String(name).toLowerCase();
-  if (!NAME.test(name)) return { error: 'Латиница, цифры и дефис, от 3 символов' };
+  if (!NAME.test(name)) return { error: t('desec.nameRule') };
   const password = crypto.randomBytes(24).toString('base64url');
   let answer;
   try {
@@ -179,7 +180,7 @@ async function register({ name, email }) {
       },
     });
   } catch {
-    return { error: 'deSEC не отвечает, попробуйте ещё раз' };
+    return { error: t('desec.down') };
   }
   if (answer.status === 202) {
     desec = { email: String(email).trim(), password, name };
@@ -189,15 +190,15 @@ async function register({ name, email }) {
   // deSEC's own words for the field it refused ({"domain": ["…"]}), so the person sees the real reason.
   const said = (field) => [json[field]].flat(2).filter((x) => typeof x === 'string').join(' ');
   console.log('deSEC sign-up refused:', answer.status, answer.text.slice(0, 400));
-  if (answer.status === 429) return { error: 'Слишком часто, подождите минуту' };
-  if (json.email) return { error: `Почта не подходит. deSEC: ${said('email')}` };
+  if (answer.status === 429) return { error: t('desec.tooOften') };
+  if (json.email) return { error: t('desec.badEmail', { said: said('email') }) };
   // 400 {"domain": ["This domain name conflicts with an existing domain, or is disallowed by policy."]}
   if (json.domain && /conflicts with an existing domain|disallowed by policy/i.test(said('domain'))) {
-    return { error: 'Имя занято, нужно другое' };
+    return { error: t('desec.nameTaken') };
   }
-  if (json.domain) return { error: `Имя не подходит. deSEC: ${said('domain')}` };
-  if (json.code === 'registration_denied') return { error: 'deSEC отказал в регистрации' };
-  return { error: `deSEC: ${JSON.stringify(json).slice(0, 160)}` };
+  if (json.domain) return { error: t('desec.badName', { said: said('domain') }) };
+  if (json.code === 'registration_denied') return { error: t('desec.denied') };
+  return { error: t('desec.other', { said: JSON.stringify(json).slice(0, 160) }) };
 }
 
 /**
@@ -205,7 +206,7 @@ async function register({ name, email }) {
  * everything under it (app., the relay) at the server.
  */
 async function waitMail({ ip }) {
-  if (!desec) return { error: 'Начните заново: имя и почта' };
+  if (!desec) return { error: t('desec.startOver') };
   mailWait = { stop: false };
   const me = mailWait;
   const deadline = Date.now() + 12 * 60 * 60 * 1000;
@@ -222,7 +223,7 @@ async function waitMail({ ip }) {
     }
     await wait(5000);
   }
-  if (!token) return { error: me.stop ? 'Отменено' : 'Ссылка из письма устарела, начните заново' };
+  if (!token) return { error: me.stop ? t('desec.cancelled') : t('desec.linkExpired') };
   const domain = `${desec.name}.dedyn.io`;
   // The domain appears with the activation; give it a moment if the login was quicker.
   for (let i = 0; i < 12; i++) {
@@ -244,14 +245,14 @@ async function pointAt({ domain, token, ip }) {
   try {
     set = await api(`/domains/${domain}/rrsets/`, { method: 'PUT', body: records, token });
   } catch {
-    return { error: 'deSEC не отвечает, попробуйте ещё раз' };
+    return { error: t('desec.down') };
   }
   if (set.status === 200) return null;
   console.log('deSEC rrsets refused:', set.status, set.text.slice(0, 400));
-  if (set.status === 404) return { error: 'Этого адреса на deSEC больше нет' };
-  if (set.status === 401 || set.status === 403) return { error: 'deSEC не пускает к этому адресу' };
-  if (set.status === 429) return { error: 'Слишком часто, подождите минуту' };
-  return { error: `deSEC не принял адрес сервера (${set.status})` };
+  if (set.status === 404) return { error: t('desec.gone') };
+  if (set.status === 401 || set.status === 403) return { error: t('desec.noAccess') };
+  if (set.status === 429) return { error: t('desec.tooOften') };
+  return { error: t('desec.notAccepted', { status: set.status }) };
 }
 
 /**
@@ -263,14 +264,14 @@ async function reuse({ email, password, name, ip }) {
   try {
     login = await api('/auth/login/', { method: 'POST', body: { email, password } });
   } catch {
-    return { error: 'deSEC не отвечает, попробуйте ещё раз' };
+    return { error: t('desec.down') };
   }
   if (login.status !== 200) {
     console.log('deSEC login refused:', login.status, login.text.slice(0, 400));
-    if (login.status === 429) return { error: 'Слишком часто, подождите минуту' };
-    if (login.status === 400 || login.status === 401) return { error: 'deSEC не принял сохранённый вход' };
-    if (login.status === 403) return { error: 'deSEC не пускает в этот аккаунт' };
-    return { error: `deSEC: ${login.status}` };
+    if (login.status === 429) return { error: t('desec.tooOften') };
+    if (login.status === 400 || login.status === 401) return { error: t('desec.savedRejected') };
+    if (login.status === 403) return { error: t('desec.accountDenied') };
+    return { error: t('desec.other', { said: login.status }) };
   }
   const domain = `${name}.dedyn.io`;
   const failed = await pointAt({ domain, token: login.json.token, ip });
@@ -285,7 +286,7 @@ function cancelMail() {
 /** A domain of one's own: its three names must already point at the server. */
 async function checkDomain({ domain, turn, ip }) {
   domain = String(domain).toLowerCase();
-  if (!DOMAIN.test(domain) || !TURN.test(turn)) return { error: 'Не похоже на домен' };
+  if (!DOMAIN.test(domain) || !TURN.test(turn)) return { error: t('dns.notDomain') };
   const missing = [];
   for (const name of [domain, `app.${domain}`, `${turn}.${domain}`]) {
     try {
@@ -295,7 +296,7 @@ async function checkDomain({ domain, turn, ip }) {
       missing.push(name);
     }
   }
-  return missing.length ? { error: `Ещё нет записей: ${missing.join(', ')}` } : { ok: true };
+  return missing.length ? { error: t('dns.missing', { names: missing.join(', ') }) } : { ok: true };
 }
 
 /* ---------- the install ---------- */
@@ -306,9 +307,9 @@ async function checkDomain({ domain, turn, ip }) {
  * (its key, the deSEC account) before anything changes on it.
  */
 async function install({ domain, turn, installer }, report, save) {
-  if (!ssh) return report({ state: 'fail', why: 'Нет связи с сервером, подключитесь снова' });
+  if (!ssh) return report({ state: 'fail', why: t('install.noSession') });
   domain = String(domain).toLowerCase();
-  if (!DOMAIN.test(domain) || !TURN.test(turn)) return report({ state: 'fail', why: 'Адрес не подходит' });
+  if (!DOMAIN.test(domain) || !TURN.test(turn)) return report({ state: 'fail', why: t('install.badAddress') });
   const { conn } = ssh;
   // The app's own key: the installer adds it for root and switches password login off.
   const key = utils.generateKeyPairSync('ed25519', { comment: 'gomex-app' });
@@ -318,7 +319,7 @@ async function install({ domain, turn, installer }, report, save) {
     ? exec(conn, 'cat > /root/gomex-install.sh', { stdin: fs.readFileSync(installer) })
     : exec(conn, `curl -fsSL --retry 3 ${sq(INSTALLER_URL)} -o /root/gomex-install.sh`);
   const fetched = await fetchInstaller;
-  if (fetched.code !== 0) return report({ state: 'fail', why: 'Не скачать установщик', tail: fetched.tail });
+  if (fetched.code !== 0) return report({ state: 'fail', why: t('install.noInstaller'), tail: fetched.tail });
 
   const env = [
     'GOMEX_YES=1',
@@ -364,7 +365,7 @@ async function install({ domain, turn, installer }, report, save) {
     },
   }).finally(() => clearInterval(ticker));
   if (ready) return report({ state: 'ready', url: ready });
-  report({ state: 'fail', why: why || `Установщик остановился (код ${code})`, tail });
+  report({ state: 'fail', why: why || t('install.stopped', { code }), tail });
 }
 
 module.exports = { connect, close, register, reuse, waitMail, cancelMail, checkDomain, install };

@@ -30,8 +30,10 @@ const ptt = require('./ptt');
 const serverSetup = require('./server-setup');
 const screenPicker = require('./screen-picker');
 const reachable = require('./reachable');
+const i18n = require('./i18n');
+const { t } = i18n;
 
-// The server address can be changed from the tray ("Адрес сервера…") if Gomex ever has to move to a
+// The server address can be changed from the tray ("Server address…") if Gomex ever has to move to a
 // new domain — no reinstall. Stored in the app's settings folder.
 const CONFIG_FILE = path.join(app.getPath('userData'), 'config.json');
 function readConfig() {
@@ -59,7 +61,7 @@ if (PENDING !== undefined) {
     // Not fatal: the invite would just open again next time.
   }
 }
-// Where "Свой сервер" on the first start leads.
+// Where "Your own server" on the first start leads.
 const SERVER_GUIDE = 'https://gomex.party/server-install';
 // The app's own updates come from the project's GitHub Releases whatever server it talks to, and only signed ones
 // install (updater.js). release-desktop.sh puts the manifest's address into package.json, like the server's; a build
@@ -148,22 +150,22 @@ function showTextMenu(params) {
     for (const word of params.dictionarySuggestions.slice(0, 5)) {
       items.push({ label: word, click: () => contents.replaceMisspelling(word) });
     }
-    if (items.length === 0) items.push({ label: 'Нет вариантов', enabled: false });
+    if (items.length === 0) items.push({ label: t('menu.noSuggestions'), enabled: false });
     items.push(
-      { label: 'Добавить в словарь', click: () => contents.session.addWordToSpellCheckerDictionary(params.misspelledWord) },
+      { label: t('menu.addWord'), click: () => contents.session.addWordToSpellCheckerDictionary(params.misspelledWord) },
       { type: 'separator' },
     );
   }
   if (params.isEditable) {
     items.push(
-      { label: 'Вырезать', role: 'cut', enabled: editFlags.canCut },
-      { label: 'Копировать', role: 'copy', enabled: editFlags.canCopy },
-      { label: 'Вставить', role: 'paste', enabled: editFlags.canPaste },
+      { label: t('menu.cut'), role: 'cut', enabled: editFlags.canCut },
+      { label: t('menu.copy'), role: 'copy', enabled: editFlags.canCopy },
+      { label: t('menu.paste'), role: 'paste', enabled: editFlags.canPaste },
       { type: 'separator' },
-      { label: 'Выделить всё', role: 'selectAll', enabled: editFlags.canSelectAll },
+      { label: t('menu.selectAll'), role: 'selectAll', enabled: editFlags.canSelectAll },
     );
   } else if (params.selectionText) {
-    items.push({ label: 'Копировать', role: 'copy', enabled: editFlags.canCopy });
+    items.push({ label: t('menu.copy'), role: 'copy', enabled: editFlags.canCopy });
   }
   if (items.length > 0) Menu.buildFromTemplate(items).popup();
 }
@@ -233,30 +235,30 @@ function updateTrayMenu() {
   const update = updater.getState();
   const updateItem =
     update.status === 'ready'
-      ? { label: `Перезапустить и обновить до ${update.version}`, click: () => updater.install() }
+      ? { label: t('tray.updateReady', { version: update.version }), click: () => updater.install() }
       : update.status === 'manual'
-        ? { label: `Скачать Gomex ${update.version}…`, click: () => updater.install() }
+        ? { label: t('tray.updateManual', { version: update.version }), click: () => updater.install() }
         : update.status === 'checking'
-          ? { label: 'Проверяем обновления…', enabled: false }
+          ? { label: t('tray.updateChecking'), enabled: false }
           : update.status === 'downloading'
-            ? { label: `Скачиваем обновление… ${Math.round((update.progress ?? 0) * 100)}%`, enabled: false }
-            : { label: 'Проверить обновления', click: () => updater.check() };
+            ? { label: t('tray.updateDownloading', { percent: Math.round((update.progress ?? 0) * 100) }), enabled: false }
+            : { label: t('tray.updateCheck'), click: () => updater.check() };
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: 'Открыть Gomex', click: showWindow },
-      { label: 'Адрес сервера…', click: () => openAddressWindow() },
+      { label: t('tray.open'), click: showWindow },
+      { label: t('tray.address'), click: () => openAddressWindow() },
       {
-        label: 'Запускать при входе в систему',
+        label: t('tray.login'),
         type: 'checkbox',
         checked: app.getLoginItemSettings().openAtLogin,
         click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked, openAsHidden: true }),
       },
       { type: 'separator' },
       updateItem,
-      { label: `Версия ${app.getVersion()}`, enabled: false },
+      { label: t('tray.version', { version: app.getVersion() }), enabled: false },
       { type: 'separator' },
       {
-        label: 'Выйти из Gomex',
+        label: t('tray.quit'),
         click: () => {
           quitting = true;
           app.quit();
@@ -278,13 +280,13 @@ function openAddressWindow({ firstRun = false } = {}) {
     resizable: false,
     minimizable: false,
     maximizable: false,
-    title: firstRun ? 'Gomex' : 'Адрес сервера',
+    title: firstRun ? 'Gomex' : t('address.windowTitle'),
     backgroundColor: '#0b0b0d',
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'address-preload.js'), contextIsolation: true, sandbox: true },
   });
   addressWindow.loadFile(path.join(__dirname, 'address.html'), {
-    query: { current: APP_URL, first: firstRun ? '1' : '', placeholder: DEFAULT_URL || 'https://app.example.com' },
+    query: { lang: i18n.getLang(), current: APP_URL, first: firstRun ? '1' : '', placeholder: DEFAULT_URL || 'https://app.example.com' },
   });
   addressWindow.on('closed', () => {
     addressWindow = null;
@@ -293,16 +295,16 @@ function openAddressWindow({ firstRun = false } = {}) {
 
 ipcMain.handle('address:save', (event, value) => {
   // Only the local address window may change where the app points.
-  if (!event.senderFrame?.url.startsWith('file://')) return 'Нельзя';
+  if (!event.senderFrame?.url.startsWith('file://')) return t('address.denied');
   let url;
   // "chat.example.com" is what people paste most; it means https.
   const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? value : `https://${value}`;
   try {
     url = new URL(withScheme);
   } catch {
-    return 'Это не похоже на адрес. Пример: https://app.example.com';
+    return t('address.notAddress');
   }
-  if (url.protocol !== 'https:') return 'Адрес должен начинаться с https://';
+  if (url.protocol !== 'https:') return t('address.needHttps');
   fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true });
   // A pasted invite link (…/?invite=CODE) is opened once on the next start; a bare address just opens the app.
   const rest = url.pathname + url.search;
@@ -318,7 +320,7 @@ ipcMain.handle('address:guide', (event) => {
   shell.openExternal(SERVER_GUIDE);
 });
 
-/* ---------- "Свой сервер": setting up a server from the app (onboarding.html, server-setup.js) ---------- */
+/* ---------- "Your own server": setting up a server from the app (onboarding.html, server-setup.js) ---------- */
 
 /** @type {BrowserWindow | null} */
 let setupWindow = null;
@@ -332,12 +334,12 @@ function openSetupWindow() {
     height: 680,
     minWidth: 420,
     minHeight: 600,
-    title: 'Свой сервер',
+    title: t('setup.title'),
     backgroundColor: '#0c0c0e',
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'onboarding-preload.js'), contextIsolation: true, sandbox: true },
   });
-  setupWindow.loadFile(path.join(__dirname, 'onboarding.html'));
+  setupWindow.loadFile(path.join(__dirname, 'onboarding.html'), { query: { lang: i18n.getLang() } });
   setupWindow.on('closed', () => {
     setupWindow = null;
     addressWatch = null;
@@ -346,7 +348,7 @@ function openSetupWindow() {
   });
 }
 
-// "Свой сервер" on the first start: the setup window takes the place of the small one.
+// "Your own server" on the first start: the setup window takes the place of the small one.
 ipcMain.handle('address:setup', (event) => {
   if (!event.senderFrame?.url.startsWith('file://')) return;
   openSetupWindow();
@@ -373,7 +375,7 @@ function remember(domain, fields) {
 /** The setup window's calls; nothing else may make them. */
 const fromSetup = (event) => setupWindow && event.sender === setupWindow.webContents;
 const setupCall = (name, fn) =>
-  ipcMain.handle(`setup:${name}`, (event, ...args) => (fromSetup(event) ? fn(...args) : { error: 'Нельзя' }));
+  ipcMain.handle(`setup:${name}`, (event, ...args) => (fromSetup(event) ? fn(...args) : { error: t('setup.denied') }));
 
 let freeAccount = null;
 setupCall('open-external', (url) => {
@@ -385,7 +387,7 @@ setupCall('wait-mail', async (where) => {
   const answer = await serverSetup.waitMail(where);
   if (answer.ok) {
     freeAccount = { domain: answer.domain, account: answer.account };
-    callBack('Почта подтверждена', 'Адрес готов, можно продолжать');
+    callBack(t('note.mailTitle'), t('note.mailBody'));
   }
   return answer.ok ? { ok: true } : answer;
 });
@@ -435,13 +437,13 @@ function savedDesec() {
 setupCall('saved-address', () => ({ domain: savedDesec()?.domain ?? null }));
 setupCall('use-saved', async ({ ip }) => {
   const saved = savedDesec();
-  if (!saved) return { error: 'Сохранённого адреса нет' };
+  if (!saved) return { error: t('setup.noSaved') };
   const answer = await serverSetup.reuse({ ...saved.account, name: saved.domain.replace(/\.dedyn\.io$/, ''), ip });
   if (answer.ok) freeAccount = { domain: answer.domain, account: answer.account };
   return answer.ok ? { ok: true, domain: answer.domain } : answer;
 });
 setupCall('check-domain', (domain) => serverSetup.checkDomain(domain));
-setupCall('connect-drive', () => ({ error: 'Google Диск появится в следующей версии, пока можно без копии' }));
+setupCall('connect-drive', () => ({ error: t('setup.driveSoon') }));
 
 /**
  * After the install: tells the setup window when the new address answers from this computer. A name made minutes ago
@@ -454,7 +456,7 @@ async function watchAddress(url) {
       if (addressWatch !== me || !setupWindow) return;
       setupWindow.webContents.send('setup:event', { state: 'open' });
       // The install takes minutes and the window may be away: it comes back when there's something to press.
-      callBack('Сервер готов', 'Gomex установлен');
+      callBack(t('note.readyTitle'), t('note.readyBody'));
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -467,7 +469,7 @@ setupCall('install', ({ domain, turn }) =>
     (data) => {
       setupWindow?.webContents.send('setup:event', data);
       if (data.state === 'ready') watchAddress(data.url);
-      if (data.state === 'fail' && !data.step) callBack('Установка остановилась', data.why ?? '');
+      if (data.state === 'fail' && !data.step) callBack(t('note.stoppedTitle'), data.why ?? '');
     },
     ({ privateKey, ...server }) => {
       const account = freeAccount?.domain === server.domain ? seal(JSON.stringify(freeAccount.account)) : undefined;
@@ -481,9 +483,9 @@ setupCall('open-server', (value) => {
   try {
     url = new URL(value);
   } catch {
-    return { error: 'Нет адреса' };
+    return { error: t('setup.noAddress') };
   }
-  if (url.protocol !== 'https:') return { error: 'Нет адреса' };
+  if (url.protocol !== 'https:') return { error: t('setup.noAddress') };
   const rest = url.pathname + url.search;
   keepSetupLink(url);
   fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true });
@@ -616,6 +618,8 @@ app.on('before-quit', () => {
 app.on('activate', showWindow);
 
 app.whenReady().then(async () => {
+  // The system's language (a developer can force one with GOMEX_LANG=ru|en); the windows below open in it.
+  i18n.setLang(devEnv('GOMEX_LANG') ?? i18n.pick(app.getLocale()));
   app.setAppUserModelId('io.github.gomex-inc.gomex'); // Windows notifications need it
   setUpPermissions();
   listenToPage();
