@@ -5,17 +5,19 @@ import { showError, useStore } from '../store';
 import type { MyStatus } from '../types';
 import { AvatarPicker } from '../people/UserProfile';
 import { InviteRow } from '../people/Invites';
+import { Avatar } from '../ui/Avatar';
 import { PushPage } from '../ui/PushPage';
 import { Primary, Row, RowIcon, RowValue, Rows, field, fieldArea, fieldLabel } from '../ui/settings';
 import { CheckIcon, GearIcon, LogoutIcon, PencilIcon } from '../ui/icons';
 import { DURATIONS, STATUS_LABEL, StatusDot, saveStatus, untilText } from './MeCard';
 import { useSettingsPages } from './SettingsDialog';
 
-type Page = 'status' | 'bio' | 'settings';
+type Page = 'profile' | 'status' | 'bio' | 'settings';
 
 /**
- * The phone's "Вы" tab, iOS's "me" screen: the photo and nick in the middle, then rows for the status, the about
- * line, the invite and the settings, each opening a page of its own, and "Выйти" apart at the foot.
+ * The phone's "Вы" tab, as Discord's and iOS's settings: the profile as one card at the top (photo, nick, status,
+ * opening a page with the photo, status and about), then grouped cards for the invite and the settings, and
+ * «Выйти» as a pill at the foot.
  */
 export function YouTab() {
   const me = useStore((s) => s.me);
@@ -23,38 +25,22 @@ export function YouTab() {
   const statusText = useStore((s) => s.myStatusText);
   const [page, setPage] = useState<Page | null>(null);
   const close = () => setPage(null);
+  const back = () => setPage('profile');
   if (!me) return null;
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 pb-6">
-      {/* The photo's ring is drawn in the overlay tone; here it is the window's. */}
-      <header className="flex flex-col items-center pt-8 [--overlay:var(--app-window)]">
-        <AvatarPicker size={96} />
-        <h1 className="mt-2 max-w-full truncate text-[24px] font-bold">{me.name}</h1>
-      </header>
-
-      <Rows className="mt-6">
+    <div className="flex min-h-full flex-1 flex-col overflow-y-auto px-4 pb-6 pt-4">
+      <Rows>
         <Row
-          icon={
-            <RowIcon>
+          icon={<Avatar user={me} size={44} />}
+          title={<span className="text-[17px] font-semibold">{me.name}</span>}
+          value={
+            <span className="flex items-center gap-1.5">
               <StatusDot status={status} />
-            </RowIcon>
+              {statusText || STATUS_LABEL[status]}
+            </span>
           }
-          title="Статус"
-          value={statusText || undefined}
-          onPress={() => setPage('status')}
-        >
-          <RowValue>{STATUS_LABEL[status]}</RowValue>
-        </Row>
-        <Row
-          icon={
-            <RowIcon>
-              <PencilIcon />
-            </RowIcon>
-          }
-          title="О себе"
-          value={me.bio || undefined}
-          onPress={() => setPage('bio')}
+          onPress={() => setPage('profile')}
         />
       </Rows>
       <Rows className="mt-4">
@@ -69,24 +55,53 @@ export function YouTab() {
           onPress={() => setPage('settings')}
         />
       </Rows>
-      <Rows className="mt-4">
-        <Row
-          icon={
-            <RowIcon className="text-danger">
-              <LogoutIcon />
-            </RowIcon>
-          }
-          title={<span className="text-danger">Выйти</span>}
-          chevron={false}
-          onPress={logout}
-        />
-      </Rows>
 
-      <PushPage open={page === 'status'} title="Статус" onBack={close}>
+      <button
+        type="button"
+        onClick={logout}
+        className="mt-auto flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-white text-[16px] font-medium text-danger active:opacity-80 [&_svg]:size-5"
+      >
+        <LogoutIcon />
+        Выйти
+      </button>
+
+      {/* Stays under the status and about pages it opens, so "Назад" there comes back to it. */}
+      <PushPage open={page === 'profile' || page === 'status' || page === 'bio'} title="Профиль" onBack={close}>
+        {/* The photo's ring is drawn in the overlay tone; here it is the window's. */}
+        <div className="flex flex-col items-center pt-4 [--overlay:var(--app-window)]">
+          <AvatarPicker size={96} />
+          <h2 className="mt-2 max-w-full truncate text-[22px] font-bold">{me.name}</h2>
+        </div>
+        <Rows className="mt-6">
+          <Row
+            icon={
+              <RowIcon>
+                <StatusDot status={status} />
+              </RowIcon>
+            }
+            title="Статус"
+            value={statusText || undefined}
+            onPress={() => setPage('status')}
+          >
+            <RowValue>{STATUS_LABEL[status]}</RowValue>
+          </Row>
+          <Row
+            icon={
+              <RowIcon>
+                <PencilIcon />
+              </RowIcon>
+            }
+            title="О себе"
+            value={me.bio || undefined}
+            onPress={() => setPage('bio')}
+          />
+        </Rows>
+      </PushPage>
+      <PushPage open={page === 'status'} title="Статус" onBack={back}>
         <StatusPage />
       </PushPage>
-      <PushPage open={page === 'bio'} title="О себе" onBack={close}>
-        <BioPage onSaved={close} />
+      <PushPage open={page === 'bio'} title="О себе" onBack={back}>
+        <BioPage onSaved={back} />
       </PushPage>
       <PushPage open={page === 'settings'} title="Настройки" onBack={close}>
         <SettingsPage />
