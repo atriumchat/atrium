@@ -8,16 +8,16 @@ import { InviteRow } from '../people/Invites';
 import { Avatar } from '../ui/Avatar';
 import { PushPage } from '../ui/PushPage';
 import { Primary, Row, RowIcon, RowValue, Rows, field, fieldArea, fieldLabel } from '../ui/settings';
-import { CheckIcon, GearIcon, LogoutIcon, PencilIcon } from '../ui/icons';
+import { CheckIcon, LogoutIcon, PencilIcon } from '../ui/icons';
 import { DURATIONS, STATUS_LABEL, StatusDot, saveStatus, untilText } from './MeCard';
 import { useSettingsPages } from './SettingsDialog';
 
-type Page = 'profile' | 'status' | 'bio' | 'settings';
+type Page = 'profile' | 'status' | 'bio';
 
 /**
- * The phone's "Вы" tab, as Discord's and iOS's settings: the profile as one card at the top (photo, nick, status,
- * opening a page with the photo, status and about), then grouped cards for the invite and the settings, and
- * «Выйти» as a pill at the foot.
+ * The phone's "Вы" tab, as Discord's mobile settings: the profile as one card at the top (opening the photo and the
+ * about line), the status and the invite, then every section of the settings right here, a captioned group each,
+ * and «Выйти» at the end.
  */
 export function YouTab() {
   const me = useStore((s) => s.me);
@@ -34,57 +34,44 @@ export function YouTab() {
         <Row
           icon={<Avatar user={me} size={44} />}
           title={<span className="text-[17px] font-semibold">{me.name}</span>}
-          value={
-            <span className="flex items-center gap-1.5">
-              <StatusDot status={status} />
-              {statusText || STATUS_LABEL[status]}
-            </span>
-          }
+          value={me.bio || 'Фото и о себе'}
           onPress={() => setPage('profile')}
         />
       </Rows>
       <Rows className="mt-4">
-        <InviteRow />
         <Row
           icon={
             <RowIcon>
-              <GearIcon />
+              <StatusDot status={status} />
             </RowIcon>
           }
-          title="Настройки"
-          onPress={() => setPage('settings')}
-        />
+          title="Статус"
+          value={statusText || undefined}
+          onPress={() => setPage('status')}
+        >
+          <RowValue>{STATUS_LABEL[status]}</RowValue>
+        </Row>
+        <InviteRow />
       </Rows>
+      <SettingsPage />
 
       <button
         type="button"
         onClick={logout}
-        className="mt-auto flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-white text-[16px] font-medium text-danger active:opacity-80 [&_svg]:size-5"
+        className="mt-8 flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-white text-[16px] font-medium text-danger active:opacity-80 [&_svg]:size-5"
       >
         <LogoutIcon />
         Выйти
       </button>
 
-      {/* Stays under the status and about pages it opens, so "Назад" there comes back to it. */}
-      <PushPage open={page === 'profile' || page === 'status' || page === 'bio'} title="Профиль" onBack={close}>
+      {/* Stays under the about page it opens, so "Назад" there comes back to it. */}
+      <PushPage open={page === 'profile' || page === 'bio'} title="Профиль" onBack={close}>
         {/* The photo's ring is drawn in the overlay tone; here it is the window's. */}
         <div className="flex flex-col items-center pt-4 [--overlay:var(--app-window)]">
           <AvatarPicker size={96} />
           <h2 className="mt-2 max-w-full truncate text-[22px] font-bold">{me.name}</h2>
         </div>
         <Rows className="mt-6">
-          <Row
-            icon={
-              <RowIcon>
-                <StatusDot status={status} />
-              </RowIcon>
-            }
-            title="Статус"
-            value={statusText || undefined}
-            onPress={() => setPage('status')}
-          >
-            <RowValue>{STATUS_LABEL[status]}</RowValue>
-          </Row>
           <Row
             icon={
               <RowIcon>
@@ -97,14 +84,11 @@ export function YouTab() {
           />
         </Rows>
       </PushPage>
-      <PushPage open={page === 'status'} title="Статус" onBack={back}>
+      <PushPage open={page === 'status'} title="Статус" onBack={close}>
         <StatusPage />
       </PushPage>
       <PushPage open={page === 'bio'} title="О себе" onBack={back}>
         <BioPage onSaved={back} />
-      </PushPage>
-      <PushPage open={page === 'settings'} title="Настройки" onBack={close}>
-        <SettingsPage />
       </PushPage>
     </div>
   );
