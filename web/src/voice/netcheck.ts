@@ -2,6 +2,7 @@ import { toast } from '@heroui/react';
 import { useStore } from '../store';
 import { setVoicePrefs } from './voice';
 import { attempt } from './ConnectionCheck';
+import { t } from '../i18n';
 
 const CHECKED = 'gomex_net_checked';
 
@@ -35,5 +36,5 @@ export async function firstRunNetCheck() {
   // Don't swap paths under a call that's already going.
   if (useStore.getState().voiceStatus !== 'idle') return;
   await setVoicePrefs({ relayOnly: true });
-  toast.success('Антилаг включён');
+  toast.success(t('voice.antiLag.enabled'));
 }

@@ -7,7 +7,7 @@ import { desktop } from './desktop';
  * The site: every deploy changes it, but a tab or desktop window opened before keeps running the old code — the
  * desktop app can sit in the tray for weeks. So we compare the build we're running with the server's (after each
  * reconnect, i.e. after a deploy restarts the server, when the window comes back, and every half hour) and reload:
- * on our own while nobody's looking and no call is on, otherwise when the person clicks "Обновить".
+ * on our own while nobody's looking and no call is on, otherwise when the person clicks "Update".
  *
  * The desktop app updates its own shell (desktop/updater.js); here we only mirror its state for the banner.
  */

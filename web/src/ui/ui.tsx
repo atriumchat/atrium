@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Button, Label, Slider, Tooltip } from '@heroui/react';
+import { useT } from '../i18n';
 import { getUserVolume, setUserVolume } from '../voice/devices';
 
 type Placement = 'top' | 'bottom' | 'left' | 'right';
@@ -58,6 +59,7 @@ export function RoundButton(props: {
 
 /** Per-person playback volume, 0–100%. */
 export function VolumeSlider({ userId, name }: { userId: string; name: string }) {
+  const { t } = useT();
   const [value, setValue] = useState(() => getUserVolume(userId));
   return (
     <Slider
@@ -73,7 +75,7 @@ export function VolumeSlider({ userId, name }: { userId: string; name: string })
       formatOptions={{ style: 'percent' }}
       className="w-full"
     >
-      <Label>Громкость: {name}</Label>
+      <Label>{t('common.volume', { name })}</Label>
       <Slider.Output />
       <Slider.Track>
         <Slider.Fill />

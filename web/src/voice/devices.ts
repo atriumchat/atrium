@@ -1,5 +1,6 @@
 import { Room, Track, type RemoteParticipant } from 'livekit-client';
 import { showError, useStore } from '../store';
+import { t } from '../i18n';
 
 /** How loud each person plays, and which microphone and speakers calls use. */
 
@@ -56,6 +57,6 @@ export async function setPreferredDevice(kind: AudioDeviceKind, deviceId: string
   try {
     await room.switchActiveDevice(kind, deviceId);
   } catch {
-    showError('Не удалось переключить устройство');
+    showError(t('voice.err.device'));
   }
 }

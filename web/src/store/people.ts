@@ -1,4 +1,5 @@
 import { api } from '../api';
+import { t } from '../i18n';
 import type { Dm, Friend, User } from '../types';
 import { get, set, showError } from './core';
 import { isHomePage, openDm } from './shell';
@@ -32,7 +33,7 @@ export async function messageUser(userId: string) {
     set((s) => ({ dms: [dm, ...s.dms.filter((d) => d.id !== dm.id)] }));
     openDm(dm.id);
   } catch (e) {
-    showError(e instanceof Error ? e.message : 'Не удалось открыть переписку');
+    showError(e instanceof Error ? e.message : t('common.openDmFailed'));
   }
 }
 
@@ -72,7 +73,7 @@ export function dmTitle(dm: Dm, users: Record<string, User>, meId: string | unde
   if (dm.kind === 'dm') return users[dm.userId ?? '']?.name ?? '…';
   if (dm.name) return dm.name;
   const others = dm.members.filter((id) => id !== meId).map((id) => users[id]?.name ?? '…');
-  return others.length ? others.join(', ') : 'Пустая группа';
+  return others.length ? others.join(', ') : t('common.emptyGroup');
 }
 
 export const isDmId = (id: string | null) => !!id && get().dms.some((d) => d.id === id);

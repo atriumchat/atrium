@@ -12,6 +12,7 @@ import { ResetPassword } from './account/ResetPassword';
 import { clearResetFromUrl, resetFromUrl } from './account/resetLink';
 import { WhereToUse, whereToUseNeeded } from './account/WhereToUse';
 import type { Session } from './types';
+import { useT } from './i18n';
 
 type Phase = 'loading' | 'login' | 'setup' | 'reset' | 'key' | 'where' | 'ready' | 'offline';
 
@@ -105,12 +106,13 @@ export function App() {
 }
 
 function Splash({ offline, retry }: { offline: boolean; retry: () => void }) {
+  const { t } = useT();
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 text-txt-2">
       {offline ? (
         <>
-          <span>Сервер недоступен</span>
-          <Button onPress={retry}>Попробовать снова</Button>
+          <span>{t('account.app.offline')}</span>
+          <Button onPress={retry}>{t('account.app.retry')}</Button>
         </>
       ) : (
         <Spinner />

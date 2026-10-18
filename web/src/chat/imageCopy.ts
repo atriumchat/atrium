@@ -1,4 +1,5 @@
 import { toast } from '@heroui/react';
+import { t } from '../i18n';
 import { showError } from '../store';
 
 type Reply = { id: number; png?: Blob; error?: string };
@@ -54,7 +55,7 @@ const READY_MAX = 3;
 
 /**
  * Starts getting a picture as a PNG: downloads it (usually from the browser's cache, uploads never change) and
- * converts it in the worker. Called when the menu opens, so by the time "Копировать картинку" is pressed it's
+ * converts it in the worker. Called when the menu opens, so by the time "Copy image" is pressed it's
  * mostly done, and again on the press for the rest; the second call shares the first one's work.
  */
 export function pngOf(url: string): Promise<Blob> {
@@ -75,7 +76,7 @@ export function pngOf(url: string): Promise<Blob> {
 }
 
 export function notifyCopied() {
-  toast.success('Скопировано', { timeout: 1500 });
+  toast.success(t('common.copy.done'), { timeout: 1500 });
 }
 
 /**
@@ -86,14 +87,14 @@ export function copyImage(url: string) {
   try {
     navigator.clipboard
       .write([new ClipboardItem({ 'image/png': pngOf(url) })])
-      .then(notifyCopied, () => showError('Не получилось скопировать'));
+      .then(notifyCopied, () => showError(t('common.copy.failed')));
   } catch {
-    showError('Не получилось скопировать');
+    showError(t('common.copy.failed'));
   }
 }
 
 export function copyText(text: string) {
   // No clipboard on a page that isn't https (or localhost).
-  if (!navigator.clipboard) return showError('Не получилось скопировать');
-  navigator.clipboard.writeText(text).then(notifyCopied, () => showError('Не получилось скопировать'));
+  if (!navigator.clipboard) return showError(t('common.copy.failed'));
+  navigator.clipboard.writeText(text).then(notifyCopied, () => showError(t('common.copy.failed')));
 }

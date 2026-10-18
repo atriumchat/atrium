@@ -1,5 +1,6 @@
 import { useEffect, useState, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { t, useT } from '../i18n';
 import type { Attachment } from '../types';
 import { DownloadIcon, XIcon } from '../ui/icons';
 import { useAttachmentMenu } from './AttachmentMenu';
@@ -27,14 +28,15 @@ export function MessageAttachments({ attachments }: { attachments: Attachment[] 
 }
 
 export function fileSize(bytes = 0) {
-  if (bytes < 1024) return `${bytes} Б`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} КБ`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} МБ`;
+  if (bytes < 1024) return t('chat.size.b', { n: bytes });
+  if (bytes < 1024 * 1024) return t('chat.size.kb', { n: (bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0) });
+  return t('chat.size.mb', { n: (bytes / 1024 / 1024).toFixed(1) });
 }
 
 /** Any non-picture file: its type in a circle, name, size, and the whole card downloads it. */
 function FileCard({ file }: { file: Attachment }) {
-  const ext = (file.name ?? '').split('.').pop()?.slice(0, 4).toUpperCase() || 'ФАЙЛ';
+  const { t } = useT();
+  const ext = (file.name ?? '').split('.').pop()?.slice(0, 4).toUpperCase() || t('chat.attach.fileExt');
   const { open, menu } = useAttachmentMenu();
   return (
     <>
@@ -58,6 +60,7 @@ function FileCard({ file }: { file: Attachment }) {
 
 /** Images under a message. Space is reserved from the stored size so the chat doesn't jump while they load. */
 function MessageImages({ attachments }: { attachments: Attachment[] }) {
+  const { t } = useT();
   const [open, setOpen] = useState<Attachment | null>(null);
   const { open: openMenu, menu } = useAttachmentMenu();
   if (attachments.length === 0) return null;
@@ -77,7 +80,7 @@ function MessageImages({ attachments }: { attachments: Attachment[] }) {
               type="button"
               onClick={() => setOpen(a)}
               onContextMenu={openMenu(a)}
-              aria-label="Открыть картинку"
+              aria-label={t('chat.attach.openImage')}
               className="max-w-full cursor-zoom-in overflow-hidden rounded-[12px] bg-default outline-none focus-visible:ring-2 focus-visible:ring-accent"
               style={{ width, aspectRatio: `${width} / ${height}` }}
             >
@@ -94,6 +97,7 @@ function MessageImages({ attachments }: { attachments: Attachment[] }) {
 }
 
 function Lightbox({ image, onClose, onContextMenu }: { image: Attachment; onClose: () => void; onContextMenu: (e: MouseEvent<HTMLElement>) => void }) {
+  const { t } = useT();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -106,13 +110,13 @@ function Lightbox({ image, onClose, onContextMenu }: { image: Attachment; onClos
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Картинка"
+      aria-label={t('chat.attach.image')}
       onClick={onClose}
       className="fixed inset-0 z-50 flex cursor-zoom-out flex-col items-center justify-center gap-3 bg-black/85 p-6"
     >
       <button
         type="button"
-        aria-label="Закрыть"
+        aria-label={t('common.close')}
         onClick={onClose}
         className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
       >
@@ -126,7 +130,7 @@ function Lightbox({ image, onClose, onContextMenu }: { image: Attachment; onClos
         onClick={(e) => e.stopPropagation()}
         className="text-[14px] text-white/70 hover:text-white hover:underline"
       >
-        Открыть в новой вкладке
+        {t('chat.attach.openTab')}
       </a>
     </div>,
     document.body,

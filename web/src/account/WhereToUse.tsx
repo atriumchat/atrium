@@ -3,6 +3,7 @@ import { desktop } from '../desktop';
 import { AppleLogo, DOWNLOADS, WindowsLogo } from '../shell/Downloads';
 import { LineArt, type ArtName } from '../ui/Illustrations';
 import { DotsIcon, PlusSquareIcon, ShareIcon } from '../ui/icons';
+import { useT } from '../i18n';
 
 export type Platform = 'mac' | 'windows' | 'ios' | 'android' | 'other';
 
@@ -79,7 +80,7 @@ const quiet = 'flex h-[46px] w-full items-center justify-center rounded-full tex
  * "Where to use Gomex", shown once after signing up: the desktop app on a computer, the Home Screen on an
  * iPhone, installing on Android, or simply carrying on in the browser.
  */
-/** `inWindow`: opened from the rail, where the window's own close is the way out, so no «Остаться в браузере». */
+/** `inWindow`: opened from the rail, where the window's own close is the way out, so no "Stay in browser". */
 export function WhereToUse({ onDone, platform = detectPlatform(), inWindow = false }: { onDone: () => void; platform?: Platform; inWindow?: boolean }) {
   if (platform === 'ios') return <OnIPhone onDone={onDone} />;
   if (platform === 'android') return <OnAndroid onDone={onDone} />;
@@ -102,6 +103,7 @@ function Column({ art, title, text, children }: { art: ArtName; title: string; t
 }
 
 function OnComputer({ onDone, platform, inWindow }: { onDone: () => void; platform: Platform; inWindow: boolean }) {
+  const { t } = useT();
   const [mac] = useState<'mac-intel' | 'mac-arm64'>(() => (platform === 'mac' && intelMac() ? 'mac-intel' : 'mac-arm64'));
   const [started, setStarted] = useState(false);
   const known = platform === 'mac' || platform === 'windows';
@@ -114,22 +116,22 @@ function OnComputer({ onDone, platform, inWindow }: { onDone: () => void; platfo
         : DOWNLOADS;
 
   return (
-    <Column art="computer" title="Gomex на компьютере" text="Приложение для Mac и Windows">
+    <Column art="computer" title={t('account.where.computerTitle')} text={t('account.where.computerText')}>
       {started ? (
         <button onClick={onDone} className={primary}>
-          Готово
+          {t('account.where.done')}
         </button>
       ) : (
         <>
           {known && (
             <a href={file(platform === 'mac' ? mac : 'windows')} download onClick={() => setStarted(true)} className={primary}>
               {platform === 'mac' ? <AppleLogo size={17} /> : <WindowsLogo size={15} />}
-              {platform === 'mac' ? 'Скачать для Mac' : 'Скачать для Windows'}
+              {platform === 'mac' ? t('account.where.downloadMac') : t('account.where.downloadWindows')}
             </a>
           )}
           {!inWindow && (
             <button onClick={onDone} className={known ? quiet : primary}>
-              Остаться в браузере
+              {t('account.where.stayInBrowser')}
             </button>
           )}
         </>
@@ -157,20 +159,22 @@ function Step({ n, label, icon }: { n: number; label: string; icon: ReactNode })
 }
 
 function OnIPhone({ onDone }: { onDone: () => void }) {
+  const { t } = useT();
   return (
-    <Column art="iphone" title="Gomex на экране Домой">
+    <Column art="iphone" title={t('account.where.iphoneTitle')}>
       <ol className="mb-5 flex flex-col gap-2">
-        <Step n={1} label="Поделиться" icon={<ShareIcon size={19} strokeWidth={1.7} />} />
-        <Step n={2} label="На экран Домой" icon={<PlusSquareIcon size={19} strokeWidth={1.7} />} />
+        <Step n={1} label={t('account.where.share')} icon={<ShareIcon size={19} strokeWidth={1.7} />} />
+        <Step n={2} label={t('account.where.addToHome')} icon={<PlusSquareIcon size={19} strokeWidth={1.7} />} />
       </ol>
       <button onClick={onDone} className={primary}>
-        Продолжить
+        {t('account.where.continue')}
       </button>
     </Column>
   );
 }
 
 function OnAndroid({ onDone }: { onDone: () => void }) {
+  const { t } = useT();
   const prompt = useInstallPrompt();
   const [busy, setBusy] = useState(false);
 
@@ -191,25 +195,25 @@ function OnAndroid({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <Column art="android" title="Gomex на телефоне" text={prompt ? 'Значок на главном экране' : undefined}>
+    <Column art="android" title={t('account.where.androidTitle')} text={prompt ? t('account.where.androidText') : undefined}>
       {prompt ? (
         <>
           <button onClick={install} disabled={busy} className={`${primary} disabled:opacity-60`}>
-            Установить
+            {t('account.where.install')}
           </button>
           <button onClick={onDone} className={quiet}>
-            Остаться в браузере
+            {t('account.where.stayInBrowser')}
           </button>
         </>
       ) : (
         <>
           {/* No install offer from this browser: its own menu does the same. */}
           <ol className="mb-5 flex flex-col gap-2">
-            <Step n={1} label="Меню браузера" icon={<DotsIcon size={19} className="rotate-90" />} />
-            <Step n={2} label="Добавить на главный экран" icon={<PlusSquareIcon size={19} strokeWidth={1.7} />} />
+            <Step n={1} label={t('account.where.browserMenu')} icon={<DotsIcon size={19} className="rotate-90" />} />
+            <Step n={2} label={t('account.where.addToHomeAndroid')} icon={<PlusSquareIcon size={19} strokeWidth={1.7} />} />
           </ol>
           <button onClick={onDone} className={primary}>
-            Продолжить
+            {t('account.where.continue')}
           </button>
         </>
       )}

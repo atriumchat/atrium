@@ -2,20 +2,22 @@ import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Description, Dropdown, Label, Popover, Separator } from '@heroui/react';
 import { api } from '../api';
 import { showError, useStore } from '../store';
+import { localeOf, t, useT, type Key } from '../i18n';
 import type { MyStatus } from '../types';
 import { AvatarPicker } from '../people/UserProfile';
 import { SettingsDialog } from './SettingsDialog';
 import { ChevronRightIcon, PencilIcon, PlusIcon } from '../ui/icons';
 
-export const STATUS_LABEL: Record<MyStatus, string> = { online: 'В сети', dnd: 'Не беспокоить', invisible: 'Невидимка' };
+/** Callers re-render on a language change through their own useT(). */
+export const statusLabel = (status: MyStatus) => t(`shell.status.${status}`);
 
-export const DURATIONS: [number, string][] = [
-  [15, '15 минут'],
-  [60, '1 час'],
-  [8 * 60, '8 часов'],
-  [24 * 60, '24 часа'],
-  [3 * 24 * 60, '3 дня'],
-  [0, 'Навсегда'],
+export const DURATIONS: [number, Key][] = [
+  [15, 'shell.duration.m15'],
+  [60, 'shell.duration.h1'],
+  [8 * 60, 'shell.duration.h8'],
+  [24 * 60, 'shell.duration.h24'],
+  [3 * 24 * 60, 'shell.duration.d3'],
+  [0, 'shell.duration.forever'],
 ];
 
 export async function saveStatus(status: MyStatus, text: string, minutes?: number) {
@@ -23,16 +25,16 @@ export async function saveStatus(status: MyStatus, text: string, minutes?: numbe
     const r = await api.setStatus(status, text.trim(), minutes);
     useStore.setState({ myStatus: r.status, myStatusText: r.text, myStatusUntil: r.until });
   } catch (e) {
-    showError(e instanceof Error ? e.message : 'Не удалось сменить статус');
+    showError(e instanceof Error ? e.message : t('shell.status.changeFailed'));
   }
 }
 
-/** "до 18:30", or with the day when it isn't today. */
+/** "until 18:30", or with the day when it isn't today. */
 export function untilText(until: number) {
   const d = new Date(until);
-  const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-  if (d.toDateString() === new Date().toDateString()) return `до ${time}`;
-  return `до ${d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}, ${time}`;
+  const time = d.toLocaleTimeString(localeOf(), { hour: '2-digit', minute: '2-digit' });
+  if (d.toDateString() === new Date().toDateString()) return t('shell.status.until', { time });
+  return t('shell.status.untilDate', { date: d.toLocaleDateString(localeOf(), { day: 'numeric', month: 'short' }), time });
 }
 
 /**
@@ -41,16 +43,17 @@ export function untilText(until: number) {
  * editing the profile and the status, with "do not disturb" and "invisible" for a while or for good.
  */
 export function MeCard({ anchor, children, className }: { anchor: RefObject<HTMLElement | null>; children: ReactNode; className?: string }) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const [settings, setSettings] = useState(false);
   return (
     <>
       <Popover isOpen={open} onOpenChange={setOpen}>
-        <Popover.Trigger aria-label="Мой профиль" className={className}>
+        <Popover.Trigger aria-label={t('shell.me.profile')} className={className}>
           {children}
         </Popover.Trigger>
         <Popover.Content triggerRef={anchor} placement="top start" offset={8} className="w-[300px] overflow-hidden p-0">
-          <Popover.Dialog aria-label="Мой профиль" className="p-0 outline-none">
+          <Popover.Dialog aria-label={t('shell.me.profile')} className="p-0 outline-none">
             <Card
               onEdit={() => {
                 setOpen(false);
@@ -66,6 +69,7 @@ export function MeCard({ anchor, children, className }: { anchor: RefObject<HTML
 }
 
 function Card({ onEdit }: { onEdit: () => void }) {
+  const { t } = useT();
   const me = useStore((s) => s.me);
   if (!me) return null;
   return (
@@ -85,7 +89,7 @@ function Card({ onEdit }: { onEdit: () => void }) {
       <div className="p-3 pt-4">
         <div className="flex flex-col rounded-[12px] bg-white/[0.05] p-1">
           <Row icon={<PencilIcon size={16} />} onPress={onEdit}>
-            Редактировать профиль
+            {t('shell.me.edit')}
           </Row>
           <div className="mx-3 h-px bg-separator" />
           <StatusRow />
@@ -117,6 +121,7 @@ export function StatusDot({ status }: { status: MyStatus }) {
 }
 
 function StatusRow() {
+  const { t } = useT();
   const status = useStore((s) => s.myStatus);
   const until = useStore((s) => s.myStatusUntil);
   const text = useStore((s) => s.myStatusText);
@@ -132,20 +137,20 @@ function StatusRow() {
           <StatusDot status={status} />
         </span>
         <span className="min-w-0 flex-1 truncate">
-          {STATUS_LABEL[status]}
+          {statusLabel(status)}
           {until && status !== 'online' && <span className="text-muted"> · {untilText(until)}</span>}
         </span>
         <ChevronRightIcon size={16} className="shrink-0 text-muted" />
       </Dropdown.Trigger>
       <Dropdown.Popover placement="right top" offset={12} className="min-w-64">
-        <Dropdown.Menu aria-label="Статус" onAction={(key) => key === 'online' && choose('online')}>
-          <Dropdown.Item id="online" textValue="В сети">
+        <Dropdown.Menu aria-label={t('shell.status.title')} onAction={(key) => key === 'online' && choose('online')}>
+          <Dropdown.Item id="online" textValue={t('shell.status.online')}>
             <StatusDot status="online" />
-            <Label>В сети</Label>
+            <Label>{t('shell.status.online')}</Label>
           </Dropdown.Item>
           <Separator />
-          <Timed status="dnd" hint="Без звуков и уведомлений" onPick={choose} />
-          <Timed status="invisible" hint="Для остальных — не в сети" onPick={choose} />
+          <Timed status="dnd" hint={t('shell.status.dndHint')} onPick={choose} />
+          <Timed status="invisible" hint={t('shell.status.invisibleHint')} onPick={choose} />
         </Dropdown.Menu>
       </Dropdown.Popover>
     </Dropdown>
@@ -153,23 +158,24 @@ function StatusRow() {
 }
 
 function Timed({ status, hint, onPick }: { status: MyStatus; hint: string; onPick: (status: MyStatus, minutes: number) => void }) {
+  const { t } = useT();
   return (
     <Dropdown.SubmenuTrigger>
-      <Dropdown.Item id={status} textValue={STATUS_LABEL[status]}>
+      <Dropdown.Item id={status} textValue={statusLabel(status)}>
         <span className="flex self-start pt-1">
           <StatusDot status={status} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
-          <Label>{STATUS_LABEL[status]}</Label>
+          <Label>{statusLabel(status)}</Label>
           <Description className="text-[12px] text-muted">{hint}</Description>
         </span>
         <Dropdown.SubmenuIndicator />
       </Dropdown.Item>
       <Dropdown.Popover offset={8} className="min-w-44">
-        <Dropdown.Menu aria-label={`${STATUS_LABEL[status]}: на сколько`} onAction={(key) => onPick(status, Number(key))}>
-          {DURATIONS.map(([minutes, label]) => (
-            <Dropdown.Item key={minutes} id={String(minutes)} textValue={label}>
-              <Label>{label}</Label>
+        <Dropdown.Menu aria-label={t('shell.status.duration', { status: statusLabel(status) })} onAction={(key) => onPick(status, Number(key))}>
+          {DURATIONS.map(([minutes, key]) => (
+            <Dropdown.Item key={minutes} id={String(minutes)} textValue={t(key)}>
+              <Label>{t(key)}</Label>
             </Dropdown.Item>
           ))}
         </Dropdown.Menu>
@@ -180,6 +186,7 @@ function Timed({ status, hint, onPick }: { status: MyStatus; hint: string; onPic
 
 /** Your line of status next to the photo, as Discord's thought bubble: click to write, Enter to keep. */
 function StatusBubble() {
+  const { t } = useT();
   const status = useStore((s) => s.myStatus);
   const saved = useStore((s) => s.myStatusText);
   const [editing, setEditing] = useState(false);
@@ -209,8 +216,8 @@ function StatusBubble() {
               setEditing(false);
             }
           }}
-          placeholder="Катаю, сплю, на паре…"
-          aria-label="Свой статус"
+          placeholder={t('shell.status.placeholder')}
+          aria-label={t('shell.status.own')}
           className="w-full bg-transparent outline-none placeholder:text-faint"
         />
       ) : (
@@ -222,7 +229,7 @@ function StatusBubble() {
           className={`flex w-full min-w-0 items-center gap-1.5 text-left ${saved ? 'text-foreground' : 'text-muted hover:text-foreground'}`}
         >
           {!saved && <PlusIcon size={14} className="shrink-0" />}
-          <span className="line-clamp-2 break-words">{saved || 'Свой статус'}</span>
+          <span className="line-clamp-2 break-words">{saved || t('shell.status.own')}</span>
         </button>
       )}
     </div>

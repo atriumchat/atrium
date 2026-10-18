@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { closeDetail, dmTitle, isDmId, openDm, openFriends, openPicker, openTab, selectChannel, useStore, voiceMembers, type MobileTab } from '../store';
+import { useT } from '../i18n';
 import { leaveVoice, toggleMute } from '../voice/voice';
 import { HomeContent, homeBadgeCount, serverBadgeCount, ServerContent } from './Content';
 import { Sidebar } from './Sidebar';
@@ -79,6 +80,7 @@ function useCallPlace() {
  * and hang-up. Tap it to go back to the call.
  */
 function CallPill() {
+  const { t } = useT();
   const { id, name, open } = useCallPlace();
   const status = useStore((s) => s.voiceStatus);
   const micOff = useStore((s) => s.muted || s.deafened);
@@ -108,18 +110,18 @@ function CallPill() {
             <span className={`block text-[12px] leading-4 tabular-nums ${connected ? 'text-success' : 'text-warning'}`}>
               {connected ? (
                 <>
-                  в голосе · <CallDuration />
+                  {t('shell.call.inVoice')} · <CallDuration />
                 </>
               ) : (
-                'подключение…'
+                t('shell.call.connectingShort')
               )}
             </span>
           </span>
         </button>
-        <RoundButton tone={micOff ? 'on' : 'plain'} alert={micOff} label={micOff ? 'Включить микрофон' : 'Выключить микрофон'} onPress={toggleMute}>
+        <RoundButton tone={micOff ? 'on' : 'plain'} alert={micOff} label={micOff ? t('shell.call.micOn') : t('shell.call.micOff')} onPress={toggleMute}>
           {micOff ? <MicSlashIcon /> : <MicIcon />}
         </RoundButton>
-        <RoundButton tone="danger" label="Отключиться" onPress={() => leaveVoice()}>
+        <RoundButton tone="danger" label={t('shell.call.disconnect')} onPress={() => leaveVoice()}>
           <PhoneDownIcon />
         </RoundButton>
       </div>
@@ -129,6 +131,7 @@ function CallPill() {
 
 /** Inside a conversation (no tab bar there): a slim "voice connected" strip on top; tap it to go back to the call. */
 function CallBar() {
+  const { t } = useT();
   const { id, name, open } = useCallPlace();
   const status = useStore((s) => s.voiceStatus);
   const micOff = useStore((s) => s.muted || s.deafened);
@@ -145,7 +148,7 @@ function CallBar() {
         <SignalIcon size={18} className={connected ? 'text-success' : 'text-warning'} />
         <span className="min-w-0">
           <span className={`block text-[14px] font-medium leading-5 ${connected ? 'text-success' : 'text-warning'}`}>
-            {connected ? 'Голос подключён' : 'Подключение…'}
+            {connected ? t('shell.call.connected') : t('shell.call.connecting')}
           </span>
           <span className="block truncate text-[12px] tabular-nums text-muted">
             {name}
@@ -158,10 +161,10 @@ function CallBar() {
           </span>
         </span>
       </button>
-      <RoundButton size="sm" tone={micOff ? 'on' : 'plain'} alert={micOff} label={micOff ? 'Включить микрофон' : 'Выключить микрофон'} onPress={toggleMute}>
+      <RoundButton size="sm" tone={micOff ? 'on' : 'plain'} alert={micOff} label={micOff ? t('shell.call.micOn') : t('shell.call.micOff')} onPress={toggleMute}>
         {micOff ? <MicSlashIcon /> : <MicIcon />}
       </RoundButton>
-      <RoundButton size="sm" tone="danger" label="Отключиться" onPress={() => leaveVoice()}>
+      <RoundButton size="sm" tone="danger" label={t('shell.call.disconnect')} onPress={() => leaveVoice()}>
         <PhoneDownIcon />
       </RoundButton>
     </div>
@@ -197,6 +200,7 @@ function ServerTab() {
  * DMs, groups, and channels while they have something unread.
  */
 function HomeTab() {
+  const { t } = useT();
   const incoming = useStore((s) => s.friends.filter((f) => f.status === 'incoming').length);
   const dms = useDmList();
 
@@ -212,7 +216,7 @@ function HomeTab() {
         <div className="px-3">
           <button onClick={openFriends} className="flex h-12 w-full items-center gap-3 rounded-full bg-default px-4 text-left transition-colors active:bg-[#28282d]">
             <UsersIcon size={20} />
-            <span className="flex-1 text-[16px] font-medium">Друзья</span>
+            <span className="flex-1 text-[16px] font-medium">{t('shell.home.friends')}</span>
             {incoming > 0 && <Badge count={incoming} />}
             <ChevronRightIcon size={18} className="text-muted" />
           </button>
@@ -220,12 +224,12 @@ function HomeTab() {
         {/* Same insets as the server tab's list: titles at 24px, rows at 12px. */}
         <section className="px-3">
           <div className="flex items-center justify-between pb-1 pl-3">
-            <h2 className="text-[17px] font-semibold">Личные сообщения</h2>
-            <RoundButton size="sm" tone="ghost" label="Новая группа" onPress={() => openPicker({ mode: 'create' })}>
+            <h2 className="text-[17px] font-semibold">{t('shell.home.dms')}</h2>
+            <RoundButton size="sm" tone="ghost" label={t('shell.home.newGroup')} onPress={() => openPicker({ mode: 'create' })}>
               <PlusIcon />
             </RoundButton>
           </div>
-          {dms.length === 0 ? <EmptyState compact art="messages" title="Сообщений пока нет" text="Здесь будут лички и группы" /> : dms.map((dm) => <FeedDm key={dm.id} dm={dm} big />)}
+          {dms.length === 0 ? <EmptyState compact art="messages" title={t('shell.home.empty.title')} text={t('shell.home.empty.text')} /> : dms.map((dm) => <FeedDm key={dm.id} dm={dm} big />)}
         </section>
       </div>
     </div>
@@ -237,6 +241,7 @@ function HomeTab() {
  * up into a lighter segment with its name.
  */
 function TabBar() {
+  const { t } = useT();
   const serverUnread = useStore(serverBadgeCount);
   const homeBadge = useStore(homeBadgeCount);
   const me = useStore((s) => s.me);
@@ -244,9 +249,9 @@ function TabBar() {
   return (
     <nav className="shrink-0 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-2">
       <div className="flex h-16 items-center gap-1 rounded-full border-[0.5px] border-white/10 bg-default p-1.5">
-        <Tab id="home" label="Главная" badge={homeBadge} icon={(on) => (on ? <HomeFilledIcon size={24} /> : <HomeIcon size={24} />)} />
-        <Tab id="server" label="Сервер" badge={serverUnread} icon={(on) => <ServerMark icon={serverIcon} size={24} filled={on} />} />
-        <Tab id="you" label="Вы" icon={() => <Avatar user={me ?? undefined} size={28} ringBg="var(--default)" />} />
+        <Tab id="home" label={t('shell.tab.home')} badge={homeBadge} icon={(on) => (on ? <HomeFilledIcon size={24} /> : <HomeIcon size={24} />)} />
+        <Tab id="server" label={t('shell.tab.server')} badge={serverUnread} icon={(on) => <ServerMark icon={serverIcon} size={24} filled={on} />} />
+        <Tab id="you" label={t('shell.tab.you')} icon={() => <Avatar user={me ?? undefined} size={28} ringBg="var(--default)" />} />
       </div>
     </nav>
   );

@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { AlertDialog, Button, Drawer, Modal } from '@heroui/react';
+import { useT } from '../i18n';
 import { useIsMobile } from '../hooks';
 import { showError } from '../store';
 
@@ -163,6 +164,7 @@ export function ConfirmDialog({
   onConfirm: () => unknown;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const [busy, setBusy] = useState(false);
 
   async function confirm() {
@@ -171,7 +173,7 @@ export function ConfirmDialog({
       await onConfirm();
       onClose();
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Не получилось');
+      showError(e instanceof Error ? e.message : t('common.failed'));
       setBusy(false);
     }
   }
@@ -189,7 +191,7 @@ export function ConfirmDialog({
           </AlertDialog.Body>
           <AlertDialog.Footer>
             <Button variant="tertiary" onPress={onClose} className="rounded-full">
-              Отмена
+              {t('common.cancel')}
             </Button>
             <Button variant="danger" onPress={confirm} isPending={busy} className="rounded-full text-white [--button-fg:white]">
               {confirmLabel}

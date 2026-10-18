@@ -11,10 +11,12 @@ import { FriendButton, UserProfile } from './UserProfile';
 import { RoundButton } from '../ui/ui';
 import { BubbleIcon, CheckIcon, UserPlusIcon, XIcon } from '../ui/icons';
 import { RoomCircles, useRoomOf } from './WhoWhere';
+import { useT } from '../i18n';
 
 type Tab = 'online' | 'all' | 'pending' | 'add';
 
 export function FriendsView() {
+  const { t } = useT();
   const friends = useStore((s) => s.friends);
   const online = useStore((s) => s.online);
   const isMobile = useStore((s) => s.isMobile);
@@ -39,7 +41,7 @@ export function FriendsView() {
 
   const pendingLabel = (
     <span className="flex items-center gap-1.5">
-      Заявки
+      {t('people.friends.requests')}
       {incoming > 0 && <span className="min-w-5 rounded-full bg-danger px-1.5 text-[11px] font-medium leading-5 text-white">{incoming}</span>}
     </span>
   );
@@ -51,34 +53,34 @@ export function FriendsView() {
         <header className="mx-2 mt-2 shrink-0 rounded-[24px] bg-default p-2">
           <div className="flex items-center gap-1">
             <BackButton />
-            <h1 className="flex-1 text-[16px] font-medium">Друзья</h1>
-            <RoundButton label="Добавить в друзья" tone={tab === 'add' ? 'on' : 'plain'} onPress={() => setTab('add')}>
+            <h1 className="flex-1 text-[16px] font-medium">{t('people.friends.title')}</h1>
+            <RoundButton label={t('people.friends.add')} tone={tab === 'add' ? 'on' : 'plain'} onPress={() => setTab('add')}>
               <UserPlusIcon />
             </RoundButton>
           </div>
           <div className="no-scrollbar mt-1 flex gap-1 overflow-x-auto">
-            {tabButton('online', 'В сети')}
-            {tabButton('all', 'Все')}
+            {tabButton('online', t('people.friends.online'))}
+            {tabButton('all', t('people.friends.all'))}
             {tabButton('pending', pendingLabel)}
           </div>
         </header>
       ) : (
-        // A narrow window turns "Добавить в друзья" into a round icon; narrower still, the tabs scroll sideways.
+        // A narrow window turns "Add friend" into a round icon; narrower still, the tabs scroll sideways.
         <header className="@container mx-2 mt-2 flex h-14 shrink-0 items-center gap-2 rounded-full bg-default pl-5 pr-2">
-          <h1 className="mr-3 shrink-0 text-[16px] font-medium">Друзья</h1>
+          <h1 className="mr-3 shrink-0 text-[16px] font-medium">{t('people.friends.title')}</h1>
           <div className="no-scrollbar flex min-w-0 items-center gap-2 overflow-x-auto">
-            {tabButton('online', 'В сети')}
-            {tabButton('all', 'Все')}
+            {tabButton('online', t('people.friends.online'))}
+            {tabButton('all', t('people.friends.all'))}
             {tabButton('pending', pendingLabel)}
             <button
               onClick={() => setTab('add')}
-              aria-label="Добавить в друзья"
+              aria-label={t('people.friends.add')}
               className={`ml-1 flex h-9 shrink-0 items-center justify-center rounded-full text-[14px] font-medium transition-colors @max-[38rem]:w-9 @min-[38rem]:px-4 ${
                 tab === 'add' ? 'bg-white/10 text-foreground' : 'bg-accent text-accent-foreground hover:opacity-90'
               }`}
             >
               <UserPlusIcon size={18} className="@min-[38rem]:hidden" />
-              <span className="@max-[38rem]:hidden">Добавить в друзья</span>
+              <span className="@max-[38rem]:hidden">{t('people.friends.add')}</span>
             </button>
           </div>
           <span className="flex-1" />
@@ -92,14 +94,16 @@ export function FriendsView() {
         {tab === 'add' ? (
           <AddFriend />
         ) : tab === 'pending' ? (
-          <FriendList title={`Заявки — ${pending.length}`} friends={pending} empty={['mailbox', 'Заявок нет', 'Новые заявки появятся здесь']} />
+          <FriendList title={t('people.friends.requestsTitle', { n: pending.length })} friends={pending} empty={['mailbox', t('people.friends.emptyRequests'), t('people.friends.emptyRequestsText')]} />
         ) : tab === 'all' ? (
-          <FriendList title={`Все друзья — ${accepted.length}`} friends={accepted} empty={['couch', 'Друзей пока нет', 'Здесь появятся друзья с сервера']} />
+          <FriendList title={t('people.friends.allTitle', { n: accepted.length })} friends={accepted} empty={['couch', t('people.friends.emptyFriends'), t('people.friends.emptyFriendsText')]} />
         ) : (
           <FriendList
-            title={`В сети — ${onlineFriends.length}`}
+            title={t('people.friends.onlineTitle', { n: onlineFriends.length })}
             friends={onlineFriends}
-            empty={accepted.length ? ['away', 'Никого нет в сети', 'Здесь появятся те, кто зайдёт'] : ['couch', 'Друзей пока нет', 'Здесь появятся друзья с сервера']}
+            empty={accepted.length
+                ? ['away', t('people.friends.emptyOnline'), t('people.friends.emptyOnlineText')]
+                : ['couch', t('people.friends.emptyFriends'), t('people.friends.emptyFriendsText')]}
           />
         )}
       </div>
@@ -121,6 +125,7 @@ function FriendList({ title, friends, empty }: { title: string; friends: Friend[
 }
 
 function FriendRow({ friend }: { friend: Friend }) {
+  const { t } = useT();
   const user = useStore((s) => s.users[friend.userId]);
   const online = useStore((s) => s.online.includes(friend.userId));
   const room = useRoomOf(friend.userId);
@@ -131,14 +136,20 @@ function FriendRow({ friend }: { friend: Friend }) {
     try {
       useStore.setState({ friends: await action() });
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Не получилось');
+      showError(e instanceof Error ? e.message : t('people.failed'));
     } finally {
       setBusy(false);
     }
   }
 
   const subtitle =
-    friend.status === 'incoming' ? 'Входящая заявка' : friend.status === 'outgoing' ? 'Заявка отправлена' : online ? 'В сети' : 'Не в сети';
+    friend.status === 'incoming'
+      ? t('people.friends.incoming')
+      : friend.status === 'outgoing'
+        ? t('people.friends.outgoing')
+        : online
+          ? t('people.friends.online')
+          : t('people.friends.offline');
 
   return (
     <div className="flex h-16 items-center gap-3 rounded-full px-2 pr-3 transition-colors hover:bg-default/50">
@@ -154,22 +165,22 @@ function FriendRow({ friend }: { friend: Friend }) {
         </span>
       </UserProfile>
       {friend.status === 'friend' && (
-        <RoundButton label="Написать" onPress={() => messageUser(friend.userId)}>
+        <RoundButton label={t('people.friends.message')} onPress={() => messageUser(friend.userId)}>
           <BubbleIcon />
         </RoundButton>
       )}
       {friend.status === 'incoming' && (
         <>
-          <RoundButton label="Принять" isDisabled={busy} onPress={() => run(() => api.acceptFriend(friend.userId))} className="hover:text-success">
+          <RoundButton label={t('people.friends.accept')} isDisabled={busy} onPress={() => run(() => api.acceptFriend(friend.userId))} className="hover:text-success">
             <CheckIcon />
           </RoundButton>
-          <RoundButton label="Отклонить" isDisabled={busy} onPress={() => run(() => api.removeFriend(friend.userId))} className="hover:text-danger">
+          <RoundButton label={t('people.friends.decline')} isDisabled={busy} onPress={() => run(() => api.removeFriend(friend.userId))} className="hover:text-danger">
             <XIcon />
           </RoundButton>
         </>
       )}
       {friend.status === 'outgoing' && (
-        <RoundButton label="Отменить заявку" isDisabled={busy} onPress={() => run(() => api.removeFriend(friend.userId))} className="hover:text-danger">
+        <RoundButton label={t('people.friends.cancelRequest')} isDisabled={busy} onPress={() => run(() => api.removeFriend(friend.userId))} className="hover:text-danger">
           <XIcon />
         </RoundButton>
       )}
@@ -178,6 +189,7 @@ function FriendRow({ friend }: { friend: Friend }) {
 }
 
 function AddFriend() {
+  const { t } = useT();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
@@ -196,10 +208,10 @@ function AddFriend() {
     setResult(null);
     try {
       useStore.setState({ friends: await api.addFriend(name) });
-      setResult({ ok: true, text: `Заявка для ${name.trim()} отправлена` });
+      setResult({ ok: true, text: t('people.friends.sent', { name: name.trim() }) });
       setName('');
     } catch (err) {
-      setResult({ ok: false, text: err instanceof Error ? err.message : 'Не получилось' });
+      setResult({ ok: false, text: err instanceof Error ? err.message : t('people.failed') });
     } finally {
       setBusy(false);
     }
@@ -207,27 +219,27 @@ function AddFriend() {
 
   return (
     <div className="px-3">
-      <h2 className="text-[16px] font-medium">Добавить в друзья</h2>
-      <p className="mt-1 text-[14px] text-muted">Ник человека с этого сервера</p>
+      <h2 className="text-[16px] font-medium">{t('people.friends.add')}</h2>
+      <p className="mt-1 text-[14px] text-muted">{t('people.friends.hint')}</p>
       <form onSubmit={submit} className="mt-3 flex h-14 items-center gap-2 rounded-full bg-default pl-5 pr-2 focus-within:ring-2 focus-within:ring-focus">
         <input
           autoFocus
           value={name}
           maxLength={32}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Ник"
-          aria-label="Ник друга"
+          placeholder={t('people.friends.nickPlaceholder')}
+          aria-label={t('people.friends.nickLabel')}
           className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-faint"
         />
         <Button type="submit" isPending={busy} isDisabled={!name.trim()} className="h-10 rounded-full px-5">
-          Отправить заявку
+          {t('people.friends.send')}
         </Button>
       </form>
       {result && <p className={`mt-2 text-[14px] ${result.ok ? 'text-success' : 'text-danger'}`}>{result.text}</p>}
 
       {people.length > 0 && (
         <section className="mt-8">
-          <h3 className="pb-2 text-[12px] text-faint">Люди на сервере</h3>
+          <h3 className="pb-2 text-[12px] text-faint">{t('people.friends.onServer')}</h3>
           {people.map((u) => (
             <div key={u.id} className="-mx-2 flex h-14 items-center gap-3 rounded-full px-2 transition-colors hover:bg-default/50">
               <UserProfile userId={u.id} placement="bottom start" className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">

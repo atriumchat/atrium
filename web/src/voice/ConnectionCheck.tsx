@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Room } from 'livekit-client';
 import { api } from '../api';
-import { PATH_LABEL, readStats, type CallPath } from './stats';
+import { pathLabel, readStats, type CallPath } from './stats';
 import { CheckIcon, XIcon } from '../ui/icons';
 import { Row } from '../ui/settings';
+import { t, useT } from '../i18n';
 
 /**
  * Do calls get through from here? Three tries against the server's LiveKit, each in a room of one:
@@ -28,7 +29,7 @@ export async function attempt(relayOnly: boolean): Promise<Result> {
   try {
     await Promise.race([
       room.connect(url, token, { autoSubscribe: false, rtcConfig: relayOnly ? { iceTransportPolicy: 'relay' } : undefined }),
-      new Promise((_, reject) => (timer = window.setTimeout(() => reject(new Error('не дождались ответа за 15 секунд')), 15_000))),
+      new Promise((_, reject) => (timer = window.setTimeout(() => reject(new Error(t('voice.check.timeout'))), 15_000))),
     ]);
     const ms = Math.round(performance.now() - started);
     // A moment for the stats to settle on the chosen path.
@@ -44,6 +45,7 @@ export async function attempt(relayOnly: boolean): Promise<Result> {
 
 /** The two tries, one after the other, as rows of the settings. Mount it again (a new `key`) to try again. */
 export function ConnectionCheck({ onDone }: { onDone?: (ok: boolean) => void }) {
+  const { t } = useT();
   const [normal, setNormal] = useState<Result>({ state: 'wait' });
   const [relay, setRelay] = useState<Result>({ state: 'wait' });
   const done = useRef(onDone);
@@ -69,8 +71,8 @@ export function ConnectionCheck({ onDone }: { onDone?: (ok: boolean) => void }) 
 
   return (
     <>
-      <Try title="Звонок" hint="Как браузер найдёт сам" result={normal} />
-      <Try title="Антилаг" hint="Через сервер, порт 443" result={relay} />
+      <Try title={t('voice.call.title')} hint={t('voice.check.normalHint')} result={normal} />
+      <Try title={t('voice.antiLag')} hint={t('voice.check.relayHint')} result={relay} />
     </>
   );
 }
@@ -78,6 +80,7 @@ export function ConnectionCheck({ onDone }: { onDone?: (ok: boolean) => void }) 
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 function Try({ title, hint, result }: { title: string; hint: string; result: Result }) {
+  const { t } = useT();
   return (
     <Row
       icon={
@@ -100,9 +103,9 @@ function Try({ title, hint, result }: { title: string; hint: string; result: Res
       title={title}
       value={
         result.state === 'ok'
-          ? capital([result.path && PATH_LABEL[result.path], result.rtt !== undefined && `${result.rtt} мс`, `за ${((result.ms ?? 0) / 1000).toFixed(1)} с`].filter(Boolean).join(' · '))
+          ? capital([result.path && pathLabel(result.path), result.rtt !== undefined && t('voice.ms', { value: result.rtt }), t('voice.check.took', { seconds: ((result.ms ?? 0) / 1000).toFixed(1) })].filter(Boolean).join(' · '))
           : result.state === 'fail'
-            ? `Не прошло: ${result.error}`
+            ? t('voice.check.failed', { error: result.error ?? '' })
             : hint
       }
     />

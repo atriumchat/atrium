@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store';
+import { localeOf, useT, type Key } from '../i18n';
 import { BubbleCloud, BubblePair, BubblePeanut, type BubblePerson } from '../voice/Bubbles';
 import { CallControls } from '../voice/VoiceView';
 import { ART, EmptyState, LineArt, SignInArt, type ArtName } from '../ui/Illustrations';
@@ -10,8 +11,9 @@ import { WhereToUse, type Platform } from '../account/WhereToUse';
  * made-up talking, so they can be checked without a microphone or a second person.
  */
 export function Playground() {
+  const { t, lang } = useT();
   const users = useStore((s) => s.users);
-  const all = useMemo(() => Object.values(users).sort((a, b) => a.name.localeCompare(b.name, 'ru')), [users]);
+  const all = useMemo(() => Object.values(users).sort((a, b) => a.name.localeCompare(b.name, localeOf(lang))), [users, lang]);
   const [kind, setKind] = useState<'cloud' | 'pair' | 'peanut'>('peanut');
   const [count, setCount] = useState(5);
   const [talker, setTalker] = useState<string | null>(null);
@@ -33,15 +35,15 @@ export function Playground() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="flex h-20 shrink-0 items-center gap-3 px-5">
-        <h1 className="text-[20px] font-medium">Пузыри</h1>
-        <span className="text-[14px] text-muted">говорит: {talker ? users[talker]?.name : 'никто'}</span>
+        <h1 className="text-[20px] font-medium">{t('settings.playground.bubbles')}</h1>
+        <span className="text-[14px] text-muted">{t('settings.playground.talking', { name: talker ? (users[talker]?.name ?? '') : t('settings.playground.nobody') })}</span>
         <span className="flex-1" />
         {(['cloud', 'pair', 'peanut'] as const).map((k) => (
           <button key={k} onClick={() => setKind(k)} className={`h-9 rounded-full px-4 text-[14px] ${kind === k ? 'bg-white text-black' : 'bg-default text-muted'}`}>
-            {k === 'cloud' ? 'Голосовой канал' : k === 'pair' ? 'Личка' : 'Группа'}
+            {k === 'cloud' ? t('settings.playground.voiceChannel') : k === 'pair' ? t('settings.playground.dm') : t('settings.playground.group')}
           </button>
         ))}
-        <input type="range" min={2} max={Math.max(2, all.length)} value={count} onChange={(e) => setCount(Number(e.target.value))} aria-label="Сколько людей" />
+        <input type="range" min={2} max={Math.max(2, all.length)} value={count} onChange={(e) => setCount(Number(e.target.value))} aria-label={t('settings.playground.howMany')} />
         <span className="w-6 text-[14px] text-muted">{count}</span>
       </header>
       <div className={`flex px-6 ${kind === 'cloud' ? 'min-h-0 flex-1' : kind === 'peanut' ? 'h-[300px]' : 'h-[230px]'}`}>
@@ -54,7 +56,7 @@ export function Playground() {
       <div className="flex flex-wrap gap-2 px-6 pb-6">
         {people.map((p) => (
           <button key={p.id} onClick={() => setTalker(p.id)} className="h-8 rounded-full bg-default px-3 text-[13px] text-muted hover:text-white">
-            {users[p.id]?.name} говорит
+            {t('settings.playground.says', { name: users[p.id]?.name ?? '' })}
           </button>
         ))}
       </div>
@@ -62,20 +64,20 @@ export function Playground() {
   );
 }
 
-const EMPTY: { art: ArtName; title: string; text: string; where: 'main' | 'list' | 'dialog' }[] = [
-  { art: 'couch', title: 'Друзей пока нет', text: 'Здесь появятся друзья с сервера', where: 'main' },
-  { art: 'away', title: 'Никого нет в сети', text: 'Здесь появятся те, кто зайдёт', where: 'main' },
-  { art: 'mailbox', title: 'Заявок нет', text: 'Новые заявки появятся здесь', where: 'main' },
-  { art: 'channel', title: '#общий', text: 'Это начало канала', where: 'main' },
-  { art: 'chat', title: 'Маша', text: 'Это начало переписки', where: 'main' },
-  { art: 'group', title: 'Катка по вечерам', text: 'Это начало группы', where: 'main' },
-  { art: 'voice', title: 'Голосовая', text: 'В комнате никого нет', where: 'main' },
-  { art: 'nothing', title: 'Канал не выбран', text: 'Здесь откроется канал', where: 'main' },
-  { art: 'messages', title: 'Сообщений пока нет', text: 'Здесь будут лички и группы', where: 'list' },
-  { art: 'search', title: 'Ничего не нашлось', text: 'Каналов с таким названием нет', where: 'list' },
-  { art: 'tray', title: 'Уведомлений нет', text: 'Упоминания и ответы появятся здесь', where: 'dialog' },
-  { art: 'search', title: 'Никого не нашлось', text: 'Друзей с таким ником нет', where: 'dialog' },
-  { art: 'group', title: 'Все друзья уже здесь', text: 'Позвать больше некого', where: 'dialog' },
+const EMPTY: { art: ArtName; id: string; where: 'main' | 'list' | 'dialog' }[] = [
+  { art: 'couch', id: 'friends', where: 'main' },
+  { art: 'away', id: 'online', where: 'main' },
+  { art: 'mailbox', id: 'requests', where: 'main' },
+  { art: 'channel', id: 'channel', where: 'main' },
+  { art: 'chat', id: 'chat', where: 'main' },
+  { art: 'group', id: 'group', where: 'main' },
+  { art: 'voice', id: 'voice', where: 'main' },
+  { art: 'nothing', id: 'nothing', where: 'main' },
+  { art: 'messages', id: 'messages', where: 'list' },
+  { art: 'search', id: 'searchChannels', where: 'list' },
+  { art: 'tray', id: 'tray', where: 'dialog' },
+  { art: 'search', id: 'searchFriends', where: 'dialog' },
+  { art: 'group', id: 'allHere', where: 'dialog' },
 ];
 
 /**
@@ -84,14 +86,15 @@ const EMPTY: { art: ArtName; title: string; text: string; where: 'main' | 'list'
  * and the phone sign-in's picture.
  */
 export function ArtPlayground() {
+  const { t } = useT();
   const [platform, setPlatform] = useState<Platform>('mac');
   const [scale, setScale] = useState(() => Number(new URLSearchParams(location.search).get('scale')) || 3);
   const frame = 'flex flex-col overflow-hidden rounded-[24px] border-[0.5px] border-edge';
   return (
     <div className="flex-1 overflow-y-auto p-6">
       <div className="flex items-center gap-3">
-        <h1 className="text-[20px] font-medium">Рисунки</h1>
-        <input type="range" min={1} max={8} step={0.5} value={scale} onChange={(e) => setScale(Number(e.target.value))} aria-label="Масштаб" />
+        <h1 className="text-[20px] font-medium">{t('settings.playground.art')}</h1>
+        <input type="range" min={1} max={8} step={0.5} value={scale} onChange={(e) => setScale(Number(e.target.value))} aria-label={t('settings.playground.scale')} />
         <span className="text-[14px] text-muted">×{scale}</span>
       </div>
       <div className="mt-4 flex flex-wrap items-end gap-x-10 gap-y-6">
@@ -102,7 +105,7 @@ export function ArtPlayground() {
           </figure>
         ))}
       </div>
-      <h1 className="mt-10 text-[20px] font-medium">Пустые места</h1>
+      <h1 className="mt-10 text-[20px] font-medium">{t('settings.playground.empties')}</h1>
       <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(360px,1fr))] gap-3">
         {EMPTY.map((e, i) => (
           <div
@@ -110,12 +113,12 @@ export function ArtPlayground() {
             data-shot={`empty-${i}`}
             className={`${frame} ${e.where === 'list' ? 'h-[300px] w-[320px]' : e.where === 'dialog' ? 'h-[300px] bg-overlay' : 'h-[420px]'}`}
           >
-            <EmptyState art={e.art} title={e.title} text={e.text} compact={e.where !== 'main'} plate={e.where === 'dialog' ? 'var(--overlay)' : undefined} />
+            <EmptyState art={e.art} title={t(`settings.playground.empty.${e.id}.title` as Key)} text={t(`settings.playground.empty.${e.id}.text` as Key)} compact={e.where !== 'main'} plate={e.where === 'dialog' ? 'var(--overlay)' : undefined} />
           </div>
         ))}
       </div>
       <div className="mt-10 flex items-center gap-2">
-        <h1 className="mr-3 text-[20px] font-medium">Где пользоваться</h1>
+        <h1 className="mr-3 text-[20px] font-medium">{t('settings.playground.whereToUse')}</h1>
         {(['mac', 'windows', 'ios', 'android', 'other'] as const).map((p) => (
           <button key={p} onClick={() => setPlatform(p)} className={`h-9 rounded-full px-4 text-[14px] ${platform === p ? 'bg-white text-black' : 'bg-default text-muted'}`}>
             {p}
@@ -125,7 +128,7 @@ export function ArtPlayground() {
       <div data-shot="where" className={`${frame} mt-4 h-[760px] ${platform === 'ios' || platform === 'android' ? 'w-[375px]' : ''}`}>
         <WhereToUse key={platform} platform={platform} onDone={() => setPlatform('mac')} />
       </div>
-      <h1 className="mt-10 text-[20px] font-medium">Вход на телефоне</h1>
+      <h1 className="mt-10 text-[20px] font-medium">{t('settings.playground.phoneSignIn')}</h1>
       <div data-shot="sign-in" className={`${frame} mt-4 w-[375px] bg-background`}>
         <SignInArt />
       </div>

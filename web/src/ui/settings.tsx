@@ -1,11 +1,12 @@
 import { useCallback, useState, type ComponentProps, type ReactNode } from 'react';
 import { Button } from '@heroui/react';
+import { useT } from '../i18n';
 import { useStore } from '../store';
 import { PushPage } from './PushPage';
 import { CheckIcon, ChevronRightIcon } from './icons';
 
 /*
- * The settings' look, after the setup wizard (account/setup.css) and the desktop app's «Свой сервер» window:
+ * The settings' look, after the setup wizard (account/setup.css) and the desktop app's "Your own server" window:
  * rows between hairlines, 46px fields with a 12px corner and a border inside, one white pill for the main action
  * and graphite for the rest. Fields are a faint white over whatever they sit on, so they read the same in the
  * settings and in a window opened over them. On the phone the rows go into grouped cards (see Rows), and whatever a
@@ -41,7 +42,7 @@ export function Secondary({ className = '', ...props }: ButtonProps) {
   );
 }
 
-/** Just the word, for the way out: "Отмена", "Убрать". */
+/** Just the word, for the way out: "Cancel", "Remove". */
 export function Quiet({ className = '', ...props }: ComponentProps<'button'>) {
   return (
     <button
@@ -146,7 +147,7 @@ export function Row({
   return <div className={ROW}>{inner}</div>;
 }
 
-/** The value at the end of a phone row, as iOS has it: "Обычное", the nick, the count. */
+/** The value at the end of a phone row, as iOS has it: "Default", the nick, the count. */
 export function RowValue({ children }: { children: ReactNode }) {
   return <span className="min-w-0 max-w-[50%] shrink-0 truncate text-[14px] text-muted max-md:text-[16px]">{children}</span>;
 }
@@ -229,6 +230,7 @@ export function useSub() {
  * no window over the settings and no page with one field. Keep it rendered and flip `open`, so the page can slide out.
  */
 export function SubPage({ open, title, onClose, children, footer }: { open: boolean; title: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
+  const { t } = useT();
   const isMobile = useStore((s) => s.isMobile);
   if (isMobile) {
     return (
@@ -252,7 +254,7 @@ export function SubPage({ open, title, onClose, children, footer }: { open: bool
       {children}
       <div className="mt-4 flex items-center gap-2">
         {footer}
-        <Quiet onClick={onClose}>{footer ? 'Отмена' : 'Свернуть'}</Quiet>
+        <Quiet onClick={onClose}>{footer ? t('common.cancel') : t('common.collapse')}</Quiet>
       </div>
     </div>
   ) : null;

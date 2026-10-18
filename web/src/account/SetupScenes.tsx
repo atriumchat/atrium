@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { t, useT } from '../i18n';
 import { GomexMark } from '../ui/Logo';
 import { HashIcon, HomeIcon, SearchIcon, SpeakerIcon } from '../ui/icons';
 
 /**
- * The wizard's right half, as in the desktop app's "Свой сервер" (desktop/onboarding.js): what the step is about,
+ * The wizard's right half, as in the desktop app's "Your own server" (desktop/onboarding.js): what the step is about,
  * filmed like Linear's onboarding — a camera close over a whole screen of Gomex at work, never showing its edges,
  * from two angles with hard cuts, dim, the spot that matters sharp and the rest soft. Each screen is drawn from the
  * person's own answers (the server's name and icon, the nick, the key, the link) and stays alive: messages come
@@ -29,11 +30,11 @@ export type Facts = {
   link: string;
 };
 
-const FRIENDS = [
-  { name: 'Аня', color: '#eb459e' },
-  { name: 'Дима', color: '#3ba55c' },
-  { name: 'Лёша', color: '#faa61a' },
-  { name: 'Катя', color: '#9b59b6' },
+const friends = () => [
+  { name: t('setup.scene.friend1'), color: '#eb459e' },
+  { name: t('setup.scene.friend2'), color: '#3ba55c' },
+  { name: t('setup.scene.friend3'), color: '#faa61a' },
+  { name: t('setup.scene.friend4'), color: '#9b59b6' },
 ];
 
 const letter = (name: string) => name.trim().charAt(0).toUpperCase() || '?';
@@ -69,13 +70,13 @@ function Browser({ host, children }: { host: string; children: ReactNode }) {
           Gomex
         </p>
         <p className="tabrow">
-          <span className="favicon">П</span>Почта
+          <span className="favicon">{t('setup.scene.tab1Icon')}</span>{t('setup.scene.tab1')}
         </p>
         <p className="tabrow">
-          <span className="favicon">М</span>Музыка
+          <span className="favicon">{t('setup.scene.tab2Icon')}</span>{t('setup.scene.tab2')}
         </p>
         <p className="tabrow">
-          <span className="favicon">+</span>Новая вкладка
+          <span className="favicon">+</span>{t('setup.scene.newTab')}
         </p>
       </div>
       <div className="page">{children}</div>
@@ -98,7 +99,7 @@ function ServerCircle({ icon }: { icon: string | null }) {
 
 /** Gomex on the server's side: the rail, the channel list (or `list`), your card, and `main`. */
 function App({ facts, list, main, tip = false }: { facts: Facts; list?: ReactNode; main: ReactNode; tip?: boolean }) {
-  const nick = facts.nick || 'Админ';
+  const nick = facts.nick || t('setup.scene.admin');
   return (
     <div className="app">
       <div className="panel rail">
@@ -114,14 +115,14 @@ function App({ facts, list, main, tip = false }: { facts: Facts; list?: ReactNod
       <div className="panel list">
         <p className="find">
           <SearchIcon size={18} />
-          Найти канал
+          {t('setup.scene.findChannel')}
         </p>
         {list ?? <Channels />}
         <div className="me">
           <Face name={nick} color={facts.color} here />
           <p>
             {nick}
-            <small>В сети</small>
+            <small>{t('setup.scene.online')}</small>
           </p>
         </div>
       </div>
@@ -133,51 +134,58 @@ function App({ facts, list, main, tip = false }: { facts: Facts; list?: ReactNod
 function Channels({ room }: { room?: ReactNode }) {
   return (
     <>
-      <p className="sect">Текстовые каналы</p>
+      <p className="sect">{t('setup.scene.textChannels')}</p>
       <p className={`chan${room ? '' : ' on'}`}>
-        <i>#</i>общий
+        <i>#</i>
+        {t('setup.scene.chGeneral')}
       </p>
       <p className="chan">
-        <i>#</i>игры
+        <i>#</i>
+        {t('setup.scene.chGames')}
       </p>
       <p className="chan">
-        <i>#</i>мемы
+        <i>#</i>
+        {t('setup.scene.chMemes')}
       </p>
       <p className="sect" style={{ marginTop: 18 }}>
-        Голосовые комнаты
+        {t('setup.scene.voiceRooms')}
       </p>
       {room ?? (
         <p className="chan">
           <SpeakerIcon size={18} className="opacity-60" />
-          Общий
+          {t('setup.scene.roomGeneral')}
         </p>
       )}
       <p className="chan">
         <SpeakerIcon size={18} className="opacity-60" />
-        Катка
+        {t('setup.scene.roomMatch')}
       </p>
     </>
   );
 }
 
-const CHAT = [
-  { ...FRIENDS[0], text: 'ну что, сегодня в 9?' },
-  { ...FRIENDS[1], text: 'я за' },
-  { ...FRIENDS[2], text: 'кто в Катку?' },
-  { ...FRIENDS[3], text: 'зашла 🔥' },
-  { ...FRIENDS[0], text: 'го' },
-  { ...FRIENDS[1], text: 'через 5 мин' },
-];
+const chat = () => {
+  const f = friends();
+  return [
+    { ...f[0], text: t('setup.scene.msg1') },
+    { ...f[1], text: t('setup.scene.msg2') },
+    { ...f[2], text: t('setup.scene.msg3') },
+    { ...f[3], text: t('setup.scene.msg4') },
+    { ...f[0], text: t('setup.scene.msg5') },
+    { ...f[1], text: t('setup.scene.msg6') },
+  ];
+};
+const CHAT_LENGTH = 6;
 
 function Chat({ at }: { at: number }) {
   return (
     <>
       <p className="head">
         <HashIcon size={20} className="opacity-50" />
-        общий
+        {t('setup.scene.chGeneral')}
       </p>
       <div className="chat">
-        {CHAT.map((m, k) => (
+        {chat().map((m, k) => (
           <div key={k} className={`msg${k > at ? ' later' : ''}`}>
             <Face name={m.name} color={m.color} />
             <p>
@@ -187,7 +195,7 @@ function Chat({ at }: { at: number }) {
           </div>
         ))}
       </div>
-      <p className="compose">Написать в #общий</p>
+      <p className="compose">{t('setup.scene.composer', { channel: t('setup.scene.chGeneral') })}</p>
     </>
   );
 }
@@ -200,7 +208,7 @@ function SignIn({ icon, children }: { icon: string | null; children: ReactNode }
       <h2>
         Gomex.
         <br />
-        Свои люди, свои звонки.
+        {t('setup.scene.tagline')}
       </h2>
       <form>{children}</form>
     </div>
@@ -222,11 +230,12 @@ function useLive(on: boolean, count: number, every: number, from = 1) {
   return at;
 }
 
-const CHECKS = ['Проверка сервера', 'Docker', 'SSH только по ключу', 'Файлы Gomex', 'Запуск', 'HTTPS-сертификаты'];
+const checks = () => [t('setup.scene.check1'), 'Docker', t('setup.scene.check3'), t('setup.scene.check4'), t('setup.scene.check5'), t('setup.scene.check6')];
 
 /** The installer's last screen: its steps done, and the link with the setup code in a box. */
 function CodeScene({ facts, on }: { facts: Facts; on: boolean }) {
-  const at = useLive(on, CHECKS.length, 1300);
+  const list = checks();
+  const at = useLive(on, list.length, 1300);
   const domain = facts.host.replace(/^app\./, '');
   const rows: [ReactNode, string?][] = [
     [
@@ -244,7 +253,7 @@ function CodeScene({ facts, on }: { facts: Facts; on: boolean }) {
       </>,
     ],
     ['Gomex'],
-    ...CHECKS.map((text, k): [ReactNode, string] => [
+    ...list.map((text, k): [ReactNode, string] => [
       <>
         <b className="ok">✓</b> {text}
       </>,
@@ -271,7 +280,7 @@ function CodeScene({ facts, on }: { facts: Facts; on: boolean }) {
 }
 
 function ServerScene({ facts, on }: { facts: Facts; on: boolean }) {
-  const at = useLive(on, CHAT.length, 1400, 3);
+  const at = useLive(on, CHAT_LENGTH, 1400, 3);
   return (
     <Scene on={on} kind="browser">
       <Browser host={facts.host}>
@@ -287,20 +296,20 @@ function AdminScene({ facts, on }: { facts: Facts; on: boolean }) {
       <Browser host={facts.host}>
         <SignIn icon={facts.icon}>
           <div className="switch-two">
-            <span className="on">Вход</span>
-            <span>Регистрация</span>
+            <span className="on">{t('setup.scene.signIn')}</span>
+            <span>{t('setup.scene.register')}</span>
           </div>
           <label>
-            Ник
+            {t('setup.admin.nick')}
             <span className="well focus">
               <span className="caret">{facts.nick}</span>
             </span>
           </label>
           <label>
-            Пароль
+            {t('setup.admin.password')}
             <span className="well dots">{dots(facts.passwordLength)}</span>
           </label>
-          <p className="go">Войти</p>
+          <p className="go">{t('setup.scene.signIn')}</p>
         </SignIn>
       </Browser>
     </Scene>
@@ -312,20 +321,20 @@ function KeyScene({ facts, on }: { facts: Facts; on: boolean }) {
     <Scene on={on} kind="browser">
       <Browser host={facts.host}>
         <SignIn icon={facts.icon}>
-          <h3>Восстановить доступ</h3>
+          <h3>{t('setup.scene.recover')}</h3>
           <label>
-            Ник
-            <span className="well">{facts.nick || 'Админ'}</span>
+            {t('setup.admin.nick')}
+            <span className="well">{facts.nick || t('setup.scene.admin')}</span>
           </label>
           <label>
-            Ключ восстановления
+            {t('setup.key.title')}
             <span className="well mono focus">{facts.key || 'XXXX-XXXX-XXXX-XXXX'}</span>
           </label>
           <label>
-            Новый пароль
+            {t('setup.scene.newPassword')}
             <span className="well dots">{dots(10)}</span>
           </label>
-          <p className="go">Сменить пароль и войти</p>
+          <p className="go">{t('setup.scene.resetSignIn')}</p>
         </SignIn>
       </Browser>
     </Scene>
@@ -334,27 +343,27 @@ function KeyScene({ facts, on }: { facts: Facts; on: boolean }) {
 
 /** The invite window over the app: friends coming in by the link one by one. */
 function InviteScene({ facts, on }: { facts: Facts; on: boolean }) {
-  const at = useLive(on, FRIENDS.length, 1500, 0);
+  const at = useLive(on, friends().length, 1500, 0);
   return (
     <Scene on={on} kind="browser">
       <Browser host={facts.host}>
         <App facts={facts} main={<Chat at={2} />} />
         <div className="veil">
           <div className="dialog">
-            <h3>Пригласить друзей</h3>
-            <p className="gray">Gomex — только по приглашениям. Ссылка админа без лимита.</p>
-            <p className="tiny">Пришли по ссылке</p>
-            {FRIENDS.map((f, k) => (
+            <h3>{t('setup.scene.inviteTitle')}</h3>
+            <p className="gray">{t('setup.scene.inviteNote')}</p>
+            <p className="tiny">{t('setup.scene.joined')}</p>
+            {friends().map((f, k) => (
               <p key={f.name} className={`came${k > at ? ' later' : ''}`}>
                 <Face name={f.name} color={f.color} />
                 <span>{f.name}</span>
-                <em>в друзьях</em>
+                <em>{t('setup.scene.friendsNow')}</em>
               </p>
             ))}
-            <p className="tiny">Ссылка-приглашение</p>
+            <p className="tiny">{t('setup.scene.inviteLink')}</p>
             <p className="linkbox focus">
               <span>{facts.link || `${facts.host}/?invite=…`}</span>
-              <b>Скопировать</b>
+              <b>{t('setup.scene.copy')}</b>
             </p>
           </div>
         </div>
@@ -363,9 +372,9 @@ function InviteScene({ facts, on }: { facts: Facts; on: boolean }) {
   );
 }
 
-/** The server at work: the admin in «Общий», friends dropping in, whoever talks ringed green. */
+/** The server at work: the admin in the general voice room, friends dropping in, whoever talks ringed green. */
 function RoomScene({ facts, on }: { facts: Facts; on: boolean }) {
-  const people = [{ name: facts.nick || 'Админ', color: facts.color }, ...FRIENDS];
+  const people = [{ name: facts.nick || t('setup.scene.admin'), color: facts.color }, ...friends()];
   const at = useLive(on, people.length, 1500);
   const talk = useLive(on, 7, 1100);
   const here = people.slice(0, Math.min(at + 1, people.length));
@@ -374,7 +383,7 @@ function RoomScene({ facts, on }: { facts: Facts; on: boolean }) {
     <>
       <p className="chan on">
         <SpeakerIcon size={18} className="text-[#30d158]" />
-        Общий
+        {t('setup.scene.roomGeneral')}
       </p>
       {people.map((p, k) => (
         <p key={p.name} className={`who${k > at ? ' later' : ''}`}>
@@ -394,7 +403,7 @@ function RoomScene({ facts, on }: { facts: Facts; on: boolean }) {
             <>
               <p className="head">
                 <SpeakerIcon size={20} className="opacity-50" />
-                Общий
+                {t('setup.scene.roomGeneral')}
               </p>
               <div className="room">
                 <div className="bubbles focus">
@@ -499,6 +508,7 @@ function useStill() {
 
 export function SetupScenes({ scene, facts }: { scene: SceneName; facts: Facts }) {
   useStill();
+  useT();
   // A scene is drawn from the first time it's shown on, so the one before can fade out under the next.
   const [shown, setShown] = useState<SceneName[]>([scene]);
   useEffect(() => setShown((s) => (s.includes(scene) ? s : [...s, scene])), [scene]);

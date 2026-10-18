@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@heroui/react';
 import { api } from '../api';
 import { addDm, closePicker, messageUser, openDm, showError, useStore, type Picker } from '../store';
-import { plural } from '../chat/format';
+import { useT } from '../i18n';
 import { Avatar } from '../ui/Avatar';
 import { Dialog } from '../ui/Dialog';
 import { EmptyState } from '../ui/Illustrations';
@@ -17,6 +17,7 @@ export function GroupPicker() {
 }
 
 function PickerDialog({ picker }: { picker: Picker }) {
+  const { t } = useT();
   const friends = useStore((s) => s.friends);
   const users = useStore((s) => s.users);
   const dm = useStore((s) => (picker.mode === 'add' ? s.dms.find((d) => d.id === picker.dmId) : undefined));
@@ -36,8 +37,8 @@ function PickerDialog({ picker }: { picker: Picker }) {
   const base = dm ? dm.members.length : 1;
   const left = MAX_MEMBERS - base - selected.length;
   const addingToGroup = dm?.kind === 'group';
-  const title = addingToGroup ? 'Добавить в группу' : picker.mode === 'add' ? 'Создать группу' : 'Новая группа';
-  const action = addingToGroup ? 'Добавить' : picker.mode === 'create' && selected.length <= 1 ? 'Открыть чат' : 'Создать группу';
+  const title = addingToGroup ? t('people.picker.addToGroup') : picker.mode === 'add' ? t('people.picker.createGroup') : t('people.picker.newGroup');
+  const action = addingToGroup ? t('people.picker.add') : picker.mode === 'create' && selected.length <= 1 ? t('people.picker.openChat') : t('people.picker.createGroup');
 
   function toggle(id: string) {
     setSelected((list) => (list.includes(id) ? list.filter((x) => x !== id) : left > 0 ? [...list, id] : list));
@@ -60,7 +61,7 @@ function PickerDialog({ picker }: { picker: Picker }) {
         openDm(group.id);
       }
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Не получилось');
+      showError(e instanceof Error ? e.message : t('people.failed'));
     } finally {
       setBusy(false);
     }
@@ -70,12 +71,12 @@ function PickerDialog({ picker }: { picker: Picker }) {
     <Dialog
       sheet
       title={title}
-      subtitle={left > 0 ? `Можно добавить ещё ${left} ${plural(left, ['друга', 'друзей', 'друзей'])}` : 'В группе уже 10 человек — больше нельзя'}
+      subtitle={left > 0 ? t('people.picker.canAdd', { n: left }) : t('people.picker.full')}
       onClose={closePicker}
       footer={
         <>
           <Button variant="tertiary" onPress={closePicker} className="rounded-full">
-            Отмена
+            {t('people.picker.cancel')}
           </Button>
           <Button onPress={submit} isPending={busy} isDisabled={selected.length === 0} className="rounded-full">
             {action}
@@ -89,16 +90,16 @@ function PickerDialog({ picker }: { picker: Picker }) {
           autoFocus
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Найти друга"
-          aria-label="Найти друга"
+          placeholder={t('people.picker.find')}
+          aria-label={t('people.picker.find')}
           className="min-w-0 flex-1 bg-transparent text-[16px] text-foreground outline-none placeholder:text-muted"
         />
       </label>
       {candidates.length === 0 ? (
         friends.some((f) => f.status === 'friend') ? (
-          <EmptyState compact art="search" title="Никого не нашлось" text="Друзей с таким ником нет" plate="var(--overlay)" />
+          <EmptyState compact art="search" title={t('people.picker.noResults')} text={t('people.picker.noResultsText')} plate="var(--overlay)" />
         ) : (
-          <EmptyState compact art="couch" title="Друзей пока нет" text="В группу зовут только друзей" plate="var(--overlay)" />
+          <EmptyState compact art="couch" title={t('people.friends.emptyFriends')} text={t('people.picker.onlyFriends')} plate="var(--overlay)" />
         )
       ) : (
         <ul>

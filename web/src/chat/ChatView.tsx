@@ -4,7 +4,8 @@ import { api } from '../api';
 import { addDm, mergeMessages, openFriends, openPicker, PAGE_SIZE, refreshDms, setEditing, setHasMore, setReplyingTo, showError, useStore, voiceMembers } from '../store';
 import { deleteMessage, editMessage, sendMessage, sendTyping, toggleReaction } from '../socket';
 import { joinVoice, leaveVoice } from '../voice/voice';
-import { dayDivider, messageStamp, plural, sameDay, timeOf } from './format';
+import { dayDivider, fullStamp, messageStamp, sameDay, timeOf } from './format';
+import { localeOf, useT } from '../i18n';
 import { useIsMobile } from '../hooks';
 import type { Dm, Message, Upload, User } from '../types';
 import { Avatar } from '../ui/Avatar';
@@ -44,6 +45,7 @@ export type Conversation = { id: string; kind: 'channel' | 'dm'; title: string; 
 const fetchHistory = (c: Conversation, before?: number) => (c.kind === 'dm' ? api.dmMessages(c.id, before) : api.messages(c.id, before));
 
 export function ChatView({ conversation }: { conversation: Conversation }) {
+  const { t } = useT();
   const channel = conversation;
   const isDm = conversation.kind === 'dm';
   const messages = useStore((s) => s.messages[channel.id]);
@@ -104,14 +106,14 @@ export function ChatView({ conversation }: { conversation: Conversation }) {
       mergeMessages(channel.id, list);
       setHasMore(channel.id, list.length === PAGE_SIZE);
     } catch (e) {
-      showError(`Не удалось загрузить сообщения: ${e instanceof Error ? e.message : e}`);
+      showError(t('chat.loadFailed', { error: e instanceof Error ? e.message : String(e) }));
     } finally {
       setLoadingOlder(false);
     }
   }
 
   const list = messages ?? [];
-  const placeholder = isGroup ? `Написать в «${channel.title}»` : isDm ? `Написать @${channel.title}` : `Написать в #${channel.title}`;
+  const placeholder = t(isGroup ? 'chat.placeholder.group' : isDm ? 'chat.placeholder.dm' : 'chat.placeholder.channel', { title: channel.title });
 
   return (
     <div
@@ -140,9 +142,9 @@ export function ChatView({ conversation }: { conversation: Conversation }) {
     >
       {dragging && (
         <div className="pointer-events-none absolute inset-3 z-20 flex flex-col items-center justify-center gap-1 rounded-[24px] border-2 border-dashed border-accent bg-window/90 text-center">
-          <div className="text-[20px] font-medium">Отпусти, чтобы прикрепить</div>
+          <div className="text-[20px] font-medium">{t('chat.drop.title')}</div>
           <div className="text-[15px] text-muted">
-            {isGroup ? `Картинки уйдут в «${channel.title}»` : isDm ? `Картинки уйдут @${channel.title}` : `Картинки уйдут в #${channel.title}`}
+            {t(isGroup ? 'chat.drop.group' : isDm ? 'chat.drop.dm' : 'chat.drop.channel', { title: channel.title })}
           </div>
         </div>
       )}
@@ -180,7 +182,7 @@ export function ChatView({ conversation }: { conversation: Conversation }) {
           <EmptyState
             art={isGroup ? 'group' : isDm ? 'chat' : 'channel'}
             title={isDm ? channel.title : `#${channel.title}`}
-            text={isGroup ? 'Это начало группы' : isDm ? 'Это начало переписки' : 'Это начало канала'}
+            text={t(isGroup ? 'chat.start.group' : isDm ? 'chat.start.dm' : 'chat.start.channel')}
           />
         ) : (
           <div className="flex-1" />
@@ -191,26 +193,26 @@ export function ChatView({ conversation }: { conversation: Conversation }) {
               <>
                 <DmAvatar dm={dm} size={72} />
                 <h2 className="mt-3 text-[28px] font-bold leading-9">{channel.title}</h2>
-                <p className="text-[15px] text-muted">Это начало группы «{channel.title}».</p>
+                <p className="text-[15px] text-muted">{t('chat.intro.group', { title: channel.title })}</p>
               </>
             ) : isDm ? (
               <>
                 <Avatar user={peer} size={72} />
                 <h2 className="mt-3 text-[28px] font-bold leading-9">{channel.title}</h2>
-                <p className="text-[15px] text-muted">Это начало вашей переписки с @{channel.title}.</p>
+                <p className="text-[15px] text-muted">{t('chat.intro.dm', { title: channel.title })}</p>
               </>
             ) : (
               <>
                 <span className="flex h-16 w-16 items-center justify-center rounded-full bg-default text-foreground">
                   <HashIcon size={32} />
                 </span>
-                <h2 className="mt-3 text-[28px] font-bold leading-9">Добро пожаловать в #{channel.title}</h2>
-                <p className="text-[15px] text-muted">Это начало канала.</p>
+                <h2 className="mt-3 text-[28px] font-bold leading-9">{t('chat.intro.welcome', { title: channel.title })}</h2>
+                <p className="text-[15px] text-muted">{t('chat.intro.channel')}</p>
               </>
             )}
           </div>
         )}
-        {hasMore && <div className="py-3 text-center text-[13px] text-muted">{loadingOlder ? 'Загружаем…' : ''}</div>}
+        {hasMore && <div className="py-3 text-center text-[13px] text-muted">{loadingOlder ? t('chat.loadingOlder') : ''}</div>}
 
         {list.map((m, i) => {
           const prev = list[i - 1];
@@ -246,6 +248,7 @@ export function ChatView({ conversation }: { conversation: Conversation }) {
 
 /** Header of a DM or group: who it is, call buttons, and a menu to add people (and rename or leave a group). */
 function DmHeader({ dm, title }: { dm: Dm; title: string }) {
+  const { t } = useT();
   const peer = useStore((s) => s.users[dm.userId ?? '']);
   const online = useStore((s) => dm.kind === 'dm' && s.online.includes(dm.userId ?? ''));
   const [renaming, setRenaming] = useState(false);
@@ -265,7 +268,7 @@ function DmHeader({ dm, title }: { dm: Dm; title: string }) {
           )
         }
         title={title}
-        subtitle={group ? `${dm.members.length} ${plural(dm.members.length, ['участник', 'участника', 'участников'])}` : online ? 'В сети' : 'Не в сети'}
+        subtitle={group ? t('chat.members', { n: dm.members.length }) : online ? t('chat.online') : t('chat.offline')}
         actions={
           <>
             <CallButtons dm={dm} />
@@ -279,6 +282,7 @@ function DmHeader({ dm, title }: { dm: Dm; title: string }) {
 }
 
 function ConversationMenu({ dm, onRename }: { dm: Dm; onRename: () => void }) {
+  const { t } = useT();
   const group = dm.kind === 'group';
   const [leaving, setLeaving] = useState(false);
 
@@ -293,33 +297,33 @@ function ConversationMenu({ dm, onRename }: { dm: Dm; onRename: () => void }) {
     <>
       <Dropdown>
         <Dropdown.Trigger
-          aria-label="Ещё"
+          aria-label={t('chat.more')}
           className="flex h-10 w-10 items-center justify-center rounded-full text-foreground outline-none transition-colors hover:bg-white/10 data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus"
         >
           <DotsIcon size={20} />
         </Dropdown.Trigger>
         <Dropdown.Popover placement="bottom end" className="min-w-56">
           <Dropdown.Menu
-            aria-label="Действия"
+            aria-label={t('chat.actions')}
             onAction={(key) => {
               if (key === 'add') openPicker({ mode: 'add', dmId: dm.id });
               if (key === 'rename') onRename();
               if (key === 'leave') setLeaving(true);
             }}
           >
-            <Dropdown.Item id="add" textValue="Добавить людей">
-              <Label>{group ? 'Добавить людей' : 'Создать группу'}</Label>
+            <Dropdown.Item id="add" textValue={t('chat.addPeople')}>
+              <Label>{group ? t('chat.addPeople') : t('chat.createGroup')}</Label>
               <UserPlusIcon size={16} className="ml-auto" />
             </Dropdown.Item>
             {group ? (
-              <Dropdown.Item id="rename" textValue="Переименовать">
-                <Label>Переименовать</Label>
+              <Dropdown.Item id="rename" textValue={t('chat.rename')}>
+                <Label>{t('chat.rename')}</Label>
                 <PencilIcon size={16} className="ml-auto" />
               </Dropdown.Item>
             ) : null}
             {group ? (
-              <Dropdown.Item id="leave" textValue="Покинуть группу" variant="danger">
-                <Label>Покинуть группу</Label>
+              <Dropdown.Item id="leave" textValue={t('chat.leaveGroup')} variant="danger">
+                <Label>{t('chat.leaveGroup')}</Label>
                 <LogoutIcon size={16} className="ml-auto text-danger" />
               </Dropdown.Item>
             ) : null}
@@ -328,9 +332,9 @@ function ConversationMenu({ dm, onRename }: { dm: Dm; onRename: () => void }) {
       </Dropdown>
       {leaving && (
         <ConfirmDialog
-          title="Покинуть группу?"
-          text="Вернуть в группу может только её участник"
-          confirmLabel="Покинуть"
+          title={t('chat.leaveTitle')}
+          text={t('chat.leaveText')}
+          confirmLabel={t('chat.leave')}
           onConfirm={leave}
           onClose={() => setLeaving(false)}
         />
@@ -340,6 +344,7 @@ function ConversationMenu({ dm, onRename }: { dm: Dm; onRename: () => void }) {
 }
 
 function RenameGroup({ dm, onClose }: { dm: Dm; onClose: () => void }) {
+  const { t } = useT();
   const [name, setName] = useState(dm.name);
   const [busy, setBusy] = useState(false);
 
@@ -349,7 +354,7 @@ function RenameGroup({ dm, onClose }: { dm: Dm; onClose: () => void }) {
       addDm(await api.renameGroup(dm.id, name));
       onClose();
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Не получилось');
+      showError(e instanceof Error ? e.message : t('common.failed'));
     } finally {
       setBusy(false);
     }
@@ -357,16 +362,16 @@ function RenameGroup({ dm, onClose }: { dm: Dm; onClose: () => void }) {
 
   return (
     <Dialog
-      title="Название группы"
-      subtitle="Пустое название — будут показаны имена участников"
+      title={t('chat.groupName')}
+      subtitle={t('chat.groupNameHint')}
       onClose={onClose}
       footer={
         <>
           <Button variant="tertiary" onPress={onClose} className="rounded-full">
-            Отмена
+            {t('common.cancel')}
           </Button>
           <Button onPress={save} isPending={busy} className="rounded-full">
-            Сохранить
+            {t('common.save')}
           </Button>
         </>
       }
@@ -377,8 +382,8 @@ function RenameGroup({ dm, onClose }: { dm: Dm; onClose: () => void }) {
           save();
         }}
       >
-        <TextField fullWidth value={name} onChange={setName} maxLength={48} autoFocus aria-label="Название группы">
-          <Input className="h-11 bg-default text-[16px]" placeholder="Например, «Катка по вечерам»" />
+        <TextField fullWidth value={name} onChange={setName} maxLength={48} autoFocus aria-label={t('chat.groupName')}>
+          <Input className="h-11 bg-default text-[16px]" placeholder={t('chat.groupNameExample')} />
         </TextField>
       </form>
     </Dialog>
@@ -387,6 +392,7 @@ function RenameGroup({ dm, onClose }: { dm: Dm; onClose: () => void }) {
 
 /** Banner like the reference's call header: who's talking right now, and a way in. */
 function OngoingCall() {
+  const { t } = useT();
   const voiceState = useStore((s) => s.voiceState);
   const channels = useStore((s) => s.channels);
   const users = useStore((s) => s.users);
@@ -416,7 +422,7 @@ function OngoingCall() {
         <div className="truncate text-[13px] tabular-nums text-muted">
           {inside ? (
             <>
-              Идёт звонок · <CallDuration />
+              {t('chat.call.ongoing')} · <CallDuration />
             </>
           ) : (
             room.members.map((m) => users[m.userId]?.name ?? '…').join(', ')
@@ -425,8 +431,8 @@ function OngoingCall() {
       </div>
       {!inside && (
         <Button onPress={() => joinVoice(room.channel.id)} className="h-10 shrink-0 rounded-full px-5 max-md:px-4">
-          <span className="max-md:hidden">Присоединиться</span>
-          <span className="md:hidden">Войти</span>
+          <span className="max-md:hidden">{t('chat.call.join')}</span>
+          <span className="md:hidden">{t('chat.call.joinShort')}</span>
         </Button>
       )}
     </div>
@@ -440,14 +446,15 @@ const QUICK_REACTIONS = ['👍', '❤️', '😂', '🔥'];
  * message, edit or reaction only re-renders its own row (message objects stay the same unless they change).
  */
 const MessageRow = memo(function MessageRow(props: { message: Message; startsGroup: boolean }) {
+  const { t } = useT();
   const blocked = useStore((s) => s.blocked.includes(props.message.userId));
   const [shown, setShown] = useState(false);
   if (blocked && !shown) {
     return (
       <div className="py-1 pl-[68px] pr-4 text-[13px] text-faint">
-        Сообщение от заблокированного ·{' '}
+        {t('chat.blocked.label')} ·{' '}
         <button onClick={() => setShown(true)} className="text-muted hover:text-foreground hover:underline">
-          показать
+          {t('chat.blocked.show')}
         </button>
       </div>
     );
@@ -456,6 +463,7 @@ const MessageRow = memo(function MessageRow(props: { message: Message; startsGro
 });
 
 function MessageBody({ message, startsGroup }: { message: Message; startsGroup: boolean }) {
+  const { t } = useT();
   const user = useStore((s) => s.users[message.userId]);
   const meId = useStore((s) => s.me?.id);
   const isAdmin = useStore((s) => s.canManageChannels);
@@ -488,9 +496,9 @@ function MessageBody({ message, startsGroup }: { message: Message; startsGroup: 
           </UserProfile>
           <div className="flex items-baseline gap-2">
             <UserProfile userId={message.userId} className="cursor-pointer text-[16px] font-medium leading-[22px] hover:underline">
-              <span>{user?.name ?? 'Кто-то'}</span>
+              <span>{user?.name ?? t('chat.someone')}</span>
             </UserProfile>
-            <span className="text-[12px] text-faint" title={new Date(message.createdAt).toLocaleString('ru-RU')}>
+            <span className="text-[12px] text-faint" title={fullStamp(message.createdAt)}>
               {messageStamp(message.createdAt)}
             </span>
           </div>
@@ -512,8 +520,8 @@ function MessageBody({ message, startsGroup }: { message: Message; startsGroup: 
             big={big}
             after={
               message.editedAt && (
-                <span className="text-[11px] text-faint" title={`Изменено ${new Date(message.editedAt).toLocaleString('ru-RU')}`}>
-                  {' '}(изменено)
+                <span className="text-[11px] text-faint" title={t('chat.editedAt', { time: fullStamp(message.editedAt) })}>
+                  {' '}({t('chat.edited')})
                 </span>
               )
             }
@@ -532,9 +540,9 @@ function MessageBody({ message, startsGroup }: { message: Message; startsGroup: 
       )}
       {confirming && (
         <ConfirmDialog
-          title="Удалить сообщение?"
-          text="Его больше никто не увидит. В следующий раз можно удалить сразу, с зажатым Shift."
-          confirmLabel="Удалить"
+          title={t('chat.deleteTitle')}
+          text={t('chat.deleteText')}
+          confirmLabel={t('chat.delete')}
           onConfirm={async () => {
             await deleteMessage(message.id);
           }}
@@ -547,9 +555,10 @@ function MessageBody({ message, startsGroup }: { message: Message; startsGroup: 
 
 /** The answered message above a reply: who and what, in one faint line; a click jumps to it. */
 function ReplyLine({ reply }: { reply: NonNullable<Message['replyTo']> }) {
+  const { t } = useT();
   const users = useStore((s) => s.users);
   const author = reply.deleted ? undefined : users[reply.userId];
-  const text = reply.deleted ? 'Сообщение удалено' : plainText(reply.content, users) || (reply.attachments ? 'Вложение' : '');
+  const text = reply.deleted ? t('chat.messageDeleted') : plainText(reply.content, users) || (reply.attachments ? t('chat.attachment') : '');
 
   function jump() {
     const el = document.getElementById(`msg-${reply.id}`);
@@ -570,6 +579,7 @@ function ReplyLine({ reply }: { reply: NonNullable<Message['replyTo']> }) {
 }
 
 function Reactions({ message, meId }: { message: Message; meId: string | undefined }) {
+  const { t } = useT();
   const users = useStore((s) => s.users);
   const reactions = message.reactions ?? [];
   if (reactions.length === 0) return null;
@@ -595,7 +605,7 @@ function Reactions({ message, meId }: { message: Message; meId: string | undefin
         );
       })}
       <EmojiPicker
-        label="Добавить реакцию"
+        label={t('chat.addReaction')}
         onPick={(emoji) => toggleReaction(message.id, emoji)}
         className="flex h-7 w-7 items-center justify-center rounded-full bg-default text-muted opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 data-[focus-visible=true]:opacity-100"
       >
@@ -607,28 +617,29 @@ function Reactions({ message, meId }: { message: Message; meId: string | undefin
 
 /** Hover bar at the message's top right: quick reactions, any emoji, reply, edit, delete. */
 function MessageActions(props: { onReact: (emoji: string) => void; onReply: () => void; onEdit?: () => void; onDelete?: (e?: { shiftKey?: boolean }) => void }) {
+  const { t } = useT();
   const btn = 'flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/10 hover:text-foreground';
   return (
     <div className="absolute -top-4 right-3 z-10 hidden items-center gap-0.5 rounded-full border-[0.5px] border-white/10 bg-default p-0.5 shadow-[0_6px_20px_rgba(0,0,0,.45)] group-hover:flex group-focus-within:flex has-[[aria-expanded=true]]:flex">
       {QUICK_REACTIONS.map((e) => (
-        <button key={e} onClick={() => props.onReact(e)} aria-label={`Реакция ${e}`} className={`${btn} text-[17px]`}>
+        <button key={e} onClick={() => props.onReact(e)} aria-label={t('chat.reaction', { emoji: e })} className={`${btn} text-[17px]`}>
           {e}
         </button>
       ))}
-      <EmojiPicker label="Другая реакция" onPick={props.onReact} className={btn}>
+      <EmojiPicker label={t('chat.moreReactions')} onPick={props.onReact} className={btn}>
         <SmileIcon size={18} />
       </EmojiPicker>
       <span className="mx-0.5 h-5 w-px bg-white/10" />
-      <button onClick={props.onReply} aria-label="Ответить" title="Ответить" className={btn}>
+      <button onClick={props.onReply} aria-label={t('chat.reply')} title={t('chat.reply')} className={btn}>
         <ReplyIcon size={18} />
       </button>
       {props.onEdit && (
-        <button onClick={props.onEdit} aria-label="Изменить" title="Изменить" className={btn}>
+        <button onClick={props.onEdit} aria-label={t('chat.edit')} title={t('chat.edit')} className={btn}>
           <PencilIcon size={17} />
         </button>
       )}
       {props.onDelete && (
-        <button onClick={(e) => props.onDelete!(e)} aria-label="Удалить" title="Удалить (Shift — без вопроса)" className={`${btn} hover:text-danger`}>
+        <button onClick={(e) => props.onDelete!(e)} aria-label={t('chat.delete')} title={t('chat.deleteHint')} className={`${btn} hover:text-danger`}>
           <TrashIcon size={17} />
         </button>
       )}
@@ -638,6 +649,7 @@ function MessageActions(props: { onReact: (emoji: string) => void; onReply: () =
 
 /** Editing your message in place: Enter saves, Esc cancels, an empty text asks to delete instead. */
 function EditBox({ message }: { message: Message }) {
+  const { t } = useT();
   const users = useStore((s) => s.users);
   const [text, setText] = useState(() => mentionsToNames(message.content, users));
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -658,7 +670,7 @@ function EditBox({ message }: { message: Message }) {
   async function save() {
     const content = namesToMentions(text.trim(), users);
     if (content === message.content) return setEditing(null);
-    if (!content && message.attachments.length === 0) return showError('Пустое сообщение не сохранить — удали его');
+    if (!content && message.attachments.length === 0) return showError(t('chat.emptyEdit'));
     if (await editMessage(message.id, content)) setEditing(null);
   }
 
@@ -676,18 +688,19 @@ function EditBox({ message }: { message: Message }) {
             void save();
           }
         }}
-        aria-label="Изменить сообщение"
+        aria-label={t('chat.editMessage')}
         className="w-full resize-none rounded-[20px] bg-default px-4 py-2.5 text-[16px] leading-6 text-foreground outline-none"
       />
       <div className="px-1 pt-1 text-[12px] text-faint">
-        Esc — <button onClick={() => setEditing(null)} className="text-[#64a8ff] hover:underline">отмена</button> · Enter —{' '}
-        <button onClick={() => void save()} className="text-[#64a8ff] hover:underline">сохранить</button>
+        Esc — <button onClick={() => setEditing(null)} className="text-[#64a8ff] hover:underline">{t('chat.editCancel')}</button> · Enter —{' '}
+        <button onClick={() => void save()} className="text-[#64a8ff] hover:underline">{t('chat.editSave')}</button>
       </div>
     </div>
   );
 }
 
 function TypingLine({ channelId, onVisibilityChange }: { channelId: string; onVisibilityChange: () => void }) {
+  const { t } = useT();
   const typing = useStore((s) => s.typing[channelId]);
   const users = useStore((s) => s.users);
   const meId = useStore((s) => s.me?.id);
@@ -720,7 +733,7 @@ function TypingLine({ channelId, onVisibilityChange }: { channelId: string; onVi
             ))}
           </span>
           <span className="truncate">
-            <span className="font-medium text-foreground">{names.join(', ')}</span> {names.length > 1 ? 'печатают…' : 'печатает…'}
+            <span className="font-medium text-foreground">{names.join(', ')}</span> {names.length > 1 ? t('chat.typing.many') : t('chat.typing.one')}
           </span>
         </>
       )}
@@ -736,6 +749,7 @@ type PendingFile = { key: string; name: string; size: number; preview?: string; 
 type MentionOption = { id: string; label: string; user?: User };
 
 function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: string; onResize: () => void; onSend: () => void }) {
+  const { t } = useT();
   const { id, placeholder, onResize, onSend } = props;
   const [text, setText] = useState('');
   const [pending, setPending] = useState<PendingFile[]>([]);
@@ -759,10 +773,10 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
       : [
           ...Object.values(users)
             .filter((u) => u.name.toLowerCase().startsWith(mentionQuery.toLowerCase()))
-            .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+            .sort((a, b) => a.name.localeCompare(b.name, localeOf()))
             .slice(0, 6)
             .map((u) => ({ id: u.id, label: u.name, user: u })),
-          ...('все'.startsWith(mentionQuery.toLowerCase()) ? [{ id: 'all', label: 'все' }] : []),
+          ...(t('common.md.everyone').startsWith(mentionQuery.toLowerCase()) ? [{ id: 'all', label: t('common.md.everyone') }] : []),
         ];
   const showMentions = options.length > 0;
 
@@ -797,7 +811,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
 
   function addFiles(files: File[]) {
     const accepted = files.slice(0, Math.max(0, MAX_ATTACHMENTS - pending.length));
-    if (accepted.length < files.length) showError(`Не больше ${MAX_ATTACHMENTS} вложений в одном сообщении`);
+    if (accepted.length < files.length) showError(t('chat.maxAttachments', { n: MAX_ATTACHMENTS }));
     for (const file of accepted) {
       const key = crypto.randomUUID();
       const preview = file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined;
@@ -805,7 +819,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
       api.upload(file).then(
         (upload) => setPending((list) => list.map((p) => (p.key === key ? { ...p, upload } : p))),
         (e) => {
-          showError(`Не удалось загрузить «${file.name}»: ${e instanceof Error ? e.message : e}`);
+          showError(t('chat.uploadFailed', { name: file.name, error: e instanceof Error ? e.message : String(e) }));
           if (preview) URL.revokeObjectURL(preview);
           setPending((list) => list.filter((p) => p.key !== key));
         },
@@ -858,7 +872,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
   return (
     <div className="relative flex items-end gap-3 px-3 pb-3 max-md:gap-2 max-md:px-2 max-md:pb-[max(8px,env(safe-area-inset-bottom))]">
       {showMentions && (
-        <div role="listbox" aria-label="Упомянуть" className="absolute bottom-[calc(100%-8px)] left-[88px] right-[88px] z-20 rounded-[20px] border-[0.5px] border-white/10 bg-default p-1.5 shadow-[0_12px_32px_rgba(0,0,0,.5)] max-md:left-2 max-md:right-2">
+        <div role="listbox" aria-label={t('chat.mention')} className="absolute bottom-[calc(100%-8px)] left-[88px] right-[88px] z-20 rounded-[20px] border-[0.5px] border-white/10 bg-default p-1.5 shadow-[0_12px_32px_rgba(0,0,0,.5)] max-md:left-2 max-md:right-2">
           {options.map((o, i) => (
             <button
               key={o.id}
@@ -879,12 +893,12 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
                 </span>
               )}
               <span className="truncate">{o.label}</span>
-              {!o.user && <span className="text-[13px] text-faint">всем в этом разговоре</span>}
+              {!o.user && <span className="text-[13px] text-faint">{t('chat.mentionAll')}</span>}
             </button>
           ))}
         </div>
       )}
-      <RoundButton size={isMobile ? 'md' : 'lg'} label="Прикрепить файл" onPress={() => fileInput.current?.click()} className="max-md:mb-1">
+      <RoundButton size={isMobile ? 'md' : 'lg'} label={t('chat.attachFile')} onPress={() => fileInput.current?.click()} className="max-md:mb-1">
         <PlusIcon strokeWidth={2.5} />
       </RoundButton>
       <input
@@ -902,10 +916,10 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
           <div className="-mx-2 mt-2 flex items-center gap-2 rounded-full bg-white/[0.06] py-1.5 pl-3 pr-1.5 text-[13px] text-muted">
             <ReplyIcon size={15} className="shrink-0" />
             <span className="min-w-0 flex-1 truncate">
-              Ответ <span className="font-medium text-foreground">{users[replyTo.userId]?.name ?? '…'}</span>:{' '}
-              {plainText(replyTo.content, users) || 'вложение'}
+              {t('chat.replyTo')} <span className="font-medium text-foreground">{users[replyTo.userId]?.name ?? '…'}</span>:{' '}
+              {plainText(replyTo.content, users) || t('chat.attachmentLower')}
             </span>
-            <button onClick={() => setReplyingTo(id, null)} aria-label="Не отвечать" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-white/10 hover:text-foreground">
+            <button onClick={() => setReplyingTo(id, null)} aria-label={t('chat.cancelReply')} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-white/10 hover:text-foreground">
               <XIcon size={14} strokeWidth={2.5} />
             </button>
           </div>
@@ -930,7 +944,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
                 )}
                 <button
                   type="button"
-                  aria-label={`Убрать «${p.name}»`}
+                  aria-label={t('chat.removeFile', { name: p.name })}
                   onClick={() => remove(p)}
                   className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
                 >
@@ -986,7 +1000,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
           className="max-h-[220px] w-full resize-none bg-transparent py-3 text-[16px] leading-6 text-foreground outline-none placeholder:text-faint"
         />
       </div>
-      <RoundButton size={isMobile ? 'md' : 'lg'} tone={canSend ? 'accent' : 'plain'} label="Отправить" isDisabled={!canSend} onPress={send} className="max-md:mb-1">
+      <RoundButton size={isMobile ? 'md' : 'lg'} tone={canSend ? 'accent' : 'plain'} label={t('chat.send')} isDisabled={!canSend} onPress={send} className="max-md:mb-1">
         <ArrowUpIcon strokeWidth={2.5} />
       </RoundButton>
     </div>

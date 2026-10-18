@@ -20,13 +20,13 @@ export function messageStamp(ts: number) {
   return `${new Date(ts).toLocaleDateString(localeOf())} ${timeOf(ts)}`;
 }
 
-/** Day divider label: "15 октября 2026 г." / "October 15, 2026". */
+/** Day divider label: "15 October 2026" / "October 15, 2026". */
 export const dayDivider = (ts: number) =>
   new Date(ts).toLocaleDateString(localeOf(), { day: 'numeric', month: 'long', year: 'numeric' });
 
 /** Full date and time for a tooltip. */
 export const fullStamp = (ts: number) => new Date(ts).toLocaleString(localeOf());
 
-/** Date only, e.g. "15 октября" / "October 15"; the year is added on request. */
+/** Date only, e.g. "15 October" / "October 15"; the year is added on request. */
 export const dateOnly = (ts: number, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long' }) =>
   new Date(ts).toLocaleDateString(localeOf(getLang()), opts);

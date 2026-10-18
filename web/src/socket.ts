@@ -2,6 +2,7 @@ import { io, type Socket } from 'socket.io-client';
 import type { CallState, Channel, Message, MyStatus, Reaction, User, VoiceEntry } from './types';
 import { api, setToken } from './api';
 import { desktop } from './desktop';
+import { errorText, t } from './i18n';
 import {
   addUser,
   dmTitle,
@@ -244,10 +245,10 @@ export function connectSocket(token: string, onUnauthorized: () => void) {
     if (!quiet && desktop && message.dm && message.userId !== me?.id && (document.hidden || !document.hasFocus())) {
       const s = useStore.getState();
       const dm = s.dms.find((d) => d.id === message.channelId);
-      const author = s.users[message.userId]?.name ?? 'Кто-то';
+      const author = s.users[message.userId]?.name ?? t('common.notify.someone');
       const title = dm?.kind === 'group' ? `${author} · ${dmTitle(dm, s.users, me?.id)}` : author;
       const images = message.attachments.length;
-      desktop.notify(title, plainText(message.content, s.users) || (images > 1 ? `${images} вложения` : 'Вложение'), message.channelId);
+      desktop.notify(title, plainText(message.content, s.users) || (images > 1 ? t('common.notify.images', { n: images }) : t('common.notify.attachment')), message.channelId);
     }
   });
 
@@ -286,11 +287,11 @@ export function connectSocket(token: string, onUnauthorized: () => void) {
   socket.on('voice:moved', () => {
     if (!useStore.getState().voiceChannelId) return;
     void leaveVoice({ silent: true });
-    showError(MOVED);
+    showError(movedText());
   });
 }
 
-export const MOVED = 'Звонок перешёл на другое устройство';
+export const movedText = () => t('common.callMoved');
 
 export function disconnectSocket() {
   socket?.disconnect();
@@ -307,18 +308,18 @@ export function disconnectSocket() {
 /** Emits and waits for the server's answer; shows the error (or "no connection") and returns null on failure. */
 async function ask<T = unknown>(event: string, data: unknown, failure: string): Promise<(T & { ok: true }) | null> {
   if (!socket?.connected) {
-    showError('Нет связи с сервером');
+    showError(t('common.noConnection'));
     return null;
   }
   try {
     const res = await socket.timeout(10_000).emitWithAck(event, data);
     if (!res?.ok) {
-      showError(res?.error ?? failure);
+      showError(res?.error ? errorText(res.code, res.error) : failure);
       return null;
     }
     return res;
   } catch {
-    showError('Сервер не ответил');
+    showError(t('common.noReply'));
     return null;
   }
 }
@@ -326,21 +327,21 @@ async function ask<T = unknown>(event: string, data: unknown, failure: string): 
 export async function sendMessage(channelId: string, content: string, attachments: string[] = [], replyTo?: string): Promise<boolean> {
   const isDm = useStore.getState().dms.some((d) => d.id === channelId);
   const res = isDm
-    ? await ask('dm:send', { dmId: channelId, content, attachments, replyTo }, 'Не удалось отправить сообщение')
-    : await ask('message:send', { channelId, content, attachments, replyTo }, 'Не удалось отправить сообщение');
+    ? await ask('dm:send', { dmId: channelId, content, attachments, replyTo }, t('chat.sendFailed'))
+    : await ask('message:send', { channelId, content, attachments, replyTo }, t('chat.sendFailed'));
   return res !== null;
 }
 
 export async function editMessage(id: string, content: string): Promise<boolean> {
-  return (await ask('message:edit', { id, content }, 'Не удалось изменить сообщение')) !== null;
+  return (await ask('message:edit', { id, content }, t('chat.editFailed'))) !== null;
 }
 
 export async function deleteMessage(id: string): Promise<boolean> {
-  return (await ask('message:delete', { id }, 'Не удалось удалить сообщение')) !== null;
+  return (await ask('message:delete', { id }, t('chat.deleteFailed'))) !== null;
 }
 
 export function toggleReaction(messageId: string, emoji: string) {
-  void ask('reaction:toggle', { messageId, emoji }, 'Не удалось поставить реакцию');
+  void ask('reaction:toggle', { messageId, emoji }, t('chat.reactFailed'));
 }
 
 export function declineCall(dmId: string) {

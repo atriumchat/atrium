@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { InputOTP, REGEXP_ONLY_DIGITS_AND_CHARS } from '@heroui/react';
 import { api, setToken } from '../api';
+import { useT } from '../i18n';
 import { inviteLink } from '../people/invite';
 import { CopyButton } from '../ui/CopyButton';
 import { GomexMark } from '../ui/Logo';
@@ -10,7 +11,7 @@ import { SetupScenes, type Facts, type SceneName } from './SetupScenes';
 import './setup.css';
 
 /**
- * First run on a fresh server, shown while it has no accounts. The desktop app's "Свой сервер" sets the server up and
+ * First run on a fresh server, shown while it has no accounts. The desktop app's "Your own server" sets the server up and
  * opens this page with the setup code in the address (?setup=CODE), in the same window: this is the second half of
  * that setup and looks the same (setup.css, after desktop/onboarding.css). The server's name and icon, the admin,
  * their recovery key, the first invite link, and done.
@@ -103,6 +104,7 @@ const ORDER: StepId[] = ['code', 'server', 'crop', 'admin', 'key', 'invite', 'do
 const past = (id: StepId) => !!DEMO && ORDER.indexOf(DEMO) > ORDER.indexOf(id);
 
 export function SetupWizard({ onDone }: { onDone: () => void }) {
+  const { t } = useT();
   const [fromUrl] = useState(() => codeFrom(new URLSearchParams(window.location.search).get('setup') ?? ''));
   // The code step is only on the way when the address didn't bring the code (or brought a wrong one).
   const [askCode, setAskCode] = useState(DEMO ? DEMO === 'code' : !fromUrl);
@@ -118,7 +120,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false);
 
   const [defaultName, setDefaultName] = useState('Gomex');
-  const [serverName, setServerName] = useState(past('code') ? 'Подвал' : '');
+  const [serverName, setServerName] = useState(past('code') ? t('setup.server.namePlaceholder') : '');
   const fileInput = useRef<HTMLInputElement>(null);
   // The icon as chosen, and the picture being cropped right now (a new one, or the chosen one again).
   const [icon, setIcon] = useState<{ image: HTMLImageElement; crop: Crop; name: string } | null>(null);
@@ -126,12 +128,12 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   const [draft, setDraft] = useState<{ image: HTMLImageElement; crop: Crop; name: string } | null>(null);
   const [draftPreview, setDraftPreview] = useState<string | null>(null);
 
-  const [nick, setNick] = useState(past('crop') ? 'Тимур' : '');
+  const [nick, setNick] = useState(past('crop') ? t('setup.admin.nickPlaceholder') : '');
   const [password, setPassword] = useState(nick && 'password');
   const [repeat, setRepeat] = useState(password);
   const [showPassword, setShowPassword] = useState(false);
   // What's already done on the server, so a retry after an error doesn't do it twice.
-  const [account, setAccount] = useState<{ color: string; serverName: string } | null>(past('admin') ? { color: '#5865f2', serverName: 'Подвал' } : null);
+  const [account, setAccount] = useState<{ color: string; serverName: string } | null>(past('admin') ? { color: '#5865f2', serverName: t('setup.server.namePlaceholder') } : null);
   const [iconSent, setIconSent] = useState(false);
 
   const [key, setKey] = useState(account ? 'K7QM-2XPA-9DHR-T4WC' : '');
@@ -173,7 +175,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
       api.setupCheck(fromUrl).catch((e) => {
         setAskCode(true);
         setCode('');
-        go('code', false, e instanceof Error ? e.message : 'Код не подходит');
+        go('code', false, e instanceof Error ? e.message : t('setup.code.invalid'));
       });
     }
   }, []);
@@ -191,7 +193,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     try {
       await action();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не получилось');
+      setError(e instanceof Error ? e.message : t('setup.error.failed'));
     } finally {
       setBusy(false);
     }
@@ -212,14 +214,14 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   async function pick(file: File | undefined) {
     if (fileInput.current) fileInput.current.value = '';
     if (!file) return;
-    if (file.size > 8 * 1024 * 1024) return setError('Картинка больше 8 МБ');
+    if (file.size > 8 * 1024 * 1024) return setError(t('setup.server.tooBig'));
     try {
       const image = await loadImage(file);
       if (draft && draft.image !== icon?.image) URL.revokeObjectURL(draft.image.src);
       setDraft({ image, crop: centred(image), name: file.name });
       go('crop');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не получилось открыть картинку');
+      setError(e instanceof Error ? e.message : t('setup.server.openFailed'));
     }
   }
 
@@ -251,7 +253,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
 
   function submitAdmin(e: FormEvent) {
     e.preventDefault();
-    if (password !== repeat) return setError('Пароли не совпадают');
+    if (password !== repeat) return setError(t('setup.admin.mismatch'));
     run(async () => {
       let made = account;
       if (!made) {
@@ -283,7 +285,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   /* ---------- 4. recovery key ---------- */
 
   function downloadKey() {
-    const text = [`Gomex · ${name}`, window.location.origin, `Ник: ${nick.trim()}`, `Ключ восстановления: ${key}`, ''].join('\n');
+    const text = [`Gomex · ${name}`, window.location.origin, t('setup.key.fileNick', { nick: nick.trim() }), t('setup.key.fileKey', { key }), ''].join('\n');
     const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
     const a = Object.assign(document.createElement('a'), { href: url, download: `gomex-${window.location.hostname}-key.txt` });
     a.click();
@@ -297,7 +299,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     if (step.id !== 'invite' || link) return;
     api.myInvite().then(
       (i) => setLink(inviteLink(i.code)),
-      (e) => setError(e instanceof Error ? e.message : 'Не получилось загрузить ссылку'),
+      (e) => setError(e instanceof Error ? e.message : t('setup.invite.loadFailed')),
     );
   }, [step.id, link]);
 
@@ -324,10 +326,10 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
               checkCode();
             }}
           >
-            <h1>Код установки</h1>
-            <p className="sub">Код — в конце ссылки от установщика</p>
+            <h1>{t('setup.code.title')}</h1>
+            <p className="sub">{t('setup.code.sub')}</p>
             <label className="field-label" htmlFor="setup-code">
-              Код
+              {t('setup.code.label')}
             </label>
             <InputOTP
               id="setup-code"
@@ -362,7 +364,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             </p>
             <div className="actions">
               <Primary type="submit" busy={busy} disabled={!code}>
-                Дальше
+                {t('setup.next')}
               </Primary>
             </div>
           </form>
@@ -376,35 +378,35 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
               if (serverName.trim()) go('admin');
             }}
           >
-            <h1>Название сервера</h1>
-            <p className="sub">Видно в приложении и в приглашениях</p>
+            <h1>{t('setup.server.title')}</h1>
+            <p className="sub">{t('setup.server.sub')}</p>
             <div className="rows">
               <div className="row">
                 <button
                   type="button"
                   className="logo icon-button"
-                  aria-label="Значок"
+                  aria-label={t('setup.server.icon')}
                   onClick={() => (icon ? (setDraft(icon), go('crop')) : fileInput.current?.click())}
                 >
                   {preview ? <img src={preview} alt="" /> : <GomexMark size={18} />}
                 </button>
                 <span className="grow">
-                  <b>Значок</b>
-                  <small>{icon ? <FileName name={icon.name} /> : 'Знак Gomex'}</small>
+                  <b>{t('setup.server.icon')}</b>
+                  <small>{icon ? <FileName name={icon.name} /> : t('setup.server.defaultIcon')}</small>
                 </span>
                 {icon && (
                   <button type="button" className="quiet" onClick={dropIcon}>
-                    Убрать
+                    {t('setup.server.remove')}
                   </button>
                 )}
                 <button type="button" className="secondary" onClick={() => fileInput.current?.click()}>
-                  {icon ? 'Другой' : 'Выбрать'}
+                  {icon ? t('setup.server.another') : t('setup.server.choose')}
                 </button>
               </div>
             </div>
             <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => pick(e.target.files?.[0])} />
             <label className="field-label gap" htmlFor="setup-name">
-              Название
+              {t('setup.server.nameLabel')}
             </label>
             <input
               id="setup-name"
@@ -412,7 +414,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
               value={serverName}
               onChange={(e) => setServerName(e.target.value)}
               maxLength={40}
-              placeholder="Подвал"
+              placeholder={t('setup.server.namePlaceholder')}
               spellCheck={false}
               autoComplete="off"
             />
@@ -422,15 +424,15 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             <div className="actions">
               {askCode && (
                 <button type="button" className="quiet" onClick={() => go('code', true)}>
-                  Назад
+                  {t('setup.back')}
                 </button>
               )}
               <span className="pair">
                 <button type="button" className="quiet" onClick={skipServer}>
-                  Пропустить
+                  {t('setup.server.skip')}
                 </button>
                 <Primary type="submit" disabled={!serverName.trim()}>
-                  Дальше
+                  {t('setup.next')}
                 </Primary>
               </span>
             </div>
@@ -446,14 +448,14 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
               keepCrop();
             }}
           >
-            <h1>Значок</h1>
+            <h1>{t('setup.server.icon')}</h1>
             <p className="sub">{draft.name}</p>
             <IconCropper image={draft.image} crop={draft.crop} onChange={(crop) => setDraft((d) => d && { ...d, crop })} className="crop" />
             <div className="actions">
               <button type="button" className="quiet" onClick={() => go('server', true)}>
-                Назад
+                {t('setup.back')}
               </button>
-              <Primary type="submit">Готово</Primary>
+              <Primary type="submit">{t('setup.server.cropDone')}</Primary>
             </div>
           </form>
         );
@@ -461,10 +463,10 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
       case 'admin':
         return (
           <form onSubmit={submitAdmin}>
-            <h1>Аккаунт админа</h1>
-            <p className="sub">Каналы, приглашения и настройки сервера</p>
+            <h1>{t('setup.admin.title')}</h1>
+            <p className="sub">{t('setup.admin.sub')}</p>
             <label className="field-label" htmlFor="setup-nick">
-              Ник
+              {t('setup.admin.nick')}
             </label>
             <input
               id="setup-nick"
@@ -475,14 +477,14 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
                 setError('');
               }}
               maxLength={32}
-              placeholder="Тимур"
+              placeholder={t('setup.admin.nickPlaceholder')}
               autoComplete="username"
               spellCheck={false}
               autoCapitalize="off"
               readOnly={!!account}
             />
             <label className="field-label" htmlFor="setup-password">
-              Пароль
+              {t('setup.admin.password')}
             </label>
             <span className="with-eye">
               <input
@@ -491,16 +493,16 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="От 8 символов"
+                placeholder={t('setup.admin.passwordHint')}
                 autoComplete="new-password"
                 readOnly={!!account}
               />
-              <button type="button" className="eye" aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'} onClick={() => setShowPassword((s) => !s)}>
+              <button type="button" className="eye" aria-label={showPassword ? t('setup.admin.hide') : t('setup.admin.show')} onClick={() => setShowPassword((s) => !s)}>
                 {EYE}
               </button>
             </span>
             <label className="field-label" htmlFor="setup-repeat">
-              Ещё раз
+              {t('setup.admin.repeat')}
             </label>
             <input
               id="setup-repeat"
@@ -512,14 +514,14 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
               readOnly={!!account}
             />
             <p className="error" role="alert">
-              {error || (mismatch ? 'Пароли не совпадают' : '')}
+              {error || (mismatch ? t('setup.admin.mismatch') : '')}
             </p>
             <div className="actions">
               <button type="button" className="quiet" onClick={() => go('server', true)}>
-                Назад
+                {t('setup.back')}
               </button>
               <Primary type="submit" busy={busy} disabled={!nick.trim() || password.length < 8 || repeat !== password}>
-                Создать
+                {t('setup.admin.create')}
               </Primary>
             </div>
           </form>
@@ -533,8 +535,8 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
               go('invite');
             }}
           >
-            <h1>Ключ восстановления</h1>
-            <p className="sub">Вернёт доступ, если пароль забыт</p>
+            <h1>{t('setup.key.title')}</h1>
+            <p className="sub">{t('setup.key.sub')}</p>
             <div className="relative">
               <p className="key pr-12">
                 {keyLines(key).map((line) => (
@@ -548,21 +550,21 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             <div className="tools">
               <button type="button" className={`secondary${keyKept === 'downloaded' ? ' did' : ''}`} onClick={downloadKey}>
                 {keyKept === 'downloaded' && DONE}
-                {keyKept === 'downloaded' ? 'Скачан' : 'Скачать'}
+                {keyKept === 'downloaded' ? t('setup.key.downloaded') : t('setup.key.download')}
               </button>
             </div>
             <p className="error" role="alert" style={{ marginTop: 10 }}>
               {error}
             </p>
-            {/* Ticked by itself once the key is copied or downloaded; "Дальше" waits for it. */}
+            {/* Ticked by itself once the key is copied or downloaded; "Next" waits for it. */}
             <label className="check">
               <input type="checkbox" checked={!!keyKept} onChange={(e) => setKeyKept(e.target.checked ? 'kept' : null)} />
-              <span>Ключ сохранён</span>
+              <span>{t('setup.key.kept')}</span>
             </label>
             <div className="actions">
               <span className="pair">
                 <Primary type="submit" disabled={!keyKept}>
-                  Дальше
+                  {t('setup.next')}
                 </Primary>
               </span>
             </div>
@@ -577,17 +579,17 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
               go('done');
             }}
           >
-            <h1>Позвать друзей</h1>
-            <p className="sub">По ссылке регистрация, и сразу в друзья</p>
+            <h1>{t('setup.invite.title')}</h1>
+            <p className="sub">{t('setup.invite.sub')}</p>
             <label className="field-label" htmlFor="setup-link">
-              Ссылка
+              {t('setup.invite.label')}
             </label>
             <div className="relative">
               <input
                 id="setup-link"
                 className="field pr-12"
                 readOnly
-                value={link.replace(/^https?:\/\//, '') || 'Загружаем…'}
+                value={link.replace(/^https?:\/\//, '') || t('setup.invite.loading')}
                 onFocus={(e) => e.currentTarget.select()}
               />
               <CopyButton text={link} onCopied={() => setLinkSent('copied')} className="absolute right-[5px] top-[5px]" />
@@ -596,7 +598,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
               {canShare && (
                 <button type="button" className={`secondary${linkSent === 'shared' ? ' did' : ''}`} disabled={!link} onClick={shareLink}>
                   {linkSent === 'shared' && DONE}
-                  Поделиться
+                  {t('setup.invite.share')}
                 </button>
               )}
             </div>
@@ -605,16 +607,16 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             </p>
             <div className="actions">
               <button type="button" className="quiet" onClick={() => go('key', true)}>
-                Назад
+                {t('setup.back')}
               </button>
               <span className="pair">
                 {!linkSent && (
                   <button type="button" className="quiet" onClick={() => go('done')}>
-                    Позже
+                    {t('setup.invite.later')}
                   </button>
                 )}
                 <Primary type="submit" disabled={!linkSent}>
-                  Дальше
+                  {t('setup.next')}
                 </Primary>
               </span>
             </div>
@@ -629,14 +631,14 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
               onDone();
             }}
           >
-            <h1>Всё готово</h1>
+            <h1>{t('setup.done.title')}</h1>
             <p className="sub">{host}</p>
             <div className="rows">
               <div className="row">
                 <span className="logo">{preview ? <img src={preview} alt="" /> : <GomexMark size={18} />}</span>
                 <span className="grow">
                   <b>{name}</b>
-                  <small>Сервер</small>
+                  <small>{t('setup.done.server')}</small>
                 </span>
               </div>
               <div className="row">
@@ -645,29 +647,29 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
                 </span>
                 <span className="grow">
                   <b>{nick.trim()}</b>
-                  <small>Админ</small>
+                  <small>{t('setup.done.admin')}</small>
                 </span>
               </div>
               <div className="row">
                 <span className="logo ok">{DONE}</span>
                 <span className="grow">
-                  <b>Ключ восстановления</b>
-                  <small>{keyKept === 'copied' ? 'Скопирован' : keyKept === 'downloaded' ? 'Скачан' : 'Сохранён'}</small>
+                  <b>{t('setup.key.title')}</b>
+                  <small>{keyKept === 'copied' ? t('setup.done.copied') : keyKept === 'downloaded' ? t('setup.key.downloaded') : t('setup.done.saved')}</small>
                 </span>
               </div>
               <div className="row">
                 <span className={`logo${linkSent ? ' ok' : ''}`}>{linkSent ? DONE : <UserPlusIcon size={18} />}</span>
                 <span className="grow">
-                  <b>Приглашение</b>
-                  <small>{linkSent === 'copied' ? 'Ссылка скопирована' : linkSent === 'shared' ? 'Ссылка отправлена' : 'Позже'}</small>
+                  <b>{t('setup.done.invite')}</b>
+                  <small>{linkSent === 'copied' ? t('setup.done.linkCopied') : linkSent === 'shared' ? t('setup.done.linkSent') : t('setup.invite.later')}</small>
                 </span>
               </div>
             </div>
             <div className="actions">
               <button type="button" className="quiet" onClick={() => go('invite', true)}>
-                Назад
+                {t('setup.back')}
               </button>
-              <Primary type="submit">Начать использование</Primary>
+              <Primary type="submit">{t('setup.done.start')}</Primary>
             </div>
           </form>
         );
@@ -712,12 +714,12 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             {render(step.id)}
           </section>
         </main>
-        <nav className="progress" aria-label="Шаги">
+        <nav className="progress" aria-label={t('setup.steps')}>
           {(
             [
-              ['server', 'Сервер'],
-              ['account', 'Аккаунт'],
-              ['friends', 'Друзья'],
+              ['server', t('setup.done.server')],
+              ['account', t('setup.progress.account')],
+              ['friends', t('setup.progress.friends')],
             ] as const
           ).map(([part, label]) => (
             <span key={part} className={`part${now === part ? ' now' : ''}`}>

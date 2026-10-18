@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { Room } from 'livekit-client';
 import { useStore } from '../store';
+import { t } from '../i18n';
 
 /**
  * What the call is going through right now, from the browser's WebRTC stats on LiveKit's two connections
@@ -9,14 +10,17 @@ import { useStore } from '../store';
 
 export type CallPath = 'direct' | 'udp' | 'tcp' | 'relay-udp' | 'relay-tcp' | 'relay-tls';
 
-export const PATH_LABEL: Record<CallPath, string> = {
-  direct: 'напрямую',
-  udp: 'по UDP',
-  tcp: 'по TCP',
-  'relay-udp': 'через сервер, UDP',
-  'relay-tcp': 'через сервер, TCP',
-  'relay-tls': 'через сервер, TLS 443',
-};
+const PATH_KEY = {
+  direct: 'voice.path.direct',
+  udp: 'voice.path.udp',
+  tcp: 'voice.path.tcp',
+  'relay-udp': 'voice.path.relayUdp',
+  'relay-tcp': 'voice.path.relayTcp',
+  'relay-tls': 'voice.path.relayTls',
+} as const;
+
+/** The path in words, in the current language. */
+export const pathLabel = (path: CallPath) => t(PATH_KEY[path]);
 
 export type CallStats = {
   path?: CallPath;

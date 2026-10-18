@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import { InputOTP, Input, Label, REGEXP_ONLY_DIGITS_AND_CHARS, TextField } from '@heroui/react';
+import { useT } from '../i18n';
 
 /** A new recovery key is XXXX-XXXX-XXXX-XXXX; the dashes aren't typed. */
 const ROWS = [
@@ -10,9 +11,10 @@ const KEY_LENGTH = ROWS.flat().length;
 
 /**
  * The recovery key in boxes, two rows of two groups. Pasting takes the key with dashes and spaces. Keys made before
- * had 32 characters and don't fit the boxes, so "Старый ключ" swaps them for a plain field.
+ * had 32 characters and don't fit the boxes, so "Old key" swaps them for a plain field.
  */
 export function RecoveryKeyInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const { t } = useT();
   const id = useId();
   const [old, setOld] = useState(false);
 
@@ -25,7 +27,7 @@ export function RecoveryKeyInput({ value, onChange }: { value: string; onChange:
       }}
       className="self-start text-[13px] text-muted hover:text-foreground hover:underline"
     >
-      {old ? 'Новый ключ' : 'Старый ключ'}
+      {old ? t('account.keyInput.newKey') : t('account.keyInput.oldKey')}
     </button>
   );
 
@@ -33,7 +35,7 @@ export function RecoveryKeyInput({ value, onChange }: { value: string; onChange:
     return (
       <div className="flex flex-col gap-2">
         <TextField isRequired fullWidth value={value} onChange={onChange} maxLength={64} autoComplete="off">
-          <Label>Ключ восстановления</Label>
+          <Label>{t('account.keyInput.label')}</Label>
           <Input className="h-11 bg-default font-mono text-[15px]" placeholder="XXXX-XXXX-…" />
         </TextField>
         {toggle}
@@ -43,7 +45,7 @@ export function RecoveryKeyInput({ value, onChange }: { value: string; onChange:
 
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>Ключ восстановления</Label>
+      <Label htmlFor={id}>{t('account.keyInput.label')}</Label>
       <InputOTP
         id={id}
         value={value}

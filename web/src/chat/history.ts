@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { api } from '../api';
 import { mergeMessages, PAGE_SIZE, setHasMore, showError, useStore } from '../store';
 
@@ -17,7 +18,7 @@ export function ensureHistory(id: string, kind: 'channel' | 'dm', { quiet = fals
       setHasMore(id, list.length === PAGE_SIZE);
     })
     .catch((e) => {
-      if (!quiet) showError(`Не удалось загрузить сообщения: ${e instanceof Error ? e.message : e}`);
+      if (!quiet) showError(t('chat.loadFailed', { error: e instanceof Error ? e.message : String(e) }));
     })
     .finally(() => inFlight.delete(id));
   inFlight.set(id, job);

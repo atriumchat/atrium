@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { t, useT } from '../i18n';
 import { showError } from '../store';
 import { CheckIcon, CopyIcon } from './icons';
 
@@ -6,8 +7,10 @@ import { CheckIcon, CopyIcon } from './icons';
  * Copying as an icon at the right end of the field that holds the text (a key, a link), not a button under it: the
  * tick says it's done for a moment. Place it inside a `relative` box, or in a flex row at its end.
  */
-export function CopyButton({ text, label = 'Скопировать', onCopied, className = '' }: { text: string; label?: string; onCopied?: () => void; className?: string }) {
+export function CopyButton({ text, label, onCopied, className = '' }: { text: string; label?: string; onCopied?: () => void; className?: string }) {
+  const { t } = useT();
   const [copied, setCopied] = useState(false);
+  const shownLabel = label ?? t('common.copy.label');
 
   async function copy() {
     try {
@@ -16,7 +19,7 @@ export function CopyButton({ text, label = 'Скопировать', onCopied, c
       onCopied?.();
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      showError('Не получилось скопировать — можно выделить вручную');
+      showError(t('common.copy.failed'));
     }
   }
 
@@ -25,8 +28,8 @@ export function CopyButton({ text, label = 'Скопировать', onCopied, c
       type="button"
       onClick={copy}
       disabled={!text}
-      aria-label={copied ? 'Скопировано' : label}
-      title={copied ? 'Скопировано' : label}
+      aria-label={copied ? t('common.copy.done') : shownLabel}
+      title={copied ? t('common.copy.done') : shownLabel}
       className={`flex size-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/[0.08] hover:text-foreground disabled:opacity-40 ${copied ? 'text-here hover:text-here' : ''} ${className}`}
     >
       {copied ? <CheckIcon size={18} strokeWidth={2.5} /> : <CopyIcon size={18} />}
@@ -48,5 +51,5 @@ export async function copyText(text: string) {
   area.select();
   const copied = document.execCommand('copy');
   area.remove();
-  if (!copied) throw new Error('Не получилось скопировать');
+  if (!copied) throw new Error(t('common.copy.failed'));
 }

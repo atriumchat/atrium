@@ -1,4 +1,4 @@
-/* The server's first-run wizard: the second half of "Свой сервер" in the desktop app (desktop/onboarding.css), in the
+/* The server's first-run wizard: the second half of "Your own server" in the desktop app (desktop/onboarding.css), in the
    same window and the same look. Proportions after Linear's onboarding: the step on the left in a narrow column, the
    step's own picture on the right. Everything is under .setup, and class names stay clear of HeroUI's (.input, .label…). */
 
@@ -250,6 +250,9 @@
   flex: 1;
   min-width: 0;
 }
+.setup .row > button {
+  flex: none;
+}
 .setup .row b {
   display: block;
   overflow: hidden;
@@ -348,7 +351,7 @@
 .setup .tools:empty {
   display: none;
 }
-/* "Ключ сохранён": a round box, the white tick when it's done, like the rest of the setup. */
+/* "Key saved": a round box, the white tick when it's done, like the rest of the setup. */
 .setup .check {
   display: inline-flex;
   align-items: center;
@@ -517,6 +520,7 @@
   display: grid;
   gap: 8px;
   width: 64px;
+  min-width: max-content;
 }
 .setup .track {
   position: relative;

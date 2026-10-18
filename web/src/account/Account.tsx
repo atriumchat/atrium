@@ -5,21 +5,35 @@ import { showError, useStore } from '../store';
 import { expectNewToken, switchToken } from '../socket';
 import { Avatar } from '../ui/Avatar';
 import { CheckIcon } from '../ui/icons';
-import { Primary, Row, RowValue, Rows, Secondary, SubPage, field, fieldArea, fieldLabel, useSub } from '../ui/settings';
+import { ChoiceRow, Primary, Row, RowValue, Rows, Secondary, SubPage, field, fieldArea, fieldLabel, useSub } from '../ui/settings';
 import { AvatarPicker, BioEditor } from '../people/UserProfile';
 import { downloadKey } from './RecoveryKey';
 import { CopyButton } from '../ui/CopyButton';
+import { LANGS, setLang, useT, type Lang } from '../i18n';
 
 /**
- * The "Аккаунт" page of the settings: photo and about, the nick, then a row each for the password, the recovery key
+ * The "Account" page of the settings: photo and about, the nick, then a row each for the password, the recovery key
  * and who's blocked; their forms open only from there. On the phone it is one group of the settings page, the nick
- * a row like the rest (the photo and about are on the "Вы" tab).
+ * a row like the rest (the photo and about are on the "You" tab).
  */
+/** Per device (not part of the account), so it is shown by the phone's "You" tab too. */
+export function LanguageRow() {
+  const { t, lang } = useT();
+  return (
+    <ChoiceRow<Lang>
+      title={t('account.language')}
+      value={lang}
+      options={LANGS.map((l): [Lang, string] => [l.id, l.label])}
+      onChange={setLang}
+    />
+  );
+}
+
 export function AccountSettings() {
   const isMobile = useStore((s) => s.isMobile);
   if (isMobile) {
     return (
-      // The nick is on the «Профиль» page with the photo; here only what's rarely touched.
+      // The nick is on the "Profile" page with the photo; here only what's rarely touched.
       <Rows className="mt-2">
         <PasswordRow />
         <RecoveryRow />
@@ -32,6 +46,7 @@ export function AccountSettings() {
       <ProfileBlock />
       <NameField className="mt-6" />
       <Rows className="mt-8">
+        <LanguageRow />
         <PasswordRow />
         <RecoveryRow />
         <BlockedRow />
@@ -53,14 +68,15 @@ function ProfileBlock() {
 }
 
 export function NickRow() {
+  const { t } = useT();
   const name = useStore((s) => s.me?.name);
   const sub = useSub();
   return (
     <>
-      <Row title="Ник" onPress={sub.show}>
+      <Row title={t('account.nick.title')} onPress={sub.show}>
         <RowValue>{name}</RowValue>
       </Row>
-      <SubPage key={sub.key} open={sub.open} title="Ник" onClose={sub.hide}>
+      <SubPage key={sub.key} open={sub.open} title={t('account.nick.title')} onClose={sub.hide}>
         <NameField onSaved={sub.hide} className="mt-2" />
       </SubPage>
     </>
@@ -68,6 +84,7 @@ export function NickRow() {
 }
 
 function NameField({ onSaved, className = '' }: { onSaved?: () => void; className?: string }) {
+  const { t } = useT();
   const me = useStore((s) => s.me);
   const id = useId();
   const [name, setName] = useState(me?.name ?? '');
@@ -84,7 +101,7 @@ function NameField({ onSaved, className = '' }: { onSaved?: () => void; classNam
       setPassword('');
       onSaved?.();
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Не удалось сменить ник');
+      showError(err instanceof Error ? err.message : t('account.nick.failed'));
     } finally {
       setBusy(false);
     }
@@ -94,7 +111,7 @@ function NameField({ onSaved, className = '' }: { onSaved?: () => void; classNam
     <form onSubmit={submit} className={className}>
       {/* On the phone this is a page of its own, titled the same. */}
       <label htmlFor={id} className={`${fieldLabel} max-md:sr-only`}>
-        Ник
+        {t('account.nick.title')}
       </label>
       <input id={id} value={name} maxLength={32} onChange={(e) => setName(e.target.value)} className={field} autoComplete="username" autoFocus={!!onSaved} />
       {/* A new nick is confirmed with the password, right under it. */}
@@ -104,13 +121,13 @@ function NameField({ onSaved, className = '' }: { onSaved?: () => void; classNam
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Пароль для подтверждения"
-            aria-label="Пароль"
+            placeholder={t('account.nick.passwordPlaceholder')}
+            aria-label={t('account.nick.passwordLabel')}
             className={field}
             autoComplete="current-password"
           />
           <Primary type="submit" isPending={busy} isDisabled={!password} className="shrink-0">
-            Сохранить
+            {t('account.nick.save')}
           </Primary>
         </div>
       )}
@@ -119,16 +136,18 @@ function NameField({ onSaved, className = '' }: { onSaved?: () => void; classNam
 }
 
 function PasswordRow() {
+  const { t } = useT();
   const sub = useSub();
   return (
     <>
-      <Row title="Пароль" action="Сменить" onPress={sub.show} />
+      <Row title={t('account.password.title')} action={t('account.password.change')} onPress={sub.show} />
       <PasswordPage key={sub.key} open={sub.open} onClose={sub.hide} />
     </>
   );
 }
 
 function PasswordPage({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useT();
   const isMobile = useStore((s) => s.isMobile);
   const form = useId();
   const [current, setCurrent] = useState('');
@@ -139,16 +158,16 @@ function PasswordPage({ open, onClose }: { open: boolean; onClose: () => void })
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (next.length < 8) return showError('Пароль — от 8 символов');
+    if (next.length < 8) return showError(t('account.password.tooShort'));
     setBusy(true);
     expectNewToken();
     try {
       const { token } = await api.changePassword(current, next);
       switchToken(token);
-      toast('Пароль сменён');
+      toast(t('account.password.changed'));
       onClose();
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Не удалось сменить пароль');
+      showError(err instanceof Error ? err.message : t('account.password.failed'));
     } finally {
       setBusy(false);
     }
@@ -157,11 +176,11 @@ function PasswordPage({ open, onClose }: { open: boolean; onClose: () => void })
   return (
     <SubPage
       open={open}
-      title="Смена пароля"
+      title={t('account.password.pageTitle')}
       onClose={onClose}
       footer={
         <Primary type="submit" form={form} isPending={busy} isDisabled={!current || !next || next !== repeat}>
-          {isMobile ? 'Готово' : 'Сменить пароль'}
+          {isMobile ? t('account.password.done') : t('account.password.submit')}
         </Primary>
       }
     >
@@ -170,8 +189,8 @@ function PasswordPage({ open, onClose }: { open: boolean; onClose: () => void })
           type="password"
           value={current}
           onChange={(e) => setCurrent(e.target.value)}
-          placeholder="Текущий пароль"
-          aria-label="Текущий пароль"
+          placeholder={t('account.password.current')}
+          aria-label={t('account.password.current')}
           className={field}
           autoComplete="current-password"
           autoFocus
@@ -180,8 +199,8 @@ function PasswordPage({ open, onClose }: { open: boolean; onClose: () => void })
           type="password"
           value={next}
           onChange={(e) => setNext(e.target.value)}
-          placeholder="Новый пароль, от 8 символов"
-          aria-label="Новый пароль"
+          placeholder={t('account.password.newPlaceholder')}
+          aria-label={t('account.password.newLabel')}
           className={field}
           autoComplete="new-password"
         />
@@ -189,13 +208,13 @@ function PasswordPage({ open, onClose }: { open: boolean; onClose: () => void })
           type="password"
           value={repeat}
           onChange={(e) => setRepeat(e.target.value)}
-          placeholder="Ещё раз"
-          aria-label="Новый пароль ещё раз"
+          placeholder={t('account.password.repeatPlaceholder')}
+          aria-label={t('account.password.repeatLabel')}
           className={field}
           autoComplete="new-password"
         />
         <p className={`pt-1 text-[13px] ${mismatch ? 'text-danger' : 'text-muted'}`}>
-          {mismatch ? 'Пароли не совпадают' : 'Остальные устройства выйдут из аккаунта'}
+          {mismatch ? t('account.password.mismatch') : t('account.password.othersSignOut')}
         </p>
       </form>
     </SubPage>
@@ -204,11 +223,17 @@ function PasswordPage({ open, onClose }: { open: boolean; onClose: () => void })
 
 /** The key is shown once; only its hash stays on the server. With it and the nick a new password can be set. */
 function RecoveryRow() {
+  const { t } = useT();
   const has = useStore((s) => s.hasRecoveryKey);
   const sub = useSub();
   return (
     <>
-      <Row title="Ключ восстановления" value={has ? 'Создан' : 'Не создан'} action={has ? 'Новый ключ' : 'Создать'} onPress={sub.show} />
+      <Row
+        title={t('account.recovery.title')}
+        value={has ? t('account.recovery.exists') : t('account.recovery.missing')}
+        action={has ? t('account.recovery.renew') : t('account.recovery.create')}
+        onPress={sub.show}
+      />
       <RecoveryPage key={sub.key} open={sub.open} onClose={sub.hide} />
     </>
   );
@@ -219,6 +244,7 @@ const KEPT = 'text-here [--button-fg:var(--room-here)] [&_svg]:size-3.5';
 
 /** Asks for the password, then shows the new key to copy or download: the old one stops working at that moment. */
 function RecoveryPage({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useT();
   const name = useStore((s) => s.me?.name ?? '');
   const serverName = useStore((s) => s.serverName);
   const form = useId();
@@ -236,7 +262,7 @@ function RecoveryPage({ open, onClose }: { open: boolean; onClose: () => void })
       setPassword('');
       useStore.setState({ hasRecoveryKey: true });
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Не удалось создать ключ');
+      showError(err instanceof Error ? err.message : t('account.recovery.failed'));
     } finally {
       setBusy(false);
     }
@@ -246,14 +272,14 @@ function RecoveryPage({ open, onClose }: { open: boolean; onClose: () => void })
   return (
     <SubPage
       open={open}
-      title="Ключ восстановления"
+      title={t('account.recovery.title')}
       onClose={onClose}
       footer={
         key ? (
-          <Primary onPress={onClose}>Готово</Primary>
+          <Primary onPress={onClose}>{t('account.recovery.done')}</Primary>
         ) : (
           <Primary type="submit" form={form} isPending={busy} isDisabled={!password}>
-            Создать
+            {t('account.recovery.create')}
           </Primary>
         )
       }
@@ -273,7 +299,7 @@ function RecoveryPage({ open, onClose }: { open: boolean; onClose: () => void })
               className={`max-md:h-11 max-md:flex-1 ${kept === 'downloaded' ? KEPT : ''}`}
             >
               {kept === 'downloaded' && done}
-              {kept === 'downloaded' ? 'Скачан' : 'Скачать'}
+              {kept === 'downloaded' ? t('account.recovery.downloaded') : t('account.recovery.download')}
             </Secondary>
           </div>
         </div>
@@ -283,8 +309,8 @@ function RecoveryPage({ open, onClose }: { open: boolean; onClose: () => void })
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Пароль"
-            aria-label="Пароль"
+            placeholder={t('account.recovery.password')}
+            aria-label={t('account.recovery.password')}
             className={field}
             autoComplete="current-password"
             autoFocus
@@ -297,6 +323,7 @@ function RecoveryPage({ open, onClose }: { open: boolean; onClose: () => void })
 
 /** Only while someone is blocked: the count on the row, the people inside. */
 function BlockedRow() {
+  const { t } = useT();
   const blocked = useStore((s) => s.blocked);
   const users = useStore((s) => s.users);
   const sub = useSub();
@@ -309,18 +336,18 @@ function BlockedRow() {
   return (
     <>
       {blocked.length > 0 && (
-        <Row title="Заблокированные" onPress={sub.show}>
+        <Row title={t('account.blocked.title')} onPress={sub.show}>
           <RowValue>{blocked.length}</RowValue>
         </Row>
       )}
-      <SubPage open={open} title="Заблокированные" onClose={hide}>
+      <SubPage open={open} title={t('account.blocked.title')} onClose={hide}>
         <Rows className="max-md:mt-2">
           {blocked.map((id) => (
             <Row key={id} icon={<Avatar user={users[id]} size={34} />} title={users[id]?.name ?? '…'}>
               <Secondary
-                onPress={() => api.unblock(id).then((list) => useStore.setState({ blocked: list }), (e) => showError(e instanceof Error ? e.message : 'Не получилось'))}
+                onPress={() => api.unblock(id).then((list) => useStore.setState({ blocked: list }), (e) => showError(e instanceof Error ? e.message : t('account.blocked.failed')))}
               >
-                Разблокировать
+                {t('account.blocked.unblock')}
               </Secondary>
             </Row>
           ))}

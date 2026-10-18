@@ -4,12 +4,14 @@ import { resetLink } from '../account/resetLink';
 import { showError } from '../store';
 import { CopyButton } from '../ui/CopyButton';
 import { Dialog } from '../ui/Dialog';
+import { useT } from '../i18n';
 
 /**
- * Admin only: «Ссылка для сброса пароля» for a member who lost the password and the recovery key. Making it shows the
+ * Admin only: a password reset link for a member who lost the password and the recovery key. Making it shows the
  * link once (the server keeps only a hash); a newer link replaces the older one.
  */
 export function ResetLinkButton({ userId, name }: { userId: string; name: string }) {
+  const { t } = useT();
   const [link, setLink] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -18,7 +20,7 @@ export function ResetLinkButton({ userId, name }: { userId: string; name: string
     try {
       setLink(resetLink((await api.makeResetLink(userId)).token));
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Не получилось');
+      showError(e instanceof Error ? e.message : t('account.resetLink.failed'));
     } finally {
       setBusy(false);
     }
@@ -31,7 +33,7 @@ export function ResetLinkButton({ userId, name }: { userId: string; name: string
         disabled={busy}
         className="mt-1 w-full rounded-full py-2 text-[13px] text-muted transition-colors hover:bg-white/[0.06] hover:text-foreground disabled:opacity-60"
       >
-        Ссылка для сброса пароля
+        {t('account.resetLink.button')}
       </button>
       {link && <ResetLinkDialog name={name} link={link} onClose={() => setLink(null)} />}
     </>
@@ -39,10 +41,11 @@ export function ResetLinkButton({ userId, name }: { userId: string; name: string
 }
 
 function ResetLinkDialog({ name, link, onClose }: { name: string; link: string; onClose: () => void }) {
+  const { t } = useT();
   return (
     <Dialog
-      title="Ссылка для сброса пароля"
-      subtitle={`Для ${name}. Действует 24 часа, открывается один раз.`}
+      title={t('account.resetLink.title')}
+      subtitle={t('account.resetLink.subtitle', { name })}
       onClose={onClose}
     >
       <div className="flex items-center gap-1 rounded-[18px] bg-surface-tertiary py-1.5 pl-4 pr-1.5">

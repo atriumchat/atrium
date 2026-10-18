@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@heroui/react';
 import { api } from '../api';
 import { showError, useStore } from '../store';
-import { plural } from '../chat/format';
+import { useT } from '../i18n';
 import { inviteLink, prettyCode } from './invite';
 import type { MyInvite } from '../types';
 import { Avatar } from '../ui/Avatar';
@@ -28,6 +28,7 @@ export function prefetchInvite() {
 }
 
 export function useMyInvite(enabled = true) {
+  const { t } = useT();
   const version = useStore((s) => s.inviteVersion);
   const [invite, setInvite] = useState<MyInvite | null>(cached?.invite ?? null);
   useEffect(() => {
@@ -41,9 +42,9 @@ export function useMyInvite(enabled = true) {
         cached = { invite: i, version };
         setInvite(i);
       },
-      (e) => (cached ? undefined : showError(e instanceof Error ? e.message : 'Не удалось загрузить приглашение')),
+      (e) => (cached ? undefined : showError(e instanceof Error ? e.message : t('people.invite.loadFailed'))),
     );
-  }, [version, enabled]);
+  }, [version, enabled, t]);
   const replace = (i: MyInvite) => {
     cached = { invite: i, version };
     setInvite(i);
@@ -57,6 +58,7 @@ export function useMyInvite(enabled = true) {
  * place on the link is taken, or after it's closed.
  */
 export function InviteBanner() {
+  const { t } = useT();
   const users = useStore((s) => s.users);
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(() => {
@@ -86,15 +88,14 @@ export function InviteBanner() {
     <div className="relative mb-2 rounded-[24px] bg-default p-4">
       <button
         onClick={close}
-        aria-label="Скрыть"
+        aria-label={t('people.invite.hide')}
         className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full text-muted hover:bg-white/10 hover:text-foreground"
       >
         <XIcon size={14} />
       </button>
-      <div className="pr-6 text-[15px] font-medium">Пригласить друзей</div>
+      <div className="pr-6 text-[15px] font-medium">{t('people.invite.title')}</div>
       <p className="mt-0.5 text-[13px] leading-snug text-muted">
-        Gomex — только по приглашениям.{' '}
-        {left === null ? 'Ссылка без лимита.' : `Осталось ${left} ${plural(left, ['место', 'места', 'мест'])}.`}
+        {left === null ? t('people.invite.bannerNoLimit') : t('people.invite.bannerLeft', { n: left })}
       </p>
       <div className="mt-3 flex items-center gap-2">
         <span className="flex min-w-0 flex-1 gap-1 overflow-hidden">
@@ -106,7 +107,7 @@ export function InviteBanner() {
           ))}
         </span>
         <Button onPress={() => setOpen(true)} className="h-9 shrink-0 rounded-full px-4 text-[14px] [--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]">
-          Пригласить
+          {t('people.invite.button')}
         </Button>
       </div>
       {open && <InviteDialog onClose={() => setOpen(false)} />}
@@ -114,8 +115,9 @@ export function InviteBanner() {
   );
 }
 
-/** "Пригласить друзей" as a row of the phone's "Вы" tab: opens the invite window. */
+/** "Invite friends" as a row of the phone's "You" tab: opens the invite window. */
 export function InviteRow() {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -125,7 +127,7 @@ export function InviteRow() {
             <UserPlusIcon />
           </RowIcon>
         }
-        title="Пригласить друзей"
+        title={t('people.invite.title')}
         onPress={() => setOpen(true)}
       />
       {open && <InviteDialog onClose={() => setOpen(false)} />}
@@ -138,6 +140,7 @@ export function InviteRow() {
  * came through it in the middle, and the one link to send at the bottom with its copy button inside.
  */
 function InviteDialog({ onClose }: { onClose: () => void }) {
+  const { t } = useT();
   const users = useStore((s) => s.users);
   const isMobile = useStore((s) => s.isMobile);
   const [invite, setInvite] = useMyInvite();
@@ -157,7 +160,7 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      showError('Не удалось скопировать ссылку');
+      showError(t('people.invite.copyFailed'));
     }
   }
 
@@ -165,7 +168,7 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
     // On a phone, the system share sheet (Telegram, WhatsApp, …); on a computer, just copy.
     if (isMobile && navigator.share) {
       try {
-        await navigator.share({ title: 'Gomex', text: 'Залетай в Gomex — это моё приглашение', url: link });
+        await navigator.share({ title: 'Gomex', text: t('people.invite.shareText'), url: link });
       } catch {
         // Closed the sheet: nothing to do.
       }
@@ -177,12 +180,12 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
   return (
     // On the phone the link sits at the sheet's foot, under the thumb.
     <Window
-      label="Пригласить друзей"
+      label={t('people.invite.title')}
       onClose={onClose}
       className="max-w-[440px] p-0"
       footer={
         <div className="px-6 pb-6 pt-5">
-          <div className="pb-2 text-[14px] text-muted">Ссылка-приглашение</div>
+          <div className="pb-2 text-[14px] text-muted">{t('people.invite.link')}</div>
           <div className="flex h-12 items-center gap-2 rounded-full bg-surface-tertiary pl-4 pr-1.5">
             <span className={`min-w-0 flex-1 truncate text-[14px] ${full ? 'text-faint' : ''}`}>{link.replace(/^https?:\/\//, '')}</span>
             {/* On the computer copying is an icon in the field; on the phone the share sheet is the way, a button. */}
@@ -193,7 +196,7 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
                 className="h-9 shrink-0 rounded-full px-4 text-[14px] [--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]"
               >
                 {copied && <CheckIcon size={16} strokeWidth={2.5} />}
-                {copied ? 'Скопировано' : 'Поделиться'}
+                {copied ? t('people.invite.copied') : t('people.invite.share')}
               </Button>
             ) : (
               <CopyButton text={invite && !full ? link : ''} />
@@ -201,10 +204,10 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
           </div>
           {invite && (
             <p className="mt-2 px-1 text-[12px] leading-5 text-faint">
-              {full ? `Все ${limit} ${plural(limit ?? 0, ['место занято', 'места заняты', 'мест заняты'])}. ` : left !== null ? `Осталось ${left} ${plural(left, ['место', 'места', 'мест'])}. ` : ''}
-              Код для входа: <span className="font-mono text-muted">{prettyCode(invite.code)}</span> ·{' '}
+              {full ? t('people.invite.taken', { n: limit ?? 0 }) : left !== null ? t('people.invite.left', { n: left }) : ''}
+              {t('people.invite.code')} <span className="font-mono text-muted">{prettyCode(invite.code)}</span> ·{' '}
               <button onClick={() => setResetting(true)} className="text-muted hover:text-foreground hover:underline">
-                Сбросить ссылку
+                {t('people.invite.reset')}
               </button>
             </p>
           )}
@@ -212,29 +215,27 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
       }
     >
       <div className="px-6 pr-14 pt-6 max-md:pt-3">
-        <h2 className="text-[20px] font-medium leading-7">Пригласить друзей</h2>
+        <h2 className="text-[20px] font-medium leading-7">{t('people.invite.title')}</h2>
         <p className="mt-1 text-[14px] leading-snug text-muted">
-          {limit === null
-            ? 'Gomex — только по приглашениям. Ссылка админа без лимита.'
-            : `Gomex — только по приглашениям. По ссылке зарегистрируются ${limit} ${plural(limit, ['человек', 'человека', 'человек'])} и сразу попадут в друзья.`}
+          {limit === null ? t('people.invite.descNoLimit') : t('people.invite.desc', { n: limit })}
         </p>
       </div>
 
       <div className="px-6 pt-5">
         <div className="flex items-center justify-between pb-1">
-          <span className="text-[12px] text-faint">Пришли по ссылке</span>
+          <span className="text-[12px] text-faint">{t('people.invite.joined')}</span>
           {invite && limit !== null && (
             <span className="text-[12px] tabular-nums text-faint">
-              {used} из {limit}
+              {t('people.invite.usedOf', { used, limit })}
             </span>
           )}
         </div>
         {!invite ? (
-          <p className="py-8 text-center text-[14px] text-muted">Загружаем…</p>
+          <p className="py-8 text-center text-[14px] text-muted">{t('people.inbox.loading')}</p>
         ) : used === 0 ? (
           <div className="flex items-center gap-3 py-3">
             <EmptySeats count={Math.min(left ?? 3, 5)} />
-            <span className="text-[14px] text-muted">Пока никто не пришёл</span>
+            <span className="text-[14px] text-muted">{t('people.invite.nobody')}</span>
           </div>
         ) : (
           // The sheet scrolls as a whole on the phone; the window keeps the list short on the computer.
@@ -243,7 +244,7 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
               <li key={id} className="flex h-12 items-center gap-3 rounded-full px-2">
                 <Avatar user={users[id]} size={32} ringBg="var(--overlay)" />
                 <span className="min-w-0 flex-1 truncate text-[15px]">{users[id]?.name ?? '…'}</span>
-                <span className="text-[13px] text-faint">в друзьях</span>
+                <span className="text-[13px] text-faint">{t('people.invite.friendsTag')}</span>
               </li>
             ))}
           </ul>
@@ -251,9 +252,9 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
       </div>
       {resetting && (
         <ConfirmDialog
-          title="Сбросить ссылку?"
-          text="Старая перестанет работать, а уже приглашённые останутся."
-          confirmLabel="Сбросить"
+          title={t('people.invite.resetTitle')}
+          text={t('people.invite.resetText')}
+          confirmLabel={t('people.invite.resetConfirm')}
           onConfirm={async () => setInvite(await api.resetInvite())}
           onClose={() => setResetting(false)}
         />

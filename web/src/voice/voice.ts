@@ -1,6 +1,6 @@
 import { createLocalVideoTrack, type AudioCaptureOptions, DisconnectReason, LocalVideoTrack, Room, RoomEvent, ScreenSharePresets, Track, VideoPresets } from 'livekit-client';
 import { api } from '../api';
-import { getSocket, MOVED } from '../socket';
+import { getSocket, movedText } from '../socket';
 import { isDmId, openDm, selectChannel, selfEntry, showError, useStore } from '../store';
 import { playSound } from './sounds';
 import { applyNoise, micTrack, suspendNoise } from './noise';
@@ -10,6 +10,7 @@ import { desktop } from '../desktop';
 import { startQualityReports, type QualityReporter } from './report';
 // Push-to-talk listens from the moment the call code loads; it calls back into applyMic() below.
 import './ptt';
+import { t } from '../i18n';
 
 /** The call itself: connecting to LiveKit, the mic, camera and screen, leaving. */
 
@@ -48,11 +49,11 @@ export async function applyMic() {
       set({ muted: true });
       showError(
         e instanceof Error && e.name === 'NotAllowedError'
-          ? 'Нет доступа к микрофону: он выключен в настройках браузера или системы'
-          : `Микрофон не включился: ${e instanceof Error ? e.message : e}`,
+          ? t('voice.err.micDenied')
+          : t('voice.err.micFailed', { error: e instanceof Error ? e.message : String(e) }),
       );
     } else if (!live && room.localParticipant.isMicrophoneEnabled) {
-      showError('Микрофон не выключился');
+      showError(t('voice.err.micOffFailed'));
     }
   }
   if (live) await applyNoise();
@@ -167,7 +168,7 @@ export async function joinVoice(channelId: string, { video = false, navigate = t
       resetVoice();
       getSocket()?.emit('voice:leave');
       // The same person joined the same room from another tab or device, and LiveKit let only one stay.
-      showError(reason === DisconnectReason.DUPLICATE_IDENTITY ? MOVED : 'Связь с голосовым каналом потеряна');
+      showError(reason === DisconnectReason.DUPLICATE_IDENTITY ? movedText() : t('voice.err.lost'));
     });
 
   try {
@@ -177,7 +178,7 @@ export async function joinVoice(channelId: string, { video = false, navigate = t
   } catch (e) {
     await room.disconnect();
     if (get().voiceChannelId === channelId) resetVoice();
-    showError(`Не удалось подключиться к голосу: ${e instanceof Error ? e.message : e}`);
+    showError(t('voice.err.connect', { error: e instanceof Error ? e.message : String(e) }));
     return;
   }
 
@@ -275,7 +276,7 @@ export async function toggleScreenShare() {
     // says it with an AbortError ("Invalid capture constraints"): Electron has no way to deny from there.
     const cancelled = e instanceof Error && (e.name === 'NotAllowedError' || (desktop && e.name === 'AbortError'));
     if (!cancelled) {
-      showError(`Не удалось включить демонстрацию: ${e instanceof Error ? e.message : e}`);
+      showError(t('voice.err.share', { error: e instanceof Error ? e.message : String(e) }));
     }
   }
   syncLocalMedia(room);
@@ -331,7 +332,7 @@ export async function toggleCamera() {
   } catch {
     track?.stop();
     if (get().room === room) set({ cameraOn: false });
-    showError('Нет доступа к камере');
+    showError(t('voice.err.camera'));
   } finally {
     if (get().room === room) set({ cameraPending: false, cameraPreview: null });
   }

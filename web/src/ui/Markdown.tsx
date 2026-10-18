@@ -1,4 +1,5 @@
 import { Fragment, useState, type ReactNode } from 'react';
+import { t, useT } from '../i18n';
 import { useStore } from '../store';
 import type { User } from '../types';
 
@@ -22,18 +23,18 @@ export function invitedRoom(text: string): string | null {
 }
 
 function roomName(id: string) {
-  return useStore.getState().channels.find((c) => c.id === id)?.name ?? 'удалённая комната';
+  return useStore.getState().channels.find((c) => c.id === id)?.name ?? t('common.md.deletedRoom');
 }
 
-/** Mentions as the people read them: "@Миша", "@все". */
+/** Mentions as the people read them: "@Mike", "@everyone". */
 export function mentionsToNames(text: string, users: Record<string, User>) {
-  return text.replace(MENTION, (_, id: string) => (id === 'all' ? '@все' : `@${users[id]?.name ?? 'кто-то'}`));
+  return text.replace(MENTION, (_, id: string) => (id === 'all' ? `@${t('common.md.everyone')}` : `@${users[id]?.name ?? t('common.md.someone')}`));
 }
 
 /** One line of plain text for previews and notifications: names instead of ids, no formatting marks. */
 export function plainText(text: string, users: Record<string, User>) {
   const room = invitedRoom(text);
-  if (room) return `Приглашение в комнату «${roomName(room)}»`;
+  if (room) return t('common.md.roomInvite', { name: roomName(room) });
   return mentionsToNames(text, users)
     .replace(ROOM, (_, id: string) => roomName(id))
     .replace(/```[\w-]*\n?/g, '')
@@ -43,7 +44,7 @@ export function plainText(text: string, users: Record<string, User>) {
     .trim();
 }
 
-/** "@Name" typed in the composer becomes <@id> on the wire; longest names first, so "@Аня Кот" wins over "@Аня". */
+/** "@Name" typed in the composer becomes <@id> on the wire; longest names first, so "@Ann Lee" wins over "@Ann". */
 export function namesToMentions(text: string, users: Record<string, User>) {
   let out = text.replace(/@(все|everyone)(?![\p{L}\p{N}_])/giu, '<@all>');
   const list = Object.values(users).sort((a, b) => b.name.length - a.name.length);
@@ -54,7 +55,7 @@ export function namesToMentions(text: string, users: Record<string, User>) {
   return out;
 }
 
-/** `after` goes right after the last word (e.g. "(изменено)"), not on a line of its own. */
+/** `after` goes right after the last word (e.g. "(edited)"), not on a line of its own. */
 export function Markdown({ text, big = false, after }: { text: string; big?: boolean; after?: ReactNode }) {
   const blocks = splitBlocks(text);
   return (
@@ -148,27 +149,30 @@ function inline(text: string, keyBase: string): ReactNode[] {
 }
 
 function Mention({ id }: { id: string }) {
+  const { t } = useT();
   const user = useStore((s) => (id === 'all' ? undefined : s.users[id]));
   const isMe = useStore((s) => id === 'all' || s.me?.id === id);
   return (
     <span className={`text-[#64a8ff] ${isMe ? 'font-semibold' : 'font-medium'}`}>
-      @{id === 'all' ? 'все' : (user?.name ?? 'кто-то')}
+      @{id === 'all' ? t('common.md.everyone') : (user?.name ?? t('common.md.someone'))}
     </span>
   );
 }
 
 function RoomName({ id }: { id: string }) {
+  const { t } = useT();
   const name = useStore((s) => s.channels.find((c) => c.id === id)?.name);
-  return <span className="font-medium text-[#64a8ff]">{name ?? 'удалённая комната'}</span>;
+  return <span className="font-medium text-[#64a8ff]">{name ?? t('common.md.deletedRoom')}</span>;
 }
 
 function Spoiler({ children }: { children: ReactNode }) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   return (
     <span
       role="button"
       tabIndex={0}
-      aria-label={open ? undefined : 'Спойлер, показать'}
+      aria-label={open ? undefined : t('common.md.spoiler')}
       onClick={() => setOpen(true)}
       onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setOpen(true)}
       className={`rounded-[6px] px-0.5 transition-colors ${open ? 'bg-white/10' : 'cursor-pointer bg-[#3f3f46] text-transparent [&_*]:invisible'}`}

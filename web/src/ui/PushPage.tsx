@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useT } from '../i18n';
 import { RoundButton } from './ui';
 import { ChevronLeftIcon } from './icons';
 
@@ -102,10 +103,11 @@ export function PushPage({
   open: boolean;
   title: string;
   onBack: () => void;
-  /** The page's one action at the right of its title, as iOS has «Готово»: above the keyboard, never under it. */
+  /** The page's one action at the right of its title, as iOS has Done: above the keyboard, never under it. */
   action?: ReactNode;
   children: ReactNode;
 }) {
+  const { t } = useT();
   const push = usePush(open, onBack);
   if (!push.mounted) return null;
   // On the body, after the app: above the shell and its conversation layer, under menus and toasts opened later.
@@ -120,7 +122,7 @@ export function PushPage({
         {...push.swipe}
       >
         <header className="flex h-14 shrink-0 items-center gap-1 px-2">
-          <RoundButton tone="ghost" label="Назад" onPress={onBack} className="[&_svg]:size-6">
+          <RoundButton tone="ghost" label={t('common.back')} onPress={onBack} className="[&_svg]:size-6">
             <ChevronLeftIcon />
           </RoundButton>
           <h1 className="min-w-0 flex-1 truncate text-[17px] font-semibold">{title}</h1>

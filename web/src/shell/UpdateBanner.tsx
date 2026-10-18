@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@heroui/react';
 import { useStore } from '../store';
+import { useT } from '../i18n';
 import { desktop } from '../desktop';
 import { INSTALLERS } from '../updates';
 import { DownloadIcon, XIcon } from '../ui/icons';
@@ -13,6 +14,7 @@ const DISMISSED_KEY = 'gomex.oldAppBannerDismissed';
  * build, or this desktop app is too old to update itself.
  */
 export function UpdateBanner() {
+  const { t } = useT();
   const app = useStore((s) => s.desktopUpdate);
   const site = useStore((s) => s.siteUpdate);
   const [oldAppDismissed, setOldAppDismissed] = useState(() => {
@@ -24,18 +26,18 @@ export function UpdateBanner() {
   });
 
   if (app?.status === 'ready') {
-    return <Banner title={`Обновление ${app.version} готово`} action="Перезапустить" onAction={() => desktop?.update?.install()} />;
+    return <Banner title={t('settings.banner.ready', { version: app.version ?? '' })} action={t('settings.banner.restart')} onAction={() => desktop?.update?.install()} />;
   }
   if (app?.status === 'manual') {
-    return <Banner title={`Вышел Gomex ${app.version}`} action="Скачать" onAction={() => desktop?.update?.install()} />;
+    return <Banner title={t('settings.banner.manual', { version: app.version ?? '' })} action={t('settings.banner.download')} onAction={() => desktop?.update?.install()} />;
   }
   // A build without the release key turns down every update, and would otherwise do it silently, for good.
   const reinstall = desktop ? INSTALLERS[desktop.platform] : undefined;
   if (app?.status === 'error' && app.code === 'no-key' && reinstall) {
     return (
       <Banner
-        title="Автообновление не работает"
-        action="Скачать"
+        title={t('settings.banner.noAutoUpdate')}
+        action={t('settings.banner.download')}
         onAction={() => {
           window.location.href = reinstall;
         }}
@@ -43,14 +45,14 @@ export function UpdateBanner() {
     );
   }
   if (site) {
-    return <Banner title="Gomex обновился" action="Обновить" onAction={() => window.location.reload()} />;
+    return <Banner title={t('settings.banner.siteUpdated')} action={t('settings.banner.refresh')} onAction={() => window.location.reload()} />;
   }
   const installer = desktop && !desktop.update ? INSTALLERS[desktop.platform] : undefined;
   if (installer && !oldAppDismissed) {
     return (
       <Banner
-        title="Новое приложение — теперь обновляется само"
-        action="Скачать"
+        title={t('settings.banner.newApp')}
+        action={t('settings.banner.download')}
         onAction={() => {
           window.location.href = installer;
         }}
@@ -69,6 +71,7 @@ export function UpdateBanner() {
 }
 
 function Banner({ title, action, onAction, onDismiss }: { title: string; action: string; onAction: () => void; onDismiss?: () => void }) {
+  const { t } = useT();
   return (
     <div className="mx-2 mb-2 flex items-center gap-2.5 rounded-[14px] bg-accent/15 py-2 pl-3 pr-2">
       <DownloadIcon size={18} className="shrink-0 text-accent" />
@@ -77,7 +80,7 @@ function Banner({ title, action, onAction, onDismiss }: { title: string; action:
         {action}
       </Button>
       {onDismiss && (
-        <button onClick={onDismiss} aria-label="Скрыть" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted hover:bg-default hover:text-foreground">
+        <button onClick={onDismiss} aria-label={t('settings.banner.hide')} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted hover:bg-default hover:text-foreground">
           <XIcon size={14} />
         </button>
       )}

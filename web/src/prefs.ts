@@ -1,4 +1,5 @@
 /** Per-device voice settings, kept in localStorage. */
+import { t } from './i18n';
 
 export type NoiseMode = 'off' | 'browser' | 'rnnoise';
 
@@ -30,12 +31,12 @@ export function savePrefs(prefs: VoicePrefs) {
   }
 }
 
-/** How a key reads in the settings: "`", "V", "F13", "Мышь 4". */
+/** How a key reads in the settings: "`", "V", "F13", "Mouse 4". */
 export function keyLabel(code: string) {
-  if (code === 'Mouse4') return 'Мышь 4';
-  if (code === 'Mouse5') return 'Мышь 5';
+  if (code === 'Mouse4') return t('common.key.mouse', { n: 4 });
+  if (code === 'Mouse5') return t('common.key.mouse', { n: 5 });
   if (code === 'Backquote') return '`';
-  if (code === 'Space') return 'Пробел';
+  if (code === 'Space') return t('common.key.space');
   if (code.startsWith('Key')) return code.slice(3);
   if (code.startsWith('Digit')) return code.slice(5);
   if (code.startsWith('Numpad')) return `Num ${code.slice(6)}`;

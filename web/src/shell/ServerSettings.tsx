@@ -1,21 +1,23 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { api } from '../api';
+import { useT } from '../i18n';
 import { setChannels, showError, useStore } from '../store';
 import { ServerMark } from '../ui/Logo';
 import { IconCropper, centred, cropToBlob, loadImage, type Crop } from '../ui/IconCropper';
-import { plural, shortStamp } from '../chat/format';
+import { shortStamp } from '../chat/format';
 import type { DeletedChannel } from '../types';
 import { Primary, Quiet, Row, RowValue, Rows, Secondary, SubPage, field, fieldLabel, useSub } from '../ui/settings';
 
 /**
- * The "Сервер" page of the settings, for the admin: the server's icon and name, as in the first-run setup. On the
+ * The "Server" page of the settings, for the admin: the server's icon and name, as in the first-run setup. On the
  * phone one group of the settings page, the name a row of its own.
  */
 export function ServerSettings() {
+  const { t } = useT();
   const isMobile = useStore((s) => s.isMobile);
   if (isMobile) {
     return (
-      <Rows title="Сервер" className="mt-6">
+      <Rows title={t('settings.server.title')} className="mt-6">
         <IconRow />
         <NameRow />
         <TrashRow />
@@ -39,6 +41,7 @@ const apply = (info: { serverName: string; serverIcon: string | null }) => useSt
 
 /** The icon's row, as in the setup wizard; a picked picture opens its crop on its own. */
 function IconRow() {
+  const { t } = useT();
   const icon = useStore((s) => s.serverIcon);
   const input = useRef<HTMLInputElement>(null);
   const [picked, setPicked] = useState<{ image: HTMLImageElement; crop: Crop } | null>(null);
@@ -49,14 +52,14 @@ function IconRow() {
   async function pick(file: File | undefined) {
     if (input.current) input.current.value = '';
     if (!file) return;
-    if (file.size > 8 * 1024 * 1024) return showError('Картинка больше 8 МБ');
+    if (file.size > 8 * 1024 * 1024) return showError(t('settings.server.imageTooBig'));
     try {
       const image = await loadImage(file);
       if (picked) URL.revokeObjectURL(picked.image.src);
       setPicked({ image, crop: centred(image) });
       setCropping(true);
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Не получилось открыть картинку');
+      showError(e instanceof Error ? e.message : t('settings.server.imageOpenFailed'));
     }
   }
 
@@ -65,7 +68,7 @@ function IconRow() {
     try {
       await action();
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Не получилось');
+      showError(e instanceof Error ? e.message : t('settings.server.failed'));
     } finally {
       setBusy(false);
     }
@@ -74,17 +77,17 @@ function IconRow() {
   return (
     <>
       <input ref={input} type="file" accept="image/*" hidden onChange={(e) => pick(e.target.files?.[0])} />
-      <Row icon={<ServerMark icon={icon} size={34} />} title="Значок" value={icon ? 'Свой' : 'Знак Gomex'}>
+      <Row icon={<ServerMark icon={icon} size={34} />} title={t('settings.server.icon')} value={icon ? t('settings.server.iconCustom') : t('settings.server.iconDefault')}>
         {icon && (
           <Quiet disabled={busy} onClick={() => run(async () => apply(await api.deleteServerIcon()))}>
-            Убрать
+            {t('settings.server.remove')}
           </Quiet>
         )}
-        <Secondary onPress={() => input.current?.click()}>{icon ? 'Заменить' : 'Выбрать'}</Secondary>
+        <Secondary onPress={() => input.current?.click()}>{icon ? t('settings.server.replace') : t('settings.server.pick')}</Secondary>
       </Row>
       <SubPage
         open={cropping && !!picked}
-        title="Значок"
+        title={t('settings.server.icon')}
         onClose={() => setCropping(false)}
         footer={
           picked && (
@@ -97,7 +100,7 @@ function IconRow() {
                 })
               }
             >
-              Сохранить
+              {t('settings.server.save')}
             </Primary>
           )
         }
@@ -116,14 +119,15 @@ function IconRow() {
 }
 
 function NameRow() {
+  const { t } = useT();
   const name = useStore((s) => s.serverName);
   const sub = useSub();
   return (
     <>
-      <Row title="Название" onPress={sub.show}>
+      <Row title={t('settings.server.name')} onPress={sub.show}>
         <RowValue>{name}</RowValue>
       </Row>
-      <SubPage key={sub.key} open={sub.open} title="Название" onClose={sub.hide}>
+      <SubPage key={sub.key} open={sub.open} title={t('settings.server.name')} onClose={sub.hide}>
         <NameField onSaved={sub.hide} className="mt-2" />
       </SubPage>
     </>
@@ -131,6 +135,7 @@ function NameRow() {
 }
 
 function NameField({ onSaved, className = '' }: { onSaved?: () => void; className?: string }) {
+  const { t } = useT();
   const saved = useStore((s) => s.serverName);
   const id = useId();
   const [name, setName] = useState(saved);
@@ -146,7 +151,7 @@ function NameField({ onSaved, className = '' }: { onSaved?: () => void; classNam
       setName(info.serverName);
       onSaved?.();
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Не удалось переименовать');
+      showError(err instanceof Error ? err.message : t('settings.server.renameFailed'));
     } finally {
       setBusy(false);
     }
@@ -156,13 +161,13 @@ function NameField({ onSaved, className = '' }: { onSaved?: () => void; classNam
     <form onSubmit={submit} className={className}>
       {/* On the phone this is a page of its own, titled the same. */}
       <label htmlFor={id} className={`${fieldLabel} max-md:sr-only`}>
-        Название
+        {t('settings.server.name')}
       </label>
       <div className="flex gap-2 max-md:flex-col">
         <input id={id} value={name} maxLength={40} onChange={(e) => setName(e.target.value)} className={field} />
         {changed && (
           <Primary type="submit" isPending={busy} className="shrink-0">
-            Сохранить
+            {t('settings.server.save')}
           </Primary>
         )}
       </div>
@@ -170,8 +175,9 @@ function NameField({ onSaved, className = '' }: { onSaved?: () => void; classNam
   );
 }
 
-/** Only while a channel is in the trash: the count on the row, the channels inside, each with «Вернуть». */
+/** Only while a channel is in the trash: the count on the row, the channels inside, each with "Restore". */
 function TrashRow() {
+  const { t } = useT();
   const channels = useStore((s) => s.channels);
   const [trash, setTrash] = useState<DeletedChannel[]>([]);
   const sub = useSub();
@@ -188,22 +194,22 @@ function TrashRow() {
   return (
     <>
       {trash.length > 0 && (
-        <Row title="Удалённые каналы" onPress={sub.show}>
+        <Row title={t('settings.server.trash')} onPress={sub.show}>
           <RowValue>{trash.length}</RowValue>
         </Row>
       )}
-      <SubPage open={open} title="Удалённые каналы" onClose={hide}>
+      <SubPage open={open} title={t('settings.server.trash')} onClose={hide}>
         <Rows className="max-md:mt-2">
           {trash.map((c) => (
             <Row
               key={c.id}
               title={c.kind === 'text' ? `# ${c.name}` : c.name}
-              value={`${shortStamp(c.deletedAt)} · ${c.messages} ${plural(c.messages, ['сообщение', 'сообщения', 'сообщений'])}`}
+              value={`${shortStamp(c.deletedAt)} · ${t('settings.server.trashMessages', { n: c.messages })}`}
             >
               <Secondary
-                onPress={() => api.restoreChannel(c.id).then(setChannels, (e) => showError(e instanceof Error ? e.message : 'Не получилось'))}
+                onPress={() => api.restoreChannel(c.id).then(setChannels, (e) => showError(e instanceof Error ? e.message : t('settings.server.failed')))}
               >
-                Вернуть
+                {t('settings.server.restore')}
               </Secondary>
             </Row>
           ))}

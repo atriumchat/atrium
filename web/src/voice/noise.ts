@@ -4,6 +4,7 @@ import wasmUrl from '@sapphi-red/web-noise-suppressor/rnnoise.wasm?url';
 import simdUrl from '@sapphi-red/web-noise-suppressor/rnnoise_simd.wasm?url';
 import { LocalAudioTrack, Track, type AudioProcessorOptions, type TrackProcessor } from 'livekit-client';
 import { showError, useStore } from '../store';
+import { t } from '../i18n';
 
 /**
  * Strong noise suppression: RNNoise (a small neural net, MIT, via @sapphi-red/web-noise-suppressor) between the
@@ -79,7 +80,7 @@ export async function applyNoise() {
       await track.stopProcessor();
     }
   } catch (e) {
-    showError(`Сильное шумоподавление не включилось: ${e instanceof Error ? e.message : e}`);
+    showError(t('voice.err.noise', { error: e instanceof Error ? e.message : String(e) }));
   }
 }
 

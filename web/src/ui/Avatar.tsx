@@ -1,3 +1,4 @@
+import { useT } from '../i18n';
 import type { User } from '../types';
 
 const GREEN = 'var(--success)';
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export function Avatar({ user, size = 32, speaking = false, dimmed = false, online = false, ringBg = 'var(--app-window)', status }: Props) {
+  const { t } = useT();
   const shown = status ?? user?.status ?? 'online';
   const letter = (user?.name ?? '?').trim().charAt(0).toUpperCase() || '?';
   const dot = Math.max(10, Math.round(size * 0.31));
@@ -39,7 +41,7 @@ export function Avatar({ user, size = 32, speaking = false, dimmed = false, onli
       {online && (
         <span
           className="absolute flex items-center justify-center rounded-full"
-          title={shown === 'dnd' ? 'Не беспокоить' : shown === 'invisible' ? 'Невидимка' : 'В сети'}
+          title={shown === 'dnd' ? t('common.status.dnd') : shown === 'invisible' ? t('common.status.invisible') : t('common.status.online')}
           style={{
             width: dot,
             height: dot,

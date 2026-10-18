@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import type { User } from '../types';
 import { VolumeSlider } from '../ui/ui';
 import { HeadphonesSlashIcon, MicSlashIcon } from '../ui/icons';
+import { useT } from '../i18n';
 
 /**
  * People in a call drawn as photo circles instead of tiles. Three layouts:
@@ -147,6 +148,7 @@ function Face({ user }: { user: User | undefined }) {
  * their volume.
  */
 function Bubble(props: { person: BubblePerson; nodeRef: (el: HTMLDivElement | null) => void; live: boolean; max: number; tag?: boolean; badge?: boolean }) {
+  const { t } = useT();
   const { person, live, max, tag = true, badge = true } = props;
   const user = useStore((s) => s.users[person.id]);
   const isMe = useStore((s) => s.me?.id === person.id);
@@ -167,7 +169,7 @@ function Bubble(props: { person: BubblePerson; nodeRef: (el: HTMLDivElement | nu
       >
         {live && !isMe && !person.ringing ? (
           <Popover>
-            <Popover.Trigger aria-label={`Громкость: ${name}`} className="block h-full w-full cursor-pointer rounded-full outline-none data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-white">
+            <Popover.Trigger aria-label={t('voice.volume', { name })} className="block h-full w-full cursor-pointer rounded-full outline-none data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-white">
               {face}
             </Popover.Trigger>
             <Popover.Content placement="bottom" className="w-64">
@@ -177,7 +179,7 @@ function Bubble(props: { person: BubblePerson; nodeRef: (el: HTMLDivElement | nu
             </Popover.Content>
           </Popover>
         ) : (
-          <span role="img" aria-label={person.ringing ? `${name} — вызываем` : isMe ? `${name} (вы)` : name} className="block h-full w-full">
+          <span role="img" aria-label={person.ringing ? t('voice.ringingAria', { name }) : isMe ? `${name} ${t('voice.you')}` : name} className="block h-full w-full">
             {face}
           </span>
         )}
@@ -454,7 +456,7 @@ function peanutScale(w: number, h: number) {
 
 /**
  * Who sits in the left lobe. A new speaker takes over only after talking for a moment while the current one
- * is quiet, so a quick "ага" doesn't send the bubbles flying.
+ * is quiet, so a quick "uh-huh" doesn't send the bubbles flying.
  */
 class SpeakerPicker {
   speaker = '';
@@ -486,6 +488,7 @@ class SpeakerPicker {
   }
 }
 
+  const { t } = useT();
 export function BubblePeanut({ people, speaking, live }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const { w, h } = useBox(box);
@@ -638,7 +641,7 @@ export function BubblePeanut({ people, speaking, live }: Props) {
         <Bubble key={p.id} person={p} nodeRef={refFor(p.id)} live={live} max={bigMax} badge={false} />
       ))}
       {extra > 0 && (
-        <div ref={tipRef} role="img" aria-label={`Ещё ${extra}`} className="absolute left-0 top-0 flex items-center justify-center rounded-full bg-[#e5e5ea] text-[13px] font-medium text-black" style={fullSize(tipMax)}>
+        <div ref={tipRef} role="img" aria-label={t('voice.moreAria', { count: extra })} className="absolute left-0 top-0 flex items-center justify-center rounded-full bg-[#e5e5ea] text-[13px] font-medium text-black" style={fullSize(tipMax)}>
           +{extra}
         </div>
       )}

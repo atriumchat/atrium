@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Dropdown, Label, Separator } from '@heroui/react';
 import type { Attachment } from '../types';
 import { CopyIcon, DownloadIcon, ExternalLinkIcon, LinkIcon } from '../ui/icons';
+import { useT } from '../i18n';
 import { copyImage, copyText, pngOf } from './imageCopy';
 
 type Action = 'copy-image' | 'save' | 'copy-link' | 'open';
@@ -56,6 +57,7 @@ export function useAttachmentMenu() {
 }
 
 function AttachmentMenu({ target, onClose }: { target: Target; onClose: () => void }) {
+  const { t } = useT();
   const { item, x, y } = target;
   const isFile = item.kind === 'file';
   // The menu hangs off the point that was clicked: an empty box of no size right there.
@@ -67,12 +69,12 @@ function AttachmentMenu({ target, onClose }: { target: Target; onClose: () => vo
       <Dropdown isOpen onOpenChange={(open) => !open && onClose()}>
         {/* No opening animation: a menu that fades in feels slower than it is. */}
         <Dropdown.Popover triggerRef={anchor} placement="bottom start" offset={2} className="min-w-56 data-[entering=true]:animate-none">
-          <Dropdown.Menu aria-label={isFile ? 'Действия с файлом' : 'Действия с картинкой'} onAction={(key) => run(key as Action, item)}>
-            {!isFile && <Item id="copy-image" label="Копировать картинку" icon={<CopyIcon size={16} />} />}
-            <Item id="save" label={isFile ? 'Сохранить' : 'Сохранить картинку'} icon={<DownloadIcon size={16} />} />
+          <Dropdown.Menu aria-label={isFile ? t('chat.attach.fileActions') : t('chat.attach.imageActions')} onAction={(key) => run(key as Action, item)}>
+            {!isFile && <Item id="copy-image" label={t('chat.attach.copyImage')} icon={<CopyIcon size={16} />} />}
+            <Item id="save" label={isFile ? t('chat.attach.save') : t('chat.attach.saveImage')} icon={<DownloadIcon size={16} />} />
             {!isFile && <Separator />}
-            <Item id="copy-link" label="Копировать ссылку" icon={<LinkIcon size={16} />} />
-            {!isFile && <Item id="open" label="Открыть в браузере" icon={<ExternalLinkIcon size={16} />} />}
+            <Item id="copy-link" label={t('chat.attach.copyLink')} icon={<LinkIcon size={16} />} />
+            {!isFile && <Item id="open" label={t('chat.attach.openBrowser')} icon={<ExternalLinkIcon size={16} />} />}
           </Dropdown.Menu>
         </Dropdown.Popover>
       </Dropdown>

@@ -1,12 +1,13 @@
 import { useRef, type ReactNode, type RefObject } from 'react';
 import { Button, Tooltip } from '@heroui/react';
+import { useT } from '../i18n';
 import { dmTitle, isDmId, openDm, selectChannel, useStore } from '../store';
 import { leaveVoice, toggleCamera, toggleDeafen, toggleMute, toggleScreenShare } from '../voice/voice';
 import { Avatar } from '../ui/Avatar';
 import { useCallStats } from '../voice/stats';
 import { BypassHint, CallQuality } from '../voice/Bypass';
 import { DeviceMenu, SettingsMenu } from './SettingsMenu';
-import { MeCard, STATUS_LABEL } from './MeCard';
+import { MeCard, statusLabel } from './MeCard';
 import { RoundButton } from '../ui/ui';
 import {
   HeadphonesIcon,
@@ -34,6 +35,7 @@ export function UserPanel() {
 }
 
 function VoiceStatus() {
+  const { t } = useT();
   const channelId = useStore((s) => s.voiceChannelId);
   const status = useStore((s) => s.voiceStatus);
   // "room / server" for a voice room, the person or group for a call in DMs.
@@ -55,21 +57,21 @@ function VoiceStatus() {
         <CallQuality stats={stats} connected={connected} />
         <button onClick={() => (isDmId(channelId) ? openDm(channelId) : selectChannel(channelId))} className="min-w-0 flex-1 text-left">
           <span className={`block text-[14px] font-medium ${connected ? 'text-success' : 'text-warning'}`}>
-            {connected ? 'Голос подключён' : 'Подключение…'}
+            {connected ? t('shell.call.connected') : t('shell.call.connecting')}
           </span>
           <span className="block truncate text-[12px] text-muted hover:underline">{where}</span>
         </button>
-        <RoundButton size="sm" tone="ghost" label="Отключиться" onPress={() => leaveVoice()} className="hover:text-danger">
+        <RoundButton size="sm" tone="ghost" label={t('shell.call.disconnect')} onPress={() => leaveVoice()} className="hover:text-danger">
           <PhoneDownIcon />
         </RoundButton>
       </div>
       <BypassHint stats={stats} />
       <div className="mt-2 grid grid-cols-2 gap-2">
-        <WideButton label={cameraOn ? 'Выключить камеру' : 'Включить камеру'} on={cameraOn} disabled={!connected} onPress={toggleCamera}>
+        <WideButton label={cameraOn ? t('shell.call.cameraOff') : t('shell.call.cameraOn')} on={cameraOn} disabled={!connected} onPress={toggleCamera}>
           {cameraOn ? <VideoIcon /> : <VideoSlashIcon />}
         </WideButton>
         <WideButton
-          label={screenSharing ? 'Остановить демонстрацию' : 'Показать экран'}
+          label={screenSharing ? t('shell.call.screenStop') : t('shell.call.screenStart')}
           on={screenSharing}
           disabled={!connected}
           onPress={toggleScreenShare}
@@ -103,6 +105,7 @@ function WideButton(props: { label: string; on: boolean; disabled: boolean; onPr
 }
 
 function MeRow({ island }: { island: RefObject<HTMLDivElement | null> }) {
+  const { t } = useT();
   const me = useStore((s) => s.me);
   const muted = useStore((s) => s.muted);
   const deafened = useStore((s) => s.deafened);
@@ -122,24 +125,24 @@ function MeRow({ island }: { island: RefObject<HTMLDivElement | null> }) {
           <div className="min-w-0">
             <div className="truncate text-[14px] font-medium leading-5">{me.name}</div>
             <div className="truncate text-[12px] text-muted">
-              {deafened ? 'Звук выкл.' : muted ? 'Микрофон выкл.' : myStatusText || STATUS_LABEL[myStatus]}
+              {deafened ? t('shell.call.statusSoundOff') : muted ? t('shell.call.statusMicOff') : myStatusText || statusLabel(myStatus)}
             </div>
           </div>
         </MeCard>
       )}
       <ToggleWithDevice
         active={micOff}
-        label={micOff ? 'Включить микрофон' : 'Выключить микрофон'}
+        label={micOff ? t('shell.call.micOn') : t('shell.call.micOff')}
         onPress={toggleMute}
-        device={<DeviceMenu kind="audioinput" label="Выбрать микрофон" />}
+        device={<DeviceMenu kind="audioinput" label={t('shell.call.pickMic')} />}
       >
         {micOff ? <MicSlashIcon /> : <MicIcon />}
       </ToggleWithDevice>
       <ToggleWithDevice
         active={deafened}
-        label={deafened ? 'Включить звук' : 'Выключить звук'}
+        label={deafened ? t('shell.call.soundOn') : t('shell.call.soundOff')}
         onPress={toggleDeafen}
-        device={<DeviceMenu kind="audiooutput" label="Выбрать устройство вывода" />}
+        device={<DeviceMenu kind="audiooutput" label={t('shell.call.pickOutput')} />}
       >
         {deafened ? <HeadphonesSlashIcon /> : <HeadphonesIcon />}
       </ToggleWithDevice>

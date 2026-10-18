@@ -3,13 +3,13 @@ import { Popover } from '@heroui/react';
 import { selectChannel, useStore, voiceMembers } from '../store';
 import { joinVoice, lastRoomId } from '../voice/voice';
 import type { Channel } from '../types';
-import { plural } from '../chat/format';
+import { useT, type TFn } from '../i18n';
 import { Avatar } from '../ui/Avatar';
 import { UserProfile } from './UserProfile';
 import { DotsIcon, HeadphonesIcon } from '../ui/icons';
 
-/** "4 человека". */
-const peopleCount = (n: number) => `${n} ${plural(n, ['человек', 'человека', 'человек'])}`;
+/** "4 people". */
+const peopleCount = (t: TFn, n: number) => t('people.who.count', { n });
 
 const SIZE = 128;
 const GAP = 12;
@@ -66,19 +66,20 @@ export function RoomCircles() {
 
 /** The rooms that didn't fit: a grey circle that opens them as a list. */
 function RestCircle({ rooms }: { rooms: { room: Channel; people: string[] }[] }) {
+  const { t } = useT();
   const users = useStore((s) => s.users);
   const [open, setOpen] = useState(false);
   const people = rooms.reduce((n, r) => n + r.people.length, 0);
   return (
     <Popover isOpen={open} onOpenChange={setOpen}>
       <Popover.Trigger
-        aria-label="Остальные комнаты"
+        aria-label={t('people.who.otherRooms')}
         className="flex size-32 shrink-0 cursor-pointer flex-col items-center justify-center gap-2 rounded-full bg-default outline-none transition-[background-color,box-shadow] duration-200 hover:bg-[#28282d] data-[pressed=true]:bg-[#1a1a1d] data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus"
       >
         <DotsIcon size={26} />
         <span className="flex flex-col items-center">
-          <span className="text-[15px] font-semibold leading-5">ещё {rooms.length}</span>
-          <span className="text-[12px] leading-4 text-muted">{people ? peopleCount(people) : 'все пустые'}</span>
+          <span className="text-[15px] font-semibold leading-5">{t('people.who.more', { n: rooms.length })}</span>
+          <span className="text-[12px] leading-4 text-muted">{people ? peopleCount(t, people) : t('people.who.allEmpty')}</span>
         </span>
       </Popover.Trigger>
       <Popover.Content placement="bottom start" className="w-72 p-0">
@@ -94,7 +95,7 @@ function RestCircle({ rooms }: { rooms: { room: Channel; people: string[] }[] })
             >
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[15px] font-medium leading-5">{room.name}</span>
-                <span className={`block text-[12px] leading-4 ${inside.length ? 'text-others' : 'text-muted'}`}>{inside.length ? peopleCount(inside.length) : 'пусто'}</span>
+                <span className={`block text-[12px] leading-4 ${inside.length ? 'text-others' : 'text-muted'}`}>{inside.length ? peopleCount(t, inside.length) : t('people.who.empty')}</span>
               </span>
               <span className="flex -space-x-2">
                 {inside.slice(0, 3).map((id) => (
@@ -112,15 +113,16 @@ function RestCircle({ rooms }: { rooms: { room: Channel; people: string[] }[] })
 }
 
 function RoomCircle({ room, people, mine }: { room: Channel; people: string[]; mine: boolean }) {
+  const { t } = useT();
   const users = useStore((s) => s.users);
   const meId = useStore((s) => s.me?.id);
-  const line = people.length ? peopleCount(people.length) : 'пусто';
+  const line = people.length ? peopleCount(t, people.length) : t('people.who.empty');
   const faces = mine && meId ? [meId, ...people.filter((id) => id !== meId)] : people;
 
   return (
     <button
       onClick={() => (mine ? selectChannel(room.id) : joinVoice(room.id))}
-      aria-label={mine ? `«${room.name}»: открыть комнату` : `Зайти в «${room.name}»`}
+      aria-label={mine ? t('people.who.openRoom', { name: room.name }) : t('people.who.joinRoom', { name: room.name })}
       className={`group flex size-32 shrink-0 flex-col items-center justify-center gap-2 rounded-full outline-none transition-[filter,box-shadow] duration-200 hover:brightness-[1.07] active:brightness-95 focus-visible:ring-2 focus-visible:ring-focus ${
         mine ? 'bg-here text-here-ink' : 'bg-others text-others-ink'
       }`}
@@ -163,10 +165,11 @@ const RING = { here: 'var(--room-here)', others: 'var(--room-others)', online: '
 const PLACE = { here: 'text-here', others: 'text-others', online: 'text-muted' } as const;
 
 /**
- * The phone home's "Кто где": everyone around in one row, ringed by where they are — with you (green), in
+ * The phone home's "Who is where": everyone around in one row, ringed by where they are — with you (green), in
  * another room (pink), just online (white) — and whoever's away folded into "+N" at the end.
  */
 export function PeopleRow() {
+  const { t } = useT();
   const users = useStore((s) => s.users);
   const meId = useStore((s) => s.me?.id);
   const online = useStore((s) => s.online);
@@ -196,7 +199,7 @@ export function PeopleRow() {
   return (
     <section>
       <h2 className="flex items-baseline gap-2 px-6 text-[17px] font-semibold">
-        Кто где <span className="text-[15px] font-normal text-muted">{around.length} из {people.length}</span>
+        {t('people.who.title')} <span className="text-[15px] font-normal text-muted">{t('people.who.aroundOf', { a: around.length, b: people.length })}</span>
       </h2>
       <div className="flex gap-3 overflow-x-auto px-4 pb-1 pt-3 no-scrollbar">
         {around.map((u) => {
@@ -208,7 +211,7 @@ export function PeopleRow() {
               </span>
               <span className="w-full">
                 <span className="block truncate text-[12px] font-medium leading-4">{u.name}</span>
-                <span className={`block truncate text-[11px] leading-4 ${PLACE[r]}`}>{roomOf.get(u.id)?.name ?? (u.statusText || 'в сети')}</span>
+                <span className={`block truncate text-[11px] leading-4 ${PLACE[r]}`}>{roomOf.get(u.id)?.name ?? (u.statusText || t('people.who.online'))}</span>
               </span>
             </UserProfile>
           );
@@ -216,7 +219,7 @@ export function PeopleRow() {
         {away > 0 && (
           <span className="flex w-16 shrink-0 flex-col items-center gap-1.5 text-center">
             <span className="flex size-[58px] items-center justify-center rounded-full bg-default text-[15px] font-medium text-muted">+{away}</span>
-            <span className="text-[11px] leading-4 text-muted">не в сети</span>
+            <span className="text-[11px] leading-4 text-muted">{t('people.who.away')}</span>
           </span>
         )}
       </div>

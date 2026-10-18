@@ -1,16 +1,17 @@
 import { Button } from '@heroui/react';
 import { useStore, voiceMembers } from '../store';
 import { joinVoice } from './voice';
-import { plural } from '../chat/format';
 import { Avatar } from '../ui/Avatar';
 import { SpeakerIcon } from '../ui/icons';
+import { useT } from '../i18n';
 
 /**
- * A call into a voice room, sent from the room's "Позвать в комнату": the room, who's inside, and a button
+ * A call into a voice room, sent from the room's "Call to room" button: the room, who's inside, and a button
  * to go in. Pink when people are there, green when you are, grey when it's empty or gone — as the room
  * circles on the home screen.
  */
 export function RoomCard({ channelId }: { channelId: string }) {
+  const { t } = useT();
   const room = useStore((s) => s.channels.find((c) => c.id === channelId));
   const voiceState = useStore((s) => s.voiceState);
   const here = useStore((s) => s.voiceChannelId === channelId);
@@ -24,7 +25,7 @@ export function RoomCard({ channelId }: { channelId: string }) {
         <SpeakerIcon size={22} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[15px] font-medium leading-5">{room?.name ?? 'Комната удалена'}</span>
+        <span className="block truncate text-[15px] font-medium leading-5">{room?.name ?? t('voice.room.deleted')}</span>
         {room && (
           <span className="flex items-center gap-1.5 text-[13px] leading-5 text-muted">
             {people.length > 0 && (
@@ -36,7 +37,7 @@ export function RoomCard({ channelId }: { channelId: string }) {
                 ))}
               </span>
             )}
-            {people.length > 0 ? `${people.length} ${plural(people.length, ['человек', 'человека', 'человек'])}` : 'Пусто'}
+            {people.length > 0 ? t('voice.room.people', { n: people.length }) : t('voice.room.empty')}
           </span>
         )}
       </span>
@@ -47,7 +48,7 @@ export function RoomCard({ channelId }: { channelId: string }) {
           onPress={() => joinVoice(channelId)}
           className="h-9 shrink-0 rounded-full px-4 text-[14px] [--button-bg-hover:#e7e7ea] [--button-bg:white] [--button-fg:#0b0b0c]"
         >
-          {here ? 'Вы здесь' : 'Войти'}
+          {here ? t('voice.room.here') : t('voice.room.enter')}
         </Button>
       )}
     </div>

@@ -3,6 +3,7 @@ import { Button, Dropdown, Input, Label, Separator, TextField } from '@heroui/re
 import { api } from '../api';
 import { addDm, markRead, setChannels, showError, useStore, voiceMembers } from '../store';
 import { sendMessage } from '../socket';
+import { localeOf, useT } from '../i18n';
 import { roomToken } from '../ui/Markdown';
 import { Avatar } from '../ui/Avatar';
 import type { Channel } from '../types';
@@ -18,6 +19,7 @@ type Action = 'read' | 'mute' | 'invite' | 'rename' | 'delete';
  * in the list). Nothing is shown when there's nothing to offer.
  */
 export function ChannelMenu({ channelId, className = '' }: { channelId: string; className?: string }) {
+  const { t } = useT();
   const channels = useStore((s) => s.channels);
   const canManage = useStore((s) => s.canManageChannels);
   const unread = useStore((s) => s.unread[channelId] ?? 0);
@@ -35,25 +37,25 @@ export function ChannelMenu({ channelId, className = '' }: { channelId: string; 
       if (action === 'mute') useStore.setState({ mutedChannels: await api.muteChannel(channel.id, !muted) });
       if (action === 'invite' || action === 'rename' || action === 'delete') setDialog({ action, id: channel.id });
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Не получилось');
+      showError(e instanceof Error ? e.message : t('shell.menu.failed'));
     }
   }
 
   const personal: ReactNode[] = [];
-  if (isText && unread > 0) personal.push(<Item key="read" id="read" label="Отметить прочитанным" icon={<CheckIcon size={16} />} />);
+  if (isText && unread > 0) personal.push(<Item key="read" id="read" label={t('shell.menu.markRead')} icon={<CheckIcon size={16} />} />);
   if (isText)
     personal.push(
       muted ? (
-        <Item key="mute" id="mute" label="Включить уведомления" icon={<BellIcon size={16} />} />
+        <Item key="mute" id="mute" label={t('shell.menu.unmute')} icon={<BellIcon size={16} />} />
       ) : (
-        <Item key="mute" id="mute" label="Без уведомлений" icon={<BellSlashIcon size={16} />} />
+        <Item key="mute" id="mute" label={t('shell.menu.mute')} icon={<BellSlashIcon size={16} />} />
       ),
     );
-  if (!isText) personal.push(<Item key="invite" id="invite" label="Позвать в комнату" icon={<UserPlusIcon size={16} />} />);
+  if (!isText) personal.push(<Item key="invite" id="invite" label={t('shell.menu.inviteToRoom')} icon={<UserPlusIcon size={16} />} />);
 
   const admin: ReactNode[] = [];
   if (canManage) {
-    admin.push(<Item key="rename" id="rename" label="Переименовать" icon={<PencilIcon size={16} />} />);
+    admin.push(<Item key="rename" id="rename" label={t('shell.menu.rename')} icon={<PencilIcon size={16} />} />);
   }
   if (personal.length + admin.length === 0) return null;
 
@@ -61,19 +63,19 @@ export function ChannelMenu({ channelId, className = '' }: { channelId: string; 
     <>
       <Dropdown>
         <Dropdown.Trigger
-          aria-label={isText ? `Действия с каналом ${channel.name}` : `Действия с комнатой ${channel.name}`}
+          aria-label={isText ? t('shell.menu.channelActionsNamed', { name: channel.name }) : t('shell.menu.roomActionsNamed', { name: channel.name })}
           className={`flex shrink-0 items-center justify-center rounded-full outline-none transition-colors hover:bg-default data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus ${className || 'h-10 w-10 text-foreground'}`}
         >
           <DotsIcon size={20} />
         </Dropdown.Trigger>
         <Dropdown.Popover placement="bottom end" className="min-w-60">
-          <Dropdown.Menu aria-label={isText ? 'Действия с каналом' : 'Действия с комнатой'} onAction={(key) => run(key as Action)}>
+          <Dropdown.Menu aria-label={isText ? t('shell.menu.channelActions') : t('shell.menu.roomActions')} onAction={(key) => run(key as Action)}>
             {personal}
             {admin}
             {canManage && <Separator />}
             {canManage && (
-              <Dropdown.Item id="delete" textValue={isText ? 'Удалить канал' : 'Удалить комнату'} variant="danger">
-                <Label>{isText ? 'Удалить канал' : 'Удалить комнату'}</Label>
+              <Dropdown.Item id="delete" textValue={isText ? t('shell.menu.deleteChannel') : t('shell.menu.deleteRoom')} variant="danger">
+                <Label>{isText ? t('shell.menu.deleteChannel') : t('shell.menu.deleteRoom')}</Label>
                 <TrashIcon size={16} className="ml-auto text-danger" />
               </Dropdown.Item>
             )}
@@ -97,10 +99,11 @@ function Item({ id, label, icon }: { id: Action; label: string; icon: ReactNode 
 }
 
 /**
- * Friends to call into a voice room: each "Позвать" sends them a room card in your DM, with a button to
+ * Friends to call into a voice room: each "Invite" sends them a room card in your DM, with a button to
  * join. People already in the room aren't offered.
  */
 function InviteToRoom({ channel, onClose }: { channel: Channel; onClose: () => void }) {
+  const { t, lang } = useT();
   const friends = useStore((s) => s.friends);
   const users = useStore((s) => s.users);
   const voiceState = useStore((s) => s.voiceState);
@@ -113,7 +116,7 @@ function InviteToRoom({ channel, onClose }: { channel: Channel; onClose: () => v
     .filter((f) => f.status === 'friend' && !inside.has(f.userId))
     .map((f) => users[f.userId])
     .filter((u) => u && (!q || u.name.toLowerCase().includes(q)))
-    .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    .sort((a, b) => a.name.localeCompare(b.name, localeOf(lang)));
 
   async function invite(userId: string) {
     setBusy(userId);
@@ -122,7 +125,7 @@ function InviteToRoom({ channel, onClose }: { channel: Channel; onClose: () => v
       addDm(dm);
       if (await sendMessage(dm.id, roomToken(channel.id))) setSent((list) => [...list, userId]);
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Не получилось');
+      showError(e instanceof Error ? e.message : t('shell.menu.failed'));
     } finally {
       setBusy(null);
     }
@@ -131,12 +134,12 @@ function InviteToRoom({ channel, onClose }: { channel: Channel; onClose: () => v
   return (
     <Dialog
       sheet
-      title="Позвать в комнату"
+      title={t('shell.menu.inviteToRoom')}
       subtitle={channel.name}
       onClose={onClose}
       footer={
         <Button onPress={onClose} className="rounded-full">
-          Готово
+          {t('shell.menu.done')}
         </Button>
       }
     >
@@ -146,16 +149,16 @@ function InviteToRoom({ channel, onClose }: { channel: Channel; onClose: () => v
           autoFocus
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Найти друга"
-          aria-label="Найти друга"
+          placeholder={t('shell.menu.findFriend')}
+          aria-label={t('shell.menu.findFriend')}
           className="min-w-0 flex-1 bg-transparent text-[16px] text-foreground outline-none placeholder:text-muted"
         />
       </label>
       {candidates.length === 0 ? (
         q ? (
-          <EmptyState compact art="search" title="Никого не нашлось" text="Друзей с таким ником нет" plate="var(--overlay)" />
+          <EmptyState compact art="search" title={t('shell.menu.noOne.title')} text={t('shell.menu.noOne.text')} plate="var(--overlay)" />
         ) : (
-          <EmptyState compact art="group" title="Все друзья уже здесь" text="Позвать больше некого" plate="var(--overlay)" />
+          <EmptyState compact art="group" title={t('shell.menu.allHere.title')} text={t('shell.menu.allHere.text')} plate="var(--overlay)" />
         )
       ) : (
         <ul>
@@ -173,7 +176,7 @@ function InviteToRoom({ channel, onClose }: { channel: Channel; onClose: () => v
                   onPress={() => invite(u.id)}
                   className="h-8 rounded-full px-3 text-[13px]"
                 >
-                  {done ? 'Позван' : 'Позвать'}
+                  {done ? t('shell.menu.invited') : t('shell.menu.invite')}
                 </Button>
               </li>
             );
@@ -185,6 +188,7 @@ function InviteToRoom({ channel, onClose }: { channel: Channel; onClose: () => v
 }
 
 function RenameChannel({ channel, onClose }: { channel: Channel; onClose: () => void }) {
+  const { t } = useT();
   const [name, setName] = useState(channel.name);
   const [busy, setBusy] = useState(false);
   const isText = channel.kind === 'text';
@@ -200,22 +204,22 @@ function RenameChannel({ channel, onClose }: { channel: Channel; onClose: () => 
       setChannels(await api.renameChannel(channel.id, name));
       onClose();
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Не получилось переименовать');
+      showError(e instanceof Error ? e.message : t('shell.menu.renameFailed'));
       setBusy(false);
     }
   }
 
   return (
     <Dialog
-      title={isText ? 'Название канала' : 'Название комнаты'}
+      title={isText ? t('shell.sidebar.nameChannel') : t('shell.sidebar.nameRoom')}
       onClose={onClose}
       footer={
         <>
           <Button variant="tertiary" onPress={onClose} className="rounded-full">
-            Отмена
+            {t('shell.menu.cancel')}
           </Button>
           <Button onPress={save} isPending={busy} isDisabled={!result} className="rounded-full">
-            Сохранить
+            {t('shell.menu.save')}
           </Button>
         </>
       }
@@ -226,26 +230,23 @@ function RenameChannel({ channel, onClose }: { channel: Channel; onClose: () => 
           save();
         }}
       >
-        <TextField fullWidth value={name} onChange={setName} maxLength={32} autoFocus aria-label={isText ? 'Название канала' : 'Название комнаты'}>
+        <TextField fullWidth value={name} onChange={setName} maxLength={32} autoFocus aria-label={isText ? t('shell.sidebar.nameChannel') : t('shell.sidebar.nameRoom')}>
           <Input className="h-11 bg-default text-[16px]" onFocus={(e) => e.currentTarget.select()} />
         </TextField>
-        {isText && result && result !== name && <p className="px-1 pt-2 text-[13px] text-muted">Будет #{result}</p>}
+        {isText && result && result !== name && <p className="px-1 pt-2 text-[13px] text-muted">{t('shell.menu.becomes', { name: result })}</p>}
       </form>
     </Dialog>
   );
 }
 
 function DeleteChannel({ channel, onClose }: { channel: Channel; onClose: () => void }) {
+  const { t } = useT();
   const isText = channel.kind === 'text';
   return (
     <ConfirmDialog
-      title={isText ? `Удалить #${channel.name}?` : `Удалить «${channel.name}»?`}
-      text={
-        isText
-          ? 'Канал пропадёт у всех. Админ сможет вернуть его с перепиской в течение 7 дней.'
-          : 'Комната пропадёт у всех, а кто сейчас в ней — отключится.'
-      }
-      confirmLabel="Удалить"
+      title={isText ? t('shell.menu.deleteChannelTitle', { name: channel.name }) : t('shell.menu.deleteRoomTitle', { name: channel.name })}
+      text={isText ? t('shell.menu.deleteChannelText') : t('shell.menu.deleteRoomText')}
+      confirmLabel={t('shell.menu.delete')}
       onConfirm={async () => setChannels(await api.deleteChannel(channel.id))}
       onClose={onClose}
     />

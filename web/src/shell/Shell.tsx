@@ -3,6 +3,7 @@ import { Tooltip } from '@heroui/react';
 import { RoomAudioRenderer, RoomContext } from '@livekit/components-react';
 import { openDm, openHome, openServer, useStore } from '../store';
 import { useIsMobile } from '../hooks';
+import { useT } from '../i18n';
 import { desktop } from '../desktop';
 import { startUpdateChecks } from '../updates';
 import { firstRunNetCheck } from '../voice/netcheck';
@@ -141,6 +142,7 @@ function usePlayground() {
 }
 
 function ServerRail({ className }: { className: string }) {
+  const { t } = useT();
   const serverName = useStore((s) => s.serverName);
   const serverIcon = useStore((s) => s.serverIcon);
   const mode = useStore((s) => s.mode);
@@ -149,7 +151,7 @@ function ServerRail({ className }: { className: string }) {
 
   return (
     <nav className={`flex flex-col items-center gap-2.5 pt-3 ${className}`}>
-      <RailItem label="Главная" active={mode === 'home'} badge={homeBadge} onPress={openHome}>
+      <RailItem label={t('shell.tab.home')} active={mode === 'home'} badge={homeBadge} onPress={openHome}>
         <span
           className={`flex h-12 w-12 items-center justify-center ${mode === 'home' ? 'bg-white text-black' : 'bg-default group-hover:bg-[#28282d]'} ${railShape(mode === 'home')}`}
         >

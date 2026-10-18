@@ -6,10 +6,12 @@ import type { Session } from '../types';
 import { SignInArt } from '../ui/Illustrations';
 import { GomexMark } from '../ui/Logo';
 import { RecoveryKeyInput } from './RecoveryKeyInput';
+import { useT } from '../i18n';
 
 type Mode = 'login' | 'register' | 'recover';
 
 export function Login({ onLoggedIn }: { onLoggedIn: (session: Session, signedUp: boolean) => void }) {
+  const { t } = useT();
   // Opened from an invite link: straight to sign-up with the code filled in.
   const [linkCode] = useState(inviteFromUrl);
   const [mode, setMode] = useState<Mode>(linkCode ? 'register' : 'login');
@@ -26,9 +28,9 @@ export function Login({ onLoggedIn }: { onLoggedIn: (session: Session, signedUp:
     if (!linkCode) return;
     api.checkInvite(linkCode).then(
       (r) => setInviter(r.inviter),
-      (e) => setLinkProblem(e instanceof Error ? e.message : 'Приглашение не подошло'),
+      (e) => setLinkProblem(e instanceof Error ? e.message : t('account.login.inviteFailed')),
     );
-  }, [linkCode]);
+  }, [linkCode, t]);
 
   // A valid link means the code field isn't needed at all.
   const showInviteField = mode === 'register' && !(linkCode && inviter);
@@ -48,11 +50,14 @@ export function Login({ onLoggedIn }: { onLoggedIn: (session: Session, signedUp:
       clearInviteFromUrl();
       onLoggedIn(session, mode === 'register');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не получилось');
+      setError(err instanceof Error ? err.message : t('account.login.failed'));
     } finally {
       setBusy(false);
     }
   }
+
+  // The bold nick sits inside the sentence: split around a marker so word order stays the dictionary's.
+  const invitedBy = t('account.login.invitedBy', { name: '\u0000' }).split('\u0000');
 
   const tab = (id: Mode, label: string) => (
     <button
@@ -81,38 +86,40 @@ export function Login({ onLoggedIn }: { onLoggedIn: (session: Session, signedUp:
         <h1 className="mt-1 px-4 text-center text-[34px] font-medium leading-[1.12] tracking-[-0.02em] max-md:text-[28px]">
           Gomex.
           <br />
-          Свои люди, свои звонки.
+          {t('account.login.tagline')}
         </h1>
       <form onSubmit={submit} className="mt-8 flex w-full max-w-[380px] flex-col gap-4 px-4">
 
         {mode === 'recover' ? (
           <div>
-            <h2 className="text-[18px] font-medium">Восстановить доступ</h2>
-            <p className="mt-1 text-[14px] leading-snug text-muted">Ник, ключ восстановления и новый пароль. Ключ одноразовый, остальные устройства выйдут из аккаунта.</p>
+            <h2 className="text-[18px] font-medium">{t('account.login.recoverTitle')}</h2>
+            <p className="mt-1 text-[14px] leading-snug text-muted">{t('account.login.recoverHint')}</p>
           </div>
         ) : (
           <div className="flex gap-1 rounded-full bg-default p-1">
-            {tab('login', 'Вход')}
-            {tab('register', 'Регистрация')}
+            {tab('login', t('account.login.tabLogin'))}
+            {tab('register', t('account.login.tabRegister'))}
           </div>
         )}
 
         {mode === 'register' && linkCode && inviter && (
           <p className="rounded-[12px] bg-accent/15 px-4 py-3 text-[15px]">
-            Приглашение от <b>{inviter}</b>
+            {invitedBy[0]}
+            <b>{inviter}</b>
+            {invitedBy[1]}
           </p>
         )}
         {mode === 'register' && linkCode && linkProblem && (
-          <p className="rounded-[12px] bg-danger/15 px-4 py-3 text-[14px] text-danger">{linkProblem}. Попроси новую ссылку.</p>
+          <p className="rounded-[12px] bg-danger/15 px-4 py-3 text-[14px] text-danger">{t('account.login.askNewLink', { problem: linkProblem })}</p>
         )}
         {showInviteField && (
           <TextField isRequired fullWidth value={invite} onChange={setInvite}>
-            <Label>Приглашение</Label>
-            <Input className="h-11 bg-default text-[16px]" placeholder="Ссылка или код от друга" />
+            <Label>{t('account.login.inviteLabel')}</Label>
+            <Input className="h-11 bg-default text-[16px]" placeholder={t('account.login.invitePlaceholder')} />
           </TextField>
         )}
         <TextField isRequired fullWidth value={name} onChange={setName} maxLength={32} autoComplete="username" autoFocus>
-          <Label>Ник</Label>
+          <Label>{t('account.login.name')}</Label>
           <Input className="h-11 bg-default text-[16px]" />
         </TextField>
         {mode === 'recover' && (
@@ -127,7 +134,7 @@ export function Login({ onLoggedIn }: { onLoggedIn: (session: Session, signedUp:
           minLength={mode === 'login' ? undefined : 8}
           autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
         >
-          <Label>{mode === 'recover' ? 'Новый пароль' : 'Пароль'}</Label>
+          <Label>{mode === 'recover' ? t('account.login.newPassword') : t('account.login.password')}</Label>
           <Input className="h-11 bg-default text-[16px]" />
         </TextField>
 
@@ -135,12 +142,12 @@ export function Login({ onLoggedIn }: { onLoggedIn: (session: Session, signedUp:
           <p className="text-[14px] text-danger">{error}</p>
         ) : (
           mode === 'register' && (
-            <p className="text-[13px] text-muted">Попасть сюда можно только по приглашению от того, кто уже на сервере. Пароль — от 8 символов.</p>
+            <p className="text-[13px] text-muted">{t('account.login.registerHint')}</p>
           )
         )}
 
         <Button type="submit" fullWidth isPending={busy} className="mt-1 h-12 rounded-full text-[16px]">
-          {mode === 'login' ? 'Войти' : mode === 'recover' ? 'Сменить пароль и войти' : 'Зарегистрироваться'}
+          {mode === 'login' ? t('account.login.submitLogin') : mode === 'recover' ? t('account.login.submitRecover') : t('account.login.submitRegister')}
         </Button>
         {mode !== 'register' && (
           <button
@@ -151,7 +158,7 @@ export function Login({ onLoggedIn }: { onLoggedIn: (session: Session, signedUp:
             }}
             className="self-center text-[14px] text-muted hover:text-foreground hover:underline"
           >
-            {mode === 'recover' ? 'Вспомнил пароль' : 'Забыл пароль?'}
+            {mode === 'recover' ? t('account.login.rememberedPassword') : t('account.login.forgotPassword')}
           </button>
         )}
       </form>

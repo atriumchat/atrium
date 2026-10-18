@@ -6,29 +6,31 @@ import { desktop } from '../desktop';
 import { BypassSwitch } from './Bypass';
 import { ConnectionCheck } from './ConnectionCheck';
 import { ChoiceRow, Row, RowFrame, Rows, Secondary } from '../ui/settings';
+import { useT } from '../i18n';
 
-/** The "Голос" page of the settings, for this device: noise suppression, push-to-talk, the bypass, a check. */
+/** The "Voice" page of the settings, for this device: noise suppression, push-to-talk, the bypass, a check. */
 export function VoiceSettings() {
+  const { t } = useT();
   const prefs = useStore((s) => s.voicePrefs);
   const isMobile = useStore((s) => s.isMobile);
 
   return (
-    <Rows title="Голос" className="mt-6">
+    <Rows title={t('voice.settings.title')} className="mt-6">
       <NoiseRow />
       {/* In the browser the key only works while Gomex's window is open; the desktop app hears it from anywhere. */}
       <ChoiceRow<'voice' | 'ptt'>
-        title="Микрофон"
+        title={t('voice.settings.mic')}
         value={prefs.ptt ? 'ptt' : 'voice'}
         onChange={(mode) => setVoicePrefs({ ptt: mode === 'ptt' })}
         options={[
           // Every choice says something under the row, so switching doesn't make the page jump.
-          ['voice', 'Всегда включён', 'Слышно всё время'],
+          ['voice', t('voice.settings.micAlways'), t('voice.settings.micAlwaysHint')],
           [
             'ptt',
-            'По клавише',
+            t('voice.settings.ptt'),
             // On the computer the key itself sits under the row, so no row of its own drops in when it's chosen.
             isMobile || !prefs.ptt ? (
-              desktop?.ptt ? 'Работает и в фоне' : 'Пока окно открыто'
+              desktop?.ptt ? t('voice.settings.pttBackground') : t('voice.settings.pttWindow')
             ) : (
               <KeyHint value={prefs.pttKey} onChange={(pttKey) => setVoicePrefs({ pttKey })} />
             ),
@@ -45,12 +47,13 @@ export function VoiceSettings() {
 }
 
 /**
- * The phone's «Звонки» group on the "Вы" tab: what's touched when friends hear noise or the call stutters. No
+ * The phone's "Calls" group on the "You" tab: what's touched when friends hear noise or the call stutters. No
  * push-to-talk there: without a keyboard it's a computer's setting.
  */
 export function CallsGroup({ className = '' }: { className?: string }) {
+  const { t } = useT();
   return (
-    <Rows title="Звонки" className={className}>
+    <Rows title={t('voice.settings.calls')} className={className}>
       <NoiseRow />
       <RowFrame>
         <BypassSwitch />
@@ -61,16 +64,17 @@ export function CallsGroup({ className = '' }: { className?: string }) {
 }
 
 function NoiseRow() {
+  const { t } = useT();
   const noise = useStore((s) => s.voicePrefs.noise);
   return (
     <ChoiceRow<NoiseMode>
-      title="Шумоподавление"
+      title={t('voice.noise.title')}
       value={noise}
       onChange={(value) => setVoicePrefs({ noise: value })}
       options={[
-        ['off', 'Выкл', 'Звук как есть'],
-        ['browser', 'Обычное', 'Убирает ровный шум'],
-        ['rnnoise', 'Сильное', 'Убирает клавиатуру и улицу'],
+        ['off', t('voice.noise.off'), t('voice.noise.offHint')],
+        ['browser', t('voice.noise.browser'), t('voice.noise.browserHint')],
+        ['rnnoise', t('voice.noise.rnnoise'), t('voice.noise.rnnoiseHint')],
       ]}
     />
   );
@@ -106,15 +110,16 @@ function useKeyCatch(onChange: (code: string) => void) {
 // A key cap, so a short label like ` still reads as a key.
 const KEY_CAP = 'inline-block min-w-5 rounded-[6px] border border-white/[0.12] px-1.5 text-center font-mono text-[12px] leading-[18px] text-foreground';
 
-/** The key under the "Микрофон" row on the computer: the cap, then «Сменить» (and where it works, in the browser). */
+/** The key under the "Microphone" row on the computer: the cap, then "Change" (and where it works, in the browser). */
 function KeyHint({ value, onChange }: { value: string; onChange: (code: string) => void }) {
+  const { t } = useT();
   const [listening, setListening] = useKeyCatch(onChange);
   if (listening) {
     return (
       <span>
-        Клавиша или кнопка мыши…{' '}
+        {t('voice.settings.keyPrompt')}{' '}
         <button type="button" onClick={() => setListening(false)} className="text-foreground hover:underline">
-          Отмена
+          {t('voice.settings.cancel')}
         </button>
       </span>
     );
@@ -124,39 +129,41 @@ function KeyHint({ value, onChange }: { value: string; onChange: (code: string) 
       <kbd className={KEY_CAP}>{keyLabel(value)}</kbd>
       <span>·</span>
       <button type="button" onClick={() => setListening(true)} className="text-foreground hover:underline">
-        Сменить
+        {t('voice.settings.change')}
       </button>
-      {!desktop?.ptt && <span>· пока окно открыто</span>}
+      {!desktop?.ptt && <span>{t('voice.settings.pttWindowInline')}</span>}
     </span>
   );
 }
 
 /** The push-to-talk key as a row of its own, on the phone. */
 function KeyRow({ value, onChange }: { value: string; onChange: (code: string) => void }) {
+  const { t } = useT();
   const [listening, setListening] = useKeyCatch(onChange);
   return (
     <Row
-      title="Клавиша"
+      title={t('voice.settings.key')}
       value={
         listening ? (
-          'Клавиша или кнопка мыши…'
+          t('voice.settings.keyPrompt')
         ) : (
           <kbd className={KEY_CAP}>{keyLabel(value)}</kbd>
         )
       }
     >
-      <Secondary onPress={() => setListening((v) => !v)}>{listening ? 'Отмена' : 'Сменить'}</Secondary>
+      <Secondary onPress={() => setListening((v) => !v)}>{listening ? t('voice.settings.cancel') : t('voice.settings.change')}</Secondary>
     </Row>
   );
 }
 
 /** Calls tried from here on demand: the two tries show up as rows of their own under this one. */
 function CheckRow() {
+  const { t } = useT();
   const [run, setRun] = useState(0);
   const [busy, setBusy] = useState(false);
   return (
     <>
-      <Row title="Проверка связи">
+      <Row title={t('voice.settings.check')}>
         <Secondary
           isPending={busy}
           onPress={() => {
@@ -164,7 +171,7 @@ function CheckRow() {
             setBusy(true);
           }}
         >
-          {run ? 'Ещё раз' : 'Проверить'}
+          {run ? t('voice.settings.checkAgain') : t('voice.settings.checkRun')}
         </Secondary>
       </Row>
       {run > 0 && <ConnectionCheck key={run} onDone={() => setBusy(false)} />}

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { Slider } from '@heroui/react';
+import { t, useT } from '../i18n';
 
 /**
  * The server's icon cut from any picture: the picture under a round window (the icon is a circle everywhere in the
@@ -20,7 +21,7 @@ export async function loadImage(file: File): Promise<HTMLImageElement> {
     await img.decode();
   } catch {
     URL.revokeObjectURL(img.src);
-    throw new Error('Это не похоже на картинку');
+    throw new Error(t('common.crop.notImage'));
   }
   return img;
 }
@@ -55,7 +56,7 @@ function draw(img: HTMLImageElement, crop: Crop, size: number) {
 /** The square as a PNG (the server makes its own WebP of it); PNG keeps a logo's transparent corners. */
 export function cropToBlob(img: HTMLImageElement, crop: Crop, size = 512): Promise<Blob> {
   return new Promise((resolve, reject) =>
-    draw(img, crop, size).toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Не получилось вырезать картинку'))), 'image/png'),
+    draw(img, crop, size).toBlob((blob) => (blob ? resolve(blob) : reject(new Error(t('common.crop.failed')))), 'image/png'),
   );
 }
 
@@ -74,6 +75,7 @@ export function IconCropper({
   /** The frame's own look and height; the window inside keeps 20px from its shorter side. */
   className?: string;
 }) {
+  const { t } = useT();
   const frame = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
   const latest = useRef(crop);
@@ -151,7 +153,7 @@ export function IconCropper({
         ref={frame}
         tabIndex={0}
         role="img"
-        aria-label="Кадр значка"
+        aria-label={t('common.crop.frame')}
         onPointerDown={down}
         onPointerMove={drag}
         onPointerUp={up}
@@ -180,7 +182,7 @@ export function IconCropper({
         />
       </div>
       <Slider
-        aria-label="Масштаб"
+        aria-label={t('common.crop.zoom')}
         minValue={1}
         maxValue={MAX_ZOOM}
         step={0.01}

@@ -4,12 +4,14 @@ import { api, setToken } from '../api';
 import type { Session } from '../types';
 import { GomexMark } from '../ui/Logo';
 import { clearResetFromUrl } from './resetLink';
+import { useT } from '../i18n';
 
 /**
  * The page a reset link opens: a new password, twice. The link belongs to one person (the admin made it for them);
  * it works once, ends their other sessions and signs this one in.
  */
 export function ResetPassword({ token, onDone, onCancel }: { token: string; onDone: (session: Session) => void; onCancel: () => void }) {
+  const { t } = useT();
   const [name, setName] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [password, setPassword] = useState('');
@@ -21,13 +23,15 @@ export function ResetPassword({ token, onDone, onCancel }: { token: string; onDo
   useEffect(() => {
     api.checkReset(token).then(
       (r) => setName(r.name),
-      (e) => setProblem(e instanceof Error ? e.message : 'Ссылка не подошла'),
+      (e) => setProblem(e instanceof Error ? e.message : t('account.reset.linkFailed')),
     );
-  }, [token]);
+  }, [token, t]);
+
+  const forName = t('account.reset.forName', { name: '\u0000' }).split('\u0000');
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (password !== repeat) return setError('Пароли не совпадают');
+    if (password !== repeat) return setError(t('account.reset.mismatch'));
     setBusy(true);
     setError(null);
     try {
@@ -36,7 +40,7 @@ export function ResetPassword({ token, onDone, onCancel }: { token: string; onDo
       clearResetFromUrl();
       onDone(session);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не получилось');
+      setError(err instanceof Error ? err.message : t('account.reset.failed'));
     } finally {
       setBusy(false);
     }
@@ -46,38 +50,40 @@ export function ResetPassword({ token, onDone, onCancel }: { token: string; onDo
     <div className="flex h-full overflow-y-auto bg-background">
       <div className="m-auto flex w-full max-w-[380px] flex-col items-center gap-5 px-4 py-8">
         <GomexMark size={56} />
-        <h1 className="text-[24px] font-medium leading-tight">Новый пароль</h1>
+        <h1 className="text-[24px] font-medium leading-tight">{t('account.reset.title')}</h1>
         {problem ? (
           <>
-            <p className="w-full rounded-[12px] bg-danger/15 px-4 py-3 text-[14px] text-danger">{problem}. Попроси новую ссылку.</p>
+            <p className="w-full rounded-[12px] bg-danger/15 px-4 py-3 text-[14px] text-danger">{t('account.login.askNewLink', { problem })}</p>
             <Button fullWidth onPress={onCancel} className="h-12 rounded-full text-[16px]">
-              На страницу входа
+              {t('account.reset.toLogin')}
             </Button>
           </>
         ) : (
           <form onSubmit={submit} className="flex w-full flex-col gap-4">
             {name && (
               <p className="text-center text-[15px] text-muted">
-                Для <b className="text-foreground">{name}</b>
+                {forName[0]}
+                <b className="text-foreground">{name}</b>
+                {forName[1]}
               </p>
             )}
             {/* So a password manager saves the new password under the right nick. */}
             <input type="text" value={name ?? ''} readOnly autoComplete="username" tabIndex={-1} aria-hidden className="sr-only" />
             <TextField isRequired fullWidth type="password" value={password} onChange={setPassword} minLength={8} autoComplete="new-password" autoFocus>
-              <Label>Новый пароль</Label>
+              <Label>{t('account.reset.newPassword')}</Label>
               <Input className="h-11 bg-default text-[16px]" />
             </TextField>
             <TextField isRequired fullWidth type="password" value={repeat} onChange={setRepeat} minLength={8} autoComplete="new-password">
-              <Label>Ещё раз</Label>
+              <Label>{t('account.reset.repeat')}</Label>
               <Input className="h-11 bg-default text-[16px]" />
             </TextField>
             {error || mismatch ? (
-              <p className="text-[14px] text-danger">{error ?? 'Пароли не совпадают'}</p>
+              <p className="text-[14px] text-danger">{error ?? t('account.reset.mismatch')}</p>
             ) : (
-              <p className="text-[13px] text-muted">Пароль — от 8 символов.</p>
+              <p className="text-[13px] text-muted">{t('account.reset.minLength')}</p>
             )}
             <Button type="submit" fullWidth isPending={busy} isDisabled={!name} className="h-12 rounded-full text-[16px]">
-              Сохранить и войти
+              {t('account.reset.save')}
             </Button>
           </form>
         )}

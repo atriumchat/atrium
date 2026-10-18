@@ -4,7 +4,7 @@ import { api } from '../api';
 import { selectChannel, setChannels, showError, useStore, voiceMembers } from '../store';
 import { joinVoice } from '../voice/voice';
 import { ensureHistory } from '../chat/history';
-import { plural } from '../chat/format';
+import { useT } from '../i18n';
 import type { Channel, VoiceEntry } from '../types';
 import { Avatar } from '../ui/Avatar';
 import { CallDuration } from '../voice/CallDuration';
@@ -14,6 +14,7 @@ import { EmptyState } from '../ui/Illustrations';
 import { BellSlashIcon, HashIcon, HeadphonesSlashIcon, MicSlashIcon, PlusIcon, SearchIcon, SpeakerIcon, VideoIcon } from '../ui/icons';
 
 export function Sidebar() {
+  const { t } = useT();
   const channels = useStore((s) => s.channels);
   const [filter, setFilter] = useState('');
   const query = filter.trim().toLowerCase();
@@ -30,8 +31,8 @@ export function Sidebar() {
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Найти канал"
-            aria-label="Найти канал"
+            placeholder={t('shell.sidebar.search')}
+            aria-label={t('shell.sidebar.search')}
             className="min-w-0 flex-1 bg-transparent text-[15px] text-foreground outline-none placeholder:text-faint"
           />
         </label>
@@ -39,10 +40,10 @@ export function Sidebar() {
       <nav className="flex-1 overflow-y-auto px-2 pb-3 max-md:px-3">
         {/* A search that finds nothing shows only that, without the two empty sections under it. */}
         {query && visible.length === 0 ? (
-          <EmptyState compact art="search" title="Ничего не нашлось" text="Каналов с таким названием нет" />
+          <EmptyState compact art="search" title={t('shell.sidebar.noResults.title')} text={t('shell.sidebar.noResults.text')} />
         ) : (
           <>
-            <Section title="Текстовые каналы" kind="text">
+            <Section title={t('shell.sidebar.textChannels')} kind="text">
               {visible
                 .filter((c) => c.kind === 'text')
                 .map((c) => (
@@ -51,7 +52,7 @@ export function Sidebar() {
                   </Draggable>
                 ))}
             </Section>
-            <Section title="Голосовые комнаты" kind="voice">
+            <Section title={t('shell.sidebar.voiceRooms')} kind="voice">
               {visible
                 .filter((c) => c.kind === 'voice')
                 .map((c) => (
@@ -74,6 +75,7 @@ type Drag = ReturnType<typeof useChannelDrag>;
  * takes the new order at once and the server confirms it (or the old order comes back).
  */
 function useChannelDrag(channels: Channel[]) {
+  const { t } = useT();
   const [dragged, setDragged] = useState<Channel | null>(null);
   const [over, setOver] = useState<{ id: string; after: boolean } | null>(null);
 
@@ -94,7 +96,7 @@ function useChannelDrag(channels: Channel[]) {
       setChannels(await api.reorderChannels(same.map((c) => c.id)));
     } catch (e) {
       setChannels(before);
-      showError(e instanceof Error ? e.message : 'Не получилось переставить');
+      showError(e instanceof Error ? e.message : t('shell.sidebar.reorderFailed'));
     }
   }
 
@@ -148,6 +150,7 @@ function Draggable({ channel, drag, children }: { channel: Channel; drag: Drag |
 }
 
 function Section({ title, kind, children }: { title: string; kind: Channel['kind']; children: ReactNode }) {
+  const { t } = useT();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
   const canManage = useStore((s) => s.canManageChannels);
@@ -160,7 +163,7 @@ function Section({ title, kind, children }: { title: string; kind: Channel['kind
       setName('');
       setAdding(false);
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Не удалось создать канал');
+      showError(err instanceof Error ? err.message : t('shell.sidebar.createFailed'));
     }
   }
 
@@ -172,7 +175,7 @@ function Section({ title, kind, children }: { title: string; kind: Channel['kind
           <RoundButton
             size="sm"
             tone="ghost"
-            label={kind === 'text' ? 'Создать текстовый канал' : 'Создать голосовую комнату'}
+            label={kind === 'text' ? t('shell.sidebar.createText') : t('shell.sidebar.createVoice')}
             onPress={() => setAdding((v) => !v)}
             className="h-7 w-7 min-w-7 [&_svg]:size-4"
           >
@@ -191,8 +194,8 @@ function Section({ title, kind, children }: { title: string; kind: Channel['kind
             onChange={(e) => setName(e.target.value)}
             onBlur={() => !name && setAdding(false)}
             onKeyDown={(e) => e.key === 'Escape' && setAdding(false)}
-            placeholder={kind === 'text' ? 'Название канала' : 'Название комнаты'}
-            aria-label={kind === 'text' ? 'Название текстового канала' : 'Название голосовой комнаты'}
+            placeholder={kind === 'text' ? t('shell.sidebar.nameChannel') : t('shell.sidebar.nameRoom')}
+            aria-label={kind === 'text' ? t('shell.sidebar.nameTextChannel') : t('shell.sidebar.nameVoiceRoom')}
             className="h-10 w-full rounded-full bg-default px-4 text-[15px] outline-none placeholder:text-faint focus:ring-2 focus:ring-focus"
           />
         </form>
@@ -225,6 +228,7 @@ function RowMenu({ channelId }: { channelId: string }) {
 const ROW_MENU_ROOM = 'md:group-hover:pr-9';
 
 function TextItem({ channel }: { channel: Channel }) {
+  const { t } = useT();
   // On a phone the list is its own screen, so nothing in it is "the open one".
   const active = useStore((s) => s.selectedChannelId === channel.id && !s.isMobile);
   const unread = useStore((s) => s.unread[channel.id] ?? 0);
@@ -235,9 +239,9 @@ function TextItem({ channel }: { channel: Channel }) {
   const showUnread = unread > 0 && !active && !muted;
   const showMentions = mentions > 0 && !active;
   const label = showMentions
-    ? `${channel.name}, ${mentions} ${plural(mentions, ['упоминание', 'упоминания', 'упоминаний'])}`
+    ? t('shell.sidebar.mentions', { name: channel.name, n: mentions })
     : showUnread
-      ? `${channel.name}, есть новые сообщения`
+      ? t('shell.sidebar.unread', { name: channel.name })
       : undefined;
   return (
     <div className="group relative">
@@ -297,6 +301,7 @@ function VoiceItem({ channel }: { channel: Channel }) {
 
 /** Person under a voice room, Discord-style. Click someone else in your room to set their volume. */
 function VoiceMember({ entry }: { entry: VoiceEntry }) {
+  const { t } = useT();
   const user = useStore((s) => s.users[entry.userId]);
   const isMe = useStore((s) => s.me?.id === entry.userId);
   const inSameRoom = useStore((s) => s.voiceChannelId === entry.channelId && s.voiceStatus === 'connected');
@@ -308,7 +313,7 @@ function VoiceMember({ entry }: { entry: VoiceEntry }) {
       <span className={`min-w-0 flex-1 truncate text-left text-[15px] ${speaking ? 'text-foreground' : 'text-muted'}`}>
         {user?.name ?? '…'}
       </span>
-      {entry.screen && <span className="rounded-[4px] bg-danger px-1 text-[10px] font-bold uppercase leading-4 text-white">В эфире</span>}
+      {entry.screen && <span className="rounded-[4px] bg-danger px-1 text-[10px] font-bold uppercase leading-4 text-white">{t('shell.sidebar.live')}</span>}
       {entry.video && <VideoIcon size={16} className="text-muted" />}
       {entry.deafened ? (
         <HeadphonesSlashIcon size={16} className="text-muted" />
@@ -323,7 +328,7 @@ function VoiceMember({ entry }: { entry: VoiceEntry }) {
   return (
     <li>
       <Popover>
-        <Popover.Trigger aria-label={`Громкость: ${user?.name ?? ''}`} className={`${row} cursor-pointer hover:bg-default/50`}>
+        <Popover.Trigger aria-label={t('shell.sidebar.volume', { name: user?.name ?? '' })} className={`${row} cursor-pointer hover:bg-default/50`}>
           {content}
         </Popover.Trigger>
         <Popover.Content placement="right" className="w-64">
