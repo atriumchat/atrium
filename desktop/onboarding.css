@@ -96,7 +96,8 @@ main {
   justify-content: safe center;
   width: 100%;
   max-width: 400px;
-  margin: 0 auto;
+  /* Along the window's left edge, under the mark, not floating in the middle of the half. */
+  margin: 0;
   padding: 24px 0;
   overflow-y: auto;
   /* In only once the step before has gone, so the two never show at once. */
