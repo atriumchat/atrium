@@ -441,7 +441,7 @@ setupCall('use-saved', async ({ ip }) => {
   return answer.ok ? { ok: true, domain: answer.domain } : answer;
 });
 setupCall('check-domain', (domain) => serverSetup.checkDomain(domain));
-setupCall('connect-drive', () => ({ error: 'Google Диск появится в следующей версии, пока можно без бэкапов' }));
+setupCall('connect-drive', () => ({ error: 'Google Диск появится в следующей версии, пока можно без копии' }));
 
 /**
  * After the install: tells the setup window when the new address answers from this computer. A name made minutes ago

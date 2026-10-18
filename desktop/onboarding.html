@@ -123,8 +123,8 @@
 
         <!-- 3. Backups away from the server: a nightly encrypted copy on the admin's Google Drive. -->
         <section class="step" data-step="backup" hidden>
-          <h1>Бэкапы</h1>
-          <p class="sub">Каждую ночь копия переписки и файлов</p>
+          <h1>Резервная копия</h1>
+          <p class="sub">Переписка и фото сохранятся, что бы ни случилось с сервером</p>
           <div class="rows">
             <div class="row">
               <span class="logo">
@@ -134,14 +134,16 @@
               <button class="secondary" type="button" id="drive-connect">Подключить</button>
               <span class="on" id="drive-on" hidden>Подключён</span>
             </div>
-            <div class="row"><span><b>Зашифрованы</b><small>Ключ только у админа</small></span></div>
-            <div class="row"><span><b>14 дней</b><small>Старые удаляются сами</small></span></div>
+            <!-- What a copy saves you from, not what it is. -->
+            <div class="row"><span><b>Сервер сломался или хостер закрылся</b><small>Всё вернётся на новом</small></span></div>
+            <div class="row"><span><b>Кто-то удалил лишнее</b><small>Можно вернуть вчерашнее</small></span></div>
+            <div class="row"><span><b>Копия зашифрована</b><small>Google её не прочитает</small></span></div>
           </div>
           <p class="error" id="e-backup" role="alert"></p>
           <div class="actions">
             <button class="quiet back" type="button">Назад</button>
             <span class="pair">
-              <button class="quiet" type="button" id="skip-backup">Без бэкапов</button>
+              <button class="quiet" type="button" id="skip-backup">Без копии</button>
               <button class="primary" type="button" id="go-backup" disabled>Дальше</button>
             </span>
           </div>
