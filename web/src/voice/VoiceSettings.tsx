@@ -29,11 +29,15 @@ export function VoiceSettings() {
         value={prefs.ptt ? 'ptt' : 'voice'}
         onChange={(mode) => setVoicePrefs({ ptt: mode === 'ptt' })}
         options={[
-          ['voice', 'Всегда включён'],
+          // Every choice says something under the row, so switching doesn't make the page jump.
+          ['voice', 'Всегда включён', 'Слышно всё время'],
           ['ptt', 'По клавише', desktop?.ptt ? 'Работает и в фоне' : 'Пока окно открыто'],
         ]}
       />
-      {prefs.ptt && <KeyRow value={prefs.pttKey} onChange={(pttKey) => setVoicePrefs({ pttKey })} />}
+      {/* Always in place, so choosing "По клавише" lights it up instead of dropping a new row in. */}
+      <div aria-disabled={!prefs.ptt} className={`transition-opacity ${prefs.ptt ? '' : 'pointer-events-none opacity-40'}`}>
+        <KeyRow value={prefs.pttKey} onChange={(pttKey) => setVoicePrefs({ pttKey })} />
+      </div>
       <RowFrame>
         <BypassSwitch />
       </RowFrame>
