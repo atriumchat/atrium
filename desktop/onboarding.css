@@ -680,7 +680,9 @@ h1 {
 .part {
   display: grid;
   gap: 8px;
-  width: 64px;
+  /* The three bars share the steps' column, edge to edge. */
+  flex: 1;
+  min-width: 0;
 }
 .track {
   position: relative;
@@ -1105,11 +1107,6 @@ h1 {
   }
   .right {
     display: none;
-  }
-  /* One column: the three bars share its whole width. */
-  .part {
-    flex: 1;
-    width: auto;
   }
 }
 
