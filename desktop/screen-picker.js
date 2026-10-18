@@ -112,4 +112,13 @@ function choose(parent, { sound }) {
   });
 }
 
-module.exports = { choose };
+/** The language changed: the open picker (if any) reloads in it, with its window title. */
+function relocalize() {
+  if (!picker) return;
+  picker.setTitle(i18n.t('picker.title'));
+  const url = new URL(picker.webContents.getURL());
+  url.searchParams.set('lang', i18n.getLang());
+  picker.webContents.loadURL(url.href);
+}
+
+module.exports = { choose, relocalize };

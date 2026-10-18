@@ -44,6 +44,13 @@ function readConfig() {
   }
 }
 
+/** Writes the config, keeping the language choice, which isn't part of where the app points. */
+function writeConfig(next) {
+  const { language } = readConfig();
+  fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true });
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(language ? { ...next, language } : next, null, 2));
+}
+
 // A server is the default only in builds made for one: GOMEX_DEFAULT_URL in release-desktop.sh puts the address into
 // package.json (electron-builder's extraMetadata). Any other build first asks where its server is.
 const DEFAULT_URL = require('./package.json').gomexDefaultUrl || '';
@@ -253,6 +260,19 @@ function updateTrayMenu() {
         checked: app.getLoginItemSettings().openAtLogin,
         click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked, openAsHidden: true }),
       },
+      {
+        label: t('tray.language'),
+        submenu: [
+          { label: t('tray.langSystem'), value: null },
+          { label: 'Русский', value: 'ru' },
+          { label: 'English', value: 'en' },
+        ].map(({ label, value }) => ({
+          label,
+          type: 'radio',
+          checked: (readConfig().language ?? null) === value,
+          click: () => setLanguage(value, { fromPage: false }),
+        })),
+      },
       { type: 'separator' },
       updateItem,
       { label: t('tray.version', { version: app.getVersion() }), enabled: false },
@@ -268,12 +288,53 @@ function updateTrayMenu() {
   );
 }
 
+/**
+ * The language choice: 'ru', 'en' or null (follow the system). Kept in the config, applied at once to the tray, the
+ * open windows and, from the tray, the Gomex page (which tells its own language setting through the bridge).
+ */
+function setLanguage(choice, { fromPage }) {
+  const config = readConfig();
+  if (choice) config.language = choice;
+  else delete config.language;
+  fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true });
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+  i18n.setLang(choice ?? i18n.pick(app.getLocale()));
+  updateTrayMenu();
+  addressWindow?.setTitle(firstRunAddress ? 'Gomex' : t('address.windowTitle'));
+  setupWindow?.setTitle(t('setup.title'));
+  relocalize(addressWindow?.webContents);
+  // The setup window holds a half-made server's answers in the page, so it only reloads while nothing is filled in
+  // yet; from a later step it keeps its language until opened again.
+  setupWindow?.webContents
+    .executeJavaScript(`document.querySelector('.step:not([hidden])')?.dataset.step === 'server' && !document.getElementById('pass').value`)
+    .then((untouched) => untouched && relocalize(setupWindow?.webContents))
+    .catch(() => undefined);
+  screenPicker.relocalize();
+  reachable.relocalize();
+  // The page learns of a change made here; one it made itself needs no echo.
+  if (!fromPage && win && !win.isDestroyed() && fromGomex(win.webContents.getURL())) {
+    win.webContents.executeJavaScript(
+      `window.dispatchEvent(new CustomEvent('gomex-language', { detail: ${JSON.stringify(choice)} }))`,
+    ).catch(() => undefined);
+  }
+}
+
+/** Reloads one of the app's own pages in the current language. */
+function relocalize(contents) {
+  if (!contents || contents.isDestroyed()) return;
+  const url = new URL(contents.getURL());
+  url.searchParams.set('lang', i18n.getLang());
+  contents.loadURL(url.href);
+}
+
 /** @type {BrowserWindow | null} */
 let addressWindow = null;
+let firstRunAddress = false;
 
 /** firstRun: no server address yet, so this window is the whole app; closing it quits. */
 function openAddressWindow({ firstRun = false } = {}) {
   if (addressWindow) return addressWindow.focus();
+  firstRunAddress = firstRun;
   addressWindow = new BrowserWindow({
     width: firstRun ? 480 : 460,
     height: firstRun ? 300 : 210,
@@ -305,11 +366,10 @@ ipcMain.handle('address:save', (event, value) => {
     return t('address.notAddress');
   }
   if (url.protocol !== 'https:') return t('address.needHttps');
-  fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true });
   // A pasted invite link (…/?invite=CODE) is opened once on the next start; a bare address just opens the app.
   const rest = url.pathname + url.search;
   const config = rest === '/' ? { url: url.origin } : { url: url.origin, open: rest };
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+  writeConfig(config);
   quitting = true;
   app.relaunch();
   app.exit(0);
@@ -488,8 +548,7 @@ setupCall('open-server', (value) => {
   if (url.protocol !== 'https:') return { error: t('setup.noAddress') };
   const rest = url.pathname + url.search;
   keepSetupLink(url);
-  fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true });
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(rest === '/' ? { url: url.origin } : { url: url.origin, open: rest }, null, 2));
+  writeConfig(rest === '/' ? { url: url.origin } : { url: url.origin, open: rest });
   quitting = true;
   app.relaunch();
   app.exit(0);
@@ -572,6 +631,12 @@ function listenToPage() {
     if (trusted(event)) updater.install();
   });
 
+  // The language choice, shared with the web app's own setting: 'ru', 'en' or null (follow the system).
+  ipcMain.handle('language:get', (event) => (trusted(event) ? (readConfig().language ?? null) : null));
+  ipcMain.handle('language:set', (event, choice) => {
+    if (trusted(event) && (choice === 'ru' || choice === 'en' || choice === null)) setLanguage(choice, { fromPage: true });
+  });
+
   // Push-to-talk outside the window (ptt.js). Only the key the page asks for is watched, and the page may
   // switch to a new key at most once a second — a hijacked page can't sweep the keyboard to log typing.
   // Stopping (null) is never held back.
@@ -619,7 +684,7 @@ app.on('activate', showWindow);
 
 app.whenReady().then(async () => {
   // The system's language (a developer can force one with GOMEX_LANG=ru|en); the windows below open in it.
-  i18n.setLang(devEnv('GOMEX_LANG') ?? i18n.pick(app.getLocale()));
+  i18n.setLang(devEnv('GOMEX_LANG') ?? readConfig().language ?? i18n.pick(app.getLocale()));
   app.setAppUserModelId('io.github.gomex-inc.gomex'); // Windows notifications need it
   setUpPermissions();
   listenToPage();
