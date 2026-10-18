@@ -14,16 +14,7 @@ export function VoiceSettings() {
 
   return (
     <Rows title="Голос" className="mt-6">
-      <ChoiceRow<NoiseMode>
-        title="Шумоподавление"
-        value={prefs.noise}
-        onChange={(noise) => setVoicePrefs({ noise })}
-        options={[
-          ['off', 'Выкл', 'Звук как есть'],
-          ['browser', 'Обычное', 'Убирает ровный шум'],
-          ['rnnoise', 'Сильное', 'Убирает клавиатуру и улицу'],
-        ]}
-      />
+      <NoiseRow />
       {/* In the browser the key only works while Gomex's window is open; the desktop app hears it from anywhere. */}
       <ChoiceRow<'voice' | 'ptt'>
         title="Микрофон"
@@ -50,6 +41,38 @@ export function VoiceSettings() {
       </RowFrame>
       <CheckRow />
     </Rows>
+  );
+}
+
+/**
+ * The phone's «Звонки» group on the "Вы" tab: what's touched when friends hear noise or the call stutters. No
+ * push-to-talk there: without a keyboard it's a computer's setting.
+ */
+export function CallsGroup({ className = '' }: { className?: string }) {
+  return (
+    <Rows title="Звонки" className={className}>
+      <NoiseRow />
+      <RowFrame>
+        <BypassSwitch />
+      </RowFrame>
+      <CheckRow />
+    </Rows>
+  );
+}
+
+function NoiseRow() {
+  const noise = useStore((s) => s.voicePrefs.noise);
+  return (
+    <ChoiceRow<NoiseMode>
+      title="Шумоподавление"
+      value={noise}
+      onChange={(value) => setVoicePrefs({ noise: value })}
+      options={[
+        ['off', 'Выкл', 'Звук как есть'],
+        ['browser', 'Обычное', 'Убирает ровный шум'],
+        ['rnnoise', 'Сильное', 'Убирает клавиатуру и улицу'],
+      ]}
+    />
   );
 }
 

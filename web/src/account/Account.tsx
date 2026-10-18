@@ -19,8 +19,8 @@ export function AccountSettings() {
   const isMobile = useStore((s) => s.isMobile);
   if (isMobile) {
     return (
-      <Rows title="Аккаунт" className="mt-6">
-        <NickRow />
+      // The nick is on the «Профиль» page with the photo; here only what's rarely touched.
+      <Rows className="mt-2">
         <PasswordRow />
         <RecoveryRow />
         <BlockedRow />
@@ -52,7 +52,7 @@ function ProfileBlock() {
   );
 }
 
-function NickRow() {
+export function NickRow() {
   const name = useStore((s) => s.me?.name);
   const sub = useSub();
   return (

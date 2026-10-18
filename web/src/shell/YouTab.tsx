@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import { api } from '../api';
 import { logout } from '../account/session';
 import { showError, useStore } from '../store';
@@ -8,21 +8,25 @@ import { InviteRow } from '../people/Invites';
 import { Avatar } from '../ui/Avatar';
 import { PushPage } from '../ui/PushPage';
 import { Primary, Row, RowIcon, RowValue, Rows, field, fieldArea, fieldLabel } from '../ui/settings';
-import { CheckIcon, ChevronRightIcon, LogoutIcon, PencilIcon } from '../ui/icons';
+import { CheckIcon, ChevronRightIcon, LogoutIcon, PencilIcon, UserIcon } from '../ui/icons';
+import { GomexMark } from '../ui/Logo';
+import { AccountSettings, NickRow } from '../account/Account';
+import { CallsGroup } from '../voice/VoiceSettings';
+import { ServerSettings } from './ServerSettings';
 import { DURATIONS, STATUS_LABEL, StatusDot, saveStatus, untilText } from './MeCard';
-import { useSettingsPages } from './SettingsDialog';
 
-type Page = 'profile' | 'status' | 'bio';
+type Page = 'profile' | 'status' | 'bio' | 'account' | 'server';
 
 /**
- * The phone's "Вы" tab, as Discord's mobile settings: the profile as one card at the top (opening the photo and the
- * about line), the status and the invite, then every section of the settings right here, a captioned group each,
- * and «Выйти» at the end.
+ * The phone's "Вы" tab, sorted by how often things are touched, on one screen without scrolling: the profile card
+ * (photo, nick, about on its page), the status and the invite; the calls' settings, touched when friends hear noise;
+ * then «Аккаунт» and the admin's «Сервер», rarely, a page each; «Выйти» last, at the foot.
  */
 export function YouTab() {
   const me = useStore((s) => s.me);
   const status = useStore((s) => s.myStatus);
   const statusText = useStore((s) => s.myStatusText);
+  const isAdmin = useStore((s) => s.isAdmin);
   const [page, setPage] = useState<Page | null>(null);
   const close = () => setPage(null);
   const back = () => setPage('profile');
@@ -43,7 +47,7 @@ export function YouTab() {
         </span>
         <ChevronRightIcon size={18} className="shrink-0 text-faint" />
       </button>
-      <Rows className="mt-4">
+      <Rows className="mt-3">
         <Row
           icon={
             <RowIcon>
@@ -58,12 +62,36 @@ export function YouTab() {
         </Row>
         <InviteRow />
       </Rows>
-      <SettingsPage />
+      <CallsGroup className="mt-5" />
+      {/* Rarely touched, a page each. */}
+      <Rows className="mt-3">
+        <Row
+          icon={
+            <RowIcon>
+              <UserIcon />
+            </RowIcon>
+          }
+          title="Аккаунт"
+          onPress={() => setPage('account')}
+        />
+        {isAdmin && (
+          <Row
+            icon={
+              <RowIcon>
+                <GomexMark size={18} />
+              </RowIcon>
+            }
+            title="Сервер"
+            onPress={() => setPage('server')}
+          />
+        )}
+      </Rows>
 
+      {/* Last on the tab, at its foot. */}
       <button
         type="button"
         onClick={logout}
-        className="mt-8 flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-white text-[16px] font-medium text-danger active:opacity-80 [&_svg]:size-5"
+        className="mt-auto flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-white text-[16px] font-medium text-danger active:opacity-80 [&_svg]:size-5"
       >
         <LogoutIcon />
         Выйти
@@ -77,6 +105,7 @@ export function YouTab() {
           <h2 className="mt-2 max-w-full truncate text-[22px] font-bold">{me.name}</h2>
         </div>
         <Rows className="mt-6">
+          <NickRow />
           <Row
             icon={
               <RowIcon>
@@ -94,6 +123,12 @@ export function YouTab() {
       </PushPage>
       <PushPage open={page === 'bio'} title="О себе" onBack={back}>
         <BioPage onSaved={back} />
+      </PushPage>
+      <PushPage open={page === 'account'} title="Аккаунт" onBack={close}>
+        <AccountSettings />
+      </PushPage>
+      <PushPage open={page === 'server'} title="Сервер" onBack={close}>
+        <ServerSettings />
       </PushPage>
     </div>
   );
@@ -201,18 +236,6 @@ function BioPage({ onSaved }: { onSaved: () => void }) {
           Сохранить
         </Primary>
       </div>
-    </>
-  );
-}
-
-/** Every section of the settings on one page, a group each, as iOS's Settings. */
-function SettingsPage() {
-  const pages = useSettingsPages();
-  return (
-    <>
-      {pages.map((page) => (
-        <Fragment key={page.id}>{page.content}</Fragment>
-      ))}
     </>
   );
 }
