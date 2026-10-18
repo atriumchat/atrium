@@ -124,6 +124,19 @@ curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.s
 curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh -s link
 ```
 
+Вернуть данные из ночной копии (удалили канал по ошибке или сервер сломался; на новом сервере сначала положи копии
+в `/root/gomex-backups/daily`):
+
+```bash
+curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh -s restore
+```
+
+Установщик покажет копии с датой и размером, спросит, какую вернуть (`GOMEX_YES=1 GOMEX_RESTORE=2026-10-18` — без
+вопросов), сохранит нынешние данные копией `pre-restore-<время>` в той же папке, остановит приложение, положит данные
+на место, запустит и проверит, что оно отвечает. Ошибочный выбор отменяется тем же `restore` с копией `pre-restore-…`.
+
+Удалённый канал возвращать так не нужно: он неделю лежит в «Сервер → Удалённые каналы», оттуда его возвращает админ.
+
 Снять Gomex с сервера:
 
 ```bash

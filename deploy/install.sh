@@ -3,6 +3,7 @@
 #   curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh   # the wizard
 #   curl -fsSL …/install.sh | sh -s update                                 # update, no questions
 #   curl -fsSL …/install.sh | sh -s uninstall                              # take Gomex off the server again
+#   curl -fsSL …/install.sh | sh -s restore                               # put data back from a nightly backup
 #   curl -fsSL …/install.sh | sh -s link                                   # the setup link again, while setup is not done
 #   curl -fsSL …/install.sh | DOMAIN=chat.example.com GOMEX_YES=1 sh       # no questions at all
 # Each installer takes its own release's tarball from that GitHub Release, checked against the SHA-256 pinned
@@ -12,6 +13,11 @@
 #   npx @gomex.llc/install            # update: npx @gomex.llc/install update
 # Re-running is an update: .env (all the secrets) and the data stay.
 # link prints the link with the setup code (https://app.DOMAIN/?setup=CODE) again, or says that setup is already done.
+# restore lists the nightly backups in /root/gomex-backups/daily with their date and size and asks which one to put
+# back (GOMEX_YES=1 GOMEX_RESTORE=<folder name, e.g. 2026-10-18> asks nothing). It first saves the current data as one
+# more backup, pre-restore-<time>, in the same folder, then stops the app, puts the chosen database and files back,
+# starts the app and checks that it answers. Works on the same server and on a new one with the backups copied to
+# /root/gomex-backups/daily after a normal install.
 # uninstall asks first (GOMEX_YES=1 skips the question), then removes: the containers and their images, GOMEX_DIR
 # (/opt/gomex: .env, the data, the files), /root/gomex-backups, the nightly backup service and timer, this installer's
 # copy (/root/gomex-install.sh) and log (/var/log/gomex-install.log), and what it changed for SSH: its key-only
@@ -1182,6 +1188,92 @@ show_link() {
   printf '%s\n' "https://app.$DOMAIN/?setup=$code"
 }
 
+# ---------------------------------------------------------------------------------------------- restore
+
+BACKUPS=/root/gomex-backups/daily
+
+# `restore`: the data of a nightly backup back in place (a channel's history lost, a server that broke). What was there
+# is kept first as pre-restore-<time>, so a wrong choice can be undone with the same command.
+restore_all() {
+  (( EUID == 0 )) || die "Нужен root: sudo sh install.sh restore"
+  (( EXISTING )) || die "Gomex здесь ещё не стоит: сначала установи, потом restore"
+  local data=$GOMEX_DIR/deploy/data names=() name pick="${GOMEX_RESTORE:-}" size
+  [[ -d $BACKUPS ]] || die "Бэкапов нет: $BACKUPS"
+  # Newest first; only folders that hold a database count.
+  while IFS= read -r name; do
+    [[ -f $BACKUPS/$name/hangout.db ]] && names+=("$name")
+  done < <(find "$BACKUPS" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -r)
+  (( ${#names[@]} )) || die "В $BACKUPS нет ни одной копии"
+
+  if [[ ${GOMEX_YES:-} == 1 ]]; then
+    [[ -n $pick ]] || die "Без вопросов: GOMEX_YES=1 GOMEX_RESTORE=<копия> sh install.sh restore. Копии: ${names[*]}"
+  else
+    (( TTY )) || die "Нет терминала. Без вопросов: GOMEX_YES=1 GOMEX_RESTORE=<копия> sh install.sh restore"
+  fi
+  if [[ -z $pick ]]; then
+    say
+    title "Какую копию вернуть?"
+    local labels=()
+    for name in "${names[@]}"; do
+      size=$(du -sh "$BACKUPS/$name" 2>/dev/null | cut -f1)
+      labels+=("$(pad "$name" 30)$size")
+    done
+    ESC_MEANS=выход
+    choose "${labels[@]}" || exit 0
+    pick=${names[CHOICE]}
+    say
+    dim "Нынешние данные сохранятся копией pre-restore-… в той же папке."
+    say
+    choose "Отмена" "Вернуть $pick" || exit 0
+    if (( CHOICE != 1 )); then dim "Ничего не изменено."; exit 0; fi
+    say
+  fi
+  # A name from the list only: no paths.
+  [[ $pick != */* && $pick != .* && -f $BACKUPS/$pick/hangout.db ]] || die "Нет такой копии: $pick"
+
+  cd "$GOMEX_DIR/deploy"
+  local saved
+  saved=pre-restore-$(date +%F_%H%M%S)
+  docker compose stop app >>"$LOG" 2>&1 || die "Не остановить приложение. Смотри лог."
+  ok "Приложение остановлено"
+
+  # With the app stopped, the files are whole: the current data are copied as they are (pictures hard-linked).
+  mkdir -p "$BACKUPS/$saved/media"
+  cp -a "$data"/hangout.db* "$BACKUPS/$saved/" 2>>"$LOG" || true
+  local dir
+  for dir in avatars uploads; do
+    [[ -d $data/$dir ]] && { cp -al "$data/$dir" "$BACKUPS/$saved/media/" 2>>"$LOG" || cp -a "$data/$dir" "$BACKUPS/$saved/media/"; }
+  done
+  chmod -R go-rwx "$BACKUPS/$saved"
+  ok "Нынешние данные: $saved"
+
+  rm -f "$data"/hangout.db "$data"/hangout.db-wal "$data"/hangout.db-shm
+  cp -a "$BACKUPS/$pick/hangout.db" "$data/hangout.db"
+  for dir in avatars uploads; do
+    if [[ -d $BACKUPS/$pick/media/$dir ]]; then
+      mkdir -p "$data/$dir"
+      rsync -a --delete "$BACKUPS/$pick/media/$dir/" "$data/$dir/"
+    else
+      rm -rf "${data:?}/$dir"
+    fi
+  done
+  chown -R 10001:10001 "$data"
+  chmod 700 "$data"
+  ok "Данные из $pick"
+
+  docker compose up -d app >>"$LOG" 2>&1 || die "Не запустить приложение. Данные до возврата: $BACKUPS/$saved"
+  local i
+  for i in $(seq 1 90); do
+    curl -fs --max-time 3 -o /dev/null http://127.0.0.1:8000/api/setup && break
+    (( i == 90 )) && die "Приложение не отвечает. Данные до возврата: $BACKUPS/$saved (sh install.sh restore)"
+    sleep 1
+  done
+  ok "Приложение отвечает"
+  say
+  line "Готово: данные из $pick."
+  say
+}
+
 # ---------------------------------------------------------------------------------------------- uninstall
 
 # `uninstall`: Gomex off this server, back to what it was before the installer (Docker and ufw stay).
@@ -1258,6 +1350,7 @@ Gomex $RELEASE_VERSION — установка на этот сервер.
   sh install.sh            мастер установки (повторный запуск — обновление)
   sh install.sh update     обновить без вопросов
   sh install.sh link       ссылка для первой настройки ещё раз (если настройка не закончена)
+  sh install.sh restore    вернуть данные из ночной копии (GOMEX_YES=1 GOMEX_RESTORE=<копия> — без вопросов)
   sh install.sh uninstall  снять Gomex с сервера: контейнеры, данные, бэкапы (GOMEX_YES=1 — без вопроса)
   DOMAIN=chat.example.com GOMEX_YES=1 sh install.sh   без вопросов
 EOF
@@ -1363,6 +1456,7 @@ main() {
     update) MODE=update ;;
     uninstall) MODE=uninstall ;;
     link) MODE="link" ;;
+    restore) MODE=restore ;;
     -h | --help | help) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;
   esac
@@ -1381,6 +1475,11 @@ main() {
   if [[ $MODE == link ]]; then
     detect_install
     show_link
+    return
+  fi
+  if [[ $MODE == restore ]]; then
+    detect_install
+    restore_all
     return
   fi
   if [[ $MODE == uninstall ]]; then

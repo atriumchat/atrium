@@ -189,7 +189,7 @@ async def message_send(sid, data):
         content, attachments, upload_ids = message_body(user["id"], data)
     except ValueError as e:
         return {"ok": False, "error": str(e)}
-    if not query("SELECT 1 FROM channels WHERE id = ? AND kind = 'text'", (channel_id,)):
+    if not query("SELECT 1 FROM channels WHERE id = ? AND kind = 'text' AND deleted_at IS NULL", (channel_id,)):
         return {"ok": False, "error": "Нет такого канала"}
     try:
         reply_to = reply_target("messages", "channel_id", channel_id, data)
@@ -261,7 +261,7 @@ async def typing(sid, data):
     payload = {"channelId": channel_id, "userId": user["id"]}
     if dm_for(user["id"], channel_id):
         await sio.emit("typing", payload, to=[r for r in dm_rooms(channel_id) if r != user_room(user["id"])])
-    elif query("SELECT 1 FROM channels WHERE id = ?", (channel_id,)):
+    elif query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NULL", (channel_id,)):
         await sio.emit("typing", payload, skip_sid=sid)
 
 
@@ -353,7 +353,7 @@ async def reaction_toggle(sid, data):
 
 def voice_target(user_id: str, target: str) -> str | None:
     """'channel' for a server voice room, 'dm' for a DM/group the user is in, None if they can't join it."""
-    if query("SELECT 1 FROM channels WHERE id = ? AND kind = 'voice'", (target,)):
+    if query("SELECT 1 FROM channels WHERE id = ? AND kind = 'voice' AND deleted_at IS NULL", (target,)):
         return "channel"
     if dm_for(user_id, target):
         return "dm"
