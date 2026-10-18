@@ -1,32 +1,32 @@
-/** Russian plural: plural(2, ['участник', 'участника', 'участников']) -> 'участника'. */
-export function plural(n: number, forms: [string, string, string]) {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return forms[0];
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return forms[1];
-  return forms[2];
-}
+import { getLang, localeOf, t } from '../i18n';
 
 export const sameDay = (a: number, b: number) => new Date(a).toDateString() === new Date(b).toDateString();
 
-export const timeOf = (ts: number) => new Date(ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+export const timeOf = (ts: number) => new Date(ts).toLocaleTimeString(localeOf(), { hour: '2-digit', minute: '2-digit' });
 
-/** A list's short stamp: "21:02" today, "вчера", then "15.10". */
+/** A list's short stamp: "21:02" today, "yesterday", then "15.10" / "10/15". */
 export function shortStamp(ts: number) {
   const now = Date.now();
   if (sameDay(ts, now)) return timeOf(ts);
-  if (sameDay(ts, now - 86_400_000)) return 'вчера';
-  return new Date(ts).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+  if (sameDay(ts, now - 86_400_000)) return t('format.yesterday');
+  return new Date(ts).toLocaleDateString(localeOf(), { day: '2-digit', month: '2-digit' });
 }
 
-/** Discord-style message header stamp: "Сегодня, в 15:28" / "Вчера, в 15:28" / "15.10.2026 15:28". */
+/** Discord-style message header stamp: "Today at 15:28" / "Yesterday at 15:28" / the full date and time. */
 export function messageStamp(ts: number) {
   const now = Date.now();
-  if (sameDay(ts, now)) return `Сегодня, в ${timeOf(ts)}`;
-  if (sameDay(ts, now - 86_400_000)) return `Вчера, в ${timeOf(ts)}`;
-  return `${new Date(ts).toLocaleDateString('ru-RU')} ${timeOf(ts)}`;
+  if (sameDay(ts, now)) return t('format.todayAt', { time: timeOf(ts) });
+  if (sameDay(ts, now - 86_400_000)) return t('format.yesterdayAt', { time: timeOf(ts) });
+  return `${new Date(ts).toLocaleDateString(localeOf())} ${timeOf(ts)}`;
 }
 
-/** Day divider label: "15 октября 2026 г." */
+/** Day divider label: "15 октября 2026 г." / "October 15, 2026". */
 export const dayDivider = (ts: number) =>
-  new Date(ts).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+  new Date(ts).toLocaleDateString(localeOf(), { day: 'numeric', month: 'long', year: 'numeric' });
+
+/** Full date and time for a tooltip. */
+export const fullStamp = (ts: number) => new Date(ts).toLocaleString(localeOf());
+
+/** Date only, e.g. "15 октября" / "October 15"; the year is added on request. */
+export const dateOnly = (ts: number, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long' }) =>
+  new Date(ts).toLocaleDateString(localeOf(getLang()), opts);

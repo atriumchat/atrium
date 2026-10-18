@@ -1,3 +1,4 @@
+import { errorText, t, type Params } from './i18n';
 import type { Bootstrap, Channel, DeletedChannel, Dm, Friend, InboxItem, Message, MyInvite, MyStatus, Session, Upload, User } from './types';
 
 type ServerInfo = { serverName: string; serverIcon: string | null };
@@ -22,11 +23,14 @@ export function setToken(token: string | null) {
 }
 
 export class ApiError extends Error {
+  /** `message` is the server's Russian text (what old clients show); `code` lets us show our own translation. */
   constructor(
     public status: number,
     message: string,
+    public code?: string,
+    public params?: Params,
   ) {
-    super(message);
+    super(code ? errorText(code, message, params) : message);
   }
 }
 
@@ -41,15 +45,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     },
   });
   if (!res.ok) {
-    let detail = `Ошибка ${res.status}`;
+    let detail = t('err.http', { status: res.status });
+    let code: string | undefined;
+    let params: Params | undefined;
     try {
       const body = await res.json();
       if (typeof body.detail === 'string') detail = body.detail;
-      else if (Array.isArray(body.detail)) detail = 'Некоторые поля слишком короткие или длинные';
+      else if (Array.isArray(body.detail)) detail = t('err.invalidFields');
+      if (typeof body.code === 'string') code = body.code;
+      params = body.params;
     } catch {
       // Non-JSON error body, keep the generic message.
     }
-    throw new ApiError(res.status, detail);
+    throw new ApiError(res.status, detail, code, params);
   }
   return res.json() as Promise<T>;
 }
