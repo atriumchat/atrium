@@ -27,6 +27,8 @@ export type MyInvite = {
   limit: number | null;
 };
 
+/** A channel in the trash: when it was deleted (ms) and how many messages it still holds. */
+export type DeletedChannel = Channel & { deletedAt: number; messages: number };
 export type Channel = { id: string; name: string; kind: 'text' | 'voice'; position: number };
 
 /**

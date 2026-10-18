@@ -15,7 +15,7 @@ router = APIRouter()
 
 
 def list_channels() -> list[dict]:
-    return query("SELECT id, name, kind, position FROM channels ORDER BY position, created_at")
+    return query("SELECT id, name, kind, position FROM channels WHERE deleted_at IS NULL ORDER BY position, created_at")
 
 
 def mentions_in(content: str) -> tuple[list[str], bool]:
@@ -157,6 +157,7 @@ class ChannelMuteIn(BaseModel):
 
 
 MAX_COUNT = 99
+TRASH_TTL_MS = 7 * 24 * 3600 * 1000
 
 
 def read_marks(user: dict) -> dict[str, int]:
@@ -170,7 +171,7 @@ def unread_counts(user: dict) -> tuple[dict[str, int], dict[str, int]]:
     since = lambda conversation_id: marks.get(conversation_id, user["createdAt"])  # noqa: E731
     mention = f"%<@{user['id']}>%"
     unread, mentions = {}, {}
-    conversations = [("messages", "channel_id", c["id"]) for c in query("SELECT id FROM channels WHERE kind = 'text'")]
+    conversations = [("messages", "channel_id", c["id"]) for c in query("SELECT id FROM channels WHERE kind = 'text' AND deleted_at IS NULL")]
     conversations += [("dm_messages", "dm_id", r["dm_id"]) for r in query("SELECT dm_id FROM dm_members WHERE user_id = ?", (user["id"],))]
     with connect_db() as conn:
         for table, column, conversation_id in conversations:
@@ -194,7 +195,7 @@ class ReadIn(BaseModel):
 
 async def save_read(user: dict, conversation_id: str, at: int) -> bool:
     """Read a channel or DM up to `at` (a message time); never goes backwards. Other tabs and devices hear of it."""
-    readable = query("SELECT 1 FROM channels WHERE id = ? AND kind = 'text'", (conversation_id,)) or dm_for(user["id"], conversation_id)
+    readable = query("SELECT 1 FROM channels WHERE id = ? AND kind = 'text' AND deleted_at IS NULL", (conversation_id,)) or dm_for(user["id"], conversation_id)
     if not readable:
         return False
     at = min(at, now_ms())
@@ -222,7 +223,7 @@ def inbox(before: int | None = None, user: dict = Depends(current_user)):
     mention = f"%<@{user['id']}>%"
     before = before or now_ms() + 1
     channel_rows = query(
-        """SELECT m.* FROM messages m
+        """SELECT m.* FROM messages m JOIN channels c ON c.id = m.channel_id AND c.deleted_at IS NULL
            WHERE m.user_id != ? AND m.created_at < ?
              AND (m.content LIKE ? OR m.content LIKE '%<@all>%'
                   OR m.reply_to IN (SELECT id FROM messages WHERE user_id = ?))
@@ -247,6 +248,8 @@ def inbox(before: int | None = None, user: dict = Depends(current_user)):
 @router.get("/api/channels/{channel_id}/messages")
 def channel_messages(channel_id: str, before: int | None = None, limit: int = 50, user: dict = Depends(current_user)):
     limit = max(1, min(limit, 100))
+    if not query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NULL", (channel_id,)):
+        raise HTTPException(status_code=404, detail="Нет такого канала")
     rows = query(
         "SELECT * FROM messages WHERE channel_id = ? AND created_at < ? ORDER BY created_at DESC LIMIT ?",
         (channel_id, before or now_ms() + 1, limit),
@@ -265,7 +268,7 @@ def channel_name(raw: str, kind: str) -> str:
 
 
 def channel_or_404(channel_id: str) -> dict:
-    rows = query("SELECT * FROM channels WHERE id = ?", (channel_id,))
+    rows = query("SELECT * FROM channels WHERE id = ? AND deleted_at IS NULL", (channel_id,))
     if not rows:
         raise HTTPException(status_code=404, detail="Нет такого канала")
     return rows[0]
@@ -280,7 +283,7 @@ async def create_channel(body: ChannelIn, user: dict = Depends(current_user)):
     if not is_admin(user):
         raise HTTPException(status_code=403, detail="Каналы создаёт только админ")
     name = channel_name(body.name, body.kind)
-    position = query("SELECT COALESCE(MAX(position), 0) + 1 AS p FROM channels")[0]["p"]
+    position = query("SELECT COALESCE(MAX(position), 0) + 1 AS p FROM channels WHERE deleted_at IS NULL")[0]["p"]
     execute(
         "INSERT INTO channels (id, name, kind, position, created_at) VALUES (?, ?, ?, ?, ?)",
         (uuid.uuid4().hex, name, body.kind, position, now_ms()),
@@ -337,12 +340,8 @@ async def mute_channel(channel_id: str, body: ChannelMuteIn, user: dict = Depend
     return muted
 
 
-@router.delete("/api/channels/{channel_id}")
-async def delete_channel(channel_id: str, user: dict = Depends(current_user)):
-    if not is_admin(user):
-        raise HTTPException(status_code=403, detail="Каналы удаляет только админ")
-    if channel_or_404(channel_id)["kind"] == "text" and query("SELECT COUNT(*) AS n FROM channels WHERE kind = 'text'")[0]["n"] <= 1:
-        raise HTTPException(status_code=400, detail="Последний текстовый канал удалить нельзя")
+def purge_channel(channel_id: str) -> None:
+    """Delete a channel for good, with its messages, reactions, read marks and uploads."""
     # All channels share the 'channel' upload scope, so this channel's images are found through its messages.
     upload_ids = sorted(
         {
@@ -360,6 +359,47 @@ async def delete_channel(channel_id: str, user: dict = Depends(current_user)):
         conn.execute("DELETE FROM messages WHERE channel_id = ?", (channel_id,))
         conn.execute("DELETE FROM channels WHERE id = ?", (channel_id,))
     remove_upload_files(upload_ids)
+
+
+def purge_deleted_channels() -> int:
+    """Channels that have been in the trash for a week go for good."""
+    ids = [r["id"] for r in query("SELECT id FROM channels WHERE deleted_at IS NOT NULL AND deleted_at < ?", (now_ms() - TRASH_TTL_MS,))]
+    for channel_id in ids:
+        purge_channel(channel_id)
+    return len(ids)
+
+
+@router.get("/api/channels/deleted")
+def deleted_channels(user: dict = Depends(current_user)):
+    if not is_admin(user):
+        raise HTTPException(status_code=403, detail="Удалённые каналы видит только админ")
+    return query(
+        """SELECT c.id, c.name, c.kind, c.deleted_at AS deletedAt,
+                  (SELECT COUNT(*) FROM messages m WHERE m.channel_id = c.id) AS messages
+           FROM channels c WHERE c.deleted_at IS NOT NULL ORDER BY c.deleted_at DESC"""
+    )
+
+
+@router.post("/api/channels/{channel_id}/restore")
+async def restore_channel(channel_id: str, user: dict = Depends(current_user)):
+    if not is_admin(user):
+        raise HTTPException(status_code=403, detail="Каналы возвращает только админ")
+    if not query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NOT NULL", (channel_id,)):
+        raise HTTPException(status_code=404, detail="Нет такого канала")
+    execute("UPDATE channels SET deleted_at = NULL WHERE id = ?", (channel_id,))
+    channels = list_channels()
+    await sio.emit("channels", channels)
+    return channels
+
+
+@router.delete("/api/channels/{channel_id}")
+async def delete_channel(channel_id: str, user: dict = Depends(current_user)):
+    if not is_admin(user):
+        raise HTTPException(status_code=403, detail="Каналы удаляет только админ")
+    if channel_or_404(channel_id)["kind"] == "text" and query("SELECT COUNT(*) AS n FROM channels WHERE kind = 'text' AND deleted_at IS NULL")[0]["n"] <= 1:
+        raise HTTPException(status_code=400, detail="Последний текстовый канал удалить нельзя")
+    execute("UPDATE channels SET deleted_at = ? WHERE id = ?", (now_ms(), channel_id))
+    purge_deleted_channels()
     channels = list_channels()
     await sio.emit("channels", channels)
     # Whoever was in the room is hung up; their apps leave the LiveKit room once the channel is gone.

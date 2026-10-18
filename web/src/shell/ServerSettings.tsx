@@ -1,8 +1,10 @@
-import { useId, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { api } from '../api';
-import { showError, useStore } from '../store';
+import { setChannels, showError, useStore } from '../store';
 import { ServerMark } from '../ui/Logo';
 import { IconCropper, centred, cropToBlob, loadImage, type Crop } from '../ui/IconCropper';
+import { plural, shortStamp } from '../chat/format';
+import type { DeletedChannel } from '../types';
 import { Primary, Quiet, Row, RowValue, Rows, Secondary, SubPage, field, fieldLabel, useSub } from '../ui/settings';
 
 /**
@@ -16,6 +18,7 @@ export function ServerSettings() {
       <Rows title="Сервер" className="mt-6">
         <IconRow />
         <NameRow />
+        <TrashRow />
       </Rows>
     );
   }
@@ -25,6 +28,9 @@ export function ServerSettings() {
         <IconRow />
       </Rows>
       <NameField className="mt-6" />
+      <Rows className="mt-6">
+        <TrashRow />
+      </Rows>
     </>
   );
 }
@@ -161,5 +167,48 @@ function NameField({ onSaved, className = '' }: { onSaved?: () => void; classNam
         )}
       </div>
     </form>
+  );
+}
+
+/** Only while a channel is in the trash: the count on the row, the channels inside, each with «Вернуть». */
+function TrashRow() {
+  const channels = useStore((s) => s.channels);
+  const [trash, setTrash] = useState<DeletedChannel[]>([]);
+  const sub = useSub();
+  const { open, hide } = sub;
+  // A deletion or a restore (here or on another device) changes the channel list; the trash follows.
+  useEffect(() => {
+    api.deletedChannels().then(setTrash, () => {});
+  }, [channels]);
+  // The last one brought back takes the row away, and the list with it.
+  useEffect(() => {
+    if (open && trash.length === 0) hide();
+  }, [open, trash.length, hide]);
+
+  return (
+    <>
+      {trash.length > 0 && (
+        <Row title="Удалённые каналы" onPress={sub.show}>
+          <RowValue>{trash.length}</RowValue>
+        </Row>
+      )}
+      <SubPage open={open} title="Удалённые каналы" onClose={hide}>
+        <Rows className="max-md:mt-2">
+          {trash.map((c) => (
+            <Row
+              key={c.id}
+              title={c.kind === 'text' ? `# ${c.name}` : c.name}
+              value={`${shortStamp(c.deletedAt)} · ${c.messages} ${plural(c.messages, ['сообщение', 'сообщения', 'сообщений'])}`}
+            >
+              <Secondary
+                onPress={() => api.restoreChannel(c.id).then(setChannels, (e) => showError(e instanceof Error ? e.message : 'Не получилось'))}
+              >
+                Вернуть
+              </Secondary>
+            </Row>
+          ))}
+        </Rows>
+      </SubPage>
+    </>
   );
 }
