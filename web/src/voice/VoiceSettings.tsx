@@ -10,6 +10,7 @@ import { ChoiceRow, Row, RowFrame, Rows, Secondary } from '../ui/settings';
 /** The "Голос" page of the settings, for this device: noise suppression, push-to-talk, the bypass, a check. */
 export function VoiceSettings() {
   const prefs = useStore((s) => s.voicePrefs);
+  const isMobile = useStore((s) => s.isMobile);
 
   return (
     <Rows title="Голос" className="mt-6">
@@ -31,13 +32,19 @@ export function VoiceSettings() {
         options={[
           // Every choice says something under the row, so switching doesn't make the page jump.
           ['voice', 'Всегда включён', 'Слышно всё время'],
-          ['ptt', 'По клавише', desktop?.ptt ? 'Работает и в фоне' : 'Пока окно открыто'],
+          [
+            'ptt',
+            'По клавише',
+            // On the computer the key itself sits under the row, so no row of its own drops in when it's chosen.
+            isMobile || !prefs.ptt ? (
+              desktop?.ptt ? 'Работает и в фоне' : 'Пока окно открыто'
+            ) : (
+              <KeyHint value={prefs.pttKey} onChange={(pttKey) => setVoicePrefs({ pttKey })} />
+            ),
+          ],
         ]}
       />
-      {/* Always in place, so choosing "По клавише" lights it up instead of dropping a new row in. */}
-      <div aria-disabled={!prefs.ptt} className={`transition-opacity ${prefs.ptt ? '' : 'pointer-events-none opacity-40'}`}>
-        <KeyRow value={prefs.pttKey} onChange={(pttKey) => setVoicePrefs({ pttKey })} />
-      </div>
+      {isMobile && prefs.ptt && <KeyRow value={prefs.pttKey} onChange={(pttKey) => setVoicePrefs({ pttKey })} />}
       <RowFrame>
         <BypassSwitch />
       </RowFrame>
@@ -46,8 +53,8 @@ export function VoiceSettings() {
   );
 }
 
-/** The push-to-talk key: "Сменить" takes the next key or side mouse button. Escape cancels. */
-function KeyRow({ value, onChange }: { value: string; onChange: (code: string) => void }) {
+/** Waits for the next key or side mouse button while `listening`; Escape cancels. */
+function useKeyCatch(onChange: (code: string) => void) {
   const [listening, setListening] = useState(false);
 
   useEffect(() => {
@@ -70,7 +77,40 @@ function KeyRow({ value, onChange }: { value: string; onChange: (code: string) =
       window.removeEventListener('mousedown', mouse, true);
     };
   }, [listening, onChange]);
+  return [listening, setListening] as const;
+}
 
+// A key cap, so a short label like ` still reads as a key.
+const KEY_CAP = 'inline-block min-w-5 rounded-[6px] border border-white/[0.12] px-1.5 text-center font-mono text-[12px] leading-[18px] text-foreground';
+
+/** The key under the "Микрофон" row on the computer: the cap, then «Сменить» (and where it works, in the browser). */
+function KeyHint({ value, onChange }: { value: string; onChange: (code: string) => void }) {
+  const [listening, setListening] = useKeyCatch(onChange);
+  if (listening) {
+    return (
+      <span>
+        Клавиша или кнопка мыши…{' '}
+        <button type="button" onClick={() => setListening(false)} className="text-foreground hover:underline">
+          Отмена
+        </button>
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1.5">
+      <kbd className={KEY_CAP}>{keyLabel(value)}</kbd>
+      <span>·</span>
+      <button type="button" onClick={() => setListening(true)} className="text-foreground hover:underline">
+        Сменить
+      </button>
+      {!desktop?.ptt && <span>· пока окно открыто</span>}
+    </span>
+  );
+}
+
+/** The push-to-talk key as a row of its own, on the phone. */
+function KeyRow({ value, onChange }: { value: string; onChange: (code: string) => void }) {
+  const [listening, setListening] = useKeyCatch(onChange);
   return (
     <Row
       title="Клавиша"
@@ -78,8 +118,7 @@ function KeyRow({ value, onChange }: { value: string; onChange: (code: string) =
         listening ? (
           'Клавиша или кнопка мыши…'
         ) : (
-          // A key cap, so a short label like ` still reads as a key.
-          <kbd className="inline-block min-w-5 rounded-[6px] border border-white/[0.12] px-1.5 text-center font-mono text-[12px] leading-[18px] text-foreground">{keyLabel(value)}</kbd>
+          <kbd className={KEY_CAP}>{keyLabel(value)}</kbd>
         )
       }
     >

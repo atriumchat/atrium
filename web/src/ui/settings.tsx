@@ -163,7 +163,7 @@ export function ChoiceRow<T extends string>({
 }: {
   title: string;
   value: T;
-  options: [T, string, string?][];
+  options: [T, string, ReactNode?][];
   onChange: (value: T) => void;
 }) {
   const isMobile = useStore((s) => s.isMobile);
