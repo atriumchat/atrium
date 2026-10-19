@@ -46,15 +46,16 @@ export class RnnoiseProcessor implements TrackProcessor<Track.Kind.Audio, AudioP
     const audioContext = this.audioContext!;
     // The page's CSP covers the worklet too: without 'wasm-unsafe-eval' RNNoise can't start and sends silence.
     await WebAssembly.compile(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]));
-    wasm ??= loadRnnoise({ url: wasmUrl, simdUrl }).catch((e) => {
-      wasm = null; // a failed load isn't kept: the next try fetches again
+    // Held here: a failed load clears `wasm` (the next try fetches again) and must still fail this one.
+    const binary = (wasm ??= loadRnnoise({ url: wasmUrl, simdUrl }).catch((e) => {
+      wasm = null;
       throw e;
-    });
+    }));
     if (!loaded.has(audioContext)) {
       await audioContext.audioWorklet.addModule(workletUrl);
       loaded.add(audioContext);
     }
-    this.node = new RnnoiseWorkletNode(audioContext, { wasmBinary: await wasm, maxChannels: 1 });
+    this.node = new RnnoiseWorkletNode(audioContext, { wasmBinary: await binary, maxChannels: 1 });
     this.source = audioContext.createMediaStreamSource(new MediaStream([track]));
     this.destination = audioContext.createMediaStreamDestination();
     this.source.connect(this.node).connect(this.destination);
