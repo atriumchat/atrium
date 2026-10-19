@@ -67,9 +67,20 @@ export async function setVoicePrefs(patch: Partial<VoicePrefs>) {
   set({ voicePrefs: prefs, pttDown: false });
   savePrefs(prefs);
   const track = micTrack();
-  if (track && (patch.noise === 'off' || patch.noise === 'browser') && patch.noise !== before.noise) {
-    // The browser's own suppression is a capture setting: re-open the mic with it on or off.
-    await track.restartTrack({ noiseSuppression: patch.noise === 'browser', echoCancellation: true, autoGainControl: true, deviceId: getPreferredDevice('audioinput') });
+  if (track && patch.noise && patch.noise !== before.noise) {
+    // The browser's own suppression is a capture setting: re-open the mic with it on or off (off under RNNoise,
+    // which does the job itself). The processor goes first: restarting under it would rebuild it on its old input.
+    try {
+      if (track.getProcessor()) await track.stopProcessor();
+      await track.restartTrack({
+        noiseSuppression: prefs.noise === 'browser',
+        echoCancellation: true,
+        autoGainControl: true,
+        deviceId: getPreferredDevice('audioinput'),
+      });
+    } catch (e) {
+      showError(t('voice.err.micFailed', { error: e instanceof Error ? e.message : String(e) }));
+    }
   }
   await applyMic();
   await applyNoise();
