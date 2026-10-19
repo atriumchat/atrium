@@ -69,7 +69,7 @@ export async function setVoicePrefs(patch: Partial<VoicePrefs>) {
   const track = micTrack();
   if (track && patch.noise && patch.noise !== before.noise) {
     // The browser's own suppression is a capture setting: re-open the mic with it on or off (off under RNNoise,
-    // which does the job itself). The processor goes first: restarting under it would rebuild it on its old input.
+    // which does the job itself). A processor here is RNNoise on its way out: dropped first, not rebuilt on a new mic.
     try {
       if (track.getProcessor()) await track.stopProcessor();
       await track.restartTrack({
