@@ -71,9 +71,11 @@ http://app.{$DOMAIN} {
 		# HTTPS only, remembered by the browser for a year.
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		# Only our own code and resources may run or load: a slipped-through script tag can't pull anything in
-		# or send data elsewhere. Inline styles are allowed because React sets style attributes. LiveKit's
+		# or send data elsewhere. Inline styles are allowed because React sets style attributes. WebAssembly
+		# (wasm-unsafe-eval, not unsafe-eval: JS eval stays blocked) is for the strong noise suppression: RNNoise is
+		# compiled in the audio worklet, and without it the worklet loads fine and sends silence. LiveKit's
 		# signalling is on app.DOMAIN, also for the desktop app, which may open the root domain.
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' wss://app.{$DOMAIN} wss://{$DOMAIN}; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' wss://app.{$DOMAIN} wss://{$DOMAIN}; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy no-referrer
