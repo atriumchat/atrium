@@ -21,14 +21,17 @@ export class RnnoiseProcessor implements TrackProcessor<Track.Kind.Audio, AudioP
   private source?: MediaStreamAudioSourceNode;
   private node?: RnnoiseWorkletNode;
   private destination?: MediaStreamAudioDestinationNode;
+  private audioContext?: AudioContext;
 
-  async init(options: AudioProcessorOptions) {
-    await this.build(options);
+  async init({ track, audioContext }: AudioProcessorOptions) {
+    this.audioContext = audioContext;
+    await this.build(track);
   }
 
-  async restart(options: AudioProcessorOptions) {
+  // LiveKit hands restart() the new mic track but not the AudioContext, so the one from init() is reused.
+  async restart({ track }: AudioProcessorOptions) {
     await this.destroy();
-    await this.build(options);
+    await this.build(track);
   }
 
   async destroy() {
@@ -39,8 +42,14 @@ export class RnnoiseProcessor implements TrackProcessor<Track.Kind.Audio, AudioP
     this.source = this.node = this.destination = this.processedTrack = undefined;
   }
 
-  private async build({ track, audioContext }: AudioProcessorOptions) {
-    wasm ??= loadRnnoise({ url: wasmUrl, simdUrl });
+  private async build(track: MediaStreamTrack) {
+    const audioContext = this.audioContext!;
+    // The page's CSP covers the worklet too: without 'wasm-unsafe-eval' RNNoise can't start and sends silence.
+    await WebAssembly.compile(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]));
+    wasm ??= loadRnnoise({ url: wasmUrl, simdUrl }).catch((e) => {
+      wasm = null; // a failed load isn't kept: the next try fetches again
+      throw e;
+    });
     if (!loaded.has(audioContext)) {
       await audioContext.audioWorklet.addModule(workletUrl);
       loaded.add(audioContext);
