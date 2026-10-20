@@ -804,7 +804,8 @@ step_ssh() {
     rm -f "$conf"
     return 1
   fi
-  systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null
+  # No systemd (or another unit name): the file is valid and applies at sshd's next start, which isn't a failure.
+  systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true
 }
 
 step_files() {
