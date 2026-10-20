@@ -25,6 +25,7 @@ from .config import (
     USER_COLORS,
 )
 from .errors import ApiError
+from .media import remove_media_files
 from .db import connect_db, execute, now_ms, query, seed_admins
 from .auth import (
     AVATARS_BY_USER,
@@ -58,7 +59,7 @@ router = APIRouter()
 
 def remove_avatar_file(name: str | None) -> None:
     if name:
-        (AVATAR_DIR / name).unlink(missing_ok=True)
+        remove_media_files([AVATAR_DIR / name])
 
 
 def is_cyrillic(ch: str) -> bool:
@@ -255,9 +256,20 @@ async def login(body: LoginIn, request: Request, response: Response):
         raise ApiError(401, "badCredentials", "Неверный ник или пароль")
     if password_outdated(row["password_hash"]):
         password_hash = await password_work(hash_password, body.password)
-        execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, row["id"]))
-    set_media_cookie(request, response, row["id"])
-    return {"token": issue_token(row["id"]), "user": public_user(row)}
+        with connect_db() as conn:
+            changed = conn.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ? AND password_hash = ? AND token_version = ?",
+                (password_hash, row["id"], row["password_hash"], row["token_version"]),
+            ).rowcount
+        if not changed:
+            raise ApiError(401, "badCredentials", "Неверный ник или пароль")
+    else:
+        current = query("SELECT token_version, password_hash FROM users WHERE id = ?", (row["id"],))
+        if not current or current[0]["token_version"] != row["token_version"] or current[0]["password_hash"] != row["password_hash"]:
+            raise ApiError(401, "badCredentials", "Неверный ник или пароль")
+    # Never upgrade a stale password check into a session issued after a concurrent reset.
+    set_media_cookie(request, response, row["id"], version=row["token_version"])
+    return {"token": issue_token(row["id"], version=row["token_version"]), "user": public_user(row)}
 
 
 @router.post("/api/logout")
@@ -394,10 +406,18 @@ async def change_password(body: PasswordChangeIn, request: Request, response: Re
     if not await password_work(verify_password, body.current, row["password_hash"]):
         raise ApiError(403, "badCurrentPassword", "Неверный текущий пароль")
     password_hash = await password_work(hash_password, body.new)
-    execute("UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE id = ?", (password_hash, user["id"]))
+    with connect_db() as conn:
+        changed = conn.execute(
+            "UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE id = ? AND password_hash = ? AND token_version = ?",
+            (password_hash, user["id"], row["password_hash"], row["token_version"]),
+        ).rowcount
+        if not changed:
+            raise ApiError(403, "badCurrentPassword", "Неверный текущий пароль")
+        conn.execute("DELETE FROM password_resets WHERE user_id = ?", (user["id"],))
     await disconnect_user(user["id"])
-    set_media_cookie(request, response, user["id"])
-    return {"token": issue_token(user["id"])}
+    version = row["token_version"] + 1
+    set_media_cookie(request, response, user["id"], version=version)
+    return {"token": issue_token(user["id"], version=version)}
 
 
 RECOVERY_KEY_LEN = 16
@@ -456,13 +476,18 @@ async def recover(body: RecoverIn, request: Request, response: Response):
         raise ApiError(401, "badRecovery", "Неверный ник или ключ восстановления")
     password_hash = await password_work(hash_password, body.password)
     recovery_key, recovery_hash = await fresh_recovery_key()
-    execute(
-        "UPDATE users SET password_hash = ?, recovery_hash = ?, token_version = token_version + 1 WHERE id = ?",
-        (password_hash, recovery_hash, row["id"]),
-    )
+    with connect_db() as conn:
+        changed = conn.execute(
+            "UPDATE users SET password_hash = ?, recovery_hash = ?, token_version = token_version + 1 WHERE id = ? AND recovery_hash = ? AND token_version = ?",
+            (password_hash, recovery_hash, row["id"], stored, row["token_version"]),
+        ).rowcount
+        if not changed:
+            raise ApiError(401, "badRecovery", "Неверный ник или ключ восстановления")
+        conn.execute("DELETE FROM password_resets WHERE user_id = ?", (row["id"],))
     await disconnect_user(row["id"])
-    set_media_cookie(request, response, row["id"])
-    return {"token": issue_token(row["id"]), "user": public_user(row), "recoveryKey": recovery_key, "serverName": server_name()}
+    version = row["token_version"] + 1
+    set_media_cookie(request, response, row["id"], version=version)
+    return {"token": issue_token(row["id"], version=version), "user": public_user(row), "recoveryKey": recovery_key, "serverName": server_name()}
 
 
 # --- admin reset link: for someone who lost the password and the recovery key (there's no e-mail to send it to) ---
@@ -547,11 +572,12 @@ async def reset_password(body: ResetIn, request: Request, response: Response):
             "UPDATE users SET password_hash = ?, recovery_hash = ?, token_version = token_version + 1 WHERE id = ?",
             (password_hash, recovery_hash, reset["user_id"]),
         )
+        version = conn.execute("SELECT token_version FROM users WHERE id = ?", (reset["user_id"],)).fetchone()[0]
     user_id = reset["user_id"]
     await disconnect_user(user_id)
-    set_media_cookie(request, response, user_id)
+    set_media_cookie(request, response, user_id, version=version)
     user = public_user(query("SELECT * FROM users WHERE id = ?", (user_id,))[0])
-    return {"token": issue_token(user_id), "user": user, "recoveryKey": recovery_key, "serverName": server_name()}
+    return {"token": issue_token(user_id, version=version), "user": user, "recoveryKey": recovery_key, "serverName": server_name()}
 
 
 def blocked_ids(user_id: str) -> list[str]:
@@ -567,6 +593,9 @@ async def block(other_id: str, user: dict = Depends(current_user)):
     execute("DELETE FROM friendships WHERE user_a = ? AND user_b = ?", ordered_pair(user["id"], other_id))
     await notify_friends_changed(user["id"], other_id)
     await sio.emit("blocks", blocked_ids(user["id"]), to=user_room(user["id"]))
+    pair = ":".join(ordered_pair(user["id"], other_id))
+    for dm in query("SELECT id FROM dms WHERE pair_key = ?", (pair,)):
+        await end_dm_voice(dm["id"])
     return blocked_ids(user["id"])
 
 
@@ -755,9 +784,9 @@ def my_account(user_id: str) -> dict:
 def bootstrap(request: Request, response: Response, user: dict = Depends(current_user)):
     users = [public_user(r) for r in query("SELECT * FROM users ORDER BY name")]
     # Sessions from before the media cookie existed get it here, and everyone's gets renewed.
-    set_media_cookie(request, response, user["id"])
+    set_media_cookie(request, response, user["id"], version=user["_authVersion"])
     return {
-        "me": user,
+        "me": {k: v for k, v in user.items() if k != "_authVersion"},
         "users": users,
         "channels": list_channels(),
         "livekitUrl": LIVEKIT_URL,
@@ -775,5 +804,5 @@ def bootstrap(request: Request, response: Response, user: dict = Depends(current
 # The other gomex modules import this one too: they come last, once everything above is defined.
 from .channels import list_channels, muted_channels, unread_counts
 from .uploads import PRIVATE_IMAGE_HEADERS, make_avatar, process_image
-from .realtime import disconnect_user, presence_payload, sio, user_room
+from .realtime import disconnect_user, end_dm_voice, presence_payload, sio, user_room
 from .server import icon_url

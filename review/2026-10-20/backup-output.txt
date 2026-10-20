@@ -1,0 +1,1 @@
+BACKUP_FILE_RACE: snapshot references ['fixture.bin'] but media copy does not contain it; backup exit 0

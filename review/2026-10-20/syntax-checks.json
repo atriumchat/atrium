@@ -1,0 +1,140 @@
+[
+  {
+    "file": "desktop/address-preload.js",
+    "kind": "node syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "desktop/address.js",
+    "kind": "node syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "desktop/check-i18n.js",
+    "kind": "node syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "desktop/i18n-page.js",
+    "kind": "node syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "desktop/i18n.js",
+    "kind": "node syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "desktop/main.js",
+    "kind": "node syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "desktop/onboarding-preload.js",
+    "kind": "node syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "desktop/onboarding.js",
+    "kind": "node syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "desktop/picker-preload.js",
+    "kind": "node syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "desktop/picker.js",
+    "kind": "node syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "desktop/preload.js",
+    "kind": "node syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "desktop/ptt.js",
+    "kind": "node syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "desktop/reachable.js",
+    "kind": "node syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "desktop/screen-picker.js",
+    "kind": "node syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "desktop/server-setup.js",
+    "kind": "node syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "desktop/unreachable-preload.js",
+    "kind": "node syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "desktop/unreachable.js",
+    "kind": "node syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "desktop/updater.js",
+    "kind": "node syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "deploy/backup.sh",
+    "kind": "bash syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "deploy/install.sh",
+    "kind": "sh syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "deploy/install.sh heredoc",
+    "kind": "bash syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "deploy/release-desktop.sh",
+    "kind": "bash syntax",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "file": "deploy/release.sh",
+    "kind": "bash syntax",
+    "status": 0,
+    "output": ""
+  }
+]

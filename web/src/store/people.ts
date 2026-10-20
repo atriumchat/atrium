@@ -1,7 +1,7 @@
 import { api } from '../api';
 import { t } from '../i18n';
 import type { Dm, Friend, User } from '../types';
-import { get, set, showError } from './core';
+import { get, getSessionEpoch, set, showError } from './core';
 import { isHomePage, openDm } from './shell';
 
 /** Everyone else: users, friends, DMs and groups, who's online. */
@@ -28,8 +28,10 @@ export function peopleSlice(): PeopleSlice {
 
 /** Open (creating if needed) the DM with a user and switch to it. */
 export async function messageUser(userId: string) {
+  const epoch = getSessionEpoch();
   try {
     const dm = await api.openDm(userId);
+    if (epoch !== getSessionEpoch()) return;
     set((s) => ({ dms: [dm, ...s.dms.filter((d) => d.id !== dm.id)] }));
     openDm(dm.id);
   } catch (e) {
@@ -42,16 +44,20 @@ export function addDm(dm: Dm) {
 }
 
 export async function refreshFriends() {
+  const epoch = getSessionEpoch();
   try {
-    set({ friends: await api.friends() });
+    const friends = await api.friends();
+    if (epoch === getSessionEpoch()) set({ friends });
   } catch {
     // Keep the old list; the next change event retries.
   }
 }
 
 export async function refreshDms() {
+  const epoch = getSessionEpoch();
   try {
     const dms = await api.dms();
+    if (epoch !== getSessionEpoch()) return;
     const ids = new Set(dms.map((d) => d.id));
     set((s) => ({
       dms,

@@ -17,6 +17,7 @@ from .config import (
     ANIMATION_MAX_SIDE,
     ANIMATION_PIXEL_BUDGET,
     AVATAR_SIZE,
+    AVATAR_DIR,
     IMAGE_MAX_SIDE,
     MAX_FILE_NAME,
     MAX_FILE_UPLOAD,
@@ -31,6 +32,7 @@ from .config import (
 from .errors import ApiError
 from .db import connect_db, execute, now_ms, query
 from .auth import UPLOADS_BY_USER, current_user, media_user
+from .media import remove_media_files
 
 
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
@@ -124,9 +126,7 @@ def preview_name(upload_id: str) -> str:
 
 
 def remove_upload_files(upload_ids) -> None:
-    for upload_id in upload_ids:
-        (UPLOAD_DIR / upload_id).unlink(missing_ok=True)
-        (UPLOAD_DIR / preview_name(upload_id)).unlink(missing_ok=True)
+    remove_media_files(path for upload_id in upload_ids for path in (UPLOAD_DIR / upload_id, UPLOAD_DIR / preview_name(upload_id)))
 
 
 def attachment_out(upload: dict) -> dict:
@@ -255,9 +255,28 @@ async def housekeeping() -> None:
         try:
             await run_in_threadpool(sweep_unsent_uploads)
             await run_in_threadpool(purge_deleted_channels)
+            await run_in_threadpool(sweep_orphan_media)
         except Exception as e:  # never let a bad hour stop the loop
             print(f"housekeeping failed: {e!r}", flush=True)
         await asyncio.sleep(3600)
+
+
+def sweep_orphan_media() -> None:
+    """Retry physical deletions deferred by a backup; fresh uploads may not have a DB row yet."""
+    uploads = {r["id"] for r in query("SELECT id FROM uploads")}
+    uploads |= {preview_name(name) for name in uploads if name.endswith(".webp")}
+    avatars = {r["avatar"] for r in query("SELECT avatar FROM users WHERE avatar IS NOT NULL")}
+    avatars |= {r["value"] for r in query("SELECT value FROM settings WHERE key = 'server_icon'")}
+    cutoff = now_ms() / 1000 - 3600
+    paths = []
+    for directory, keep in ((UPLOAD_DIR, uploads), (AVATAR_DIR, avatars)):
+        for path in directory.iterdir():
+            try:
+                if path.is_file() and path.name not in keep and path.stat().st_mtime < cutoff:
+                    paths.append(path)
+            except FileNotFoundError:
+                pass
+    remove_media_files(paths)
 
 
 # The other gomex modules import this one too: they come last, once everything above is defined.

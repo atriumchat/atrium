@@ -5,11 +5,12 @@ import json
 import re
 import time
 import urllib.request
+from urllib.parse import parse_qs, urlsplit
 import uuid
 
 import jwt
 import socketio
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
@@ -33,21 +34,27 @@ router = APIRouter()
 
 def livekit_token(user: dict, room: str) -> str:
     now = int(time.time())
+    version = user.get("_authVersion")
+    if version is None:
+        version = query("SELECT token_version FROM users WHERE id = ?", (user["id"],))[0]["token_version"]
     claims = {
         "iss": LIVEKIT_API_KEY,
         "sub": user["id"],
         "name": user["name"],
         "nbf": now - 10,
         "exp": now + VOICE_TOKEN_TTL,
-        "metadata": json.dumps({"color": user["color"]}),
+        # LiveKit preserves metadata when it refreshes tokens; custom top-level claims are lost.
+        "metadata": json.dumps({"color": user["color"], "authVersion": version}),
         "video": {
             "room": room,
             "roomJoin": True,
             "canPublish": True,
             "canSubscribe": True,
             "canPublishData": True,
+            "canUpdateOwnMetadata": False,
         },
     }
+    execute("INSERT OR IGNORE INTO voice_grants (user_id, room) VALUES (?, ?)", (user["id"], room))
     return jwt.encode(claims, LIVEKIT_API_SECRET, algorithm="HS256")
 
 
@@ -356,9 +363,37 @@ def voice_target(user_id: str, target: str) -> str | None:
     """'channel' for a server voice room, 'dm' for a DM/group the user is in, None if they can't join it."""
     if query("SELECT 1 FROM channels WHERE id = ? AND kind = 'voice' AND deleted_at IS NULL", (target,)):
         return "channel"
-    if dm_for(user_id, target):
+    dm = dm_for(user_id, target)
+    if dm:
+        if dm["kind"] == "dm" and any(blocked_between(user_id, m) for m in dm_member_ids(target) if m != user_id):
+            return None
         return "dm"
     return None
+
+
+@router.get("/api/rtc/authorize")
+def authorize_rtc(request: Request):
+    """Caddy checks each signalling connection, including joins with a refreshed LiveKit token."""
+    try:
+        uri = request.headers.get("x-forwarded-uri", "")
+        token = parse_qs(urlsplit(uri).query).get("access_token", [""])[0]
+        if not token:
+            token = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+        claims = jwt.decode(token, LIVEKIT_API_SECRET, algorithms=["HS256"], issuer=LIVEKIT_API_KEY,
+                            options={"require": ["exp", "sub"]})
+        metadata = json.loads(claims.get("metadata", "{}"))
+        rows = query("SELECT token_version FROM users WHERE id = ?", (claims["sub"],))
+        if not rows or not isinstance(metadata, dict) or metadata.get("authVersion") != rows[0]["token_version"]:
+            raise ValueError("revoked session")
+        room = claims["video"]["room"]
+        if room != f"check-{claims['sub']}":
+            kind, separator, target = room.partition("-")
+            expected = voice_target(claims["sub"], target) if separator else None
+            if not expected or kind != ("voice" if expected == "channel" else "dm"):
+                raise ValueError("room access denied")
+    except (jwt.PyJWTError, ValueError, TypeError, KeyError, AttributeError):
+        raise ApiError(401, "sessionExpired", "Нужно войти заново")
+    return {"ok": True}
 
 
 @sio.on("voice:join")
@@ -467,9 +502,22 @@ class VoiceTokenIn(BaseModel):
 
 
 async def disconnect_user(user_id: str) -> None:
-    """Drop every open socket of this person (their old tokens just stopped working)."""
+    """End signalling and media, including rooms issued without a presence event."""
+    rooms = {r["room"] for r in query("SELECT room FROM voice_grants WHERE user_id = ?", (user_id,))}
+    rooms.update(livekit_room(e["kind"], e["channelId"]) for e in voice.values() if e["userId"] == user_id)
+    await sio.emit("session:ended", to=user_room(user_id))
     for sid in [sid for sid, uid in online.items() if uid == user_id]:
         await sio.disconnect(sid)
+    await asyncio.gather(*(run_in_threadpool(livekit_remove, room, user_id) for room in rooms))
+
+
+async def end_dm_voice(dm_id: str) -> None:
+    members = dm_member_ids(dm_id)
+    for sid in [s for s, entry in voice.items() if entry["channelId"] == dm_id]:
+        del voice[sid]
+    await sio.emit("voice:ended", {"channelId": dm_id}, to=dm_rooms(dm_id))
+    await sync_call(dm_id)
+    await asyncio.gather(*(run_in_threadpool(livekit_remove, livekit_room("dm", dm_id), uid) for uid in members))
 
 
 @router.post("/api/check-token")

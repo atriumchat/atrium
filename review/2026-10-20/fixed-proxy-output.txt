@@ -1,0 +1,1 @@
+PASS: real Caddy app route + ASGI JWT authorization: valid=200, revoked/invalid=401; denied requests never reach media stub.

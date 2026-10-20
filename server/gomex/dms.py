@@ -4,7 +4,7 @@ import json
 import sqlite3
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
@@ -221,19 +221,21 @@ async def leave_group(group_id: str, user: dict = Depends(current_user)):
 
 
 @router.get("/api/dms/{dm_id}/messages")
-def dm_messages(dm_id: str, before: int | None = None, limit: int = 50, user: dict = Depends(current_user)):
+def dm_messages(dm_id: str, before: int | None = None, limit: int = 50,
+                before_id: str = Query("", alias="beforeId", max_length=64), user: dict = Depends(current_user)):
     if not dm_for(user["id"], dm_id):
         raise ApiError(404, "noDm", "Нет такой переписки")
     limit = max(1, min(limit, 100))
+    boundary, cursor = history_boundary(before, before_id)
     rows = query(
-        "SELECT * FROM dm_messages WHERE dm_id = ? AND created_at < ? ORDER BY created_at DESC LIMIT ?",
-        (dm_id, before or now_ms() + 1, limit),
+        f"SELECT * FROM dm_messages WHERE dm_id = ? AND {boundary} ORDER BY created_at DESC, id DESC LIMIT ?",
+        (dm_id, *cursor, limit),
     )
     return messages_out(list(reversed(rows)), "dm_messages")
 
 
 # The other gomex modules import this one too: they come last, once everything above is defined.
 from .users import friend_ids, ordered_pair
-from .channels import messages_out
+from .channels import history_boundary, messages_out
 from .uploads import remove_upload_files
 from .realtime import calls, livekit_remove, sio, sync_call, user_room, voice

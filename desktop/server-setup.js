@@ -40,8 +40,24 @@ function sshError(error) {
 /** Runs a command; streams its output lines to `onLine` and resolves with the exit code and the output's tail. */
 function exec(conn, command, { onLine, stdin } = {}) {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (error, result) => {
+      if (settled) return;
+      settled = true;
+      conn.removeListener('error', lost);
+      conn.removeListener('close', closed);
+      conn.removeListener('end', closed);
+      if (error) reject(error);
+      else resolve(result);
+    };
+    const lost = (error) => finish(error);
+    const closed = () => finish(new Error(t('ssh.noReply')));
+    conn.on('error', lost);
+    conn.on('close', closed);
+    conn.on('end', closed);
     conn.exec(command, (error, stream) => {
-      if (error) return reject(error);
+      if (error) return finish(error);
+      if (settled) return stream.close();
       const tail = [];
       let buffer = '';
       const take = (chunk) => {
@@ -57,9 +73,11 @@ function exec(conn, command, { onLine, stdin } = {}) {
       };
       stream.on('data', take);
       stream.stderr.on('data', take);
+      stream.on('error', lost);
       stream.on('close', (code) => {
         if (buffer) take('\n');
-        resolve({ code, tail });
+        if (!Number.isInteger(code)) finish(new Error(t('ssh.noReply')));
+        else finish(null, { code, tail });
       });
       if (stdin !== undefined) stream.end(stdin);
     });
@@ -79,48 +97,58 @@ async function connect({ host, user, password }) {
   }
   const conn = new Client();
   let hostKey = null;
-  const ready = await new Promise((resolve) => {
-    conn.on('ready', () => resolve(null));
-    conn.on('error', (error) => resolve(sshError(error)));
-    conn.on('keyboard-interactive', (_name, _text, _lang, prompts, finish) => finish(prompts.map(() => password)));
-    conn.connect({
-      host: address,
-      port: 22,
-      username: user,
-      password,
-      tryKeyboard: true,
-      readyTimeout: 20000,
-      keepaliveInterval: 15000,
-      hostVerifier: (key) => {
-        hostKey = crypto.createHash('sha256').update(key).digest('base64');
-        return true;
-      },
+  try {
+    const ready = await new Promise((resolve) => {
+      conn.on('ready', () => resolve(null));
+      conn.on('error', (error) => resolve(sshError(error)));
+      conn.on('close', () => resolve(sshError(new Error(t('ssh.noReply')))));
+      conn.on('end', () => resolve(sshError(new Error(t('ssh.noReply')))));
+      conn.on('keyboard-interactive', (_name, _text, _lang, prompts, finish) => finish(prompts.map(() => password)));
+      conn.connect({
+        host: address,
+        port: 22,
+        username: user,
+        password,
+        tryKeyboard: true,
+        readyTimeout: 20000,
+        keepaliveInterval: 15000,
+        hostVerifier: (key) => {
+          hostKey = crypto.createHash('sha256').update(key).digest('base64');
+          return true;
+        },
+      });
     });
-  });
-  if (ready) return ready;
-  const probe = [
-    '. /etc/os-release 2>/dev/null; echo "OS=$PRETTY_NAME"',
-    'echo "ARCH=$(uname -m)"',
-    "echo \"MEM=$(awk '/^MemTotal:/ { print int($2 / 1024) }' /proc/meminfo)\"",
-    "echo \"DISK=$(df -Pm / | awk 'NR == 2 { print $4 }')\"",
-    'echo "UID=$(id -u)"',
-  ].join('; ');
-  const { tail } = await exec(conn, probe);
-  const facts = Object.fromEntries(tail.map((line) => line.split(/=(.*)/s).slice(0, 2)));
-  if (facts.UID !== '0') {
+    if (ready) {
+      conn.end();
+      return ready;
+    }
+    const probe = [
+      '. /etc/os-release 2>/dev/null; echo "OS=$PRETTY_NAME"',
+      'echo "ARCH=$(uname -m)"',
+      "echo \"MEM=$(awk '/^MemTotal:/ { print int($2 / 1024) }' /proc/meminfo)\"",
+      "echo \"DISK=$(df -Pm / | awk 'NR == 2 { print $4 }')\"",
+      'echo "UID=$(id -u)"',
+    ].join('; ');
+    const { tail } = await exec(conn, probe);
+    const facts = Object.fromEntries(tail.map((line) => line.split(/=(.*)/s).slice(0, 2)));
+    if (facts.UID !== '0') {
+      conn.end();
+      return { error: t('ssh.needRoot') };
+    }
+    const memory = Number(facts.MEM) / 1024;
+    const disk = Number(facts.DISK) / 1024;
+    ssh = { conn, host, ip: address, user, hostKey };
+    return {
+      facts: {
+        ip: address,
+        os: [facts.OS, facts.ARCH].filter(Boolean).join(' · '),
+        size: t('ssh.size', { memory: memory.toFixed(memory < 10 ? 1 : 0), disk: Math.round(disk) }),
+      },
+    };
+  } catch (error) {
     conn.end();
-    return { error: t('ssh.needRoot') };
+    return sshError(error);
   }
-  const memory = Number(facts.MEM) / 1024;
-  const disk = Number(facts.DISK) / 1024;
-  ssh = { conn, host, ip: address, user, hostKey };
-  return {
-    facts: {
-      ip: address,
-      os: [facts.OS, facts.ARCH].filter(Boolean).join(' · '),
-      size: t('ssh.size', { memory: memory.toFixed(memory < 10 ? 1 : 0), disk: Math.round(disk) }),
-    },
-  };
 }
 
 function close() {
@@ -306,7 +334,7 @@ async function checkDomain({ domain, turn, ip }) {
  * { state: 'ready', url } or { state: 'fail', why, tail }. `save` gets what the app keeps for this server
  * (its key, the deSEC account) before anything changes on it.
  */
-async function install({ domain, turn, installer }, report, save) {
+async function installSteps({ domain, turn, installer }, report, save) {
   if (!ssh) return report({ state: 'fail', why: t('install.noSession') });
   domain = String(domain).toLowerCase();
   if (!DOMAIN.test(domain) || !TURN.test(turn)) return report({ state: 'fail', why: t('install.badAddress') });
@@ -366,6 +394,15 @@ async function install({ domain, turn, installer }, report, save) {
   }).finally(() => clearInterval(ticker));
   if (ready) return report({ state: 'ready', url: ready });
   report({ state: 'fail', why: why || t('install.stopped', { code }), tail });
+}
+
+async function install(options, report, save) {
+  try {
+    await installSteps(options, report, save);
+  } catch (error) {
+    close();
+    report({ state: 'fail', why: sshError(error).error });
+  }
 }
 
 module.exports = { connect, close, register, reuse, waitMail, cancelMail, checkDomain, install };

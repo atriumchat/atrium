@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Spinner, Toast } from '@heroui/react';
-import { api, ApiError, getToken, setToken } from './api';
+import { api, ApiError, getToken } from './api';
 import { initStore } from './store';
 import { connectSocket } from './socket';
 import { clearInviteFromUrl } from './people/invite';
@@ -12,6 +12,7 @@ import { ResetPassword } from './account/ResetPassword';
 import { clearResetFromUrl, resetFromUrl } from './account/resetLink';
 import { WhereToUse, whereToUseNeeded } from './account/WhereToUse';
 import type { Session } from './types';
+import { endSession } from './account/session';
 import { useT } from './i18n';
 
 type Phase = 'loading' | 'login' | 'setup' | 'reset' | 'key' | 'where' | 'ready' | 'offline';
@@ -58,14 +59,14 @@ export function App() {
       // Already a member: an invite link opened again has nothing left to do.
       clearInviteFromUrl();
       connectSocket(getToken()!, () => {
-        setToken(null);
-        setPhase('login');
+        storeNewKey(null);
+        endSession();
       });
       setPhase('ready');
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
-        setToken(null);
-        setPhase('login');
+        storeNewKey(null);
+        endSession();
       } else {
         setPhase('offline');
       }

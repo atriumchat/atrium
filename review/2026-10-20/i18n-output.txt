@@ -1,0 +1,5 @@
+
+> gomex-desktop@1.6.0 check:i18n
+> node check-i18n.js
+
+i18n ok: 247 keys

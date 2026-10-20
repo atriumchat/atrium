@@ -221,9 +221,11 @@ export async function leaveVoice({ silent = false } = {}) {
   if (!voiceChannelId) return;
   // Taken before resetVoice() drops it: the last report needs the room still connected.
   const last = reporter;
+  // Telemetry must never keep a microphone/camera alive after hangup.
+  void last?.stop().catch(() => {});
+  room?.localParticipant.trackPublications.forEach((publication) => publication.track?.stop());
   resetVoice();
   getSocket()?.emit('voice:leave');
-  await last?.stop();
   if (room) {
     await room.disconnect();
     if (!silent) playSound('leave');

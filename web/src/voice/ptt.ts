@@ -50,7 +50,7 @@ if (typeof window !== 'undefined') {
   // Let go of the key outside the window: it never sends keyup here.
   window.addEventListener('blur', () => !desktop?.ptt && setPtt(false));
   // The desktop app hears the key anywhere, even with the window in the background.
-  desktop?.ptt?.onChange((down) => get().voicePrefs.ptt && get().voiceStatus === 'connected' && setPtt(down));
+  desktop?.ptt?.onChange((down) => onPttEvent(get().voicePrefs.pttKey, down, document.hasFocus() ? document.activeElement : null));
   if (desktop?.ptt) {
     syncPttWatch();
     useStore.subscribe(syncPttWatch);

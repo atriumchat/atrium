@@ -1,5 +1,5 @@
 import type { Bootstrap, MyStatus, User } from '../types';
-import { get, set } from './core';
+import { get, resetStore, set } from './core';
 
 /** You: who you're signed in as and your status. */
 export type AccountSlice = {
@@ -24,6 +24,7 @@ export function accountSlice(): AccountSlice {
 }
 
 export function initStore(data: Bootstrap) {
+  if (get().me?.id !== data.me.id) resetStore();
   const firstText = data.channels.find((c) => c.kind === 'text');
   set({
     serverName: data.serverName,
@@ -42,6 +43,6 @@ export function initStore(data: Bootstrap) {
     hasRecoveryKey: !!data.hasRecoveryKey,
     isAdmin: !!data.isAdmin,
     serverRelayOnly: !!data.relayOnly,
-    selectedChannelId: get().selectedChannelId ?? firstText?.id ?? data.channels[0]?.id ?? null,
+    selectedChannelId: data.channels.some((c) => c.id === get().selectedChannelId) ? get().selectedChannelId : firstText?.id ?? data.channels[0]?.id ?? null,
   });
 }

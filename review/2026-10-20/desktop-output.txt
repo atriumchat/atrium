@@ -1,0 +1,2 @@
+SSH_PROBE_FAILURE: {"uncaughtRejection":"SSH transport lost after authentication"}
+The onboarding submit handler awaits this call without catch/finally; busy(false) is skipped.

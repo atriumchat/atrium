@@ -88,6 +88,12 @@ CREATE TABLE IF NOT EXISTS channel_mutes (
   channel_id TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
   PRIMARY KEY (user_id, channel_id)
 );
+-- Persist issued rooms so a restart cannot hide a media session from account revocation.
+CREATE TABLE IF NOT EXISTS voice_grants (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  room TEXT NOT NULL,
+  PRIMARY KEY (user_id, room)
+);
 """.replace("{DMS_TABLES}", DMS_TABLES.replace("{dms}", "dms"))
 
 

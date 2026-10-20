@@ -1,6 +1,6 @@
 import { t } from '../i18n';
 import { api } from '../api';
-import { mergeMessages, PAGE_SIZE, setHasMore, showError, useStore } from '../store';
+import { compareMessages, getSessionEpoch, mergeMessages, PAGE_SIZE, setHasMore, showError, useStore } from '../store';
 
 const inFlight = new Map<string, Promise<void>>();
 
@@ -10,29 +10,36 @@ const inFlight = new Map<string, Promise<void>>();
  */
 export function ensureHistory(id: string, kind: 'channel' | 'dm', { quiet = false } = {}): Promise<void> {
   if (useStore.getState().hasMore[id] !== undefined) return Promise.resolve();
-  const running = inFlight.get(id);
+  const epoch = getSessionEpoch();
+  const key = `${epoch}:${id}`;
+  const running = inFlight.get(key);
   if (running) return running;
   const job = (kind === 'dm' ? api.dmMessages(id) : api.messages(id))
     .then((list) => {
+      if (epoch !== getSessionEpoch()) return;
       mergeMessages(id, list);
       setHasMore(id, list.length === PAGE_SIZE);
     })
     .catch((e) => {
-      if (!quiet) showError(t('chat.loadFailed', { error: e instanceof Error ? e.message : String(e) }));
+      if (!quiet && epoch === getSessionEpoch()) showError(t('chat.loadFailed', { error: e instanceof Error ? e.message : String(e) }));
     })
-    .finally(() => inFlight.delete(id));
-  inFlight.set(id, job);
+    .finally(() => inFlight.delete(key));
+  inFlight.set(key, job);
   return job;
 }
 
 /** After start-up, quietly fetch the newest conversations and the text channels, one at a time. */
 export async function warmUpHistory() {
+  const epoch = getSessionEpoch();
   const { dms, channels } = useStore.getState();
   const queue: [string, 'channel' | 'dm'][] = [
     ...dms.slice(0, 6).map((d) => [d.id, 'dm'] as [string, 'dm']),
     ...channels.filter((c) => c.kind === 'text').map((c) => [c.id, 'channel'] as [string, 'channel']),
   ];
-  for (const [id, kind] of queue) await ensureHistory(id, kind, { quiet: true });
+  for (const [id, kind] of queue) {
+    if (epoch !== getSessionEpoch()) return;
+    await ensureHistory(id, kind, { quiet: true });
+  }
 }
 
 /**
@@ -41,20 +48,23 @@ export async function warmUpHistory() {
  * the list restarts from the newest page so it never has a hole in the middle.
  */
 export async function refreshNewest(id: string, kind: 'channel' | 'dm') {
+  const epoch = getSessionEpoch();
   const known = new Set((useStore.getState().messages[id] ?? []).map((m) => m.id));
   const page = await (kind === 'dm' ? api.dmMessages(id) : api.messages(id));
-  const first = page[0], last = page.at(-1);
+  if (epoch !== getSessionEpoch()) return;
+  const first = page[0];
   useStore.setState((s) => {
     const have = s.messages[id] ?? [];
     // Nothing left on the server: keep only what arrived over the socket while we were asking.
-    if (!first || !last) return { messages: { ...s.messages, [id]: have.filter((m) => !known.has(m.id)) }, hasMore: { ...s.hasMore, [id]: false } };
-    if (page.length === PAGE_SIZE && !have.some((m) => m.id === first.id)) {
-      return { messages: { ...s.messages, [id]: page }, hasMore: { ...s.hasMore, [id]: true } };
-    }
-    // Inside the page's time span the server's copy wins: gone means deleted. Anything newer came over the socket.
+    if (!first) return { messages: { ...s.messages, [id]: have.filter((m) => !known.has(m.id)) }, hasMore: { ...s.hasMore, [id]: false } };
+    const keepOlder = page.length === PAGE_SIZE && page.some((m) => known.has(m.id));
+    // Only ids unknown at request start arrived while it was in flight; known ids may have been deleted.
     const inPage = new Set(page.map((m) => m.id));
-    const kept = have.filter((m) => !inPage.has(m.id) && (m.createdAt < first.createdAt || m.createdAt > last.createdAt));
-    return { messages: { ...s.messages, [id]: [...kept, ...page].sort((a, b) => a.createdAt - b.createdAt) } };
+    const kept = have.filter((m) => !inPage.has(m.id) && (!known.has(m.id) || (keepOlder && compareMessages(m, first) < 0)));
+    return {
+      messages: { ...s.messages, [id]: [...kept, ...page].sort(compareMessages) },
+      hasMore: { ...s.hasMore, [id]: keepOlder ? (s.hasMore[id] ?? true) : page.length === PAGE_SIZE },
+    };
   });
 }
 

@@ -5,6 +5,8 @@ import { desktop } from './desktop';
 import { errorText, t } from './i18n';
 import {
   addUser,
+  getSessionEpoch,
+  initStore,
   dmTitle,
   isDmId,
   markTyping,
@@ -81,6 +83,7 @@ function flushRead(conversationId: string) {
 let serverCounts = false;
 
 useStore.subscribe((s, prev) => {
+  if (s.me?.id !== prev.me?.id) return;
   if (!serverCounts) for (const [id, n] of Object.entries(prev.unread)) if (n > 0 && !s.unread[id]) sendRead(id, latestAt(id));
   const open = openConversationId(s);
   if (open && open !== openConversationId(prev) && pageActive()) sendRead(open, latestAt(open));
@@ -120,6 +123,23 @@ function scheduleCatchUp() {
 }
 
 async function catchUp() {
+  const epoch = getSessionEpoch();
+  try {
+    const data = await api.bootstrap();
+    if (epoch !== getSessionEpoch()) return;
+    serverCounts = true;
+    initStore(data);
+  } catch {
+    return;
+  } finally {
+    serverCounts = false;
+  }
+  await Promise.all([refreshFriends(), refreshDms()]);
+  if (epoch !== getSessionEpoch()) return;
+  const { voiceChannelId, channels, dms } = useStore.getState();
+  if (voiceChannelId && !channels.some((c) => c.id === voiceChannelId) && !dms.some((d) => d.id === voiceChannelId)) {
+    void leaveVoice({ silent: true });
+  }
   const open = openConversationId();
   const { hasMore } = useStore.getState();
   for (const id of Object.keys(hasMore)) if (id !== open) invalidateHistory(id);
@@ -128,15 +148,7 @@ async function catchUp() {
       // Still offline or the server is busy: the next reconnect tries again.
     });
   }
-  try {
-    const { unread, mentions } = await api.bootstrap();
-    serverCounts = true;
-    useStore.setState({ unread: unread ?? {}, mentions: mentions ?? {} });
-  } catch {
-    // Keep the counts we have.
-  } finally {
-    serverCounts = false;
-  }
+  if (epoch !== getSessionEpoch()) return;
   readOpenConversation();
 }
 
@@ -187,6 +199,13 @@ export function connectSocket(token: string, onUnauthorized: () => void) {
 
   socket.on('connect_error', (err) => {
     if (err.message === 'unauthorized' && Date.now() > ignoreAuthErrorsUntil) onUnauthorized();
+  });
+  socket.on('session:ended', () => {
+    void leaveVoice({ silent: true });
+    if (Date.now() > ignoreAuthErrorsUntil) onUnauthorized();
+  });
+  socket.on('voice:ended', ({ channelId }: { channelId: string }) => {
+    if (useStore.getState().voiceChannelId === channelId) void leaveVoice({ silent: true });
   });
 
   socket.on('presence', (online: string[]) => useStore.setState({ online }));
@@ -299,6 +318,8 @@ export function disconnectSocket() {
   everConnected = false;
   if (catchUpTimer) clearTimeout(catchUpTimer);
   catchUpTimer = null;
+  for (const id of Object.keys(readTimers)) clearTimeout(readTimers[id]);
+  for (const map of [sentRead, queuedRead, lastReadSend, readTimers]) for (const key of Object.keys(map)) delete map[key];
 }
 
 /**

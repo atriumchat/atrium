@@ -48,8 +48,18 @@ Checks before a commit:
 ```bash
 (cd web && npm run build)   # tsc and build
 (cd desktop && npm run check:i18n)   # English and Russian have the same keys
+(cd desktop && node --test tests/*.test.cjs)  # SSH transport failures
+server/.venv/bin/python -m pytest -q server/tests  # isolated SQLite and deploy fixtures
 deploy/release.sh lint      # bash -n and shellcheck on all scripts in deploy/
 ```
+
+Browser regressions: run `bash web/tests/run-regressions.sh`, open the printed localhost URL and click
+**Run checks**. The harness uses the actual source modules with controlled HTTP, room and desktop IPC responses;
+it does not open a microphone. Stop the script to remove the temporary harness modules.
+
+With Caddy installed, `server/.venv/bin/python server/tests/check_rtc_proxy.py` checks the production app route
+against the real ASGI authorization handler and a recording media upstream on loopback ports. A real LiveKit call
+and a VPS install/restore still need integration testing.
 
 ## Releases
 

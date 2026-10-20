@@ -64,6 +64,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 const post = (body?: unknown): RequestInit => ({ method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });
 
+function historyQuery(before?: number, beforeId?: string) {
+  if (before === undefined) return '';
+  const params = new URLSearchParams({ before: String(before) });
+  if (beforeId) params.set('beforeId', beforeId);
+  return `?${params}`;
+}
+
 export const api = {
   register: (invite: string, name: string, password: string) => request<Session>('/api/register', post({ invite, name, password })),
   login: (name: string, password: string) => request<Session>('/api/login', post({ name, password })),
@@ -94,11 +101,11 @@ export const api = {
   addGroupMembers: (groupId: string, userIds: string[]) => request<Dm>(`/api/groups/${groupId}/members`, post({ userIds })),
   renameGroup: (groupId: string, name: string) => request<Dm>(`/api/groups/${groupId}`, { method: 'PATCH', body: JSON.stringify({ name }) }),
   leaveGroup: (groupId: string) => request<{ ok: boolean }>(`/api/groups/${groupId}/members/me`, { method: 'DELETE' }),
-  dmMessages: (dmId: string, before?: number) =>
-    request<Message[]>(`/api/dms/${dmId}/messages${before ? `?before=${before}` : ''}`),
+  dmMessages: (dmId: string, before?: number, beforeId?: string) =>
+    request<Message[]>(`/api/dms/${dmId}/messages${historyQuery(before, beforeId)}`),
   bootstrap: () => request<Bootstrap>('/api/bootstrap'),
-  messages: (channelId: string, before?: number) =>
-    request<Message[]>(`/api/channels/${channelId}/messages${before ? `?before=${before}` : ''}`),
+  messages: (channelId: string, before?: number, beforeId?: string) =>
+    request<Message[]>(`/api/channels/${channelId}/messages${historyQuery(before, beforeId)}`),
   createChannel: (name: string, kind: Channel['kind']) => request<Channel[]>('/api/channels', post({ name, kind })),
   renameChannel: (id: string, name: string) =>
     request<Channel[]>(`/api/channels/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) }),
@@ -132,9 +139,9 @@ export const api = {
     request<ServerInfo>('/api/server/icon', { method: 'POST', body: image, headers: { 'Content-Type': image.type || 'application/octet-stream' } }),
   deleteServerIcon: () => request<ServerInfo>('/api/server/icon', { method: 'DELETE' }),
   renameServer: (name: string) => request<ServerInfo>('/api/server', { method: 'PATCH', body: JSON.stringify({ name }) }),
-  checkToken: () => request<{ token: string; url: string }>('/api/check-token', post()),
+  checkToken: () => request<{ token: string; url: string }>('/api/check-token', { ...post(), signal: AbortSignal.timeout(15_000) }),
   markRead: (conversationId: string, at: number) => request<{ ok: boolean }>('/api/read', post({ conversationId, at })),
-  inbox: (before?: number) => request<InboxItem[]>(`/api/inbox${before ? `?before=${before}` : ''}`),
-  callQuality: (report: Record<string, unknown>) => request<{ ok: boolean }>('/api/call-quality', post(report)),
+  inbox: (before?: number, beforeId?: string) => request<InboxItem[]>(`/api/inbox${historyQuery(before, beforeId)}`),
+  callQuality: (report: Record<string, unknown>) => request<{ ok: boolean }>('/api/call-quality', { ...post(report), signal: AbortSignal.timeout(5000) }),
   voiceToken: (channelId: string) => request<{ token: string; url: string }>('/api/voice-token', post({ channelId })),
 };

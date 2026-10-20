@@ -1,6 +1,15 @@
 import { api, setToken } from '../api';
 import { disconnectSocket } from '../socket';
 import { leaveVoice } from '../voice/voice';
+import { resetStore } from '../store';
+
+export function endSession() {
+  void leaveVoice({ silent: true }).catch(() => {});
+  disconnectSocket();
+  setToken(null);
+  resetStore();
+  window.location.reload();
+}
 
 export async function logout() {
   await leaveVoice({ silent: true });
@@ -9,6 +18,5 @@ export async function logout() {
   // what makes a copied or forgotten one stop working. It also drops the HttpOnly media cookie (JS can't); if the
   // token is already dead, the plain logout still drops the cookie.
   await api.logoutAll().catch(() => api.logout()).catch(() => {});
-  setToken(null);
-  window.location.reload();
+  endSession();
 }

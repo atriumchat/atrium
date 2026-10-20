@@ -1,0 +1,24 @@
+Browser tab: 2, Title: "Gomex regression checks", URL: "http://127.0.0.1:5190/regression-harness.html".
+1 AXWebArea Gomex regression checks, URL: 127.0.0.1:5190/regression-harness.html
+	2 heading Gomex regression checks, Value: 1
+		3 text Gomex regression checks
+	4 text Actual source modules; controlled network, room and desktop IPC. No real microphone or SSH connection.
+	5 button Run checks, ID: run
+	6 text entry area (settable) Description: PTT typing test, ID: editor
+	7 text Running source regression checks
+PASS Reconnect removes known messages deleted offline; keeps concurrent arrivals
+PASS Empty refresh removes known stale history
+PASS Full refresh preserves older pages on overlap
+PASS More than a page missed resets the gap
+PASS Equal timestamps use stable ID order
+PASS Network check failure returns a failed result
+PASS Account switch clears private caches and stops old media
+PASS Late history/friends/DM responses cannot populate another account
+PASS Mounted invite hook hides the previous account invite immediately
+PASS Reconnect applies channels, users, blocks and status from bootstrap
+PASS Hangup stops tracks and disconnects while telemetry remains stalled
+PASS Desktop typing keys do not key the mic; F13 and key release work
+
+RESULT: 12 passed, 0 failed
+
+The focused UI element is 6 text entry area (settable) Description: PTT typing test, ID: editor

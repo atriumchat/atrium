@@ -31,7 +31,7 @@ if WEB_DIST and (APP_SECRET == "dev-secret-change-me" or LIVEKIT_API_SECRET == "
     raise RuntimeError("APP_SECRET, LIVEKIT_API_SECRET and INVITE_CODE must be set in production")
 
 TOKEN_TTL = 180 * 24 * 3600
-VOICE_TOKEN_TTL = 6 * 3600
+VOICE_TOKEN_TTL = 10 * 60
 MAX_MESSAGE_LEN = 4000
 MIN_PASSWORD_LEN = 8
 # Everyone has one personal invite link; this many people can sign up with it (admins: no limit).

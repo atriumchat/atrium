@@ -1,0 +1,68 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><title>Gomex review reproduction</title><style>body{font:14px system-ui,sans-serif;padding:20px;max-width:900px}h1{font-size:22px}pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55;background:#f5f5f5;padding:16px;border-radius:8px}button{padding:8px}textarea{vertical-align:middle;margin-left:12px}</style><body><h1>Gomex review reproduction</h1><button id="run">Run reproductions</button><textarea id="ptt-editor" aria-label="PTT typing test"></textarea><pre id="output">Ready</pre><script>window.gomexDesktop = {ptt:{watch(){},onChange(callback){window.__reviewPttCallback=callback;}}};</script><script type="module">
+import { useStore, initStore } from '/src/store/index.ts';
+import { api } from '/src/api.ts';
+import { refreshNewest } from '/src/chat/history.ts';
+import { leaveVoice, __reviewSetReporter } from '/src/voice/voice.review.ts';
+import { startQualityReports } from '/src/voice/report.ts';
+import { attempt } from '/src/voice/ConnectionCheck.tsx';
+import { __reviewCatchUp } from '/src/socket.review.ts';
+const out = document.getElementById('output');
+const say = (label, data) => {out.textContent += '\n' + label + ': ' + JSON.stringify(data);};
+const message = (id, at) => ({id, channelId:'review-channel', userId:'author', content:id, createdAt:at, attachments:[], reactions:[], replyTo:null, mentions:[], mentionsAll:false});
+document.getElementById('run').onclick = async () => {
+ out.textContent = 'Running actual source modules with controlled network responses';
+ try {
+  const savedMessages = api.messages;
+  useStore.setState({messages:{'review-channel':[message('kept',100),message('deleted-offline',200)]},hasMore:{'review-channel':false}});
+  api.messages = async () => [message('kept',100)];
+  await refreshNewest('review-channel','channel');
+  say('DELETED_MESSAGE_AFTER_RECONNECT',useStore.getState().messages['review-channel'].map(m=>m.id));
+  api.messages = savedMessages;
+
+  const savedCheck = api.checkToken;
+  api.checkToken = async () => {throw new Error('simulated network failure');};
+  let result;
+  try {result = await attempt(false);} catch(e) {result = {rejected:e.message};}
+  say('NETWORK_CHECK_FAILURE',result);
+  api.checkToken = savedCheck;
+
+  useStore.setState({messages:{'private-A':[message('private-content-A',100)]},hasMore:{'private-A':false},dms:[{id:'private-A',kind:'dm',members:['A','X'],userId:'X',name:'',lastMessageAt:100}],homeView:'private-A',mode:'home'});
+  initStore({me:{id:'B',name:'Account B'},users:[{id:'B',name:'Account B'}],channels:[],serverName:'Review',canManageChannels:false,mutedChannels:[],unread:{},mentions:{},blocked:[]});
+  say('ACCOUNT_SWITCH_CACHE',{me:useStore.getState().me.id,dms:useStore.getState().dms.map(d=>d.id),messages:Object.keys(useStore.getState().messages),homeView:useStore.getState().homeView});
+
+  const savedBootstrap = api.bootstrap;
+  useStore.setState({channels:[{id:'old-channel',kind:'text',name:'Old'}],users:{A:{id:'A',name:'Old name'}},blocked:[],homeView:'friends',hasMore:{},messages:{}});
+  api.bootstrap = async()=>({unread:{},mentions:{},channels:[{id:'new-channel',kind:'text',name:'New'}],users:[{id:'A',name:'New name'}],blocked:['blocked-user']});
+  await __reviewCatchUp();
+  say('RECONNECT_METADATA',{channels:useStore.getState().channels.map(c=>c.id),user:useStore.getState().users.A.name,blocked:useStore.getState().blocked});
+  api.bootstrap = savedBootstrap;
+
+  let disconnected = 0;
+  const savedQuality = api.callQuality;
+  let releaseReport;
+  api.callQuality = () => new Promise(resolve => {releaseReport = resolve;});
+  const room = {engine:{},localParticipant:{getTrackPublication:()=>undefined},disconnect:async()=>{disconnected++;}};
+  useStore.setState({room,voiceChannelId:'review-call',voiceStatus:'connected',muted:true,dms:[],voiceState:[],messages:{},hasMore:{},homeView:'friends',me:{id:'B',name:'Account B',color:'#5865f2'}});
+  __reviewSetReporter(startQualityReports(room,'review-call'));
+  const stopping = leaveVoice({silent:true});
+  await new Promise(resolve=>setTimeout(resolve,150));
+  say('HANGUP_WHILE_REPORT_STALLED',{ui:useStore.getState().voiceStatus,roomInStore:useStore.getState().room,disconnectCalls:disconnected,waitingForReport:typeof releaseReport === 'function'});
+  releaseReport?.({ok:true});
+  await stopping;
+  say('HANGUP_AFTER_REPORT_FINISHES',{disconnectCalls:disconnected});
+  api.callQuality = savedQuality;
+  const micStates = [];
+  const pttRoom = {localParticipant:{setMicrophoneEnabled:async live=>micStates.push(live),getTrackPublication:()=>undefined}};
+  useStore.setState({room:pttRoom,voiceStatus:'connected',voiceChannelId:'review-call',voicePrefs:{ptt:true,pttKey:'KeyV',noise:'browser'},muted:false,deafened:false,pttDown:false});
+  const editor = document.getElementById('ptt-editor');
+  editor.focus();
+  editor.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyV',key:'v',bubbles:true}));
+  window.__reviewPttCallback(true);
+  await Promise.resolve();
+  say('DESKTOP_PTT_WHILE_TYPING',{focused:document.activeElement.tagName,pttDown:useStore.getState().pttDown,micStates});
+  window.__reviewPttCallback(false);
+  useStore.setState({room:null,voiceStatus:'idle',voiceChannelId:null});
+  say('DONE',true);
+ } catch(e) {say('HARNESS_ERROR',{message:e.message,stack:e.stack});}
+};
+</script></body></html>

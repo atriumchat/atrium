@@ -302,9 +302,15 @@ $('f-server').addEventListener('submit', async (event) => {
   event.preventDefault();
   if ($('go-server').disabled) return;
   busy($('go-server'), true);
-  const answer = await setup.connect({ host: $('ip').value.trim(), user: $('user').value.trim() || 'root', password: $('pass').value });
-  busy($('go-server'), false);
-  checkServerForm();
+  let answer;
+  try {
+    answer = await setup.connect({ host: $('ip').value.trim(), user: $('user').value.trim() || 'root', password: $('pass').value });
+  } catch {
+    answer = { error: t('ssh.noReply') };
+  } finally {
+    busy($('go-server'), false);
+    checkServerForm();
+  }
   if (answer.error) {
     $('e-server').textContent = answer.error;
     if (answer.field === 'host') $('ip').classList.add('bad');
@@ -663,6 +669,12 @@ function startInstall() {
       $('go-install').disabled = false;
       $('go-install').focus({ preventScroll: true });
     }
+  }).catch(() => {
+    clearInterval(clock);
+    state.installing = false;
+    $('e-install').textContent = t('ob.install.failed');
+    $('go-install').hidden = true;
+    $('retry').hidden = false;
   });
 }
 

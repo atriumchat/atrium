@@ -5,6 +5,8 @@ import { refreshDms } from './people';
 
 export const PAGE_SIZE = 50;
 
+export const compareMessages = (a: Message, b: Message) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
 /** Messages: loaded history, unread counts, typing, the composer's reply and edit. */
 export type ChatSlice = {
   messages: Record<string, Message[]>;
@@ -42,12 +44,12 @@ export function markRead(channelId: string) {
 function merged(list: Message[] | undefined, incoming: Message[]): Message[] {
   const last = list?.at(-1);
   // The usual case, a new message at the end: no need to rebuild and sort the whole list.
-  if (list && last && incoming.length === 1 && incoming[0].createdAt >= last.createdAt && !list.some((m) => m.id === incoming[0].id)) {
+  if (list && last && incoming.length === 1 && compareMessages(incoming[0], last) >= 0 && !list.some((m) => m.id === incoming[0].id)) {
     return [...list, incoming[0]];
   }
   const byId = new Map((list ?? []).map((m) => [m.id, m]));
   for (const m of incoming) byId.set(m.id, m);
-  return [...byId.values()].sort((a, b) => a.createdAt - b.createdAt);
+  return [...byId.values()].sort(compareMessages);
 }
 
 /** Merge messages into a channel, de-duplicated by id and kept in time order. */

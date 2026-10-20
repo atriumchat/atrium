@@ -3,7 +3,7 @@
 import json
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from .config import MAX_ATTACHMENTS, MAX_MESSAGE_LEN, MENTION
@@ -217,43 +217,52 @@ async def mark_read(body: ReadIn, user: dict = Depends(current_user)):
     return {"ok": True}
 
 
+def history_boundary(before: int | None, before_id: str, prefix: str = "") -> tuple[str, tuple]:
+    at = before if before is not None else now_ms() + 1
+    if before_id and before is not None:
+        return f"({prefix}created_at < ? OR ({prefix}created_at = ? AND {prefix}id < ?))", (at, at, before_id)
+    return f"{prefix}created_at < ?", (at,)
+
+
 @router.get("/api/inbox")
-def inbox(before: int | None = None, user: dict = Depends(current_user)):
+def inbox(before: int | None = None, before_id: str = Query("", alias="beforeId", max_length=64), user: dict = Depends(current_user)):
     """Messages that mention you (or everyone) or answer you, from every channel and your DMs, newest first."""
     marks = read_marks(user)
     mention = f"%<@{user['id']}>%"
-    before = before or now_ms() + 1
+    boundary, cursor = history_boundary(before, before_id, "m.")
     channel_rows = query(
-        """SELECT m.* FROM messages m JOIN channels c ON c.id = m.channel_id AND c.deleted_at IS NULL
-           WHERE m.user_id != ? AND m.created_at < ?
+        f"""SELECT m.* FROM messages m JOIN channels c ON c.id = m.channel_id AND c.deleted_at IS NULL
+           WHERE m.user_id != ? AND {boundary}
              AND (m.content LIKE ? OR m.content LIKE '%<@all>%'
                   OR m.reply_to IN (SELECT id FROM messages WHERE user_id = ?))
-           ORDER BY m.created_at DESC LIMIT 40""",
-        (user["id"], before, mention, user["id"]),
+           ORDER BY m.created_at DESC, m.id DESC LIMIT 40""",
+        (user["id"], *cursor, mention, user["id"]),
     )
     dm_rows = query(
-        """SELECT m.* FROM dm_messages m JOIN dm_members dm ON dm.dm_id = m.dm_id AND dm.user_id = ?
-           WHERE m.user_id != ? AND m.created_at < ?
+        f"""SELECT m.* FROM dm_messages m JOIN dm_members dm ON dm.dm_id = m.dm_id AND dm.user_id = ?
+           WHERE m.user_id != ? AND {boundary}
              AND (m.content LIKE ? OR m.content LIKE '%<@all>%'
                   OR m.reply_to IN (SELECT id FROM dm_messages WHERE user_id = ?))
-           ORDER BY m.created_at DESC LIMIT 40""",
-        (user["id"], user["id"], before, mention, user["id"]),
+           ORDER BY m.created_at DESC, m.id DESC LIMIT 40""",
+        (user["id"], user["id"], *cursor, mention, user["id"]),
     )
     items = messages_out(channel_rows, "messages") + messages_out(dm_rows, "dm_messages")
-    items.sort(key=lambda m: m["createdAt"], reverse=True)
+    items.sort(key=lambda m: (m["createdAt"], m["id"]), reverse=True)
     for m in items[:40]:
         m["unread"] = m["createdAt"] > marks.get(m["channelId"], user["createdAt"])
     return items[:40]
 
 
 @router.get("/api/channels/{channel_id}/messages")
-def channel_messages(channel_id: str, before: int | None = None, limit: int = 50, user: dict = Depends(current_user)):
+def channel_messages(channel_id: str, before: int | None = None, limit: int = 50,
+                     before_id: str = Query("", alias="beforeId", max_length=64), user: dict = Depends(current_user)):
     limit = max(1, min(limit, 100))
     if not query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NULL", (channel_id,)):
         raise ApiError(404, "noChannel", "Нет такого канала")
+    boundary, cursor = history_boundary(before, before_id)
     rows = query(
-        "SELECT * FROM messages WHERE channel_id = ? AND created_at < ? ORDER BY created_at DESC LIMIT ?",
-        (channel_id, before or now_ms() + 1, limit),
+        f"SELECT * FROM messages WHERE channel_id = ? AND {boundary} ORDER BY created_at DESC, id DESC LIMIT ?",
+        (channel_id, *cursor, limit),
     )
     return messages_out(list(reversed(rows)), "messages")
 

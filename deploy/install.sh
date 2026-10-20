@@ -198,7 +198,7 @@ apt_ready=0
 apt_install() {
   command -v apt-get >/dev/null || return 1
   if (( ! apt_ready )); then
-    DEBIAN_FRONTEND=noninteractive apt-get update -q
+    DEBIAN_FRONTEND=noninteractive apt-get update -q || return
     apt_ready=1
   fi
   DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends "$@"
@@ -211,10 +211,10 @@ env_get() {
 }
 env_set() {
   local file=$1 tmp
-  tmp=$(mktemp "$file.XXXXXX")
+  tmp=$(mktemp "$file.XXXXXX") || return
   K=$2 V=$3 awk 'index($0, ENVIRON["K"] "=") == 1 { if (!done) print ENVIRON["K"] "=" ENVIRON["V"]; done = 1; next }
-    { print } END { if (!done) print ENVIRON["K"] "=" ENVIRON["V"] }' "$file" >"$tmp"
-  chmod 600 "$tmp"
+    { print } END { if (!done) print ENVIRON["K"] "=" ENVIRON["V"] }' "$file" >"$tmp" || { rm -f "$tmp"; return 1; }
+  chmod 600 "$tmp" || return
   mv -f "$tmp" "$file"
 }
 
@@ -751,15 +751,17 @@ screen_summary() {
 }
 
 # ---------------------------------------------------------------------------------------------- install steps
+# run/spin capture exit codes in conditionals, which disables errexit inside the steps and their helpers.
+# Required commands must propagate failures explicitly, even with set -e enabled.
 
 step_docker() {
-  command -v curl >/dev/null || apt_install curl ca-certificates
+  command -v curl >/dev/null || apt_install curl ca-certificates || return
   if ! command -v docker >/dev/null; then
     progress sub "Скачиваем установщик Docker"
-    fetch https://get.docker.com "$GOMEX_TMP/get-docker.sh" 60
+    fetch https://get.docker.com "$GOMEX_TMP/get-docker.sh" 60 || return
     progress sub "Ставим пакеты Docker"
     # Without systemd it starts dockerd itself, which must not inherit the lock (main) and hold it for good.
-    sh "$GOMEX_TMP/get-docker.sh" 9>&-
+    sh "$GOMEX_TMP/get-docker.sh" 9>&- || return
   fi
   progress sub "Запускаем Docker"
   systemctl enable --now docker 2>/dev/null || true
@@ -770,17 +772,17 @@ step_docker() {
 # Web, TURN over TLS and UDP on 443, LiveKit's TCP fallback and media ports;
 # SSH rate-limited ("limit": the 6th new connection within 30 s is refused) on whatever port sshd listens on.
 step_firewall() {
-  command -v ufw >/dev/null || { progress sub "Ставим ufw"; apt_install ufw; }
-  ufw default deny incoming
-  ufw default allow outgoing
+  command -v ufw >/dev/null || { progress sub "Ставим ufw"; apt_install ufw || return; }
+  ufw default deny incoming || return
+  ufw default allow outgoing || return
   local rule port ports
   progress sub "Открываем порты 80, 443 и для звонков"
-  for rule in 80/tcp 443/tcp 443/udp 7881/tcp 50000:60000/udp; do ufw allow "$rule"; done
-  mkdir -p /run/sshd
+  for rule in 80/tcp 443/tcp 443/udp 7881/tcp 50000:60000/udp; do ufw allow "$rule" || return; done
+  mkdir -p /run/sshd || return
   ports=$(sshd -T 2>/dev/null | awk '$1 == "port" { print $2 }' || true)
   progress sub "Ограничиваем частоту входов по SSH"
   for port in ${ports:-22}; do
-    ufw limit "$port/tcp"
+    ufw limit "$port/tcp" || return
     ufw delete allow "$port/tcp" >/dev/null 2>&1 || true
     ufw delete allow "$port" >/dev/null 2>&1 || true
   done
@@ -794,21 +796,21 @@ step_firewall() {
 step_ssh() {
   local conf=/etc/ssh/sshd_config.d/00-gomex-key-only.conf
   progress sub "Выключаем вход по паролю"
-  mkdir -p /run/sshd
+  mkdir -p /run/sshd || return
   printf '%s\n' '# Written by the Gomex installer: log in with an SSH key only.' \
-    'PasswordAuthentication no' 'KbdInteractiveAuthentication no' 'PermitRootLogin prohibit-password' >"$conf"
+    'PasswordAuthentication no' 'KbdInteractiveAuthentication no' 'PermitRootLogin prohibit-password' >"$conf" || return
   progress sub "Проверяем настройки sshd"
   if ! sshd -t; then
     rm -f "$conf"
     return 1
   fi
-  systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true
+  systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null
 }
 
 step_files() {
   local tgz=$GOMEX_TMP/gomex.tar.gz stage=$GOMEX_TMP/release f src got=0
   if [[ -f $TARBALL_SRC ]]; then
-    cp "$TARBALL_SRC" "$tgz"
+    cp "$TARBALL_SRC" "$tgz" || return
     sha256_ok "$tgz" "$TARBALL_SHA256" && got=1
   else
     # The first source that gives the pinned bytes; a mirror can't slip anything else in.
@@ -821,27 +823,27 @@ step_files() {
   fi
   (( got )) || { echo "No source gave the release's tarball with SHA-256 $TARBALL_SHA256"; return 1; }
   progress sub "Раскладываем файлы"
-  mkdir -p "$stage"
-  tar -xzf "$tgz" -C "$stage" --strip-components=1 --no-same-owner
+  mkdir -p "$stage" || return
+  tar -xzf "$tgz" -C "$stage" --strip-components=1 --no-same-owner || return
   for f in deploy/docker-compose.yml deploy/Caddyfile deploy/backup.sh deploy/livekit.yaml.tmpl; do
     [[ -f $stage/$f ]] || { echo "Release has no $f"; return 1; }
   done
-  mkdir -p "$GOMEX_DIR/deploy" "$GOMEX_DIR/landing"
+  mkdir -p "$GOMEX_DIR/deploy" "$GOMEX_DIR/landing" || return
   # Caddy reads the Caddyfile once: an update that changes it needs Caddy recreated (step_up).
   if [[ -f $GOMEX_DIR/deploy/Caddyfile ]] && ! cmp -s "$stage/deploy/Caddyfile" "$GOMEX_DIR/deploy/Caddyfile"; then
-    touch "$GOMEX_TMP/caddyfile-changed"
+    touch "$GOMEX_TMP/caddyfile-changed" || return
   fi
-  install -m 644 "$stage/deploy/docker-compose.yml" "$stage/deploy/Caddyfile" "$stage/deploy/livekit.yaml.tmpl" "$GOMEX_DIR/deploy/"
-  install -m 755 "$stage/deploy/backup.sh" "$GOMEX_DIR/deploy/"
+  install -m 644 "$stage/deploy/docker-compose.yml" "$stage/deploy/Caddyfile" "$stage/deploy/livekit.yaml.tmpl" "$GOMEX_DIR/deploy/" || return
+  install -m 755 "$stage/deploy/backup.sh" "$GOMEX_DIR/deploy/" || return
   return 0
 }
 
 # replace_dir SRC DIR: DIR ends up with exactly SRC's files, so none a release drops linger. DIR itself stays: Caddy's
 # bind mount holds on to that folder, and a new one renamed in at the same path would stay invisible to it.
 replace_dir() {
-  mkdir -p "$2"
-  find "$2" -mindepth 1 -delete
-  cp -R "$1/." "$2/"
+  mkdir -p "$2" || return
+  find "$2" -mindepth 1 -delete || return
+  cp -R "$1/." "$2/" || return
   chmod -R a+rX "$2"
 }
 
@@ -935,9 +937,9 @@ write_landing() {
 .$b { display: block; margin-top: 28px; text-align: center; }" ;;
   esac
 
-  rm -rf "$dir"
-  mkdir -p "$dir"
-  cat >"$dir/index.html" <<EOF
+  rm -rf "$dir" || return
+  mkdir -p "$dir" || return
+  cat >"$dir/index.html" <<EOF || return
 <!doctype html>
 <html lang="ru">
 <head>
@@ -970,7 +972,7 @@ EOF
 }
 
 step_config() {
-  cd "$GOMEX_DIR/deploy"
+  cd "$GOMEX_DIR/deploy" || return
   progress sub "Секреты и настройки"
   if [[ ! -f .env ]]; then
     (umask 077 && cat >.env <<EOF
@@ -983,44 +985,46 @@ APP_SECRET=$(rand 48)
 LIVEKIT_API_KEY=API$(rand 12)
 LIVEKIT_API_SECRET=$(rand 40)
 EOF
-    )
+    ) || return
   fi
-  chmod 600 .env
-  env_set .env DOMAIN "$DOMAIN"
-  env_set .env TURN_HOST "$TURN_HOST"
-  [[ ${NAME_SET:-0} == 1 ]] && env_set .env SERVER_NAME "'$SERVER_NAME'"
+  chmod 600 .env || return
+  env_set .env DOMAIN "$DOMAIN" || return
+  env_set .env TURN_HOST "$TURN_HOST" || return
+  if [[ ${NAME_SET:-0} == 1 ]]; then env_set .env SERVER_NAME "'$SERVER_NAME'" || return; fi
   # Which images run: this release's, pinned by digest.
-  env_set .env GOMEX_REGISTRY "$REGISTRY"
-  env_set .env GOMEX_VERSION "$RELEASE_VERSION"
-  env_set .env GOMEX_APP_DIGEST "$APP_DIGEST"
-  env_set .env GOMEX_CADDY_DIGEST "$CADDY_DIGEST"
+  env_set .env GOMEX_REGISTRY "$REGISTRY" || return
+  env_set .env GOMEX_VERSION "$RELEASE_VERSION" || return
+  env_set .env GOMEX_APP_DIGEST "$APP_DIGEST" || return
+  env_set .env GOMEX_CADDY_DIGEST "$CADDY_DIGEST" || return
 
   # LiveKit's config comes from .env, so its keys always match the app's.
   local s key
   progress sub "Настройки звонков"
-  s=$(<livekit.yaml.tmpl)
+  s=$(<livekit.yaml.tmpl) || return
   for key in DOMAIN TURN_HOST LIVEKIT_API_KEY LIVEKIT_API_SECRET; do
     s=${s//"{{$key}}"/$(env_get .env "$key")}
   done
   [[ $s != *'{{'* ]] || { echo "livekit.yaml.tmpl: unknown placeholder"; return 1; }
-  if [[ -f livekit.yaml ]] && [[ $(<livekit.yaml) != "$s" ]]; then touch "$GOMEX_TMP/livekit-changed"; fi
-  (umask 077 && printf '%s\n' "$s" >livekit.yaml)
+  if [[ -f livekit.yaml ]] && [[ $(<livekit.yaml) != "$s" ]]; then touch "$GOMEX_TMP/livekit-changed" || return; fi
+  (umask 077 && printf '%s\n' "$s" >livekit.yaml) || return
 
-  mkdir -p data caddy-data caddy-config sites routes/app
+  mkdir -p data caddy-data caddy-config sites routes/app || return
   # The app runs as uid 10001 in its container; only it may touch the data.
-  chown -R 10001:10001 data
-  chmod 700 data
+  chown -R 10001:10001 data || return
+  chmod 700 data || return
 
   # The cover page's look; step_up writes the page.
   if [[ ! $(env_get .env LANDING_SEED) =~ ^[0-9]{1,10}$ ]]; then
-    env_set .env LANDING_SEED "$(((RANDOM << 15) | RANDOM))"
+    env_set .env LANDING_SEED "$(((RANDOM << 15) | RANDOM))" || return
   fi
 }
 
 # Nightly backup at 04:30 server time, a systemd timer (a fresh server may have no cron). Log: journalctl -u gomex-backup
 step_backups() {
+  command -v rsync >/dev/null || apt_install rsync || return
+  command -v flock >/dev/null || apt_install util-linux || return
   progress sub "Служба и таймер на 04:30"
-  cat >/etc/systemd/system/gomex-backup.service <<EOF
+  cat >/etc/systemd/system/gomex-backup.service <<EOF || return
 [Unit]
 Description=Gomex nightly backup
 
@@ -1028,7 +1032,7 @@ Description=Gomex nightly backup
 Type=oneshot
 ExecStart=$GOMEX_DIR/deploy/backup.sh
 EOF
-  cat >/etc/systemd/system/gomex-backup.timer <<'EOF'
+  cat >/etc/systemd/system/gomex-backup.timer <<'EOF' || return
 [Unit]
 Description=Gomex nightly backup at 04:30
 
@@ -1039,25 +1043,25 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 EOF
-  systemctl daemon-reload
+  systemctl daemon-reload || return
   systemctl enable --now gomex-backup.timer
 }
 
 step_pull() {
-  cd "$GOMEX_DIR/deploy"
+  cd "$GOMEX_DIR/deploy" || return
   progress sub "Образы приложения, звонков и веб-сервера"
   # The desktop app shows the last line of this; the plain installer keeps it quiet.
   if [[ ${GOMEX_PROGRESS:-} == 1 ]]; then docker compose pull; else docker compose pull --quiet; fi
 }
 
 step_up() {
-  cd "$GOMEX_DIR/deploy"
+  cd "$GOMEX_DIR/deploy" || return
   progress sub "Запускаем контейнеры"
-  docker compose up -d --remove-orphans
+  docker compose up -d --remove-orphans || return
   # Bind-mounted single files: an update swaps in new files the running containers never see.
-  [[ -f $GOMEX_TMP/caddyfile-changed ]] && docker compose up -d --force-recreate --no-deps caddy
+  if [[ -f $GOMEX_TMP/caddyfile-changed ]]; then docker compose up -d --force-recreate --no-deps caddy || return; fi
   # Restarting LiveKit drops calls in progress, so only when its config changed.
-  [[ -f $GOMEX_TMP/livekit-changed ]] && docker compose up -d --force-recreate --no-deps livekit
+  if [[ -f $GOMEX_TMP/livekit-changed ]]; then docker compose up -d --force-recreate --no-deps livekit || return; fi
   local i
   progress sub "Ждём ответ приложения"
   for i in $(seq 1 90); do
@@ -1068,7 +1072,7 @@ step_up() {
   # Once the app answers: the cover page carries the name it has. A site of one's own in landing/site, marked by a
   # file named .custom there, stays as it is.
   progress sub "Пишем обложку сайта"
-  [[ -e $GOMEX_DIR/landing/site/.custom ]] || write_landing "$(env_get .env LANDING_SEED)"
+  [[ -e $GOMEX_DIR/landing/site/.custom ]] || write_landing "$(env_get .env LANDING_SEED)" || return
   # Images of earlier releases.
   docker image prune -f
 }
@@ -1201,7 +1205,7 @@ restore_all() {
   [[ -d $BACKUPS ]] || die "Бэкапов нет: $BACKUPS"
   # Newest first; only folders that hold a database count.
   while IFS= read -r name; do
-    [[ -f $BACKUPS/$name/hangout.db ]] && names+=("$name")
+    [[ $name != .* && -f $BACKUPS/$name/hangout.db ]] && names+=("$name")
   done < <(find "$BACKUPS" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -r)
   (( ${#names[@]} )) || die "В $BACKUPS нет ни одной копии"
 

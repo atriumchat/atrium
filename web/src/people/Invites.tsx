@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@heroui/react';
 import { api } from '../api';
-import { showError, useStore } from '../store';
+import { getSessionEpoch, showError, useStore } from '../store';
 import { useT } from '../i18n';
 import { inviteLink, prettyCode } from './invite';
 import type { MyInvite } from '../types';
@@ -15,14 +15,15 @@ const BANNER_HIDDEN = 'gomex_invite_banner_hidden';
 
 // Your invite, kept between screens so the banner and the window show it at once instead of popping in after
 // a request; refetched when someone signs up with it (inviteVersion) or after a reset.
-let cached: { invite: MyInvite; version: number } | null = null;
+let cached: { invite: MyInvite; version: number; epoch: number } | null = null;
 
 /** Fetch your invite ahead of time, so the banner is there when home first shows. */
 export function prefetchInvite() {
-  if (cached) return;
+  const epoch = getSessionEpoch();
+  if (cached?.epoch === epoch) return;
   const version = useStore.getState().inviteVersion;
   api.myInvite().then(
-    (i) => (cached = { invite: i, version }),
+    (i) => { if (epoch === getSessionEpoch()) cached = { invite: i, version, epoch }; },
     () => undefined,
   );
 }
@@ -30,26 +31,30 @@ export function prefetchInvite() {
 export function useMyInvite(enabled = true) {
   const { t } = useT();
   const version = useStore((s) => s.inviteVersion);
-  const [invite, setInvite] = useState<MyInvite | null>(cached?.invite ?? null);
+  const userId = useStore((s) => s.me?.id);
+  const epoch = getSessionEpoch();
+  const [value, setValue] = useState<{ invite: MyInvite; epoch: number } | null>(cached?.epoch === epoch ? cached : null);
   useEffect(() => {
     if (!enabled) return;
-    if (cached && cached.version === version) {
-      setInvite(cached.invite);
+    if (cached && cached.epoch === epoch && cached.version === version) {
+      setValue(cached);
       return;
     }
     api.myInvite().then(
       (i) => {
-        cached = { invite: i, version };
-        setInvite(i);
+        if (epoch !== getSessionEpoch()) return;
+        cached = { invite: i, version, epoch };
+        setValue({ invite: i, epoch });
       },
-      (e) => (cached ? undefined : showError(e instanceof Error ? e.message : t('people.invite.loadFailed'))),
+      (e) => { if (epoch === getSessionEpoch() && cached?.epoch !== epoch) showError(e instanceof Error ? e.message : t('people.invite.loadFailed')); },
     );
-  }, [version, enabled, t]);
+  }, [version, enabled, t, userId, epoch]);
   const replace = (i: MyInvite) => {
-    cached = { invite: i, version };
-    setInvite(i);
+    if (epoch !== getSessionEpoch()) return;
+    cached = { invite: i, version, epoch };
+    setValue({ invite: i, epoch });
   };
-  return [invite, replace] as const;
+  return [value?.epoch === epoch ? value.invite : null, replace] as const;
 }
 
 /**

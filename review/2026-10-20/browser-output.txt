@@ -1,0 +1,17 @@
+Browser tab: 1, Title: "Gomex review reproduction", URL: "http://127.0.0.1:5190/review-harness.html".
+1 AXWebArea Gomex review reproduction, URL: 127.0.0.1:5190/review-harness.html
+	2 heading Gomex review reproduction, Value: 1
+		3 text Gomex review reproduction
+	4 button Run reproductions, ID: run
+	5 text entry area (settable) Description: PTT typing test, ID: ptt-editor
+	6 text Running actual source modules with controlled network responses
+DELETED_MESSAGE_AFTER_RECONNECT: ["kept","deleted-offline"]
+NETWORK_CHECK_FAILURE: {"rejected":"simulated network failure"}
+ACCOUNT_SWITCH_CACHE: {"me":"B","dms":["private-A"],"messages":["private-A"],"homeView":"private-A"}
+RECONNECT_METADATA: {"channels":["old-channel"],"user":"Old name","blocked":[]}
+HANGUP_WHILE_REPORT_STALLED: {"ui":"idle","roomInStore":null,"disconnectCalls":0,"waitingForReport":true}
+HANGUP_AFTER_REPORT_FINISHES: {"disconnectCalls":1}
+DESKTOP_PTT_WHILE_TYPING: {"focused":"TEXTAREA","pttDown":true,"micStates":[true]}
+DONE: true
+
+The focused UI element is 5 text entry area (settable) Description: PTT typing test, ID: ptt-editor

@@ -103,7 +103,12 @@ http://app.{$DOMAIN} {
 # The app: LiveKit's signalling (its client connects to wss://HOST/rtc), everything else to the Python server.
 (app) {
 	@livekit path /rtc /rtc/*
-	reverse_proxy @livekit 127.0.0.1:7880
+	route @livekit {
+		forward_auth 127.0.0.1:8000 {
+			uri /api/rtc/authorize
+		}
+		reverse_proxy 127.0.0.1:7880
+	}
 	reverse_proxy 127.0.0.1:8000
 }
 

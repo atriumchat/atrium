@@ -22,11 +22,12 @@ async function describe(room: Room): Promise<{ path?: CallPath; rtt?: number }> 
 
 /** One try at a call in a room of one: normally, or forced through the relay on 443. */
 export async function attempt(relayOnly: boolean): Promise<Result> {
-  const { token, url } = await api.checkToken();
-  const room = new Room();
   const started = performance.now();
+  let room: Room | undefined;
   let timer = 0;
   try {
+    const { token, url } = await api.checkToken();
+    room = new Room();
     await Promise.race([
       room.connect(url, token, { autoSubscribe: false, rtcConfig: relayOnly ? { iceTransportPolicy: 'relay' } : undefined }),
       new Promise((_, reject) => (timer = window.setTimeout(() => reject(new Error(t('voice.check.timeout'))), 15_000))),
@@ -39,7 +40,7 @@ export async function attempt(relayOnly: boolean): Promise<Result> {
     return { state: 'fail', error: e instanceof Error ? e.message : String(e) };
   } finally {
     clearTimeout(timer);
-    await room.disconnect();
+    await room?.disconnect().catch(() => {});
   }
 }
 

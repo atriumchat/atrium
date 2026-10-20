@@ -20,6 +20,18 @@ export const useStore = create<State>(() => ({
   ...voiceSlice(),
 }));
 
+let sessionEpoch = 0;
+export const getSessionEpoch = () => sessionEpoch;
+
+export function resetStore() {
+  sessionEpoch++;
+  const room = useStore.getState().room;
+  room?.localParticipant.trackPublications.forEach((publication) => publication.track?.stop());
+  void room?.disconnect().catch(() => {});
+  const { isMobile, siteUpdate, desktopUpdate, voicePrefs } = useStore.getState();
+  useStore.setState({ ...shellSlice(), ...accountSlice(), ...peopleSlice(), ...chatSlice(), ...voiceSlice(), isMobile, siteUpdate, desktopUpdate, voicePrefs });
+}
+
 export function set(partial: Partial<State> | ((state: State) => Partial<State>)) {
   useStore.setState(partial);
 }

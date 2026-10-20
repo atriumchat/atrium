@@ -1,0 +1,6 @@
+BLOCKED_VOICE: HTTP 200; signed roomJoin token for blocked DM, valid for 21610 seconds
+STALE_RESET_LINK: password change HTTP 200 ; old link check HTTP 200 ; old link changes password HTTP 200
+ONE_TIME_RECOVERY_RACE: two simultaneous uses of the SAME key: [200, 200] ; returned token validity: [200, 401]
+PAGINATION_COLLISION: 51 stored, first page 50 ; older page 0 ; one message unreachable
+LOGIN_RESET_RACE: password validated before reset; login completed after reset HTTP 200 ; resulting token HTTP 200
+VOICE_SESSION_REVOCATION: application token HTTP 401; voice JWT remains signed/unexpired; LiveKit removal calls: 0

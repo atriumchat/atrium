@@ -1,0 +1,123 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Gomex regression checks</title>
+<style>body{font:15px system-ui;padding:24px;max-width:960px}pre{white-space:pre-wrap;line-height:1.6;padding:20px;background:#f3f5f7}button,textarea{padding:8px}</style>
+<h1>Gomex regression checks</h1><p>Actual source modules; controlled network, room and desktop IPC. No real microphone or SSH connection.</p>
+<button id="run">Run checks</button> <textarea id="editor" aria-label="PTT typing test"></textarea><pre id="output">Ready</pre>
+<script>window.gomexDesktop={ptt:{watch(){},onChange(fn){window.pttEvent=fn;}}};</script>
+<script type="module">
+import {useStore,initStore,resetStore,mergeMessages,refreshFriends,refreshDms} from '/src/store/index.ts';
+import {api} from '/src/api.ts';
+import {useMyInvite} from '/src/people/Invites.tsx';
+import {createElement} from 'react';
+import {createRoot} from 'react-dom/client';
+import {flushSync} from 'react-dom';
+import {ensureHistory,refreshNewest} from '/src/chat/history.ts';
+import {leaveVoice,__setReporter} from '/src/voice/voice.regression.ts';
+import {startQualityReports} from '/src/voice/report.ts';
+import {attempt} from '/src/voice/ConnectionCheck.tsx';
+import {__catchUp} from '/src/socket.regression.ts';
+const output=document.getElementById('output');
+const message=(id,createdAt)=>({id,channelId:'channel',userId:'author',content:id,createdAt,attachments:[],reactions:[],mentions:[],mentionsAll:false,replyTo:null});
+const bootstrap=id=>({me:{id,name:id},users:[{id,name:id}],channels:[],serverName:'Fixture',canManageChannels:false,mutedChannels:[],unread:{},mentions:{},blocked:[]});
+const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
+const assert=(value,label)=>{if(!value)throw new Error(label);};
+const equal=(actual,expected)=>assert(JSON.stringify(actual)===JSON.stringify(expected),JSON.stringify({actual,expected}));
+let passed=0,failed=0;
+async function check(label,fn){try{await fn();output.textContent+='\nPASS '+label;passed++;}catch(error){output.textContent+='\nFAIL '+label+': '+error.stack;failed++;}}
+const ids=()=>useStore.getState().messages.channel?.map(m=>m.id);
+document.getElementById('run').onclick=async()=>{
+ document.getElementById('run').disabled=true;passed=failed=0;output.textContent='Running source regression checks';
+ const saved={...api};
+ try{
+ initStore(bootstrap('A'));
+ await check('Reconnect removes known messages deleted offline; keeps concurrent arrivals',async()=>{
+  useStore.setState({messages:{channel:[message('kept',100),message('deleted',200)]},hasMore:{channel:false}});
+  const response=deferred();api.messages=()=>response.promise;
+  const pending=refreshNewest('channel','channel');
+  mergeMessages('channel',[message('arrived',300)]);
+  response.resolve([message('kept',100)]);await pending;
+  equal(ids(),['kept','arrived']);
+ });
+ await check('Empty refresh removes known stale history',async()=>{
+  api.messages=async()=>[];await refreshNewest('channel','channel');equal(ids(),[]);
+ });
+ await check('Full refresh preserves older pages on overlap',async()=>{
+  const page=Array.from({length:50},(_,i)=>message('item-'+i,100+i));
+  useStore.setState({messages:{channel:[message('older',1),...page]},hasMore:{channel:false}});
+  api.messages=async()=>page;await refreshNewest('channel','channel');
+  assert(ids().length===51&&ids()[0]==='older','lost older page');
+ });
+ await check('More than a page missed resets the gap',async()=>{
+  useStore.setState({messages:{channel:[message('outdated',1)]},hasMore:{channel:false}});
+  api.messages=async()=>Array.from({length:50},(_,i)=>message('new-'+i,100+i));
+  await refreshNewest('channel','channel');assert(ids().length===50&&!ids().includes('outdated'),'gap retained');assert(useStore.getState().hasMore.channel,'older page unavailable');
+ });
+ await check('Equal timestamps use stable ID order',async()=>{
+  useStore.setState({messages:{}});mergeMessages('channel',[message('c',1),message('b',1)]);mergeMessages('channel',[message('a',1)]);equal(ids(),['a','b','c']);
+ });
+ await check('Network check failure returns a failed result',async()=>{
+  api.checkToken=async()=>{throw new Error('simulated network loss');};
+  equal(await attempt(false),{state:'fail',error:'simulated network loss'});
+ });
+ await check('Account switch clears private caches and stops old media',async()=>{
+  let stopped=0,disconnected=0;
+  useStore.setState({room:{localParticipant:{trackPublications:new Map([['mic',{track:{stop(){stopped++;}}}]])},disconnect:async()=>{disconnected++;}},dms:[{id:'private-A'}],messages:{'private-A':[message('private',1)]},homeView:'private-A'});
+  initStore(bootstrap('B'));
+  equal({dms:useStore.getState().dms,messages:useStore.getState().messages,home:useStore.getState().homeView,stopped,disconnected},{dms:[],messages:{},home:'friends',stopped:1,disconnected:1});
+ });
+ await check('Late history/friends/DM responses cannot populate another account',async()=>{
+  const history=deferred(),friends=deferred(),dms=deferred();
+  api.dmMessages=()=>history.promise;api.friends=()=>friends.promise;api.dms=()=>dms.promise;
+  const jobs=[ensureHistory('private-B','dm'),refreshFriends(),refreshDms()];
+  initStore(bootstrap('C'));
+  history.resolve([message('secret-B',1)]);friends.resolve([{id:'friend-B'}]);dms.resolve([{id:'dm-B'}]);await Promise.all(jobs);
+  equal({messages:useStore.getState().messages,friends:useStore.getState().friends,dms:useStore.getState().dms},{messages:{},friends:[],dms:[]});
+ });
+ await check('Mounted invite hook hides the previous account invite immediately',async()=>{
+  api.myInvite=async()=>({code:'private-C',invited:[],limit:5});
+  const container=document.createElement('div');document.body.append(container);
+  const root=createRoot(container);
+  function Probe(){const [invite]=useMyInvite();return createElement('span',null,invite?.code??'empty');}
+  try{
+   flushSync(()=>root.render(createElement(Probe)));
+   await new Promise(resolve=>setTimeout(resolve,0));
+   equal(container.textContent,'private-C');
+   api.myInvite=()=>new Promise(()=>{});
+   flushSync(()=>initStore(bootstrap('D')));
+   equal(container.textContent,'empty');
+  }finally{root.unmount();container.remove();initStore(bootstrap('C'));}
+ });
+ await check('Reconnect applies channels, users, blocks and status from bootstrap',async()=>{
+  useStore.setState({channels:[{id:'old',kind:'text',name:'old'}],users:{C:{id:'C',name:'old'}},blocked:[],hasMore:{},messages:{}});
+  api.bootstrap=async()=>({...bootstrap('C'),channels:[{id:'new',kind:'text',name:'new'}],users:[{id:'C',name:'updated'}],blocked:['blocked'],myStatus:'dnd',myStatusText:'busy'});
+  api.friends=async()=>[];api.dms=async()=>[];
+  await __catchUp();
+  const s=useStore.getState();equal({channels:s.channels.map(c=>c.id),name:s.users.C.name,blocked:s.blocked,status:s.myStatus,text:s.myStatusText},{channels:['new'],name:'updated',blocked:['blocked'],status:'dnd',text:'busy'});
+ });
+ await check('Hangup stops tracks and disconnects while telemetry remains stalled',async()=>{
+  const telemetry=deferred();let disconnected=0,stopped=0,reporting=false;
+  api.callQuality=()=>{reporting=true;return telemetry.promise;};
+  const room={engine:{},localParticipant:{getTrackPublication:()=>undefined,trackPublications:new Map([['mic',{track:{stop(){stopped++;}}}]])},disconnect:async()=>{disconnected++;}};
+  useStore.setState({room,voiceChannelId:'call',voiceStatus:'connected',muted:true,voiceState:[]});
+  __setReporter(startQualityReports(room,'call'));
+  await Promise.race([leaveVoice({silent:true}),new Promise((_,reject)=>setTimeout(()=>reject(new Error('hangup blocked')),500))]);
+  await Promise.resolve();equal({disconnected,stopped,status:useStore.getState().voiceStatus,reporting},{disconnected:1,stopped:1,status:'idle',reporting:true});
+  telemetry.resolve({ok:true});
+ });
+ await check('Desktop typing keys do not key the mic; F13 and key release work',async()=>{
+  const mic=[];
+  const room={localParticipant:{setMicrophoneEnabled:async live=>mic.push(live),getTrackPublication:()=>undefined,trackPublications:new Map()},disconnect:async()=>{}};
+  const oldHasFocus=document.hasFocus;document.hasFocus=()=>true;
+  try{
+   useStore.setState({room,voiceChannelId:'call',voiceStatus:'connected',voicePrefs:{ptt:true,pttKey:'KeyV',noise:'browser'},muted:false,deafened:false,pttDown:false});
+   const editor=document.getElementById('editor');editor.focus();window.pttEvent(true);await Promise.resolve();
+   equal({pttDown:useStore.getState().pttDown,mic},{pttDown:false,mic:[]});
+   useStore.setState({voicePrefs:{ptt:true,pttKey:'F13',noise:'browser'}});window.pttEvent(true);await Promise.resolve();
+   assert(useStore.getState().pttDown&&mic.includes(true),'F13 failed');
+   window.pttEvent(false);await Promise.resolve();assert(!useStore.getState().pttDown&&mic.at(-1)===false,'release failed');
+  }finally{document.hasFocus=oldHasFocus;useStore.setState({room:null,voiceChannelId:null,voiceStatus:'idle'});}
+ });
+ }finally{Object.assign(api,saved);resetStore();document.getElementById('run').disabled=false;}
+ output.textContent+='\n\nRESULT: '+passed+' passed, '+failed+' failed';
+ document.body.dataset.result=failed?'fail':'pass';
+};
+</script></html>

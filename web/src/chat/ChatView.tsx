@@ -1,7 +1,7 @@
 import { Fragment, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type DragEvent, type Ref } from 'react';
 import { Button, Dropdown, Input, Label, TextField } from '@heroui/react';
 import { api } from '../api';
-import { addDm, mergeMessages, openFriends, openPicker, PAGE_SIZE, refreshDms, setEditing, setHasMore, setReplyingTo, showError, useStore, voiceMembers } from '../store';
+import { addDm, getSessionEpoch, mergeMessages, openFriends, openPicker, PAGE_SIZE, refreshDms, setEditing, setHasMore, setReplyingTo, showError, useStore, voiceMembers } from '../store';
 import { deleteMessage, editMessage, sendMessage, sendTyping, toggleReaction } from '../socket';
 import { joinVoice, leaveVoice } from '../voice/voice';
 import { dayDivider, fullStamp, messageStamp, sameDay, timeOf } from './format';
@@ -42,7 +42,7 @@ function isEmojiOnly(text: string) {
 /** A text channel or a direct-message conversation; both render with the same chat. */
 export type Conversation = { id: string; kind: 'channel' | 'dm'; title: string; userId?: string };
 
-const fetchHistory = (c: Conversation, before?: number) => (c.kind === 'dm' ? api.dmMessages(c.id, before) : api.messages(c.id, before));
+const fetchHistory = (c: Conversation, before: Message) => (c.kind === 'dm' ? api.dmMessages(c.id, before.createdAt, before.id) : api.messages(c.id, before.createdAt, before.id));
 
 export function ChatView({ conversation }: { conversation: Conversation }) {
   const { t } = useT();
@@ -98,15 +98,17 @@ export function ChatView({ conversation }: { conversation: Conversation }) {
   async function loadOlder() {
     const oldest = messages?.[0];
     if (!oldest || loadingOlder) return;
+    const epoch = getSessionEpoch();
     setLoadingOlder(true);
     try {
-      const list = await fetchHistory(conversation, oldest.createdAt);
+      const list = await fetchHistory(conversation, oldest);
+      if (epoch !== getSessionEpoch()) return;
       const el = scrollRef.current;
       restoreFromBottom.current = el ? el.scrollHeight - el.scrollTop : null;
       mergeMessages(channel.id, list);
       setHasMore(channel.id, list.length === PAGE_SIZE);
     } catch (e) {
-      showError(t('chat.loadFailed', { error: e instanceof Error ? e.message : String(e) }));
+      if (epoch === getSessionEpoch()) showError(t('chat.loadFailed', { error: e instanceof Error ? e.message : String(e) }));
     } finally {
       setLoadingOlder(false);
     }

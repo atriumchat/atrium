@@ -121,10 +121,11 @@ def public_user(row: dict) -> dict:
     }
 
 
-def issue_token(user_id: str, scope: str = "api") -> str:
+def issue_token(user_id: str, scope: str = "api", *, version: int | None = None) -> str:
     now = int(time.time())
-    rows = query("SELECT token_version FROM users WHERE id = ?", (user_id,))
-    version = rows[0]["token_version"] if rows else 0
+    if version is None:
+        rows = query("SELECT token_version FROM users WHERE id = ?", (user_id,))
+        version = rows[0]["token_version"] if rows else 0
     return jwt.encode({"sub": user_id, "scope": scope, "v": version, "iat": now, "exp": now + TOKEN_TTL}, APP_SECRET, algorithm="HS256")
 
 
@@ -142,7 +143,7 @@ def user_from_token(token: str | None, scope: str = "api") -> dict | None:
     # A token from before the last password change or recovery no longer counts.
     if not rows or rows[0]["token_version"] != payload.get("v", 0):
         return None
-    return public_user(rows[0])
+    return {**public_user(rows[0]), "_authVersion": rows[0]["token_version"]}
 
 
 def current_user(authorization: str = Header(default="")) -> dict:
@@ -161,10 +162,10 @@ def media_user(request: Request) -> dict:
     return user
 
 
-def set_media_cookie(request: Request, response: Response, user_id: str) -> None:
+def set_media_cookie(request: Request, response: Response, user_id: str, *, version: int | None = None) -> None:
     response.set_cookie(
         MEDIA_COOKIE,
-        issue_token(user_id, scope="media"),
+        issue_token(user_id, scope="media", version=version),
         max_age=TOKEN_TTL,
         path="/api/",
         httponly=True,

@@ -1,0 +1,36 @@
+
+> hangout-web@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 1903 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/assets/pngWorker-CJGljHHv.js                            0.31 kB
+dist/index.html                                              1.99 kB │ gzip:   0.80 kB
+dist/assets/onest-cyrillic-ext-wght-normal-DOFToQv1.woff2   10.54 kB
+dist/assets/onest-vietnamese-wght-normal-BBxOatbv.woff2     12.40 kB
+dist/assets/onest-cyrillic-wght-normal-DayYxulF.woff2       15.86 kB
+dist/assets/onest-symbols-wght-normal-DxQzqQfC.woff2        18.16 kB
+dist/assets/onest-math-wght-normal-Bl4ZGkZl.woff2           25.48 kB
+dist/assets/onest-latin-ext-wght-normal-QAhDxQuo.woff2      28.45 kB
+dist/assets/onest-latin-wght-normal-Dun_Rd-l.woff2          33.76 kB
+dist/assets/workletProcessor-CTUsFnsu.js                    64.48 kB
+dist/assets/rnnoise-lVVwgm0Y.wasm                          152.65 kB │ gzip: 114.04 kB
+dist/assets/rnnoise_simd-BsE3sPy6.wasm                     157.23 kB │ gzip: 115.85 kB
+dist/assets/vendor-D8iHIiBm.css                              3.98 kB │ gzip:   1.44 kB
+dist/assets/index-8zhbRhfu.css                             505.61 kB │ gzip:  54.17 kB
+dist/assets/rolldown-runtime-XKyaHtl9.js                     0.72 kB │ gzip:   0.42 kB
+dist/assets/vendor-CA5gJTwG.js                              82.02 kB │ gzip:  24.88 kB
+dist/assets/react-CmslwXSQ.js                              206.79 kB │ gzip:  64.82 kB
+dist/assets/heroui-DM2T8Z9X.js                             329.63 kB │ gzip: 100.23 kB
+dist/assets/index-BEt07_jA.js                              380.10 kB │ gzip: 103.33 kB
+dist/assets/livekit-Diqk6xiD.js                            578.83 kB │ gzip: 153.52 kB
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 511ms
