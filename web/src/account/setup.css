@@ -1276,19 +1276,471 @@
   }
 }
 
+/* ---------- a phone: one object over the step, inside a dial (SetupStage) ---------- */
+
+@property --tint {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+.setup .stage {
+  position: relative;
+  /* Whatever room the step leaves: nothing on a phone scrolls, the picture gets smaller instead. */
+  flex: 1 1 0;
+  min-height: 96px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  container-type: size;
+  transition: --tint 0.9s ease;
+}
+/* The dial's size, from the room the stage has (its height less the caption). */
+.setup .stage > * {
+  --frame: min(62vw, 250px, calc(100cqh - 76px));
+}
+/* The keyboard is up: the picture steps aside into a strip, the caption next to it. */
+.setup:has(.steps input:focus:not([type="checkbox"]):not([type="file"]):not([readonly])) .stage {
+  flex: 0 0 120px;
+}
+.setup .stage .glow {
+  position: absolute;
+  inset: -30%;
+  background: radial-gradient(34% 30% at 50% 50%, color-mix(in srgb, var(--tint) 26%, transparent), transparent 72%);
+  pointer-events: none;
+}
+/* Grain, as on the landing: the glow reads as light, not as a gradient. */
+.setup .stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>");
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+.setup .stage .frame {
+  position: relative;
+  width: var(--frame);
+  aspect-ratio: 1;
+  transition: width 0.6s var(--ease), transform 0.7s var(--ease);
+}
+.setup.intro .stage .frame {
+  transform: scale(1.16);
+}
+.setup:has(.steps input:focus:not([type="checkbox"]):not([type="file"]):not([readonly])) .stage .frame {
+  transform: translateX(calc(-50vw + var(--frame) * 0.22 + 20px)) scale(0.38);
+}
+
+/* The dial: 60 ticks, every fifth longer. */
+.setup .dial {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.setup .dial line {
+  stroke: #ffffff24;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  transition: stroke 0.5s ease calc(var(--i) * 9ms);
+}
+.setup .dial line.on {
+  stroke: var(--fg);
+}
+.setup .dial line.next {
+  stroke: var(--here);
+  animation: setup-breathe 1.6s ease-in-out infinite;
+}
+/* The opening: a light runs round the dial, a second hand with a tail. */
+.setup .dial line.draw {
+  animation: setup-sweep 2.4s linear calc(var(--i) * 40ms - 2.4s) infinite;
+}
+@keyframes setup-sweep {
+  0% {
+    stroke: var(--fg);
+  }
+  28%,
+  100% {
+    stroke: #ffffff24;
+  }
+}
+@keyframes setup-breathe {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* One object at a time; the next grows out of the blur as the last one sinks into it. */
+.setup .core {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.setup .obj {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  filter: blur(12px);
+  transform: scale(0.78);
+  transition: opacity 0.4s ease, filter 0.5s ease, transform 0.7s var(--ease);
+}
+.setup .obj.on {
+  opacity: 1;
+  filter: none;
+  transform: none;
+  transition-delay: 0.14s;
+}
+
+.setup .obj.mark {
+  color: var(--fg);
+}
+.setup .obj.mark.on svg {
+  animation: setup-float 5s ease-in-out infinite;
+}
+@keyframes setup-float {
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.setup .obj.code {
+  grid-template-columns: repeat(5, 24px);
+  gap: 6px;
+}
+.setup .obj.code i {
+  display: grid;
+  place-items: center;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--fg);
+  font: 600 14px var(--mono);
+  font-style: normal;
+  transition: border-color 0.3s, transform 0.3s var(--ease);
+}
+.setup .obj.code i.has {
+  border-color: #ffffff3d;
+  transform: translateY(-2px);
+}
+
+.setup .obj.server {
+  width: 112px;
+  height: 112px;
+  border-radius: 999px;
+  background: var(--fg);
+  color: var(--window);
+  box-shadow: 0 18px 50px #0008;
+}
+.setup .obj.server img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+/* The server sends out a ring now and then: it's up. */
+.setup .obj.server::after,
+.setup .obj.invite .ticket::before,
+.setup .obj.invite .ticket::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1.5px solid var(--tint);
+  opacity: 0;
+  animation: setup-ring 2.8s var(--ease) infinite;
+}
+.setup .obj.invite .ticket::after {
+  animation-delay: 1.4s;
+}
+@keyframes setup-ring {
+  0% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+
+.setup .obj.admin .face {
+  display: grid;
+  place-items: center;
+  width: 108px;
+  height: 108px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 46px;
+  font-weight: 600;
+  box-shadow: 0 18px 50px #0008;
+  transition: background 0.6s;
+}
+.setup .obj.admin .dots {
+  position: absolute;
+  top: calc(100% + 16px);
+  display: flex;
+  gap: 5px;
+}
+.setup .obj.admin .dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--fg);
+  animation: setup-pop 0.3s var(--ease) both;
+}
+@keyframes setup-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+}
+
+/* The key as a metal plate, tilted a little, a light passing over it. */
+.setup .obj.key .plate {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  padding: 18px 16px;
+  overflow: hidden;
+  border: 1px solid #ffffff1f;
+  border-radius: 18px;
+  background: linear-gradient(140deg, #303037, #18181c 55%, #222227);
+  box-shadow: inset 0 1px #ffffff26, 0 22px 50px #000a;
+  color: #ececf1;
+  font: 600 15px/1.3 var(--mono);
+  letter-spacing: 0.08em;
+  text-align: center;
+  white-space: nowrap;
+  transform: perspective(600px) rotateX(10deg) rotateY(-12deg);
+  animation: setup-tilt 6s ease-in-out infinite;
+}
+.setup .obj.key .plate::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, #ffffff2e 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: setup-shine 3.2s ease-in-out 0.6s infinite;
+}
+@keyframes setup-tilt {
+  50% {
+    transform: perspective(600px) rotateX(4deg) rotateY(10deg);
+  }
+}
+@keyframes setup-shine {
+  60%,
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+.setup .obj.invite .ticket {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100px;
+  height: 100px;
+  border-radius: 999px;
+  background: var(--here);
+  color: #0c0c0e;
+  box-shadow: 0 18px 50px #0008;
+}
+
+/* Friends come round the dial by the link, one by one. */
+.setup .stage .orbit {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.setup .stage .friend {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--window);
+  border-radius: 999px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  opacity: 0;
+  transform: rotate(calc(var(--k) * 90deg + 45deg)) translateX(calc(var(--frame) * 0.36)) rotate(calc(var(--k) * -90deg - 45deg)) scale(0.4);
+  transition: opacity 0.4s ease, transform 0.8s var(--ease);
+}
+.setup .stage .friend.in {
+  opacity: 1;
+  transform: rotate(calc(var(--k) * 90deg + 45deg)) translateX(calc(var(--frame) * 0.66)) rotate(calc(var(--k) * -90deg - 45deg));
+}
+
+/* The end: everyone in the room, whoever talks ringed green, a tick in the middle. */
+.setup .obj.room {
+  width: 100%;
+  height: 100%;
+}
+.setup .obj.room .bub {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin: -24px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 19px;
+  font-weight: 600;
+  transform: rotate(calc(var(--k) * 72deg - 90deg)) translateX(calc(var(--frame) * 0.25)) rotate(calc(var(--k) * -72deg + 90deg));
+  transition: box-shadow 0.3s, scale 0.3s var(--ease);
+}
+.setup .obj.room .bub.talk {
+  box-shadow: 0 0 0 3px var(--window), 0 0 0 5.5px var(--here);
+  scale: 1.08;
+}
+.setup .obj.room .tick {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--here);
+  color: #0c0c0e;
+}
+
+/* What the object is: the name, the nick, the link, as they're typed. */
+.setup .stage .caption {
+  position: absolute;
+  right: 20px;
+  bottom: 18px;
+  left: 20px;
+  margin: 0;
+  overflow: hidden;
+  color: var(--quiet);
+  font-size: 15px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: all 0.6s var(--ease);
+}
+.setup .stage .caption span {
+  display: inline-block;
+  animation: setup-enter 0.5s var(--ease) 0.15s both;
+}
+.setup .stage.at-server .caption,
+.setup .stage.at-admin .caption,
+.setup .stage.at-done .caption {
+  color: var(--fg);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.setup:has(.steps input:focus:not([type="checkbox"]):not([type="file"]):not([readonly])) .stage .caption {
+  bottom: 50%;
+  left: calc(var(--frame) * 0.44 + 32px);
+  transform: translateY(50%);
+  text-align: left;
+}
+
+/* The step under the picture on a phone: across, not up; the way on under the thumb. */
+@keyframes setup-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+}
+@keyframes setup-slide-back {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .setup .dial line.draw,
+  .setup .dial line.next,
+  .setup .obj.mark.on svg,
+  .setup .obj.key .plate,
+  .setup .obj.key .plate::after,
+  .setup .obj.server::after,
+  .setup .obj.invite .ticket::before,
+  .setup .obj.invite .ticket::after {
+    animation: none;
+  }
+}
+
 /* A narrow window: the step alone. */
 @media (max-width: 820px) {
   .setup {
     grid-template-columns: 1fr;
   }
-  .setup .right {
+  .setup .right,
+  .setup .mark,
+  .setup .progress {
     display: none;
+  }
+  .setup .stage {
+    margin: -28px -40px 0;
+  }
+  .setup .left {
+    overflow: hidden;
+  }
+  /* The step as tall as it is, under the picture; the one leaving lies over it. */
+  .setup .steps {
+    flex: none;
+  }
+  .setup .step {
+    position: relative;
+    inset: auto;
+    max-width: 520px;
+    padding: 12px 0 0;
+    overflow: visible;
+    animation-name: setup-slide-in;
+  }
+  .setup .step.leaving {
+    position: absolute;
+    inset: 0 0 auto;
+  }
+  .setup .step.back-in {
+    animation-name: setup-slide-back;
+  }
+  .setup .step .actions {
+    margin-top: 24px;
+  }
+  .setup .step .actions .pair {
+    flex: 1;
+    justify-content: flex-end;
+  }
+  .setup .step .actions .primary {
+    flex: 1;
+    height: 52px;
+    font-size: 16px;
+  }
+  .setup h1 {
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .setup .hello {
+    text-align: center;
+  }
+  .setup .hello .sub {
+    margin-bottom: 0;
   }
 }
 /* A phone: the column takes the width, clear of the notch and the home bar. */
 @media (max-width: 520px) {
   .setup .left {
     padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+  }
+  .setup .stage {
+    margin: calc(-1 * max(20px, env(safe-area-inset-top))) -20px 0;
+    padding-top: env(safe-area-inset-top);
   }
   .setup .field,
   .setup .otp .input-otp__slot {

@@ -102,5 +102,7 @@ export const setup = {
   'setup.scene.inviteLink': 'Invite link',
   'setup.scene.copy': 'Copy',
   'setup.server.choose': 'Choose',
+  'setup.intro.title': 'Server is ready',
+  'setup.intro.start': 'Set up',
   'setup.admin.show': 'Show password',
 } satisfies Record<keyof typeof source, Entry>;

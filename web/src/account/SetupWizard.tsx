@@ -8,6 +8,7 @@ import { GomexMark } from '../ui/Logo';
 import { CheckIcon, UserPlusIcon } from '../ui/icons';
 import { IconCropper, centred, cropToBlob, cropToUrl, loadImage, type Crop } from '../ui/IconCropper';
 import { SetupScenes, type Facts, type SceneName } from './SetupScenes';
+import { SetupStage } from './SetupStage';
 import './setup.css';
 
 /**
@@ -65,8 +66,10 @@ function FileName({ name }: { name: string }) {
   );
 }
 
+const WIDE = '(min-width: 821px)';
+
 function useWide() {
-  const query = '(min-width: 821px)';
+  const query = WIDE;
   const [wide, setWide] = useState(() => window.matchMedia(query).matches);
   useEffect(() => {
     const media = window.matchMedia(query);
@@ -99,7 +102,9 @@ function Primary({
 
 // Design work, development only: #step=server (or code, admin, key, invite, done) opens that step with made-up answers
 // and nothing sent to the server, as desktop/onboarding.html does; #t=7000 also stops the cameras then (SetupScenes).
-export const DEMO = import.meta.env.DEV ? (window.location.hash.match(/step=(code|server|admin|key|invite|done)\b/)?.[1] as StepId | undefined) : undefined;
+// #step=intro is the phone's opening screen, then the name.
+const DEMO_HASH = import.meta.env.DEV ? window.location.hash.match(/step=(intro|code|server|admin|key|invite|done)\b/)?.[1] : undefined;
+export const DEMO = (DEMO_HASH === 'intro' ? 'server' : DEMO_HASH) as StepId | undefined;
 const ORDER: StepId[] = ['code', 'server', 'crop', 'admin', 'key', 'invite', 'done'];
 const past = (id: StepId) => !!DEMO && ORDER.indexOf(DEMO) > ORDER.indexOf(id);
 
@@ -142,6 +147,8 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   const [linkSent, setLinkSent] = useState<'copied' | 'shared' | null>(past('invite') ? 'copied' : null);
 
   const wide = useWide();
+  // A phone opens on the server, ready, before the first step (SetupStage); the desktop goes straight in.
+  const [intro, setIntro] = useState(() => !window.matchMedia(WIDE).matches && (!DEMO_HASH || DEMO_HASH === 'intro'));
   const name = serverName.trim() || defaultName;
   const host = window.location.host;
 
@@ -157,7 +164,9 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   }
 
   // Focus once the step has settled, and without scrolling: a field focused mid-animation drags the step to it.
+  // Not on a phone: the keyboard would cover the picture before the step is even read.
   useEffect(() => {
+    if (!wide) return;
     const timer = setTimeout(
       () => stepRef.current?.querySelector<HTMLElement>('input:not([disabled]):not([readonly]):not([type="file"])')?.focus({ preventScroll: true }),
       560,
@@ -197,6 +206,13 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  /** Out of the opening screen: the step comes in as if just reached. */
+  function start() {
+    setIntro(false);
+    current.current = { ...current.current, back: false, n: current.current.n + 1 };
+    setStep(current.current);
   }
 
   /* ---------- 1. code ---------- */
@@ -687,6 +703,9 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     friends: at === 'done' ? 1 : at === 'invite' && linkSent ? 0.5 : 0,
   };
   const now = onAccount ? 'account' : 'friends';
+  // The phone's dial: the whole way from the first step to the end.
+  const path: StepId[] = askCode ? ['code', 'server', 'admin', 'key', 'invite', 'done'] : ['server', 'admin', 'key', 'invite', 'done'];
+  const dial = at === 'done' ? 1 : Math.max(0, path.indexOf(at)) / (path.length - 1) + (at === 'invite' && linkSent ? 0.5 / (path.length - 1) : 0);
 
   const facts: Facts = {
     host,
@@ -701,18 +720,30 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   };
 
   return (
-    <div className="setup">
+    <div className={`setup${intro ? ' intro' : ''}`}>
       <div className="left">
         <GomexMark size={26} className="mark" />
+        {!wide && <SetupStage step={intro ? 'intro' : at} facts={facts} fill={intro ? 0 : dial} />}
         <main className="steps">
-          {leaving && (
+          {intro && (
+            <section key="intro" className="step hello">
+              <h1>{t('setup.intro.title')}</h1>
+              <p className="sub">{host}</p>
+              <div className="actions">
+                <Primary onClick={start}>{t('setup.intro.start')}</Primary>
+              </div>
+            </section>
+          )}
+          {!intro && leaving && (
             <section key={leaving.n} className="step leaving" aria-hidden="true">
               {render(leaving.id)}
             </section>
           )}
-          <section key={step.n} ref={stepRef} className={`step${step.back ? ' back-in' : ''}`}>
-            {render(step.id)}
-          </section>
+          {!intro && (
+            <section key={step.n} ref={stepRef} className={`step${step.back ? ' back-in' : ''}`}>
+              {render(step.id)}
+            </section>
+          )}
         </main>
         <nav className="progress" aria-label={t('setup.steps')}>
           {(

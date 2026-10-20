@@ -98,5 +98,7 @@ export const setup = {
   'setup.scene.inviteLink': 'Ссылка-приглашение',
   'setup.scene.copy': 'Скопировать',
   'setup.server.choose': 'Выбрать',
+  'setup.intro.title': 'Сервер готов',
+  'setup.intro.start': 'Настроить',
   'setup.admin.show': 'Показать пароль',
 } as const;
