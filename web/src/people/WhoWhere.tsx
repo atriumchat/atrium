@@ -1,153 +1,10 @@
-import { useLayoutEffect, useRef, useState } from 'react';
-import { Popover } from '@heroui/react';
 import { selectChannel, useStore, voiceMembers } from '../store';
 import { joinVoice, lastRoomId } from '../voice/voice';
 import type { Channel } from '../types';
-import { useT, type TFn } from '../i18n';
+import { useT } from '../i18n';
 import { Avatar } from '../ui/Avatar';
-import { UserProfile } from './UserProfile';
-import { DotsIcon, HeadphonesIcon } from '../ui/icons';
-
-/** "4 people". */
-const peopleCount = (t: TFn, n: number) => t('people.who.count', { n });
-
-const SIZE = 128;
-const GAP = 12;
-
-/**
- * The live voice rooms as circles over the friends list, as many as fit across: green is the one you're in
- * (opens it), pink is somewhere people are (joins it), busiest first. Every other room — empty or not fitting —
- * folds into a grey last circle that lists them. When nobody's talking, the room you sat in last is offered back.
- */
-export function RoomCircles() {
-  const channels = useStore((s) => s.channels);
-  const voiceState = useStore((s) => s.voiceState);
-  const myRoomId = useStore((s) => (s.voiceStatus !== 'idle' && s.channels.some((c) => c.id === s.voiceChannelId) ? s.voiceChannelId : null));
-  const row = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(0);
-
-  const hasRooms = channels.some((c) => c.kind === 'voice');
-  // Measured before the first paint, so the circles are there from the start instead of popping in.
-  useLayoutEffect(() => {
-    const el = row.current;
-    if (!el) return;
-    setWidth(el.clientWidth);
-    const observer = new ResizeObserver(() => setWidth(el.clientWidth));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [hasRooms]);
-
-  const last = lastRoomId();
-  const rooms = channels
-    .filter((c) => c.kind === 'voice')
-    .map((room) => ({ room, people: voiceMembers(voiceState, room.id).map((e) => e.userId) }))
-    .sort(
-      (a, b) =>
-        Number(b.room.id === myRoomId) - Number(a.room.id === myRoomId) ||
-        b.people.length - a.people.length ||
-        Number(b.room.id === last) - Number(a.room.id === last) ||
-        a.room.position - b.room.position,
-    );
-  if (rooms.length === 0) return null;
-
-  const live = rooms.filter((r) => r.people.length > 0);
-  const lead = live.length ? live : rooms.slice(0, 1);
-  const fits = Math.max(1, Math.floor((width + GAP) / (SIZE + GAP)));
-  const shown = lead.length + (rooms.length > lead.length ? 1 : 0) > fits ? lead.slice(0, fits - 1) : lead;
-  const rest = rooms.filter((r) => !shown.includes(r));
-
-  return (
-    <div ref={row} className="flex gap-3 px-1 pb-5 pt-2 max-md:pb-0">
-      {width > 0 && shown.map((r) => <RoomCircle key={r.room.id} room={r.room} people={r.people} mine={r.room.id === myRoomId} />)}
-      {width > 0 && rest.length > 0 && <RestCircle rooms={rest} />}
-    </div>
-  );
-}
-
-/** The rooms that didn't fit: a grey circle that opens them as a list. */
-function RestCircle({ rooms }: { rooms: { room: Channel; people: string[] }[] }) {
-  const { t } = useT();
-  const users = useStore((s) => s.users);
-  const [open, setOpen] = useState(false);
-  const people = rooms.reduce((n, r) => n + r.people.length, 0);
-  return (
-    <Popover isOpen={open} onOpenChange={setOpen}>
-      <Popover.Trigger
-        aria-label={t('people.who.otherRooms')}
-        className="flex size-32 shrink-0 cursor-pointer flex-col items-center justify-center gap-2 rounded-full bg-default outline-none transition-[background-color,box-shadow] duration-200 hover:bg-[#28282d] data-[pressed=true]:bg-[#1a1a1d] data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus"
-      >
-        <DotsIcon size={26} />
-        <span className="flex flex-col items-center">
-          <span className="text-[15px] font-semibold leading-5">{t('people.who.more', { n: rooms.length })}</span>
-          <span className="text-[12px] leading-4 text-muted">{people ? peopleCount(t, people) : t('people.who.allEmpty')}</span>
-        </span>
-      </Popover.Trigger>
-      <Popover.Content placement="bottom start" className="w-72 p-0">
-        <Popover.Dialog className="p-2 outline-none">
-          {rooms.map(({ room, people: inside }) => (
-            <button
-              key={room.id}
-              onClick={() => {
-                setOpen(false);
-                joinVoice(room.id);
-              }}
-              className="flex h-12 w-full items-center gap-3 rounded-[16px] px-3 text-left transition-colors hover:bg-default"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[15px] font-medium leading-5">{room.name}</span>
-                <span className={`block text-[12px] leading-4 ${inside.length ? 'text-others' : 'text-muted'}`}>{inside.length ? peopleCount(t, inside.length) : t('people.who.empty')}</span>
-              </span>
-              <span className="flex -space-x-2">
-                {inside.slice(0, 3).map((id) => (
-                  <span key={id} className="rounded-full ring-2 ring-[var(--overlay)]">
-                    <Avatar user={users[id]} size={24} />
-                  </span>
-                ))}
-              </span>
-            </button>
-          ))}
-        </Popover.Dialog>
-      </Popover.Content>
-    </Popover>
-  );
-}
-
-function RoomCircle({ room, people, mine }: { room: Channel; people: string[]; mine: boolean }) {
-  const { t } = useT();
-  const users = useStore((s) => s.users);
-  const meId = useStore((s) => s.me?.id);
-  const line = people.length ? peopleCount(t, people.length) : t('people.who.empty');
-  const faces = mine && meId ? [meId, ...people.filter((id) => id !== meId)] : people;
-
-  return (
-    <button
-      onClick={() => (mine ? selectChannel(room.id) : joinVoice(room.id))}
-      aria-label={mine ? t('people.who.openRoom', { name: room.name }) : t('people.who.joinRoom', { name: room.name })}
-      className={`group flex size-32 shrink-0 flex-col items-center justify-center gap-2 rounded-full outline-none transition-[filter,box-shadow] duration-200 hover:brightness-[1.07] active:brightness-95 focus-visible:ring-2 focus-visible:ring-focus ${
-        mine ? 'bg-here text-here-ink' : 'bg-others text-others-ink'
-      }`}
-    >
-      <span className="flex h-8 items-center">
-        {faces.length ? (
-          // On hover the faces part a little, as if making room for you.
-          <span className="flex -space-x-2.5 group-hover:-space-x-1 [&>*]:transition-[margin] [&>*]:duration-300 [&>*]:ease-out">
-            {faces.slice(0, 3).map((id) => (
-              <span key={id} className={`rounded-full ring-2 ${mine ? 'ring-here' : 'ring-others'}`}>
-                <Avatar user={users[id]} size={30} />
-              </span>
-            ))}
-          </span>
-        ) : (
-          <HeadphonesIcon size={26} />
-        )}
-      </span>
-      <span className="flex max-w-[104px] flex-col items-center">
-        <span className="max-w-full truncate text-[15px] font-semibold leading-5">{room.name}</span>
-        <span className="max-w-full truncate text-[12px] leading-4 opacity-70">{line}</span>
-      </span>
-    </button>
-  );
-}
+import { ChevronRightIcon, HeadphonesIcon, SpeakerIcon } from '../ui/icons';
+import { CallDuration } from '../voice/CallDuration';
 
 /** Which server room someone is sitting in, and whether it's yours — for the line under their name. */
 export function useRoomOf(userId: string): { name: string; withYou: boolean } | null {
@@ -161,68 +18,92 @@ export function useRoomOf(userId: string): { name: string; withYou: boolean } | 
   return key ? { name: key.slice(1), withYou: key[0] === '1' } : null;
 }
 
-const RING = { here: 'var(--room-here)', others: 'var(--room-others)', online: 'var(--foreground)' } as const;
-const PLACE = { here: 'text-here', others: 'text-others', online: 'text-muted' } as const;
+const CARD_GUTTER = 12;
 
 /**
- * The phone home's "Who is where": everyone around in one row, ringed by where they are — with you (green), in
- * another room (pink), just online (white) — and whoever's away folded into "+N" at the end.
+ * The phone's "who is in voice right now", as cards (the native app's): the people first, the room under them.
+ * Green is the room you're in, pink the others; only rooms with someone in them. With everyone out, one quiet
+ * line with the way into the room you used last. A tap opens the room (with its Join button), never joins.
  */
-export function PeopleRow() {
+export function RoomCards({ grid = false }: { grid?: boolean }) {
+  const { t } = useT();
+  const isMobile = useStore((s) => s.isMobile);
+  const channels = useStore((s) => s.channels);
+  const voiceState = useStore((s) => s.voiceState);
+  const myRoomId = useStore((s) => (s.voiceStatus !== 'idle' && s.channels.some((c) => c.id === s.voiceChannelId) ? s.voiceChannelId : null));
+  const rooms = channels.filter((c) => c.kind === 'voice');
+  if (rooms.length === 0) return null;
+  const live = rooms
+    .map((room) => ({ room, people: voiceMembers(voiceState, room.id).map((e) => e.userId) }))
+    .filter((r) => r.people.length > 0)
+    .sort((a, b) => Number(b.room.id === myRoomId) - Number(a.room.id === myRoomId) || b.people.length - a.people.length || a.room.position - b.room.position);
+
+  if (live.length === 0) {
+    const last = rooms.find((r) => r.id === lastRoomId()) ?? [...rooms].sort((a, b) => a.position - b.position)[0]!;
+    return (
+      <div style={{ paddingInline: grid ? 0 : CARD_GUTTER }} className={grid ? 'max-w-[572px]' : ''}>
+        <button
+          onClick={() => (isMobile ? selectChannel(last.id) : joinVoice(last.id))}
+          aria-label={t('people.who.joinRoom', { name: last.name })}
+          className="flex h-[52px] w-full items-center gap-3 rounded-[20px] bg-default px-4 text-left transition-[background-color,transform] duration-150 active:scale-[0.98] active:bg-[#28282d]"
+        >
+          <HeadphonesIcon size={20} className="shrink-0 text-muted" />
+          <span className="min-w-0 flex-1 truncate text-[16px] text-muted">{t('people.who.nobodyInVoice')}</span>
+          <span className="max-w-[45%] truncate text-[16px] font-medium">{last.name}</span>
+          <ChevronRightIcon size={18} className="shrink-0 text-faint" />
+        </button>
+      </div>
+    );
+  }
+
+  // One room: the whole width. More: a row you swipe, the next card peeking out at the edge.
+  const single = live.length === 1;
+  if (grid) {
+    return (
+      <div className="flex flex-wrap gap-3">
+        {live.map((r) => <RoomCard key={r.room.id} room={r.room} people={r.people} mine={r.room.id === myRoomId} single={false} onPress={() => (r.room.id === myRoomId ? selectChannel(r.room.id) : joinVoice(r.room.id))} />)}
+      </div>
+    );
+  }
+  return (
+    <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto [scrollbar-width:none]" style={{ paddingInline: CARD_GUTTER, scrollPaddingInline: CARD_GUTTER }}>
+      {live.map((r) => <RoomCard key={r.room.id} room={r.room} people={r.people} mine={r.room.id === myRoomId} single={single} onPress={() => selectChannel(r.room.id)} />)}
+    </div>
+  );
+}
+
+function RoomCard({ room, people, mine, single, onPress }: { room: Channel; people: string[]; mine: boolean; single: boolean; onPress: () => void }) {
   const { t } = useT();
   const users = useStore((s) => s.users);
   const meId = useStore((s) => s.me?.id);
-  const online = useStore((s) => s.online);
-  const blocked = useStore((s) => s.blocked);
-  const channels = useStore((s) => s.channels);
-  const voiceState = useStore((s) => s.voiceState);
-  const myRoomId = useStore((s) => (s.voiceStatus !== 'idle' ? s.voiceChannelId : null));
-
-  const roomOf = new Map<string, Channel>();
-  for (const e of voiceState) {
-    const room = e.kind === 'channel' ? channels.find((c) => c.id === e.channelId) : undefined;
-    if (room) roomOf.set(e.userId, room);
-  }
-  const ring = (id: string): keyof typeof RING | null => {
-    const room = roomOf.get(id);
-    if (room) return room.id === myRoomId ? 'here' : 'others';
-    return online.includes(id) ? 'online' : null;
-  };
-  const order = { here: 0, others: 1, online: 2 };
-  const people = Object.values(users).filter((u) => u.id !== meId && !blocked.includes(u.id));
-  const around = people
-    .filter((u) => ring(u.id))
-    .sort((a, b) => order[ring(a.id)!] - order[ring(b.id)!] || a.name.localeCompare(b.name, 'ru'));
-  const away = people.length - around.length;
-  if (people.length === 0) return null;
-
+  const faces = mine && meId ? [meId, ...people.filter((id) => id !== meId)] : people;
+  const names = faces.map((id) => (id === meId ? t('people.who.youName') : users[id]?.name ?? '…'));
+  const shown = names.length > 3 ? t('people.who.andMore', { names: names.slice(0, 2).join(', '), n: names.length - 2 }) : names.join(', ');
   return (
-    <section>
-      <h2 className="flex items-baseline gap-2 px-6 text-[17px] font-semibold">
-        {t('people.who.title')} <span className="text-[15px] font-normal text-muted">{t('people.who.aroundOf', { a: around.length, b: people.length })}</span>
-      </h2>
-      <div className="flex gap-3 overflow-x-auto px-4 pb-1 pt-3 no-scrollbar">
-        {around.map((u) => {
-          const r = ring(u.id)!;
-          return (
-            <UserProfile key={u.id} userId={u.id} placement="bottom" className="flex w-16 shrink-0 cursor-pointer flex-col items-center gap-1.5 text-center">
-              <span className="rounded-full p-[3px]" style={{ boxShadow: `inset 0 0 0 2px ${RING[r]}` }}>
-                <Avatar user={u} size={52} />
-              </span>
-              <span className="w-full">
-                <span className="block truncate text-[12px] font-medium leading-4">{u.name}</span>
-                <span className={`block truncate text-[11px] leading-4 ${PLACE[r]}`}>{roomOf.get(u.id)?.name ?? (u.statusText || t('people.who.online'))}</span>
-              </span>
-            </UserProfile>
-          );
-        })}
-        {away > 0 && (
-          <span className="flex w-16 shrink-0 flex-col items-center gap-1.5 text-center">
-            <span className="flex size-[58px] items-center justify-center rounded-full bg-default text-[15px] font-medium text-muted">+{away}</span>
-            <span className="text-[11px] leading-4 text-muted">{t('people.who.away')}</span>
+    <button
+      onClick={onPress}
+      aria-label={`${room.name}: ${names.join(', ')}`}
+      className={`flex min-h-24 shrink-0 snap-start items-center gap-3 rounded-[20px] bg-default p-3.5 text-left transition-[background-color,transform] duration-150 hover:bg-[#28282d] active:scale-[0.98] active:bg-[#28282d] ${single ? 'w-full' : 'w-[min(280px,72vw)]'}`}
+    >
+      <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <span className="line-clamp-2 text-[16px] font-semibold leading-[21px]">{shown}</span>
+        <span className={`flex items-center gap-1.5 text-[14px] font-medium ${mine ? 'text-here' : 'text-others'}`}>
+          <SpeakerIcon size={15} className="shrink-0" />
+          <span className="truncate">{room.name}</span>
+          {mine && (
+            <span className="shrink-0 tabular-nums">
+              · <CallDuration />
+            </span>
+          )}
+        </span>
+      </span>
+      <span className="flex shrink-0 -space-x-3">
+        {faces.slice(0, 3).map((id) => (
+          <span key={id} className="rounded-full ring-2 ring-[var(--default)]">
+            <Avatar user={users[id]} size={36} />
           </span>
-        )}
-      </div>
-    </section>
+        ))}
+      </span>
+    </button>
   );
 }

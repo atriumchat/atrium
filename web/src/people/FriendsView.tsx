@@ -10,7 +10,7 @@ import { EmptyState, type ArtName } from '../ui/Illustrations';
 import { FriendButton, UserProfile } from './UserProfile';
 import { RoundButton } from '../ui/ui';
 import { BubbleIcon, CheckIcon, UserPlusIcon, XIcon } from '../ui/icons';
-import { RoomCircles, useRoomOf } from './WhoWhere';
+import { RoomCards, useRoomOf } from './WhoWhere';
 import { useT } from '../i18n';
 
 type Tab = 'online' | 'all' | 'pending' | 'add';
@@ -90,7 +90,11 @@ export function FriendsView() {
 
       <div className="flex flex-1 flex-col overflow-y-auto px-3 pb-4 pt-3 max-md:px-1">
         {/* The rooms first: where people are talking right now, a tap away. On the phone they're on the home tab. */}
-        {tab !== 'add' && !isMobile && <RoomCircles />}
+        {tab !== 'add' && !isMobile && (
+          <div className="px-1 pb-4">
+            <RoomCards grid />
+          </div>
+        )}
         {tab === 'add' ? (
           <AddFriend />
         ) : tab === 'pending' ? (

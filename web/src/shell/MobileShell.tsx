@@ -1,11 +1,11 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { closeDetail, dmTitle, isDmId, openDm, openFriends, openPicker, openTab, selectChannel, useStore, voiceMembers, type MobileTab } from '../store';
 import { useT } from '../i18n';
 import { leaveVoice, toggleMute } from '../voice/voice';
 import { HomeContent, homeBadgeCount, serverBadgeCount, ServerContent } from './Content';
 import { Sidebar } from './Sidebar';
 import { Badge, FeedDm, useDmList } from './HomeSidebar';
-import { PeopleRow, RoomCircles } from '../people/WhoWhere';
+import { RoomCards } from '../people/WhoWhere';
 import { InboxButton } from '../people/Inbox';
 import { EmptyState } from '../ui/Illustrations';
 import { Avatar } from '../ui/Avatar';
@@ -17,7 +17,7 @@ import { YouTab } from './YouTab';
 import { usePush } from '../ui/PushPage';
 import { BypassHint } from '../voice/Bypass';
 import { useCallStats } from '../voice/stats';
-import { ChevronRightIcon, HomeFilledIcon, HomeIcon, MicIcon, MicSlashIcon, PhoneDownIcon, PlusIcon, SignalIcon, UsersIcon } from '../ui/icons';
+import { HomeFilledIcon, HomeIcon, MicIcon, MicSlashIcon, PhoneDownIcon, PlusIcon, SearchIcon, SignalIcon, UsersIcon } from '../ui/icons';
 
 /**
  * Phone layout: three tabs at the bottom (home, server, you) that switch instantly, and conversations that
@@ -173,14 +173,22 @@ function CallBar() {
   );
 }
 
-/** The same header on the home and server tabs, so switching between them doesn't shift anything. */
-function TabHeader() {
+/** The header of the home and server tabs: the server, then its buttons; `friends` adds Friends (on home). */
+function TabHeader({ friends = false }: { friends?: boolean }) {
+  const { t } = useT();
   const serverName = useStore((s) => s.serverName);
   const serverIcon = useStore((s) => s.serverIcon);
+  const incoming = useStore((s) => s.friends.filter((f) => f.status === 'incoming').length);
   return (
     <header className="flex h-16 shrink-0 items-center gap-3 px-4">
       <ServerMark icon={serverIcon} size={36} />
       <h1 className="min-w-0 flex-1 truncate text-[24px] font-bold">{serverName}</h1>
+      {friends && (
+        <button onClick={openFriends} aria-label={t('shell.home.friends')} className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-95">
+          <UsersIcon size={21} />
+          {incoming > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-danger px-1 text-center text-[11px] font-medium leading-[18px] text-white ring-2 ring-[var(--app-window)]">{incoming > 99 ? '99+' : incoming}</span>}
+        </button>
+      )}
       <InboxButton />
     </header>
   );
@@ -196,40 +204,38 @@ function ServerTab() {
 }
 
 /**
- * The phone's home: the server's live rooms as circles, who is where, then one feed of everything new —
- * DMs, groups, and channels while they have something unread.
+ * The phone's home, as in the native app: a search over your conversations, who is in voice right now (cards),
+ * then the conversations, newest first. Friends and the inbox are buttons in the header.
  */
 function HomeTab() {
   const { t } = useT();
-  const incoming = useStore((s) => s.friends.filter((f) => f.status === 'incoming').length);
-  const dms = useDmList();
+  const all = useDmList();
+  const users = useStore((s) => s.users);
+  const meId = useStore((s) => s.me?.id);
+  const [filter, setFilter] = useState('');
+  const query = filter.trim().toLowerCase();
+  const dms = query ? all.filter((dm) => dmTitle(dm, users, meId).toLowerCase().includes(query)) : all;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <TabHeader />
-      <div className="flex flex-1 flex-col gap-5 overflow-y-auto pb-4 pt-2">
+      <TabHeader friends />
+      <div className="flex flex-1 flex-col gap-4 overflow-y-auto pb-4 pt-1">
         <div className="px-3">
-          <RoomCircles />
+          <label className="flex h-11 items-center gap-2 rounded-full bg-default px-4">
+            <SearchIcon size={17} className="shrink-0 text-faint" />
+            <input value={filter} onChange={(e) => setFilter(e.target.value)} type="search" enterKeyHint="search" placeholder={t('shell.home.searchDms')} aria-label={t('shell.home.searchDms')} className="h-11 min-w-0 flex-1 bg-transparent text-[17px] outline-none placeholder:text-faint" />
+          </label>
         </div>
-        <PeopleRow />
-        {/* Friends on a row of its own, as on the computer; "+" belongs to the messages header only. */}
-        <div className="px-3">
-          <button onClick={openFriends} className="flex h-12 w-full items-center gap-3 rounded-full bg-default px-4 text-left transition-colors active:bg-[#28282d]">
-            <UsersIcon size={20} />
-            <span className="flex-1 text-[16px] font-medium">{t('shell.home.friends')}</span>
-            {incoming > 0 && <Badge count={incoming} />}
-            <ChevronRightIcon size={18} className="text-muted" />
-          </button>
-        </div>
+        {!query && <RoomCards />}
         {/* Same insets as the server tab's list: titles at 24px, rows at 12px. */}
         <section className="px-3">
           <div className="flex items-center justify-between pb-1 pl-3">
-            <h2 className="text-[17px] font-semibold">{t('shell.home.dms')}</h2>
+            <h2 className="text-[18px] font-semibold">{t('shell.home.dms')}</h2>
             <RoundButton size="sm" tone="ghost" label={t('shell.home.newGroup')} onPress={() => openPicker({ mode: 'create' })}>
               <PlusIcon />
             </RoundButton>
           </div>
-          {dms.length === 0 ? <EmptyState compact art="messages" title={t('shell.home.empty.title')} text={t('shell.home.empty.text')} /> : dms.map((dm) => <FeedDm key={dm.id} dm={dm} big />)}
+          {dms.length > 0 ? dms.map((dm) => <FeedDm key={dm.id} dm={dm} big />) : query ? <EmptyState compact art="search" title={t('people.picker.noResults')} /> : <EmptyState compact art="messages" title={t('shell.home.empty.title')} text={t('shell.home.empty.text')} />}
         </section>
       </div>
     </div>

@@ -12,13 +12,15 @@ export function shortStamp(ts: number) {
   return new Date(ts).toLocaleDateString(localeOf(), { day: '2-digit', month: '2-digit' });
 }
 
-/** Discord-style message header stamp: "Today at 15:28" / "Yesterday at 15:28" / the full date and time. */
-export function messageStamp(ts: number) {
-  const now = Date.now();
-  if (sameDay(ts, now)) return t('format.todayAt', { time: timeOf(ts) });
-  if (sameDay(ts, now - 86_400_000)) return t('format.yesterdayAt', { time: timeOf(ts) });
-  return `${new Date(ts).toLocaleDateString(localeOf())} ${timeOf(ts)}`;
+/** A conversation list's stamp: "now", "12m", "3h" within the day, then as shortStamp. Fresh ones need a re-render a minute (useMinute). */
+export function relativeStamp(ts: number) {
+  const minutes = Math.floor((Date.now() - ts) / 60_000);
+  if (minutes < 1) return t('shell.time.now');
+  if (minutes < 60) return t('shell.time.minutes', { n: minutes });
+  if (sameDay(ts, Date.now())) return t('shell.time.hours', { n: Math.floor(minutes / 60) });
+  return shortStamp(ts);
 }
+
 
 /** Day divider label: "15 October 2026" / "October 15, 2026". */
 export const dayDivider = (ts: number) =>

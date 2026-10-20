@@ -46,7 +46,7 @@ export function RoomCard({ channelId }: { channelId: string }) {
           size="sm"
           isDisabled={here}
           onPress={() => joinVoice(channelId)}
-          className="h-9 shrink-0 rounded-full px-4 text-[14px] [--button-bg-hover:#e7e7ea] [--button-bg:white] [--button-fg:#0b0b0c]"
+          className="h-9 shrink-0 rounded-full px-4 text-[14px] font-medium [--button-bg-hover:#2a9a45] [--button-bg:#248a3d] [--button-fg:#fff]"
         >
           {here ? t('voice.room.here') : t('voice.room.enter')}
         </Button>

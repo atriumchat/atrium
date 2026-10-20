@@ -4,7 +4,7 @@ import { api } from '../api';
 import { addDm, getSessionEpoch, mergeMessages, openFriends, openPicker, PAGE_SIZE, refreshDms, setEditing, setHasMore, setReplyingTo, showError, useStore, voiceMembers } from '../store';
 import { deleteMessage, editMessage, sendMessage, sendTyping, toggleReaction } from '../socket';
 import { joinVoice, leaveVoice } from '../voice/voice';
-import { dayDivider, fullStamp, messageStamp, sameDay, timeOf } from './format';
+import { dayDivider, fullStamp, sameDay, timeOf } from './format';
 import { localeOf, useT } from '../i18n';
 import { useIsMobile } from '../hooks';
 import type { Dm, Message, Upload, User } from '../types';
@@ -16,6 +16,7 @@ import { CallDuration } from '../voice/CallDuration';
 import { CallButtons, DmCallPanel } from '../voice/CallPanel';
 import { ConfirmDialog, Dialog } from '../ui/Dialog';
 import { UserProfile } from '../people/UserProfile';
+import { GroupInfo } from '../people/GroupInfo';
 import { fileSize, MessageAttachments } from './Attachments';
 import { EmojiPicker } from '../ui/EmojiPicker';
 import { ensureHistory } from './history';
@@ -254,7 +255,15 @@ function DmHeader({ dm, title }: { dm: Dm; title: string }) {
   const peer = useStore((s) => s.users[dm.userId ?? '']);
   const online = useStore((s) => dm.kind === 'dm' && s.online.includes(dm.userId ?? ''));
   const [renaming, setRenaming] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const group = dm.kind === 'group';
+
+  async function leave() {
+    if (useStore.getState().voiceChannelId === dm.id) await leaveVoice();
+    await api.leaveGroup(dm.id);
+    openFriends();
+    await refreshDms();
+  }
 
   return (
     <>
@@ -266,7 +275,9 @@ function DmHeader({ dm, title }: { dm: Dm; title: string }) {
               <Avatar user={peer} size={36} online={online} />
             </UserProfile>
           ) : (
-            <DmAvatar dm={dm} size={36} />
+            <GroupInfo dm={dm} onRename={() => setRenaming(true)} onLeave={() => setLeaving(true)}>
+              <DmAvatar dm={dm} size={36} />
+            </GroupInfo>
           )
         }
         title={title}
@@ -274,26 +285,19 @@ function DmHeader({ dm, title }: { dm: Dm; title: string }) {
         actions={
           <>
             <CallButtons dm={dm} />
-            <ConversationMenu dm={dm} onRename={() => setRenaming(true)} />
+            <ConversationMenu dm={dm} onRename={() => setRenaming(true)} onLeave={() => setLeaving(true)} />
           </>
         }
       />
       {renaming && <RenameGroup dm={dm} onClose={() => setRenaming(false)} />}
+      {leaving && <ConfirmDialog title={t('chat.leaveTitle')} text={t('chat.leaveText')} confirmLabel={t('chat.leave')} onConfirm={leave} onClose={() => setLeaving(false)} />}
     </>
   );
 }
 
-function ConversationMenu({ dm, onRename }: { dm: Dm; onRename: () => void }) {
+function ConversationMenu({ dm, onRename, onLeave }: { dm: Dm; onRename: () => void; onLeave: () => void }) {
   const { t } = useT();
   const group = dm.kind === 'group';
-  const [leaving, setLeaving] = useState(false);
-
-  async function leave() {
-    if (useStore.getState().voiceChannelId === dm.id) await leaveVoice();
-    await api.leaveGroup(dm.id);
-    openFriends();
-    await refreshDms();
-  }
 
   return (
     <>
@@ -310,7 +314,7 @@ function ConversationMenu({ dm, onRename }: { dm: Dm; onRename: () => void }) {
             onAction={(key) => {
               if (key === 'add') openPicker({ mode: 'add', dmId: dm.id });
               if (key === 'rename') onRename();
-              if (key === 'leave') setLeaving(true);
+              if (key === 'leave') onLeave();
             }}
           >
             <Dropdown.Item id="add" textValue={t('chat.addPeople')}>
@@ -332,15 +336,6 @@ function ConversationMenu({ dm, onRename }: { dm: Dm; onRename: () => void }) {
           </Dropdown.Menu>
         </Dropdown.Popover>
       </Dropdown>
-      {leaving && (
-        <ConfirmDialog
-          title={t('chat.leaveTitle')}
-          text={t('chat.leaveText')}
-          confirmLabel={t('chat.leave')}
-          onConfirm={leave}
-          onClose={() => setLeaving(false)}
-        />
-      )}
     </>
   );
 }
@@ -432,7 +427,7 @@ function OngoingCall() {
         </div>
       </div>
       {!inside && (
-        <Button onPress={() => joinVoice(room.channel.id)} className="h-10 shrink-0 rounded-full px-5 max-md:px-4">
+        <Button onPress={() => joinVoice(room.channel.id)} className="h-10 shrink-0 rounded-full px-5 font-medium max-md:px-4 [--button-bg-hover:#2a9a45] [--button-bg:#248a3d] [--button-fg:#fff]">
           <span className="max-md:hidden">{t('chat.call.join')}</span>
           <span className="md:hidden">{t('chat.call.joinShort')}</span>
         </Button>
@@ -500,8 +495,9 @@ function MessageBody({ message, startsGroup }: { message: Message; startsGroup: 
             <UserProfile userId={message.userId} className="cursor-pointer text-[16px] font-medium leading-[22px] hover:underline">
               <span>{user?.name ?? t('chat.someone')}</span>
             </UserProfile>
-            <span className="text-[12px] text-faint" title={fullStamp(message.createdAt)}>
-              {messageStamp(message.createdAt)}
+            {/* Just the time: the day is on the divider above; the full date is on hover. */}
+            <span className="text-[12px] text-faint tabular-nums max-md:text-[13px]" title={fullStamp(message.createdAt)}>
+              {timeOf(message.createdAt)}
             </span>
           </div>
         </>

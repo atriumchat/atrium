@@ -59,36 +59,82 @@ export function VoiceView({ channel }: { channel: Channel }) {
   );
 }
 
-/** Discord's "No one is currently in voice / Join Voice" screen. */
+/**
+ * Before you're in (as in the native app): the faces of who's there, their names, a line when someone shows their
+ * screen, the list of people; at the bottom the mic you'll come in with and a big green Join.
+ */
 function JoinPrompt({ channel, connecting }: { channel: Channel; connecting: boolean }) {
   const { t } = useT();
   const voiceState = useStore((s) => s.voiceState);
   const users = useStore((s) => s.users);
+  const micOff = useStore((s) => s.muted || s.deafened);
   const members = voiceMembers(voiceState, channel.id);
+  const names = members.map((m) => users[m.userId]?.name ?? '…');
+  const who = names.length > 3 ? t('people.who.andMore', { names: names.slice(0, 2).join(', '), n: names.length - 2 }) : names.join(', ');
+  const sharing = members.find((m) => m.screen);
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 pb-16 text-center">
-      {members.length === 0 && <LineArt art="voice" className="mb-6" />}
-      <h2 className="text-[30px] font-bold">{channel.name}</h2>
-      {members.length > 0 ? (
-        <div className="flex flex-col items-center gap-3">
-          <p className="text-[15px] text-foreground/80">{t('voice.room.inside', { names: members.map((m) => users[m.userId]?.name ?? '…').join(', ') })}</p>
-          <div className="flex -space-x-2">
-            {members.slice(0, 8).map((m) => (
-              <Avatar key={m.userId} user={users[m.userId]} size={40} ringBg="var(--background)" />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className={`flex flex-1 flex-col overflow-y-auto px-4 pt-4 ${members.length ? '' : 'justify-center pb-16'}`}>
+        <div className="flex flex-col items-center text-center">
+          {members.length ? (
+            <div className="flex items-center justify-center">
+              {members.slice(0, 4).map((m, i) => (
+                <span key={m.userId} className={`rounded-full ring-[3px] ring-[var(--app-window)] ${i ? '-ml-4' : ''} ${i % 2 ? 'mt-6' : ''}`}>
+                  <Avatar user={users[m.userId]} size={64} />
+                </span>
+              ))}
+            </div>
+          ) : (
+            <LineArt art="voice" />
+          )}
+          <h2 className="mt-4 line-clamp-2 text-[26px] font-bold leading-8">{channel.name}</h2>
+          <p className="mt-1 text-[16px] text-muted">{members.length ? who : t('voice.room.nobody')}</p>
+        </div>
+        {sharing && (
+          <div className="mx-auto mt-5 flex w-full max-w-md items-center gap-2.5 rounded-2xl bg-default p-3.5">
+            <ScreenIcon size={20} className="shrink-0 text-danger" />
+            <span className="truncate text-[16px]">{t('voice.room.sharing', { name: users[sharing.userId]?.name ?? '…' })}</span>
+          </div>
+        )}
+        {members.length > 0 && (
+          <div className="mx-auto mt-5 w-full max-w-md overflow-hidden rounded-[20px] bg-default">
+            {members.map((m, i) => (
+              <div key={m.userId}>
+                {i > 0 && <div className="ml-[62px] h-px bg-white/[0.08]" />}
+                <div className="flex min-h-14 items-center gap-3 px-3.5">
+                  <Avatar user={users[m.userId]} size={36} ringBg="var(--default)" />
+                  <span className="min-w-0 flex-1 truncate text-[16px] max-md:text-[17px]">{users[m.userId]?.name ?? '…'}</span>
+                  {m.screen && <ScreenIcon size={18} className="shrink-0 text-danger" />}
+                  {m.video && <VideoIcon size={18} className="shrink-0 text-muted" />}
+                  {m.deafened ? <HeadphonesSlashIcon size={18} className="shrink-0 text-muted" /> : m.muted ? <MicSlashIcon size={18} className="shrink-0 text-muted" /> : null}
+                </div>
+              </div>
             ))}
           </div>
+        )}
+      </div>
+      {/* The dock: the mic you'll come in with (white is on), and Join under the thumb. */}
+      <div className="shrink-0 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2">
+        <div className="mx-auto flex max-w-md items-center gap-2.5 rounded-[38px] border-[0.5px] border-white/10 bg-default p-3">
+          <button
+            type="button"
+            onClick={() => void toggleMute()}
+            aria-label={micOff ? t('voice.mic.unmute') : t('voice.mic.mute')}
+            className={`flex size-14 shrink-0 items-center justify-center rounded-full transition-[background-color,transform] duration-150 active:scale-95 ${micOff ? 'bg-white/10 text-danger' : 'bg-white text-black'}`}
+          >
+            {micOff ? <MicSlashIcon size={26} /> : <MicIcon size={26} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => joinVoice(channel.id)}
+            disabled={connecting}
+            className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-[#248a3d] text-[17px] font-semibold text-white transition-[background-color,transform] duration-150 hover:bg-[#2a9a45] active:scale-[0.98] disabled:opacity-80"
+          >
+            {connecting ? <Spinner size="sm" color="current" /> : t('voice.room.joinVoice')}
+          </button>
         </div>
-      ) : (
-        <p className="text-[15px] text-muted">{t('voice.room.nobody')}</p>
-      )}
-      <Button
-        onPress={() => joinVoice(channel.id)}
-        isPending={connecting}
-        className="mt-4 h-10 rounded-[10px] px-5 text-[15px] [--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]"
-      >
-        {connecting ? t('voice.call.connecting') : t('voice.call.joinShort')}
-      </Button>
+      </div>
     </div>
   );
 }
@@ -120,6 +166,14 @@ function ConnectedStage({ channelId }: { channelId: string }) {
   const people = voiceMembers(voiceState, channelId).map((m) => ({ id: m.userId, muted: m.muted, deafened: m.deafened }));
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
+      {/* The call's light: a soft green glow behind everyone that brightens while someone talks. */}
+      {!(media.length > 0 || cameraPending) && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 transition-opacity duration-700"
+          style={{ opacity: speaking.length > 0 ? 1 : 0.45, background: 'radial-gradient(ellipse 60% 50% at 50% 45%, rgba(48,209,88,0.16), rgba(48,209,88,0.05) 45%, transparent 75%)' }}
+        />
+      )}
       {media.length > 0 || cameraPending ? <MediaStage /> : <BubbleCloud people={people} speaking={speaking} live />}
       <StartAudio
         label={t('voice.audio.enable')}

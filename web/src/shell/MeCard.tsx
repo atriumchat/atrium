@@ -6,7 +6,7 @@ import { localeOf, t, useT, type Key } from '../i18n';
 import type { MyStatus } from '../types';
 import { AvatarPicker } from '../people/UserProfile';
 import { SettingsDialog } from './SettingsDialog';
-import { ChevronRightIcon, PencilIcon, PlusIcon } from '../ui/icons';
+import { ChevronRightIcon, PencilIcon, PlusIcon, XIcon } from '../ui/icons';
 
 /** Callers re-render on a language change through their own useT(). */
 export const statusLabel = (status: MyStatus) => t(`shell.status.${status}`);
@@ -199,7 +199,7 @@ function StatusBubble() {
   }
 
   return (
-    <div className="mb-3 min-w-0 flex-1 rounded-[16px] bg-surface-tertiary px-3 py-2 text-[13px] leading-[18px]">
+    <div className="mb-3 flex min-w-0 flex-1 items-center rounded-[16px] bg-surface-tertiary px-3 py-2 text-[13px] leading-[18px]">
       {editing ? (
         <input
           ref={input}
@@ -229,7 +229,12 @@ function StatusBubble() {
           className={`flex w-full min-w-0 items-center gap-1.5 text-left ${saved ? 'text-foreground' : 'text-muted hover:text-foreground'}`}
         >
           {!saved && <PlusIcon size={14} className="shrink-0" />}
-          <span className="line-clamp-2 break-words">{saved || t('shell.status.own')}</span>
+          <span className="line-clamp-2 min-w-0 flex-1 break-words">{saved || t('shell.status.own')}</span>
+        </button>
+      )}
+      {!editing && saved && (
+        <button type="button" onClick={() => void saveStatus(status, '')} aria-label={t('shell.you.clearStatus')} title={t('shell.you.clearStatus')} className="-mr-1 ml-1 flex size-6 shrink-0 items-center justify-center rounded-full text-muted hover:bg-white/10 hover:text-foreground">
+          <XIcon size={13} />
         </button>
       )}
     </div>

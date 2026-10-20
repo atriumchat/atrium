@@ -98,4 +98,7 @@ export const voice = {
   'voice.err.noise': 'Сильное шумоподавление не включилось: {error}',
   'voice.err.device': 'Не удалось переключить устройство',
   'voice.room.people': { one: '{n} человек', few: '{n} человека', many: '{n} человек', other: '{n} человека' },
+  'voice.room.joinVoice': 'Войти в голосовой',
+  'voice.room.sharing': '{name} показывает экран',
+  'voice.call.chat': 'Чат',
 } as const;

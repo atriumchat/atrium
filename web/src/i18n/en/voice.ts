@@ -102,4 +102,7 @@ export const voice = {
   'voice.err.noise': 'Strong noise suppression failed: {error}',
   'voice.err.device': 'Could not switch device',
   'voice.room.people': { one: '{n} person', other: '{n} people' },
+  'voice.room.joinVoice': 'Join voice',
+  'voice.room.sharing': '{name} is sharing their screen',
+  'voice.call.chat': 'Chat',
 } satisfies Record<keyof typeof source, Entry>;

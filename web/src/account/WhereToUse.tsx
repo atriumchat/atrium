@@ -87,7 +87,18 @@ export function WhereToUse({ onDone, platform = detectPlatform(), inWindow = fal
   return <OnComputer onDone={onDone} platform={platform} inWindow={inWindow} />;
 }
 
-function Column({ art, title, text, children }: { art: ArtName; title: string; text?: string; children: ReactNode }) {
+/** `inWindow`: inside the rail's download window — sized to its content, on the window's colour, centred. */
+function Column({ art, title, text, children, inWindow = false }: { art: ArtName; title: string; text?: string; children: ReactNode; inWindow?: boolean }) {
+  if (inWindow) {
+    return (
+      <div className="flex flex-col items-center px-8 pb-8 pt-10 text-center">
+        <LineArt art={art} scale={1.5} plate="var(--overlay)" />
+        <h1 className="mt-6 text-[21px] font-medium leading-[1.3] tracking-[-0.01em]">{title}</h1>
+        {text && <p className="mt-1.5 text-[15px] text-muted">{text}</p>}
+        <div className="mt-6 flex w-full flex-col gap-2">{children}</div>
+      </div>
+    );
+  }
   return (
     <div className="flex h-full overflow-y-auto bg-background">
       <div className="m-auto flex w-full max-w-[400px] flex-col px-6 pb-10 pt-[max(40px,env(safe-area-inset-top))]">
@@ -116,7 +127,7 @@ function OnComputer({ onDone, platform, inWindow }: { onDone: () => void; platfo
         : DOWNLOADS;
 
   return (
-    <Column art="computer" title={t('account.where.computerTitle')} text={t('account.where.computerText')}>
+    <Column art="computer" title={t('account.where.computerTitle')} text={t('account.where.computerText')} inWindow={inWindow}>
       {started ? (
         <button onClick={onDone} className={primary}>
           {t('account.where.done')}

@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { dmTitle, openDm, openFriends, openPicker, useStore } from '../store';
-import { shortStamp } from '../chat/format';
+import { relativeStamp } from '../chat/format';
 import { useT } from '../i18n';
 import type { Dm } from '../types';
 import { DmAvatar } from '../ui/DmAvatar';
@@ -8,7 +8,7 @@ import { ensureHistory } from '../chat/history';
 import { plainText } from '../ui/Markdown';
 import { RoundButton } from '../ui/ui';
 import { EmptyState } from '../ui/Illustrations';
-import { PhoneIcon, PlusIcon, UsersIcon } from '../ui/icons';
+import { PhoneIcon, PlusIcon, SearchIcon, UsersIcon } from '../ui/icons';
 
 /**
  * Left list on the home screen: friends on top, then your direct messages and groups, newest first.
@@ -17,7 +17,12 @@ export function HomeSidebar() {
   const { t } = useT();
   const view = useStore((s) => (s.mode === 'home' ? s.homeView : null));
   const incoming = useStore((s) => s.friends.filter((f) => f.status === 'incoming').length);
-  const dms = useDmList();
+  const all = useDmList();
+  const users = useStore((s) => s.users);
+  const meId = useStore((s) => s.me?.id);
+  const [filter, setFilter] = useState('');
+  const query = filter.trim().toLowerCase();
+  const dms = query ? all.filter((dm) => dmTitle(dm, users, meId).toLowerCase().includes(query)) : all;
 
   return (
     <aside className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -26,6 +31,10 @@ export function HomeSidebar() {
         <NavItem active={view === 'friends'} onPress={openFriends} icon={<UsersIcon size={18} />} label={t('shell.home.friends')} extra={incoming > 0 && <Badge count={incoming} />} />
       </div>
       <nav className="flex-1 overflow-y-auto px-2 pb-3">
+        <label className="mx-2 mb-2 flex h-9 items-center gap-2 rounded-full bg-default px-3.5 text-faint focus-within:ring-2 focus-within:ring-focus">
+          <SearchIcon size={15} />
+          <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('shell.home.searchDms')} aria-label={t('shell.home.searchDms')} className="min-w-0 flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-faint" />
+        </label>
         <div className="flex items-center justify-between pb-1 pl-3 pt-1">
           <h2 className="text-[14px] font-medium text-muted">{t('shell.home.dms')}</h2>
           <RoundButton size="sm" tone="ghost" label={t('shell.home.createGroup')} onPress={() => openPicker({ mode: 'create' })} className="h-7 w-7 min-w-7 [&_svg]:size-4">
@@ -33,7 +42,7 @@ export function HomeSidebar() {
           </RoundButton>
         </div>
         {dms.length === 0 ? (
-          <EmptyState compact art="messages" title={t('shell.home.empty.title')} text={t('shell.home.empty.text')} />
+          query ? <EmptyState compact art="search" title={t('people.picker.noResults')} /> : <EmptyState compact art="messages" title={t('shell.home.empty.title')} text={t('shell.home.empty.text')} />
         ) : (
           <div className="space-y-0.5">
             {dms.map((dm) => (
@@ -74,6 +83,7 @@ export function useDmList(): Dm[] {
 /** `big`: the phone's home, with roomier rows and no "open" highlight (the list is its own screen there). */
 export function FeedDm({ dm, big = false }: { dm: Dm; big?: boolean }) {
   const { t } = useT();
+  useMinute();
   const users = useStore((s) => s.users);
   const meId = useStore((s) => s.me?.id);
   const active = useStore((s) => !big && s.mode === 'home' && s.homeView === dm.id);
@@ -94,7 +104,7 @@ export function FeedDm({ dm, big = false }: { dm: Dm; big?: boolean }) {
       avatar={<DmAvatar dm={dm} size={big ? 48 : 40} online={online} ringBg={active ? 'var(--default)' : 'var(--app-side)'} />}
       title={dmTitle(dm, users, meId)}
       text={text}
-      stamp={dm.preview ? shortStamp(dm.lastMessageAt) : ''}
+      stamp={dm.preview ? relativeStamp(dm.lastMessageAt) : ''}
       after={inCall ? <PhoneIcon size={16} className="shrink-0 text-success" aria-label={t('shell.home.callActive')} /> : unread > 0 && <Badge count={unread} />}
       bold={unread > 0}
       big={big}
@@ -113,11 +123,11 @@ function FeedRow(props: { active: boolean; onPress: () => void; onWarm: () => vo
       {props.avatar}
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline gap-2">
-          <span className={`min-w-0 flex-1 truncate text-[16px] font-medium leading-5 ${props.bold || props.active ? 'text-foreground' : 'text-foreground/85'}`}>{props.title}</span>
-          <span className="shrink-0 text-[12px] leading-4 text-faint">{props.stamp}</span>
+          <span className={`min-w-0 flex-1 truncate font-medium leading-5 ${props.big ? 'text-[17px]' : 'text-[16px]'} ${props.bold || props.active ? 'text-foreground' : 'text-foreground/85'}`}>{props.title}</span>
+          <span className="shrink-0 text-[13px] leading-4 text-faint tabular-nums">{props.stamp}</span>
         </span>
         <span className="mt-0.5 flex items-center gap-2">
-          <span className="min-w-0 flex-1 truncate text-[14px] leading-5 text-muted">{props.text}</span>
+          <span className={`min-w-0 flex-1 truncate leading-5 text-muted ${props.big ? 'text-[15px]' : 'text-[14px]'}`}>{props.text}</span>
           {props.after}
         </span>
       </span>
@@ -173,4 +183,13 @@ export function ConversationRow({ dm, large = false }: { dm: Dm; large?: boolean
       {unread > 0 && <Badge count={unread} />}
     </button>
   );
+}
+
+/** Re-renders once a minute: relative stamps ("12m") keep counting while the list is on screen. */
+function useMinute() {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => tick((n) => n + 1), 60_000);
+    return () => clearInterval(timer);
+  }, []);
 }

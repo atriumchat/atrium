@@ -58,10 +58,8 @@ export function DownloadRailButton() {
 function DownloadDialog({ onClose }: { onClose: () => void }) {
   const { t } = useT();
   return (
-    <Window label={t('settings.downloads.dialog')} onClose={onClose} className="overflow-hidden p-0">
-      <div className="h-[min(640px,88vh)]">
-        <WhereToUse onDone={onClose} inWindow />
-      </div>
+    <Window label={t('settings.downloads.dialog')} onClose={onClose} className="max-w-[400px] overflow-hidden p-0">
+      <WhereToUse onDone={onClose} inWindow />
     </Window>
   );
 }

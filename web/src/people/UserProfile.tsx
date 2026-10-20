@@ -8,7 +8,8 @@ import { ConfirmDialog } from '../ui/Dialog';
 import { ResetLinkButton } from './ResetLink';
 import { useT, type Key } from '../i18n';
 import { dateOnly } from '../chat/format';
-import { CameraIcon, PencilIcon } from '../ui/icons';
+import { BubbleIcon, CameraIcon, CheckIcon, PencilIcon, PhoneIcon, UserPlusIcon } from '../ui/icons';
+import { joinVoice } from '../voice/voice';
 
 type Placement = 'top' | 'bottom' | 'left' | 'right' | 'right top' | 'left top' | 'top start' | 'bottom start';
 
@@ -42,75 +43,166 @@ export function ProfileCard({ userId, onClose }: { userId: string; onClose: () =
     const entry = s.voiceState.find((v) => v.userId === userId);
     return entry ? s.channels.find((c) => c.id === entry.channelId)?.name : undefined;
   });
+  const blocked = useStore((s) => s.blocked.includes(userId));
   if (!user) return null;
 
+  if (isMe) {
+    return (
+      <div>
+        {/* The banner is your own photo, blurred down to a mood; graphite when there's no photo. */}
+        <div className="relative h-20 overflow-hidden bg-surface-tertiary">
+          {user.avatarUrl && <img src={user.avatarUrl} alt="" className="h-full w-full scale-150 object-cover opacity-70 blur-2xl" />}
+        </div>
+        <div className="px-5 pb-5">
+          <div className="-mt-11">
+            <AvatarPicker />
+          </div>
+          <h2 className="mt-2 text-[20px] font-bold leading-7">{user.name}</h2>
+          <StatusPicker />
+          <div className="my-3 h-px bg-separator" />
+          <h3 className="text-[12px] text-faint">{t('people.profile.about')}</h3>
+          <BioEditor initial={user.bio} />
+          <h3 className="mt-3 text-[12px] text-faint">{t('people.profile.since')}</h3>
+          <p className="mt-1 text-[14px]">{dateOnly(user.createdAt, { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const presence = room ? t('people.profile.inRoom', { room }) : online ? (user.status === 'dnd' ? t('people.profile.dnd') : t('people.profile.online')) : t('people.profile.offline');
+  const dot = room || (online && user.status !== 'dnd') ? 'bg-success' : online ? 'bg-danger' : 'bg-faint';
+  // Someone else's card, top to bottom (as in the native app): who they are and where they are now; what you can
+  // do as three equal tiles; what there is to know about them in one group; blocking apart at the foot.
   return (
-    <div>
-      {/* The banner is their own photo, blurred down to a mood; graphite when there's no photo. */}
-      <div className="relative h-20 overflow-hidden bg-surface-tertiary">
+    <div className="pb-4">
+      <div className="relative h-24 overflow-hidden bg-surface-tertiary">
         {user.avatarUrl && <img src={user.avatarUrl} alt="" className="h-full w-full scale-150 object-cover opacity-70 blur-2xl" />}
       </div>
-      <div className="px-5 pb-5">
-        <div className="-mt-11">
-          {isMe ? (
-            <AvatarPicker />
-          ) : (
-            <div className="w-fit rounded-full bg-overlay p-1.5">
-              <Avatar user={user} size={80} online={online} ringBg="var(--overlay)" />
-            </div>
+      <div className="flex flex-col items-center px-5">
+        <div className="-mt-12 w-fit rounded-full bg-overlay p-1.5">
+          <Avatar user={user} size={88} ringBg="var(--overlay)" />
+        </div>
+        <h2 className="mt-1.5 max-w-full truncate text-[22px] font-bold leading-7">{user.name}</h2>
+        <p className={`mt-0.5 flex items-center gap-1.5 text-[14px] ${room ? 'text-success' : 'text-muted'}`}>
+          <span className={`size-2 rounded-full ${dot}`} />
+          {presence}
+        </p>
+        {user.statusText && <p className="mt-1.5 text-center text-[15px] leading-5">{user.statusText}</p>}
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 px-3">
+        <div className="flex gap-2">
+          <Tile label={t('people.friends.message')} disabled={blocked} onPress={() => { onClose(); void messageUser(userId); }}>
+            <BubbleIcon size={21} />
+          </Tile>
+          <Tile label={t('voice.call.start')} disabled={blocked} onPress={async () => { onClose(); const dm = await messageUser(userId); if (dm) void joinVoice(dm.id); }}>
+            <PhoneIcon size={21} />
+          </Tile>
+          <FriendTile userId={userId} name={user.name} disabled={blocked} />
+        </div>
+
+        <div className="overflow-hidden rounded-[18px] bg-default">
+          <Fact label={t('people.profile.about')}>
+            <span className={`whitespace-pre-wrap break-words ${user.bio ? '' : 'text-muted'}`}>{user.bio || t('people.profile.noBio')}</span>
+          </Fact>
+          <div className="ml-4 h-px bg-white/[0.08]" />
+          <Fact label={t('people.profile.since')}>{dateOnly(user.createdAt, { day: 'numeric', month: 'long', year: 'numeric' })}</Fact>
+          {inviter && (
+            <>
+              <div className="ml-4 h-px bg-white/[0.08]" />
+              <Fact label={t('people.profile.invitedBy')}>
+                <span className="flex items-center gap-2">
+                  <Avatar user={inviter} size={22} ringBg="var(--default)" />
+                  <span className="truncate">{inviter.name}</span>
+                </span>
+              </Fact>
+            </>
           )}
         </div>
-        <h2 className="mt-2 text-[20px] font-bold leading-7">{user.name}</h2>
-        <p className="text-[13px] text-muted">
-          {room ? (
-            <span className="text-success">{t('people.profile.inRoom', { room })}</span>
-          ) : online ? (
-            user.status === 'dnd' ? t('people.profile.dnd') : t('people.profile.online')
-          ) : (
-            t('people.profile.offline')
-          )}
-        </p>
-        {!isMe && user.statusText && <p className="mt-1 text-[14px]">{user.statusText}</p>}
-        {isMe && <StatusPicker />}
 
-        <div className="my-3 h-px bg-separator" />
-
-        <h3 className="text-[12px] text-faint">{t('people.profile.about')}</h3>
-        {isMe ? (
-          <BioEditor initial={user.bio} />
-        ) : (
-          <p className="mt-1 whitespace-pre-wrap break-words text-[14px]">{user.bio || <span className="text-muted">{t('people.profile.noBio')}</span>}</p>
-        )}
-
-        <h3 className="mt-3 text-[12px] text-faint">{t('people.profile.since')}</h3>
-        <p className="mt-1 text-[14px]">{dateOnly(user.createdAt, { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-
-        {inviter && (
-          <>
-            <h3 className="mt-3 text-[12px] text-faint">{t('people.profile.invitedBy')}</h3>
-            <p className="mt-1 text-[14px]">{inviter.name}</p>
-          </>
-        )}
-
-        {!isMe && (
-          <div className="mt-4 flex gap-2">
-            <Button
-              size="sm"
-              className="flex-1 rounded-full"
-              onPress={() => {
-                onClose();
-                messageUser(userId);
-              }}
-            >
-              {t('people.friends.message')}
-            </Button>
-            <FriendButton userId={userId} name={user.name} />
-          </div>
-        )}
-        {!isMe && <BlockButton userId={userId} name={user.name} />}
-        {!isMe && isAdmin && <ResetLinkButton userId={userId} name={user.name} />}
+        <div className="overflow-hidden rounded-[18px] bg-default">
+          <BlockButton userId={userId} name={user.name} />
+        </div>
+        {isAdmin && <ResetLinkButton userId={userId} name={user.name} />}
       </div>
     </div>
+  );
+}
+
+/** A fact about them: its name small and grey, the fact under it, as in Contacts. */
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="px-4 py-2.5">
+      <div className="text-[13px] text-muted">{label}</div>
+      <div className="mt-0.5 text-[15px] leading-5">{children}</div>
+    </div>
+  );
+}
+
+/** One of the three actions under the name: an icon over its word, all three the same size. */
+function Tile({ label, onPress, children, disabled, accent, busy }: { label: string; onPress: () => void; children: ReactNode; disabled?: boolean; accent?: boolean; busy?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onPress}
+      disabled={disabled || busy}
+      className={`flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl transition-[background-color,transform,opacity] duration-150 active:scale-[0.97] disabled:opacity-40 ${accent ? 'bg-white text-black hover:bg-[#e7e7ea]' : 'bg-default hover:bg-[#28282d]'}`}
+    >
+      {children}
+      <span className="max-w-full truncate px-1 text-[13px] font-medium">{label}</span>
+    </button>
+  );
+}
+
+/**
+ * The friendship as a tile: "Add", "Accept" (white: it's waiting for you), or what already is — "Friends",
+ * "Requested" — where undoing it asks first instead of happening on a stray click.
+ */
+function FriendTile({ userId, name, disabled }: { userId: string; name: string; disabled?: boolean }) {
+  const { t } = useT();
+  const status = useStore((s) => s.friends.find((f) => f.userId === userId)?.status);
+  const [busy, setBusy] = useState(false);
+  const [asking, setAsking] = useState(false);
+  async function run(action: () => Promise<unknown>) {
+    setBusy(true);
+    try {
+      useStore.setState({ friends: (await action()) as never });
+    } catch (e) {
+      showError(e instanceof Error ? e.message : t('people.failed'));
+    } finally {
+      setBusy(false);
+    }
+  }
+  const undo = status === 'friend' || status === 'outgoing';
+  return (
+    <>
+      {status === 'incoming' ? (
+        <Tile label={t('people.friends.accept')} accent busy={busy} disabled={disabled} onPress={() => void run(() => api.acceptFriend(userId))}>
+          <CheckIcon size={21} />
+        </Tile>
+      ) : status === 'friend' ? (
+        <Tile label={t('people.profile.isFriend')} busy={busy} disabled={disabled} onPress={() => setAsking(true)}>
+          <CheckIcon size={21} />
+        </Tile>
+      ) : status === 'outgoing' ? (
+        <Tile label={t('people.profile.requested')} busy={busy} disabled={disabled} onPress={() => setAsking(true)}>
+          <UserPlusIcon size={21} />
+        </Tile>
+      ) : (
+        <Tile label={t('people.profile.add')} busy={busy} disabled={disabled} onPress={() => void run(() => api.addFriend(name))}>
+          <UserPlusIcon size={21} />
+        </Tile>
+      )}
+      {asking && undo && (
+        <ConfirmDialog
+          title={status === 'friend' ? t('people.profile.removeFriendTitle', { name }) : t('people.profile.cancelRequestTitle', { name })}
+          text=""
+          confirmLabel={status === 'friend' ? t('people.profile.removeFriend') : t('people.friends.cancelRequest')}
+          onConfirm={() => run(() => api.removeFriend(userId))}
+          onClose={() => setAsking(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -184,7 +276,7 @@ function BlockButton({ userId, name }: { userId: string; name: string }) {
     <>
       <button
         onClick={() => (blocked ? run(() => api.unblock(userId)) : setAsking(true))}
-        className={`mt-2 w-full rounded-full py-2 text-[13px] transition-colors hover:bg-white/[0.06] ${blocked ? 'text-muted' : 'text-danger'}`}
+        className={`w-full px-4 py-3 text-left text-[15px] transition-colors hover:bg-white/[0.06] ${blocked ? 'text-foreground' : 'text-danger'}`}
       >
         {blocked ? t('people.profile.unblock') : t('people.profile.block')}
       </button>

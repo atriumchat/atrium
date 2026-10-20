@@ -34,6 +34,7 @@ export async function messageUser(userId: string) {
     if (epoch !== getSessionEpoch()) return;
     set((s) => ({ dms: [dm, ...s.dms.filter((d) => d.id !== dm.id)] }));
     openDm(dm.id);
+    return dm;
   } catch (e) {
     showError(e instanceof Error ? e.message : t('common.openDmFailed'));
   }

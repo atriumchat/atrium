@@ -133,4 +133,13 @@ export const shell = {
   'shell.you.saveFailed': 'Не удалось сохранить',
   'shell.you.bioPlaceholder': 'Игры, когда онлайн',
   'shell.you.save': 'Сохранить',
+  'shell.home.searchDms': 'Найти переписку',
+  'shell.you.settings': 'Настройки',
+  'shell.you.editStatus': 'Статус',
+  'shell.you.clearStatus': 'Сбросить статус',
+  'shell.you.friends': 'Ваши друзья',
+  'shell.sidebar.invite': 'Пригласить на сервер',
+  'shell.time.now': 'сейчас',
+  'shell.time.minutes': '{n} мин',
+  'shell.time.hours': '{n} ч',
 } as const;

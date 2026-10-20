@@ -133,4 +133,13 @@ export const shell = {
   'shell.you.saveFailed': 'Could not save',
   'shell.you.bioPlaceholder': 'Games, when online',
   'shell.you.save': 'Save',
+  'shell.home.searchDms': 'Find a conversation',
+  'shell.you.settings': 'Settings',
+  'shell.you.editStatus': 'Status',
+  'shell.you.clearStatus': 'Clear status',
+  'shell.you.friends': 'Your friends',
+  'shell.sidebar.invite': 'Invite to the server',
+  'shell.time.now': 'now',
+  'shell.time.minutes': '{n}m',
+  'shell.time.hours': '{n}h',
 } satisfies Record<keyof typeof source, Entry>;

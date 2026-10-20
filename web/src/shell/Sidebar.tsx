@@ -1,4 +1,5 @@
 import { useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
+import { InviteButton } from '../people/Invites';
 import { Popover } from '@heroui/react';
 import { api } from '../api';
 import { selectChannel, setChannels, showError, useStore, voiceMembers } from '../store';
@@ -25,7 +26,7 @@ export function Sidebar() {
 
   return (
     <aside className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="flex h-[72px] shrink-0 items-center px-4 max-md:px-3">
+      <div className="flex h-[72px] shrink-0 items-center gap-2 px-4 max-md:px-3">
         <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full bg-default px-4 text-faint focus-within:ring-2 focus-within:ring-focus max-md:h-12">
           <SearchIcon size={16} />
           <input
@@ -33,9 +34,10 @@ export function Sidebar() {
             onChange={(e) => setFilter(e.target.value)}
             placeholder={t('shell.sidebar.search')}
             aria-label={t('shell.sidebar.search')}
-            className="min-w-0 flex-1 bg-transparent text-[15px] text-foreground outline-none placeholder:text-faint"
+            className="min-w-0 flex-1 bg-transparent text-[15px] text-foreground outline-none placeholder:text-faint max-md:text-[17px]"
           />
         </label>
+        <InviteButton />
       </div>
       <nav className="flex-1 overflow-y-auto px-2 pb-3 max-md:px-3">
         {/* A search that finds nothing shows only that, without the two empty sections under it. */}
@@ -245,6 +247,8 @@ function TextItem({ channel }: { channel: Channel }) {
       : undefined;
   return (
     <div className="group relative">
+      {/* Discord's pill at the edge of the list: something new here, easier to catch than a bolder name alone. */}
+      {(showUnread || showMentions) && <span aria-hidden className="absolute -left-2 top-1/2 h-2 w-1 -translate-y-1/2 rounded-r-full bg-foreground max-md:-left-3" />}
       <button
         onClick={() => selectChannel(channel.id)}
         onPointerEnter={() => void ensureHistory(channel.id, 'channel', { quiet: true })}
