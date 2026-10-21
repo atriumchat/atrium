@@ -168,7 +168,7 @@ export function FlowPrimary({ onPress, disabled = false, busy = false, children 
  * A field as a line: its name small above, the text big on a hairline that turns white while typing, what's wrong in
  * red right under it. Always give it a placeholder: an empty line alone doesn't say it takes text.
  */
-export function LineField({ label, suffix, bad = false, error, style, ...input }: LineFieldProps & Omit<ComponentProps<typeof TextInput>, 'style'> & { style?: StyleProp<ViewStyle> }) {
+export function LineField({ label, suffix, trailing, bad = false, error, style, ...input }: LineFieldProps & Omit<ComponentProps<typeof TextInput>, 'style'> & { style?: StyleProp<ViewStyle> }) {
   const [focused, setFocused] = useState(false);
   const submit = useContext(Submit);
   const wrong = bad || !!error;
@@ -190,6 +190,7 @@ export function LineField({ label, suffix, bad = false, error, style, ...input }
           style={{ flex: 1, minWidth: 0, height: 48, fontSize: type.field.size, color: ink, fontFamily: fonts[400], outlineStyle: 'none' } as never}
         />
         {suffix ? <Text style={{ fontSize: type.field.size, color: color.muted }}>{suffix}</Text> : null}
+        {trailing}
       </View>
       {error ? <Text accessibilityRole="alert" style={{ marginTop: 6, fontSize: type.label.size, lineHeight: type.label.line, color: color.danger }}>{error}</Text> : null}
     </View>

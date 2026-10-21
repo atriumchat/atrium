@@ -10,10 +10,12 @@
   "workspaces": [
     "packages/*",
     "web",
-    "mobile"
+    "mobile",
+    "desktop/ui"
   ],
   "scripts": {
     "web": "npm run dev -w web",
-    "mobile": "npm run start -w mobile"
+    "mobile": "npm run start -w mobile",
+    "desktop-ui": "npm run dev -w @gomex/desktop-ui"
   }
 }

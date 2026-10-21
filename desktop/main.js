@@ -380,7 +380,7 @@ ipcMain.handle('address:guide', (event) => {
   shell.openExternal(SERVER_GUIDE);
 });
 
-/* ---------- "Your own server": setting up a server from the app (onboarding.html, server-setup.js) ---------- */
+/* ---------- "Your own server": setting up a server from the app (desktop/ui's onboarding page, built into ui-dist; server-setup.js) ---------- */
 
 /** @type {BrowserWindow | null} */
 let setupWindow = null;
@@ -399,7 +399,7 @@ function openSetupWindow() {
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'onboarding-preload.js'), contextIsolation: true, sandbox: true },
   });
-  setupWindow.loadFile(path.join(__dirname, 'onboarding.html'), { query: { lang: i18n.getLang() } });
+  setupWindow.loadFile(path.join(__dirname, 'ui-dist', 'onboarding.html'), { query: { lang: i18n.getLang() } });
   setupWindow.on('closed', () => {
     setupWindow = null;
     addressWatch = null;

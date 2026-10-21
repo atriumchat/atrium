@@ -41,8 +41,12 @@ npm run dev -w web
 ```bash
 cd desktop
 npm ci
-GOMEX_URL=http://localhost:5190 npx electron .
+GOMEX_URL=http://localhost:5190 npm start
 ```
+
+Окна приложения, сделанные на React (`desktop/ui`, пока «Свой сервер»), собираются в `desktop/ui-dist` перед `npm start`
+и сборками `dist:*` (`npm run ui`); `npm run desktop-ui` в корне отдаёт их для работы над дизайном, на выдуманных
+ответах и без главного процесса (`onboarding.html#step=install`).
 
 `GOMEX_LANG=ru` или `GOMEX_LANG=en` задаёт язык десктопа; по умолчанию — язык системы.
 

@@ -106,13 +106,14 @@ export function FlowSecondary({ onPress, children }: FlowSecondaryProps) {
 }
 
 /** A field as a line: its name small above, the text big on a hairline (white while typing, red when wrong), the error under it. */
-export function LineField({ label, suffix, error, bad = false, ...input }: LineFieldProps & Omit<InputHTMLAttributes<HTMLInputElement>, keyof LineFieldProps>) {
+export function LineField({ label, suffix, trailing, error, bad = false, ...input }: LineFieldProps & Omit<InputHTMLAttributes<HTMLInputElement>, keyof LineFieldProps>) {
   return (
     <label className={`flow-field${error || bad ? ' bad' : ''}`}>
       <span className="flow-field-label">{label}</span>
       <span className="flow-line">
         <input spellCheck={false} autoComplete="off" aria-invalid={error || bad ? true : undefined} {...input} />
         {suffix ? <span className="flow-suffix">{suffix}</span> : null}
+        {trailing}
       </span>
       {error ? <span className="flow-field-error" role="alert">{error}</span> : null}
     </label>

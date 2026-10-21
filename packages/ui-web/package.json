@@ -6,8 +6,7 @@
   "type": "module",
   "main": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./flow.css": "./src/flow.css"
+    ".": "./src/index.ts"
   },
   "sideEffects": [
     "*.css"

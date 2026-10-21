@@ -108,6 +108,6 @@ couple of minutes; you can close the app"). Not marketing, not jargon: people se
   `&invite=7F3K9QAB` for the invite branch). The web build stubs LiveKit and the Keychain (`mobile/web-stubs`).
 - Done on these parts: "Your own server", sign-in, invite and the recovery key on the phone (`RecoveryKeyStep`); the
   server's setup wizard on the web and in the desktop app (`@gomex/ui-web`; `#step=server`
-  and the like open a step on made-up answers in development). Next: the desktop app's own "Your own server" window,
-  then settings. The main screens (rail, channels, chat, call) last,
+  and the like open a step on made-up answers in development); the desktop app's own "Your own server" window
+  (`desktop/ui`, `npm run desktop-ui` and `onboarding.html?lang=ru#step=install` on made-up answers). Next: settings. The main screens (rail, channels, chat, call) last,
   drawn in Figma first.

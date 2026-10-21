@@ -10,10 +10,12 @@
     "start": "electron .",
     "dev": "GOMEX_URL=http://localhost:5180 electron .",
     "check:i18n": "node check-i18n.js",
-    "design": "node scripts/design.js",
-    "check:design": "node scripts/design.js --check",
     "dist:mac": "electron-builder --mac",
-    "dist:win": "electron-builder --win"
+    "dist:win": "electron-builder --win",
+    "ui": "npm --prefix .. run build -w @gomex/desktop-ui",
+    "predist:mac": "npm run ui",
+    "predist:win": "npm run ui",
+    "prestart": "npm run ui"
   },
   "build": {
     "appId": "io.github.gomex-inc.gomex",
@@ -31,11 +33,7 @@
       "address.html",
       "address.js",
       "address-preload.js",
-      "onboarding.html",
-      "onboarding.css",
-      "tokens.css",
-      "flow.css",
-      "onboarding.js",
+      "ui-dist/**",
       "onboarding-preload.js",
       "server-setup.js",
       "screen-picker.js",

@@ -60,6 +60,8 @@ export type TextActionProps = {
 export type LineFieldProps = {
   label: string;
   suffix?: string;
+  /** A small control at the line's end, after the suffix: show the password. */
+  trailing?: ReactNode;
   error?: string | false;
   bad?: boolean;
 };

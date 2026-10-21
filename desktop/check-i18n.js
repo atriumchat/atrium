@@ -11,9 +11,11 @@ for (const key of Object.keys(STRINGS.ru)) {
 }
 for (const key of Object.keys(STRINGS.en)) if (!(key in STRINGS.ru)) problems.push(`missing in ru: ${key}`);
 
-// Keys used literally: t('key'), data-i18n="key", "aria-label:key".
+// Keys used literally: t('key'), data-i18n="key", "aria-label:key"; in the app's own files and its windows (ui/src).
 const used = new Set();
-for (const file of fs.readdirSync(__dirname).filter((f) => /\.(js|html)$/.test(f) && !['i18n.js', 'i18n-page.js', 'check-i18n.js'].includes(f))) {
+const pages = fs.readdirSync(__dirname).filter((f) => /\.(js|html)$/.test(f) && !['i18n.js', 'i18n-page.js', 'check-i18n.js'].includes(f));
+const windows = fs.readdirSync(`${__dirname}/ui/src`, { recursive: true }).filter((f) => /\.tsx?$/.test(f)).map((f) => `ui/src/${f}`);
+for (const file of [...pages, ...windows]) {
   const source = fs.readFileSync(`${__dirname}/${file}`, 'utf8');
   for (const m of source.matchAll(/\bt\('([\w.]+)'/g)) used.add(m[1]);
   for (const m of source.matchAll(/data-i18n="([\w.]+)"/g)) used.add(m[1]);

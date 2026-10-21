@@ -1,4 +1,4 @@
-// Bridge for the "Your own server" window only (onboarding.html → server-setup.js in the main process).
+// Bridge for the "Your own server" window only (desktop/ui's onboarding page → server-setup.js in the main process).
 const { contextBridge, ipcRenderer } = require('electron');
 
 const call = (name, ...args) => ipcRenderer.invoke(`setup:${name}`, ...args);

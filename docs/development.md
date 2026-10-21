@@ -42,8 +42,12 @@ Desktop against the local client. `npm run dev` points at the old port 5180, so 
 ```bash
 cd desktop
 npm ci
-GOMEX_URL=http://localhost:5190 npx electron .
+GOMEX_URL=http://localhost:5190 npm start
 ```
+
+The app's own windows that are pages of React (`desktop/ui`, now "Your own server") are built into `desktop/ui-dist`
+before `npm start` and the `dist:*` builds (`npm run ui`); `npm run desktop-ui` at the root serves them for design
+work, on made-up answers without the main process (`onboarding.html#step=install`).
 
 `GOMEX_LANG=ru` or `GOMEX_LANG=en` forces the desktop language; by default it follows the system's.
 

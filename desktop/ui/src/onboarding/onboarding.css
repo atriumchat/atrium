@@ -1,0 +1,145 @@
+/* "Your own server" in the desktop app: what this window has and the web's flow parts don't (@gomex/ui-web has the
+   rest): the password's eye, the wait for deSEC's letter, the DNS records, the Drive row. Colours and sizes are tokens. */
+
+:root {
+  color-scheme: dark;
+}
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--gx-page);
+}
+
+.eye {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gx-muted);
+  cursor: pointer;
+}
+.eye:hover,
+.eye[aria-pressed="true"] {
+  color: var(--gx-text);
+}
+.eye svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* The wait for the letter's link. */
+.wait,
+.late {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0;
+  font-size: var(--gx-sub-size);
+  color: var(--gx-muted);
+}
+.wait.done .spinner {
+  display: none;
+}
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--gx-outline);
+  border-top-color: var(--gx-text);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* The three DNS records for a domain of one's own: rows between hairlines, each with its copy button. */
+.records .row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--gx-hairline);
+}
+.records .row:last-child {
+  border-bottom: 1px solid var(--gx-hairline);
+}
+.records .type,
+.records .to {
+  color: var(--gx-muted);
+}
+.records .to {
+  font-variant-numeric: tabular-nums;
+}
+.records code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: inherit;
+}
+.records .icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--gx-outline);
+  border-radius: 50%;
+  background: none;
+  color: var(--gx-text);
+  cursor: pointer;
+}
+.records .icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* The Drive: its name and account, connect underlined; then what a copy saves you from, in type. */
+.drive {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--gx-hairline);
+  border-bottom: 1px solid var(--gx-hairline);
+}
+.drive .grow {
+  flex: 1;
+}
+.drive b,
+.points b {
+  display: block;
+  font-size: var(--gx-choice-size);
+  line-height: var(--gx-choice-line);
+  font-weight: 400;
+}
+.drive small,
+.points small {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--gx-note-size);
+  color: var(--gx-muted);
+}
+.drive .on {
+  color: var(--gx-muted);
+}
+.points {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

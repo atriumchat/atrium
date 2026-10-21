@@ -7,6 +7,7 @@ COPY package.json package-lock.json ./
 COPY packages/ ./packages/
 COPY web/package.json ./web/
 COPY mobile/package.json ./mobile/
+COPY desktop/ui/package.json ./desktop/ui/
 RUN npm ci --no-audit --no-fund -w web --include-workspace-root
 COPY web/ ./web/
 RUN npm run build -w web

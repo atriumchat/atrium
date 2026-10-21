@@ -410,5 +410,6 @@
 
   const api = { STRINGS, pick, setLang, getLang: () => lang, t };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  else globalThis.gomexI18n = api;
+  // Pages read it from here: a plain <script>, and desktop/ui's bundle, which may wrap this file as CommonJS.
+  globalThis.gomexI18n = api;
 })();

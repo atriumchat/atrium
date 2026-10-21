@@ -70,7 +70,7 @@ function intelMac() {
 }
 
 /*
- * The column of the desktop app's setup window (desktop/onboarding.css): 46 px controls, a white pill for the
+ * The column of the desktop app's setup window (desktop/ui): 46 px controls, a white pill for the
  * main action, a quiet one under it.
  */
 const primary = 'flex h-[46px] w-full items-center justify-center gap-2 rounded-full bg-[#f2f2f4] text-[15px] font-medium text-[#0c0c0e] transition-colors hover:bg-white';

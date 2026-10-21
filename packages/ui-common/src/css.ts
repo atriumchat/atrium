@@ -2,7 +2,7 @@ import { color, font, radius, space, type, wideFrom } from './tokens';
 
 /**
  * The tokens as CSS: `--gx-…` variables on :root, the page and its text switching at `wideFrom`. Pure, so the web
- * (applyTokens) and the desktop app's pages (desktop/scripts/design.js writes desktop/tokens.css) make the same CSS.
+ * (applyTokens) and the desktop app's windows (desktop/ui) make the same CSS.
  */
 export function tokenCss() {
   const vars: Record<string, string | number> = {

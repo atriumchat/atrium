@@ -14,6 +14,7 @@ deploy/caddy-config/
 # Desktop app
 desktop/node_modules/
 desktop/dist/
+desktop/ui-dist/
 deploy/downloads/
 *.tsbuildinfo
 .pytest_cache/
