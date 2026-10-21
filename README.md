@@ -119,6 +119,7 @@ Report vulnerabilities to the maintainer privately, not in public discussions.
 - [Installation](docs/install.md): from the app or by command, update, restore, remove, installer options.
 - [Operation](docs/operations.md): first run and invites, settings, ports, maintenance and backups.
 - [Development](docs/development.md): local setup, checks, releases.
+- [Client architecture](docs/adr/001-client-architecture.md) and [design](DESIGN.md): the packages, Gomex Flow, why so.
 
 ## Maintenance
 
