@@ -1,0 +1,8 @@
+node_modules/
+.expo/
+dist/
+# The generated native projects (expo prebuild); a local module's own ios/ (modules/gomex-ssh) is source.
+/ios/
+/android/
+.env.local
+*.tsbuildinfo

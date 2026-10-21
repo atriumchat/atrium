@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Gomex",
+    "slug": "gomex-mobile",
+    "scheme": "gomex",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
+    "ios": {
+      "bundleIdentifier": "com.gomex.mobile",
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "audio"
+        ],
+        "NSMicrophoneUsageDescription": "Gomex использует микрофон для звонков.",
+        "NSCameraUsageDescription": "Gomex использует камеру для видеозвонков.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.gomex.mobile",
+      "permissions": [
+        "RECORD_AUDIO",
+        "CAMERA",
+        "MODIFY_AUDIO_SETTINGS",
+        "BLUETOOTH_CONNECT"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-localization",
+      "./plugins/withDeploymentTarget",
+      "@livekit/react-native-expo-plugin",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "microphonePermission": "Gomex использует микрофон для звонков.",
+          "cameraPermission": "Gomex использует камеру для видеозвонков."
+        }
+      ],
+      "expo-web-browser"
+    ]
+  }
+}
