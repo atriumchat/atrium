@@ -4,7 +4,7 @@ import { useT } from '../i18n';
 import { inviteLink } from '../people/invite';
 import { GomexMark } from '../ui/Logo';
 import { IconCropper, centred, cropToBlob, cropToUrl, loadImage, type Crop } from '../ui/IconCropper';
-import { FlowPrimary, FlowShell, FlowStep, LineField, TextAction } from '../ui/flow/Flow';
+import { FlowPrimary, FlowSecondary, FlowShell, FlowStep, LineField, TextAction } from '../ui/flow/Flow';
 
 /**
  * First run on a fresh server, shown while it has no accounts, in the flow look (DESIGN.md) as the phone app does it
@@ -264,8 +264,12 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             error={error}
             onBack={askCode ? () => go('code', true) : undefined}
             onSubmit={() => serverName.trim() && go('admin')}
-            actions={<FlowPrimary type="submit" disabled={!serverName.trim()}>{t('setup.next')}</FlowPrimary>}
-            below={<TextAction onClick={skipServer}>{t('setup.server.skip')}</TextAction>}
+            actions={
+              <>
+                <FlowPrimary type="submit" disabled={!serverName.trim()}>{t('setup.next')}</FlowPrimary>
+                <FlowSecondary onClick={skipServer}>{t('setup.server.skip')}</FlowSecondary>
+              </>
+            }
           >
             <LineField label={t('setup.server.nameLabel')} value={serverName} onChange={(e) => setServerName(e.target.value)} maxLength={40} placeholder={t('setup.server.namePlaceholder')} />
             <div className="flow-actions" style={{ alignItems: 'center' }}>
@@ -290,8 +294,12 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             sub={draft.name}
             onBack={() => go('server', true)}
             onSubmit={keepCrop}
-            actions={<FlowPrimary type="submit">{t('setup.server.cropDone')}</FlowPrimary>}
-            below={<TextAction onClick={() => fileInput.current?.click()}>{t('setup.server.another')}</TextAction>}
+            actions={
+              <>
+                <FlowPrimary type="submit">{t('setup.server.cropDone')}</FlowPrimary>
+                <FlowSecondary onClick={() => fileInput.current?.click()}>{t('setup.server.another')}</FlowSecondary>
+              </>
+            }
           >
             <IconCropper image={draft.image} crop={draft.crop} onChange={(crop) => setDraft((d) => d && { ...d, crop })} className="flow-crop" />
             <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => void pick(e.target.files?.[0])} />
@@ -343,13 +351,17 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             actions={
               linkSent ? (
                 <FlowPrimary onClick={onDone}>{t('setup.done.start')}</FlowPrimary>
-              ) : canShare ? (
-                <FlowPrimary disabled={!link} onClick={() => void shareLink()}>{t('setup.invite.share')}</FlowPrimary>
               ) : (
-                <FlowPrimary disabled={!link} onClick={() => void copyLink()}>{t('setup.invite.copy')}</FlowPrimary>
+                <>
+                  {canShare ? (
+                    <FlowPrimary disabled={!link} onClick={() => void shareLink()}>{t('setup.invite.share')}</FlowPrimary>
+                  ) : (
+                    <FlowPrimary disabled={!link} onClick={() => void copyLink()}>{t('setup.invite.copy')}</FlowPrimary>
+                  )}
+                  <FlowSecondary onClick={onDone}>{t('setup.invite.later')}</FlowSecondary>
+                </>
               )
             }
-            below={linkSent ? undefined : <TextAction onClick={onDone}>{t('setup.invite.later')}</TextAction>}
           >
             <p className="flow-big" style={{ fontSize: 22, lineHeight: '28px', letterSpacing: 0 }}>{link.replace(/^https?:\/\//, '') || t('setup.invite.loading')}</p>
             {canShare ? <TextAction left onClick={() => void copyLink()}>{linkSent === 'copied' ? t('common.copy.done') : t('common.copy.label')}</TextAction> : null}

@@ -11,7 +11,7 @@ import { Text } from '../src/text';
 import { colors } from '../src/theme';
 import { haptic } from '../src/haptics';
 import { GomexMark } from '../src/components/Logo';
-import { FlowShell, FlowStep, KeptRow, LineField, RadioRow, RING, TextAction, useFlowFrame } from '../src/components/Flow';
+import { FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, RING, TextAction, useFlowFrame } from '../src/components/Flow';
 import { RecoveryKeyStep } from '../src/components/RecoveryKeyStep';
 import { Primary } from '../src/components/Settings';
 import { real } from '../src/own/backend';
@@ -519,7 +519,7 @@ export default function OwnServer() {
             sub={t('setup.server.sub')}
             error={error}
             actions={<Primary disabled={!serverName.trim()} onPress={() => go('admin')}>{t('setup.next')}</Primary>}
-            below={<TextAction onPress={() => (setServerName(''), setIcon(null), go('admin'))}>{t('setup.server.skip')}</TextAction>}
+            aside={<FlowSecondary onPress={() => (setServerName(''), setIcon(null), go('admin'))}>{t('setup.server.skip')}</FlowSecondary>}
           >
             <LineField label={t('setup.server.nameLabel')} value={serverName} onChangeText={setServerName} maxLength={40} placeholder={t('setup.server.namePlaceholder')} autoComplete="off" textContentType="none" autoCapitalize="sentences" returnKeyType="next" onSubmitEditing={() => serverName.trim() && go('admin')} />
             <Pressable accessibilityRole="button" onPress={() => void pickIcon()} style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
@@ -559,7 +559,7 @@ export default function OwnServer() {
             sub={t('setup.invite.sub')}
             error={error}
             actions={linkSent ? <Primary busy={busy} onPress={finish}>{t('own.invite.done')}</Primary> : <Primary onPress={() => void shareLink()}>{t('setup.invite.share')}</Primary>}
-            below={linkSent ? undefined : <TextAction onPress={finish}>{t('setup.invite.later')}</TextAction>}
+            aside={linkSent ? undefined : <FlowSecondary onPress={finish}>{t('setup.invite.later')}</FlowSecondary>}
           >
             <Text numberOfLines={2} style={{ fontSize: 22, lineHeight: 28 }}>{link.replace(/^https?:\/\//, '') || t('setup.invite.loading')}</Text>
             <TextAction left onPress={() => { void Clipboard.setStringAsync(link); haptic.tap(); setLinkSent((sent) => sent ?? 'copied'); }}>{linkSent === 'copied' ? t('common.copy.done') : t('common.copy.label')}</TextAction>

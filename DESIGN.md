@@ -45,7 +45,13 @@ Content is always quieter than the title. Numbers are never put in fixed-width c
 
 ## Colour
 
-- Page `#000`, text `#fff`, secondary `colors.muted`, errors `colors.danger`.
+All values live in one file, `web/src/tokens.ts`: the web turns it into `--gx-` CSS variables at start-up
+(`applyTokens`, also read by the HeroUI theme), the phone app imports it (`mobile/src/theme.ts`). Never write a colour,
+size or radius by hand in a flow; add a token.
+
+- Page true black on a phone (OLED: the pixels go dark), near-black `#0c0c0e` in a window wider than a phone (a
+  monitor's backlight shows `#000` as glowing grey). Text white on a phone, `#ededef` on a monitor (white on black
+  halates over a long read). Secondary `muted`, errors `danger`.
 - No accent colour in flows: no green buttons, links, radios or ticks. White carries the emphasis.
 - The only filled shape on a screen is the main button (white pill, dark text); disabled it turns graphite.
 
@@ -62,7 +68,8 @@ Content is always quieter than the title. Numbers are never put in fixed-width c
 - **LineField**: label, big text on a hairline (white while typing, red when wrong), placeholder always, error under it.
 - **RadioRow**: a choice between hairlines, radio on the right (as iOS marks a choice). One option preselected.
 - **CheckRow**: a square tick box (a round one reads as a radio).
-- **TextAction**: white underlined text for skip / later / copy.
+- **FlowSecondary**: a small outlined button 2 points right of the main one, for the way round it (skip, later).
+- **TextAction**: white underlined text for other paths and small actions (forgot password, copy).
 - **KeptRow**: something remembered from before, with its action underlined on the right.
 
 ## Motion

@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useT } from '../i18n';
 import { Text } from '../text';
-import { colors } from '../theme';
+import { color, colors, radius, space, type } from '../theme';
 import { haptic } from '../haptics';
 import { ChevronLeftIcon } from '../icons';
 import { cornerRadius, EdgeTicks } from './EdgeTicks';
@@ -16,7 +16,7 @@ import { cornerRadius, EdgeTicks } from './EdgeTicks';
  */
 
 /** How far in from the screen's edge the ticks reach (EdgeTicks: 4 in, 10 long). */
-export const RING = 14;
+export const RING = space.ring;
 
 /**
  * Where a flow's content sits. Concentric with the screen's corners (Apple's rule): the buttons' 24 radius stands the
@@ -28,9 +28,9 @@ export function useFlowFrame() {
   const real = useSafeAreaInsets();
   const insets = phone ? { top: 62, bottom: 34 } : real;
   const { width, height } = useWindowDimensions();
-  const radius = cornerRadius(width, height);
-  const edge = Math.max(RING + 18, radius - 24);
-  return { phone, insets, radius, edge, top: Math.max(insets.top + 8, RING + 22), bottom: Math.max(edge, insets.bottom + 8) };
+  const corner = cornerRadius(width, height);
+  const edge = Math.max(space.edgeMin, corner - radius.button);
+  return { phone, insets, radius: corner, edge, top: Math.max(insets.top + 8, RING + 22), bottom: Math.max(edge, insets.bottom + 8) };
 }
 
 /**
@@ -40,9 +40,9 @@ export function useFlowFrame() {
 export function FlowShell({ fill, label, bottom, children }: { fill: number; label?: string; bottom?: ReactNode; children: ReactNode }) {
   const frame = useFlowFrame();
   return (
-    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: '#000' }}>
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: color.page.phone }}>
       <View style={{ flex: 1, paddingTop: frame.top, paddingBottom: frame.bottom }}>
-        {label ? <Text style={{ paddingHorizontal: frame.edge, paddingTop: 8, fontSize: 15, lineHeight: 20, color: colors.muted }}>{label}</Text> : null}
+        {label ? <Text style={{ paddingHorizontal: frame.edge, paddingTop: space.inBlock, fontSize: type.stage.size, lineHeight: type.stage.line, color: colors.muted }}>{label}</Text> : null}
         <View style={{ flex: 1, paddingTop: 4, paddingHorizontal: frame.edge }}>{children}</View>
         {bottom ? (
           <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
@@ -51,7 +51,7 @@ export function FlowShell({ fill, label, bottom, children }: { fill: number; lab
         ) : null}
       </View>
       <EdgeTicks fill={fill} island={frame.insets.top >= 59} />
-      {frame.phone ? <View style={{ position: 'absolute', top: 11, alignSelf: 'center', width: 126, height: 37, borderRadius: 19, backgroundColor: '#000', zIndex: 10 }} /> : null}
+      {frame.phone ? <View style={{ position: 'absolute', top: 11, alignSelf: 'center', width: 126, height: 37, borderRadius: 19, backgroundColor: color.page.phone, zIndex: 10 }} /> : null}
     </KeyboardAvoidingView>
   );
 }
@@ -69,16 +69,16 @@ function InsideEdge({ radius, children }: { radius: number; children: ReactNode 
       <Svg pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} width="100%" height="100%">
         <Defs>
           <LinearGradient id="fromLeft" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor="#000" stopOpacity="1" />
-            <Stop offset="1" stopColor="#000" stopOpacity="0" />
+            <Stop offset="0" stopColor={color.page.phone} stopOpacity="1" />
+            <Stop offset="1" stopColor={color.page.phone} stopOpacity="0" />
           </LinearGradient>
           <LinearGradient id="fromRight" x1="1" y1="0" x2="0" y2="0">
-            <Stop offset="0" stopColor="#000" stopOpacity="1" />
-            <Stop offset="1" stopColor="#000" stopOpacity="0" />
+            <Stop offset="0" stopColor={color.page.phone} stopOpacity="1" />
+            <Stop offset="1" stopColor={color.page.phone} stopOpacity="0" />
           </LinearGradient>
           <LinearGradient id="fromBottom" x1="0" y1="1" x2="0" y2="0">
-            <Stop offset="0" stopColor="#000" stopOpacity="1" />
-            <Stop offset="1" stopColor="#000" stopOpacity="0" />
+            <Stop offset="0" stopColor={color.page.phone} stopOpacity="1" />
+            <Stop offset="1" stopColor={color.page.phone} stopOpacity="0" />
           </LinearGradient>
         </Defs>
         <Rect x="0" y="0" width={fade} height="100%" fill="url(#fromLeft)" />
@@ -94,13 +94,15 @@ function InsideEdge({ radius, children }: { radius: number; children: ReactNode 
  * within a thumb's reach, back as an outlined round icon 2 points from the main button. `note` and `error` stand over
  * the buttons (a field's own error goes under the field, LineField); `below` under them, for a TextAction.
  */
-export function FlowStep({ title, sub, error, note, noteHidden, actions, below, onBack, children }: {
+export function FlowStep({ title, sub, error, note, noteHidden, actions, aside, below, onBack, children }: {
   title: string;
   sub: string;
   error?: string | null;
   note?: string;
   noteHidden?: boolean;
   actions?: ReactNode;
+  /** A small outlined button right of the main one (FlowSecondary): skip, later. */
+  aside?: ReactNode;
   below?: ReactNode;
   onBack?: () => void;
   children?: ReactNode;
@@ -108,21 +110,22 @@ export function FlowStep({ title, sub, error, note, noteHidden, actions, below, 
   const { t } = useT();
   return (
     <View style={{ flex: 1 }}>
-      <Text style={{ fontSize: 34, lineHeight: 40, letterSpacing: -0.8 }}>{title}</Text>
-      {sub ? <Text style={{ marginTop: 8, fontSize: 17, lineHeight: 23, color: colors.muted }}>{sub}</Text> : null}
-      {children ? <View style={{ gap: 32, marginTop: 32 }}>{children}</View> : null}
+      <Text style={{ fontSize: type.title.size, lineHeight: type.title.line, letterSpacing: type.title.tracking }}>{title}</Text>
+      {sub ? <Text style={{ marginTop: space.inBlock, fontSize: type.sub.size, lineHeight: type.sub.line, color: colors.muted }}>{sub}</Text> : null}
+      {children ? <View style={{ gap: space.between, marginTop: space.between }}>{children}</View> : null}
       <View style={{ flex: 1, minHeight: 12 }} />
       <View style={{ gap: 14 }}>
-        {error ? <Text style={{ fontSize: 15, color: colors.danger }}>{error}</Text> : null}
-        {note ? <Text style={{ fontSize: 15, color: colors.muted, opacity: noteHidden ? 0 : 1 }}>{note}</Text> : null}
-        {actions || onBack ? (
+        {error ? <Text style={{ fontSize: type.note.size, color: colors.danger }}>{error}</Text> : null}
+        {note ? <Text style={{ fontSize: type.note.size, color: colors.muted, opacity: noteHidden ? 0 : 1 }}>{note}</Text> : null}
+        {actions || onBack || aside ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
             {onBack ? (
-              <Pressable accessibilityRole="button" accessibilityLabel={t('setup.back')} onPress={onBack} hitSlop={12} style={({ pressed }) => ({ width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: pressed ? '#fff' : 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' })}>
-                <ChevronLeftIcon size={24} color="#fff" />
+              <Pressable accessibilityRole="button" accessibilityLabel={t('setup.back')} onPress={onBack} hitSlop={12} style={({ pressed }) => ({ width: 48, height: 48, borderRadius: radius.button, borderWidth: 1, borderColor: pressed ? colors.text : color.outline, alignItems: 'center', justifyContent: 'center' })}>
+                <ChevronLeftIcon size={24} color={colors.text} />
               </Pressable>
             ) : null}
             <View style={{ flex: 1 }}>{actions}</View>
+            {aside}
           </View>
         ) : null}
         {below}
@@ -146,22 +149,31 @@ export function LineField({ label, suffix, bad = false, error, style, ...input }
   const wrong = bad || !!error;
   return (
     <View style={style}>
-      <Text style={{ fontSize: 14, color: colors.muted }}>{label}</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: wrong ? colors.danger : focused ? '#fff' : 'rgba(255,255,255,0.32)' }}>
+      <Text style={{ fontSize: type.label.size, color: colors.muted }}>{label}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: wrong ? colors.danger : focused ? colors.text : color.fieldLine }}>
         <TextInput
           autoCapitalize="none"
           autoCorrect={false}
-          placeholderTextColor="rgba(255,255,255,0.3)"
-          selectionColor="#fff"
+          placeholderTextColor={color.placeholder}
+          selectionColor={colors.text}
           {...input}
           onFocus={(e) => (setFocused(true), input.onFocus?.(e))}
           onBlur={(e) => (setFocused(false), input.onBlur?.(e))}
-          style={{ flex: 1, minWidth: 0, height: 48, fontSize: 22, color: '#fff', fontFamily: 'Onest_400Regular', outlineStyle: 'none' } as never}
+          style={{ flex: 1, minWidth: 0, height: 48, fontSize: type.field.size, color: colors.text, fontFamily: 'Onest_400Regular', outlineStyle: 'none' } as never}
         />
-        {suffix ? <Text style={{ fontSize: 22, color: colors.muted }}>{suffix}</Text> : null}
+        {suffix ? <Text style={{ fontSize: type.field.size, color: colors.muted }}>{suffix}</Text> : null}
       </View>
-      {error ? <Text style={{ marginTop: 6, fontSize: 14, color: colors.danger }}>{error}</Text> : null}
+      {error ? <Text style={{ marginTop: 6, fontSize: type.label.size, color: colors.danger }}>{error}</Text> : null}
     </View>
+  );
+}
+
+/** A small outlined button right of the main one, 2 points off, for the way round it: skip, later. */
+export function FlowSecondary({ onPress, children }: { onPress: () => void; children: string }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => ({ height: 48, marginLeft: 2, paddingHorizontal: 20, borderRadius: radius.button, borderWidth: 1, borderColor: pressed ? colors.text : color.outline, alignItems: 'center', justifyContent: 'center' })}>
+      <Text style={{ fontSize: type.button.size }}>{children}</Text>
+    </Pressable>
   );
 }
 
@@ -181,14 +193,14 @@ export function RadioRow({ title, sub, on, onPress, last = false }: { title: str
       accessibilityRole="radio"
       accessibilityState={{ checked: on }}
       onPress={() => { haptic.tap(); onPress(); }}
-      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderTopWidth: 1, borderBottomWidth: last ? 1 : 0, borderColor: 'rgba(255,255,255,0.12)', opacity: pressed ? 0.6 : 1 })}
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderTopWidth: 1, borderBottomWidth: last ? 1 : 0, borderColor: color.hairline, opacity: pressed ? 0.6 : 1 })}
     >
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 20, lineHeight: 26 }}>{title}</Text>
-        {sub ? <Text style={{ marginTop: 2, fontSize: 15, lineHeight: 20, color: colors.muted }}>{sub}</Text> : null}
+        <Text style={{ fontSize: type.choice.size, lineHeight: type.choice.line }}>{title}</Text>
+        {sub ? <Text style={{ marginTop: 2, fontSize: type.note.size, lineHeight: type.note.line, color: colors.muted }}>{sub}</Text> : null}
       </View>
-      <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: on ? '#fff' : 'rgba(255,255,255,0.4)', alignItems: 'center', justifyContent: 'center' }}>
-        {on ? <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#fff' }} /> : null}
+      <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: on ? colors.text : color.control, alignItems: 'center', justifyContent: 'center' }}>
+        {on ? <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: colors.text }} /> : null}
       </View>
     </Pressable>
   );
@@ -198,8 +210,8 @@ export function RadioRow({ title, sub, on, onPress, last = false }: { title: str
 export function CheckRow({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-      <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: on ? '#fff' : 'rgba(255,255,255,0.4)', alignItems: 'center', justifyContent: 'center', backgroundColor: on ? '#fff' : 'transparent' }}>
-        {on ? <View style={{ width: 10, height: 6, marginTop: -3, borderLeftWidth: 2.5, borderBottomWidth: 2.5, borderColor: '#000', transform: [{ rotate: '-45deg' }] }} /> : null}
+      <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: on ? colors.text : color.control, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? colors.text : 'transparent' }}>
+        {on ? <View style={{ width: 10, height: 6, marginTop: -3, borderLeftWidth: 2.5, borderBottomWidth: 2.5, borderColor: color.page.phone, transform: [{ rotate: '-45deg' }] }} /> : null}
       </View>
       <Text style={{ fontSize: 17 }}>{label}</Text>
     </Pressable>

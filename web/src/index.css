@@ -8,14 +8,14 @@
  */
 :root {
   --font-inter: "Onest Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  --app-window: #0c0c0e;
-  --app-side: #0c0c0e;
-  --app-edge: #1f1f24;
+  --app-window: var(--gx-page-wide);
+  --app-side: var(--gx-page-wide);
+  --app-edge: var(--gx-edge);
   /* Rooms on the home screen: green is where you are, pink is somewhere to go. */
-  --room-here: #93e06b;
-  --room-here-ink: #0b2a00;
-  --room-others: #e4a0ea;
-  --room-others-ink: #1a0a1c;
+  --room-here: var(--gx-here);
+  --room-here-ink: var(--gx-here-ink);
+  --room-others: var(--gx-others);
+  --room-others-ink: var(--gx-others-ink);
 }
 
 @theme inline {

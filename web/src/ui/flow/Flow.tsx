@@ -82,6 +82,15 @@ export function FlowStep({ title, sub, error, note, actions, below, onBack, onSu
   );
 }
 
+/** A small outlined button right of the main one, 2px off, for the way round it: skip, later. */
+export function FlowSecondary({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" className="flow-secondary" onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
 /** The one main action: a white pill. */
 export function FlowPrimary({ busy = false, disabled = false, type = 'button', onClick, children }: { busy?: boolean; disabled?: boolean; type?: 'button' | 'submit'; onClick?: () => void; children: ReactNode }) {
   return (

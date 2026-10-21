@@ -5,18 +5,14 @@
  */
 
 .flow {
-  --flow-muted: #a1a1aa;
-  --flow-faint: #71717a;
-  --flow-danger: #ff453a;
-  --flow-hair: rgba(255, 255, 255, 0.12);
   --flow-edge: 38px;
   position: fixed;
   inset: 0;
   display: flex;
   justify-content: center;
   overflow: hidden;
-  background: #000;
-  color: #fff;
+  background: var(--gx-page);
+  color: var(--gx-text);
   font-family: var(--font-inter);
   -webkit-font-smoothing: antialiased;
 }
@@ -36,17 +32,17 @@
 }
 .flow-ticks line,
 .flow-ruler line {
-  stroke: rgba(255, 255, 255, 0.13);
+  stroke: var(--gx-tick);
   stroke-width: 1.7;
   stroke-linecap: round;
 }
 .flow-ticks line.on,
 .flow-ruler line.on {
-  stroke: #f2f2f4;
+  stroke: var(--gx-tick-on);
 }
 .flow-ticks line.next,
 .flow-ruler line.next {
-  stroke: #fff;
+  stroke: var(--gx-text);
   animation: flow-breathe 1.6s ease-in-out infinite;
 }
 @keyframes flow-breathe {
@@ -59,13 +55,13 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 480px;
+  max-width: var(--gx-column);
   height: 100%;
   padding: max(44px, calc(env(safe-area-inset-top) + 28px)) var(--flow-edge) max(var(--flow-edge), calc(env(safe-area-inset-bottom) + 12px));
 }
 @media (min-width: 821px) {
   .flow-col {
-    max-width: calc(480px + 2 * var(--flow-edge));
+    max-width: calc(var(--gx-column) + 2 * var(--flow-edge));
     padding-top: 72px;
     padding-bottom: 56px;
   }
@@ -73,9 +69,9 @@
 
 .flow-label {
   margin: 8px 0 0;
-  font-size: 15px;
-  line-height: 20px;
-  color: var(--flow-muted);
+  font-size: var(--gx-stage-size);
+  line-height: var(--gx-stage-line);
+  color: var(--gx-muted);
 }
 
 .flow-step,
@@ -112,22 +108,22 @@
 
 .flow-title {
   margin: 4px 0 0;
-  font-size: 34px;
-  line-height: 40px;
+  font-size: var(--gx-title-size);
+  line-height: var(--gx-title-line);
   font-weight: 400;
-  letter-spacing: -0.8px;
+  letter-spacing: var(--gx-title-tracking);
 }
 .flow-sub {
   margin: 8px 0 0;
-  font-size: 17px;
-  line-height: 23px;
-  color: var(--flow-muted);
+  font-size: var(--gx-sub-size);
+  line-height: var(--gx-sub-line);
+  color: var(--gx-muted);
 }
 .flow-body {
   display: flex;
   flex-direction: column;
-  gap: 32px;
-  margin-top: 32px;
+  gap: var(--gx-between);
+  margin-top: var(--gx-between);
 }
 .flow-spacer {
   flex: 1;
@@ -144,10 +140,10 @@
   font-size: 15px;
 }
 .flow-error {
-  color: var(--flow-danger);
+  color: var(--gx-danger);
 }
 .flow-note {
-  color: var(--flow-muted);
+  color: var(--gx-muted);
 }
 
 .flow-buttons {
@@ -161,33 +157,48 @@
   flex: none;
   width: 48px;
   height: 48px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--gx-outline);
   border-radius: 24px;
   background: transparent;
-  color: #fff;
+  color: var(--gx-text);
   cursor: pointer;
 }
 .flow-back:hover,
 .flow-back:active,
 .flow-back:focus-visible {
-  border-color: #fff;
+  border-color: var(--gx-text);
+}
+.flow-secondary {
+  flex: none;
+  height: 48px;
+  padding: 0 20px;
+  border: 1px solid var(--gx-outline);
+  border-radius: var(--gx-radius-button);
+  background: transparent;
+  color: var(--gx-text);
+  font: 400 var(--gx-button-size) var(--font-inter);
+  cursor: pointer;
+}
+.flow-secondary:hover,
+.flow-secondary:focus-visible {
+  border-color: var(--gx-text);
 }
 .flow-primary {
   flex: 1;
   height: 48px;
   border: 0;
-  border-radius: 24px;
-  background: #f2f2f4;
-  color: #0c0c0e;
+  border-radius: var(--gx-radius-button);
+  background: var(--gx-button);
+  color: var(--gx-button-ink);
   font: 500 17px var(--font-inter);
   cursor: pointer;
 }
 .flow-primary:hover {
-  background: #fff;
+  background: var(--gx-button-hover);
 }
 .flow-primary:disabled {
-  background: #1e1e22;
-  color: var(--flow-faint);
+  background: var(--gx-graphite);
+  color: var(--gx-faint);
   cursor: default;
 }
 .flow-primary.busy {
@@ -201,13 +212,13 @@
   width: 18px;
   height: 18px;
   margin: auto;
-  border: 2px solid #0c0c0e;
+  border: 2px solid var(--gx-button-ink);
   border-right-color: transparent;
   border-radius: 50%;
   animation: flow-spin 0.8s linear infinite;
 }
 .flow-primary.busy:disabled {
-  background: #f2f2f4;
+  background: var(--gx-button);
 }
 @keyframes flow-spin {
   to {
@@ -221,18 +232,18 @@
 .flow-field-label {
   display: block;
   font-size: 14px;
-  color: var(--flow-muted);
+  color: var(--gx-muted);
 }
 .flow-line {
   display: flex;
   align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.32);
+  border-bottom: 1px solid var(--gx-field-line);
 }
 .flow-line:focus-within {
-  border-color: #fff;
+  border-color: var(--gx-text);
 }
 .flow-field.bad .flow-line {
-  border-color: var(--flow-danger);
+  border-color: var(--gx-danger);
 }
 .flow-line input {
   flex: 1;
@@ -242,22 +253,22 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: #fff;
-  font: 400 22px var(--font-inter);
-  caret-color: #fff;
+  color: var(--gx-text);
+  font: 400 var(--gx-field-size) var(--font-inter);
+  caret-color: currentColor;
 }
 .flow-line input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--gx-placeholder);
 }
 .flow-suffix {
   font-size: 22px;
-  color: var(--flow-muted);
+  color: var(--gx-muted);
 }
 .flow-field-error {
   display: block;
   margin-top: 6px;
   font-size: 14px;
-  color: var(--flow-danger);
+  color: var(--gx-danger);
 }
 .flow-pair {
   display: flex;
@@ -273,7 +284,7 @@
   padding: 4px 0;
   border: 0;
   background: none;
-  color: #fff;
+  color: var(--gx-text);
   font: 400 17px var(--font-inter);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -297,15 +308,15 @@
   width: 100%;
   padding: 16px 0;
   border: 0;
-  border-top: 1px solid var(--flow-hair);
+  border-top: 1px solid var(--gx-hairline);
   background: none;
-  color: #fff;
+  color: var(--gx-text);
   text-align: left;
   font-family: var(--font-inter);
   cursor: pointer;
 }
 .flow-radio.last {
-  border-bottom: 1px solid var(--flow-hair);
+  border-bottom: 1px solid var(--gx-hairline);
 }
 .flow-radio-text {
   flex: 1;
@@ -320,7 +331,7 @@
   margin-top: 2px;
   font-size: 15px;
   line-height: 20px;
-  color: var(--flow-muted);
+  color: var(--gx-muted);
 }
 .flow-radio-dot {
   display: grid;
@@ -328,18 +339,18 @@
   flex: none;
   width: 22px;
   height: 22px;
-  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  border: 1.5px solid var(--gx-control);
   border-radius: 50%;
 }
 .flow-radio.on .flow-radio-dot {
-  border-color: #fff;
+  border-color: var(--gx-text);
 }
 .flow-radio.on .flow-radio-dot::after {
   content: '';
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--gx-text);
 }
 
 /* Things a step shows in type: a key, a link. */
@@ -361,7 +372,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: #fff;
+  color: var(--gx-text);
   text-align: left;
   font-family: var(--font-inter);
   cursor: pointer;
