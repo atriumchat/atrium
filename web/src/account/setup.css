@@ -1397,6 +1397,11 @@
 .setup .obj.mark {
   color: var(--fg);
 }
+/* Everything in the dial is sized by it, so a small phone gets a smaller picture, never a squeezed one. */
+.setup .obj.mark svg {
+  width: calc(var(--frame) * 0.37);
+  height: calc(var(--frame) * 0.37);
+}
 .setup .obj.mark.on svg {
   animation: setup-float 5s ease-in-out infinite;
 }
@@ -1407,18 +1412,18 @@
 }
 
 .setup .obj.code {
-  grid-template-columns: repeat(5, 24px);
-  gap: 6px;
+  grid-template-columns: repeat(5, calc(var(--frame) * 0.1));
+  gap: calc(var(--frame) * 0.024);
 }
 .setup .obj.code i {
   display: grid;
   place-items: center;
-  height: 30px;
+  height: calc(var(--frame) * 0.125);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: calc(var(--frame) * 0.032);
   background: var(--field);
   color: var(--fg);
-  font: 600 14px var(--mono);
+  font: 600 calc(var(--frame) * 0.056) var(--mono);
   font-style: normal;
   transition: border-color 0.3s, transform 0.3s var(--ease);
 }
@@ -1428,12 +1433,16 @@
 }
 
 .setup .obj.server {
-  width: 112px;
-  height: 112px;
+  width: calc(var(--frame) * 0.45);
+  height: calc(var(--frame) * 0.45);
   border-radius: 999px;
   background: var(--fg);
   color: var(--window);
   box-shadow: 0 18px 50px #0008;
+}
+.setup .obj.server svg {
+  width: calc(var(--frame) * 0.26);
+  height: calc(var(--frame) * 0.26);
 }
 .setup .obj.server img {
   width: 100%;
@@ -1470,18 +1479,18 @@
 .setup .obj.admin .face {
   display: grid;
   place-items: center;
-  width: 108px;
-  height: 108px;
+  width: calc(var(--frame) * 0.44);
+  height: calc(var(--frame) * 0.44);
   border-radius: 999px;
   color: #fff;
-  font-size: 46px;
+  font-size: calc(var(--frame) * 0.19);
   font-weight: 600;
   box-shadow: 0 18px 50px #0008;
   transition: background 0.6s;
 }
 .setup .obj.admin .dots {
   position: absolute;
-  top: calc(100% + 16px);
+  top: calc(100% + var(--frame) * 0.06);
   display: flex;
   gap: 5px;
 }
@@ -1503,15 +1512,15 @@
 .setup .obj.key .plate {
   position: relative;
   display: grid;
-  gap: 4px;
-  padding: 18px 16px;
+  gap: calc(var(--frame) * 0.016);
+  padding: calc(var(--frame) * 0.07) calc(var(--frame) * 0.064);
   overflow: hidden;
   border: 1px solid #ffffff1f;
-  border-radius: 18px;
+  border-radius: calc(var(--frame) * 0.072);
   background: linear-gradient(140deg, #303037, #18181c 55%, #222227);
   box-shadow: inset 0 1px #ffffff26, 0 22px 50px #000a;
   color: #ececf1;
-  font: 600 15px/1.3 var(--mono);
+  font: 600 calc(var(--frame) * 0.06) / 1.3 var(--mono);
   letter-spacing: 0.08em;
   text-align: center;
   white-space: nowrap;
@@ -1538,12 +1547,16 @@
   }
 }
 
+.setup .obj.invite .ticket svg {
+  width: calc(var(--frame) * 0.1);
+  height: calc(var(--frame) * 0.1);
+}
 .setup .obj.invite .ticket {
   position: relative;
   display: grid;
   place-items: center;
-  width: 100px;
-  height: 100px;
+  width: calc(var(--frame) * 0.4);
+  height: calc(var(--frame) * 0.4);
   border-radius: 999px;
   background: var(--here);
   color: #0c0c0e;
@@ -1589,12 +1602,12 @@
   left: 50%;
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
-  margin: -24px;
+  width: calc(var(--frame) * 0.19);
+  height: calc(var(--frame) * 0.19);
+  margin: calc(var(--frame) * -0.095);
   border-radius: 999px;
   color: #fff;
-  font-size: 19px;
+  font-size: calc(var(--frame) * 0.076);
   font-weight: 600;
   transform: rotate(calc(var(--k) * 72deg - 90deg)) translateX(calc(var(--frame) * 0.25)) rotate(calc(var(--k) * -72deg + 90deg));
   transition: box-shadow 0.3s, scale 0.3s var(--ease);
@@ -1607,11 +1620,15 @@
   position: absolute;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: calc(var(--frame) * 0.12);
+  height: calc(var(--frame) * 0.12);
   border-radius: 999px;
   background: var(--here);
   color: #0c0c0e;
+}
+.setup .obj.room .tick svg {
+  width: 55%;
+  height: 55%;
 }
 
 /* What the object is: the name, the nick, the link, as they're typed. */
