@@ -1,8 +1,7 @@
 import { t } from '../i18n';
 import type { MyInvite, Session } from '../protocol';
 import type { Backend } from './backend';
-import { TASKS } from './tasks';
-import type { Progress, StepState } from './setup';
+import { MOCK_DOMAIN, MOCK_INVITE, MOCK_KEY, mockProgress, type Progress } from '@gomex/setup';
 
 /**
  * "Your own server" with nothing real behind it, for design work in development: /own?mock=1 walks the whole way with
@@ -13,11 +12,8 @@ import type { Progress, StepState } from './setup';
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const fail = (error: string) => ({ error });
 
-// How long each installer step takes here, in seconds: the address waits longest, as it does for real.
-const TOOK: Record<string, number> = { check: 2, address: 7, docker: 4, firewall: 1.5, ssh: 1, files: 1, config: 1, backups: 1.5, pull: 5, up: 3, https: 3 };
-
 let name = 'podval';
-let domain = 'podval.dedyn.io';
+let domain = MOCK_DOMAIN;
 let started = 0;
 let readyAt = 0;
 let mail: { stop: boolean } | null = null;
@@ -26,8 +22,6 @@ let pace = 1; // &fast=1 runs the install twice as quick, to see the end of it d
 export function mockPace(times: number) {
   pace = times;
 }
-
-export const MOCK_KEY = 'K7QM-2XPA-9DHR-T4WC-8NBE-3VLY';
 
 /** Puts the made-up install where a step opened directly needs it: just started, or done a while ago. */
 export function mockInstall(at: 'start' | 'done', name = domain) {
@@ -42,7 +36,7 @@ export const mock: Backend = {
   connect: async ({ host, password }) => {
     await wait(1400);
     if (password === 'wrong') return fail(t('own.ssh.badLogin'));
-    return { facts: { ip: host.trim() || '203.0.113.10', os: 'Ubuntu 24.04 LTS · x86_64', size: t('own.ssh.size', { memory: '1.9', disk: 17 }), cores: 1, memory: 1.9 } };
+    return { facts: { ip: host.trim() || '203.0.113.10', os: 'Ubuntu 24.04 LTS · x86_64', root: true, cores: 1, memory: 1.9, disk: 17 } };
   },
   resume: async () => {
     await wait(800);
@@ -82,23 +76,9 @@ export const mock: Backend = {
     return { ok: true as const };
   },
   readProgress: async (): Promise<Progress> => {
-    let left = ((Date.now() - started) / 1000) * pace;
-    const steps: Record<string, StepState> = {};
-    let current: string | null = null;
-    for (const id of TASKS) {
-      const took = TOOK[id] ?? 2;
-      if (left >= took) {
-        steps[id] = { state: 'done', took };
-        left -= took;
-      } else {
-        steps[id] = { state: 'run' };
-        current = id;
-        break;
-      }
-    }
-    const ready = current ? null : `https://app.${domain}/?setup=MOCKCODE01`;
-    if (ready && !readyAt) readyAt = Date.now();
-    return { steps, current, doing: '', ready, exit: ready ? 0 : null, failed: null };
+    const progress = mockProgress(((Date.now() - started) / 1000) * pace, domain);
+    if (progress.ready && !readyAt) readyAt = Date.now();
+    return progress;
   },
   // The address spreads for a few seconds after the install.
   reachable: async () => !!readyAt && Date.now() - readyAt > 5000,
@@ -110,6 +90,6 @@ export const mock: Backend = {
   renameServer: async () => wait(300),
   uploadServerIcon: async () => wait(600),
   makeRecoveryKey: async () => ({ key: MOCK_KEY }),
-  invite: async () => ({ code: '7F3K9QAB' }) as MyInvite,
+  invite: async () => ({ code: MOCK_INVITE }) as MyInvite,
   enter: async () => undefined,
 };

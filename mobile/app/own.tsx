@@ -14,11 +14,10 @@ import { GomexMark } from '../src/components/Logo';
 import { Drum, FlowPrimary, FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, RING, TextAction, useFlowFrame } from '@gomex/ui-native';
 import { RecoveryKeyStep } from '../src/components/RecoveryKeyStep';
 import { real } from '../src/own/backend';
-import { capacity } from '../src/own/capacity';
 import { DinoRun } from '../src/own/DinoRun';
-import { TASKS } from '../src/own/tasks';
-import { MOCK_KEY, mock, mockInstall, mockPace } from '../src/own/mock';
-import { pickTurn, type Facts, type Progress, type Saved } from '../src/own/setup';
+import { capacity, doneCount, emailOk as isEmail, jobFill, MOCK_KEY, OWN_READY, ownOnPhone, pickTurn, TASKS, type Facts, type OwnPhoneStep as Step, type Progress } from '@gomex/setup';
+import { mock, mockInstall, mockPace } from '../src/own/mock';
+import type { Saved } from '../src/own/setup';
 
 /**
  * "Your own server" on the phone (src/own/setup.ts): the VPS from the host's e-mail becomes a Gomex server, then its
@@ -28,19 +27,7 @@ import { pickTurn, type Facts, type Progress, type Saved } from '../src/own/setu
  * fields as lines. Nothing scrolls.
  */
 
-type Step = 'server' | 'address' | 'free' | 'mail' | 'own' | 'install' | 'name' | 'admin' | 'key' | 'invite';
-
-// How far along the whole way each step is, for the edge; the install fills most of it as its tasks get done.
-const PATH: Record<Step, number> = { server: 0.04, address: 0.12, free: 0.2, own: 0.2, mail: 0.27, install: 0.32, name: 0.76, admin: 0.84, key: 0.91, invite: 0.97 };
-const READY = 0.68;
-// The five parts the header names.
-const STAGE: Record<Step, 'server' | 'address' | 'install' | 'setup' | 'friends'> = {
-  server: 'server', address: 'address', free: 'address', own: 'address', mail: 'address', install: 'install', name: 'setup', admin: 'setup', key: 'setup', invite: 'friends',
-};
-const STAGES = ['server', 'address', 'install', 'setup', 'friends'] as const;
 const MAX_ICON = 8 * 1024 * 1024;
-// Something@something.zone, with no spaces: enough to catch a slip before deSEC sends a letter nowhere.
-const EMAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)*\.[a-z]{2,}$/i;
 
 export default function OwnServer() {
   const { t } = useT();
@@ -67,7 +54,7 @@ export default function OwnServer() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [emailLeft, setEmailLeft] = useState(false);
-  const emailOk = EMAIL.test(email.trim());
+  const emailOk = isEmail(email);
   const [domain, setDomain] = useState('');
   const turn = useRef(pickTurn()).current;
 
@@ -106,7 +93,7 @@ export default function OwnServer() {
     const ip = '203.0.113.10';
     const domain = 'podval.dedyn.io';
     setHost(ip);
-    setFacts({ ip, os: 'Ubuntu 24.04 LTS · x86_64', size: '', cores: 1, memory: 1.9 });
+    setFacts({ ip, os: 'Ubuntu 24.04 LTS · x86_64', root: true, cores: 1, memory: 1.9, disk: 17 });
     setSaved({ host: ip, ip, user: 'root', turn, cores: 1, memory: 1.9, domain: at === 'address' || at === 'free' || at === 'own' ? undefined : domain });
     if (at === 'mail') setEmail('me@example.com');
     if (at === 'install') mockInstall('start', domain);
@@ -377,24 +364,18 @@ export default function OwnServer() {
 
   /* ---------- the edge and the header ---------- */
 
-  const doneCount = TASKS.filter((id) => progress?.steps[id]?.state === 'done').length;
-  const fill = step === 'install' ? (ready ? READY : PATH.install + ((READY - PATH.install) * doneCount) / TASKS.length) : PATH[step];
-  const stage = STAGE[step];
+  const fill = step === 'install' ? jobFill(ownOnPhone.fill('install'), OWN_READY, doneCount(progress), TASKS.length, !!ready) : ownOnPhone.fill(step);
+  const stage = ownOnPhone.stage(step);
   const size = facts ?? (saved?.cores ? { cores: saved.cores, memory: saved.memory ?? 1 } : null);
 
-  const canBack = ['address', 'free', 'own', 'mail', 'name', 'admin'].includes(step);
-  const showBack = step === 'server' || canBack || (step === 'install' && (failed || ready));
-  const back = showBack ? () => (canBack ? goBack() : router.back()) : undefined;
-  function goBack() {
-    if (step === 'admin') return go('name', true);
-    if (step === 'name') return go('install', true);
-    if (step === 'free' || step === 'own') return go('address', true);
-    if (step === 'mail') return go('free', true);
-    if (step === 'address') {
-      own.close();
-      return go('server', true);
-    }
-    router.back();
+  // Back along the way walked (ownOnPhone); from the first step, or the install once it's over, back leaves.
+  const backTo = ownOnPhone.back(step, undefined);
+  const leaves = step === 'server' || (step === 'install' && (!!failed || !!ready));
+  const back = backTo || leaves ? () => (backTo ? goBack(backTo) : router.back()) : undefined;
+  function goBack(to: Step) {
+    // Back off the address, the server's SSH session goes with it.
+    if (step === 'address') own.close();
+    go(to, true);
   }
 
   /* ---------- the steps ---------- */
@@ -570,7 +551,7 @@ export default function OwnServer() {
   return (
     <FlowShell
       fill={fill}
-      label={t('own.stageOf', { stage: t(`own.stage.${stage}`), n: STAGES.indexOf(stage) + 1, total: STAGES.length })}
+      label={t('own.stageOf', { stage: t(`own.stage.${stage.part}`), n: stage.n, total: stage.total })}
       // While it installs (and hasn't failed), the game takes the bottom of the screen, edge to edge.
       bottom={
         installing && !failed ? (

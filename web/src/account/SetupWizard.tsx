@@ -4,6 +4,7 @@ import { useT } from '../i18n';
 import { inviteLink } from '../people/invite';
 import { GomexMark } from '../ui/Logo';
 import { IconCropper, centred, cropToBlob, cropToUrl, loadImage, type Crop } from '../ui/IconCropper';
+import { adminForm, codeFrom, CODE_LENGTH, firstRun, type FirstRunStep } from '@gomex/setup';
 import { FlowPrimary, FlowProvider, FlowSecondary, FlowShell, FlowStep, LineField, TextAction } from '@gomex/ui-web';
 import './setupWizard.css';
 
@@ -14,24 +15,7 @@ import './setupWizard.css';
  * invite link; then the app.
  */
 
-type StepId = 'code' | 'server' | 'crop' | 'admin' | 'key' | 'invite';
-
-// install.sh makes the code 10 letters and digits (INVITE_CODE in .env).
-const CODE_LENGTH = 10;
-// The edge (EdgeTicks) at each step, and the part of the way it belongs to.
-const FILL: Record<StepId, number> = { code: 0.1, server: 0.25, crop: 0.3, admin: 0.5, key: 0.72, invite: 0.9 };
-const PART: Record<StepId, 0 | 1 | 2> = { code: 0, server: 0, crop: 0, admin: 1, key: 1, invite: 2 };
-
-/** The code out of anything pasted: the whole link from the installer, or the code itself. */
-function codeFrom(text: string) {
-  let value = text.trim();
-  try {
-    value = new URL(value).searchParams.get('setup') ?? value;
-  } catch {
-    // Not a link: the code itself.
-  }
-  return value.replace(/[^a-zA-Z0-9]/g, '').slice(0, CODE_LENGTH);
-}
+type StepId = FirstRunStep;
 
 // Design work, development only: #step=server (or code, admin, key, invite) opens that step with made-up answers and
 // nothing sent to the server.
@@ -76,6 +60,12 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   function go(id: StepId, back = false, problem = '') {
     setError(problem);
     setStep((s) => ({ id, back, n: s.n + 1 }));
+  }
+
+  /** Back along the way walked (firstRun); no button where there's no way back. */
+  function backFrom(id: StepId) {
+    const to = firstRun.back(id, { askCode });
+    return to ? () => go(to, true) : undefined;
   }
 
   useEffect(() => {
@@ -157,8 +147,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
 
   /* ---------- the admin ---------- */
 
-  const mismatch = repeat !== '' && repeat.length >= password.length && repeat !== password;
-  const adminReady = !!nick.trim() && password.length >= 8 && repeat === password;
+  const { ready: adminReady, mismatch } = adminForm(nick, password, repeat);
 
   function submitAdmin() {
     if (!adminReady || busy) return;
@@ -268,7 +257,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             title={t('setup.server.title')}
             sub={t('setup.server.sub')}
             error={error}
-            onBack={askCode ? () => go('code', true) : undefined}
+            onBack={backFrom('server')}
             onSubmit={() => serverName.trim() && go('admin')}
             actions={
               <>
@@ -298,7 +287,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
           <FlowStep
             title={t('setup.server.icon')}
             sub={draft.name}
-            onBack={() => go('server', true)}
+            onBack={backFrom('crop')}
             onSubmit={keepCrop}
             actions={
               <>
@@ -318,7 +307,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             title={t('setup.admin.title')}
             sub={t('setup.admin.sub')}
             error={error}
-            onBack={() => go('server', true)}
+            onBack={backFrom('admin')}
             onSubmit={submitAdmin}
             actions={<FlowPrimary type="submit" busy={busy} disabled={!adminReady}>{t('setup.admin.create')}</FlowPrimary>}
           >
@@ -376,11 +365,11 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     }
   }
 
-  const parts = [t('setup.done.server'), t('setup.progress.account'), t('setup.progress.friends')];
-  const part = PART[step.id];
+  const parts = { server: t('setup.done.server'), account: t('setup.progress.account'), friends: t('setup.progress.friends') };
+  const stage = firstRun.stage(step.id);
   return (
     <FlowProvider labels={{ back: t('setup.back') }}>
-      <FlowShell fill={FILL[step.id]} label={t('setup.stageOf', { stage: parts[part]!, n: part + 1, total: parts.length })}>
+      <FlowShell fill={firstRun.fill(step.id)} label={t('setup.stageOf', { stage: parts[stage.part], n: stage.n, total: stage.total })}>
         <div key={step.n} className={step.back ? 'flow-swap back-in' : 'flow-swap'}>
           {render(step.id)}
         </div>

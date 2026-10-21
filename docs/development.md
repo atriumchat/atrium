@@ -32,6 +32,11 @@ npm run dev -w web
 
 On an empty database the first-run wizard opens. The default code is `friends`.
 
+Shared code lives in `packages/` (`@gomex/ui-common`, `@gomex/ui-web`, `@gomex/ui-native`, `@gomex/setup`; see
+[ADR-001](adr/001-client-architecture.md)). Node 24.3 or newer with npm 11: npm 10.8 crashes building this tree. After
+adding a package, run `npm install` at the root and restart the dev servers, Metro with `--clear`: they don't pick up
+a new workspace link while running.
+
 Desktop against the local client. `npm run dev` points at the old port 5180, so the address is set explicitly:
 
 ```bash

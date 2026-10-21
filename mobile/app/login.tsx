@@ -9,7 +9,7 @@ import { useT } from '../src/i18n';
 import { Text } from '../src/text';
 import { FlowPrimary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '@gomex/ui-native';
 import { RecoveryKeyStep } from '../src/components/RecoveryKeyStep';
-import { MOCK_KEY } from '../src/own/mock';
+import { MOCK_KEY } from '@gomex/setup';
 
 /**
  * Signing in, in the flow look (DESIGN.md), a short step at a time so nothing scrolls: what you're here for, then the

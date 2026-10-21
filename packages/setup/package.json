@@ -1,0 +1,21 @@
+{
+  "name": "@gomex/setup",
+  "version": "0.1.0",
+  "private": true,
+  "description": "\"Your own server\" and a server's first run without UI: steps, validations, the installer's protocol, deSEC's answers, capacity, a made-up install.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "test": "node --import tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "tsx": "^4.20.6",
+    "typescript": "~6.0.3"
+  }
+}
