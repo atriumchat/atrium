@@ -1,7 +1,7 @@
 /*
- * The flow look (DESIGN.md), the web side of mobile/src/components/Flow.tsx: OLED black, type first, the ticks along
- * the window's edge, one white button. The column keeps 38px from the edge on a phone (the phone app's concentric
- * margin) and stands 480px wide in the middle of a bigger window.
+ * Gomex Flow on the web (DESIGN.md), the same parts as @gomex/ui-native: OLED black, type first, the ticks along the
+ * window's edge, one white button. Colours, type and radii are --gx- tokens (@gomex/ui-common, tokenCss). The column keeps 38px
+ * from the edge on a phone (the phone app's concentric margin) and stands 480px wide in the middle of a bigger window.
  */
 
 .flow {
@@ -13,7 +13,7 @@
   overflow: hidden;
   background: var(--gx-page);
   color: var(--gx-text);
-  font-family: var(--font-inter);
+  font-family: var(--gx-font);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -137,7 +137,11 @@
 .flow-error,
 .flow-note {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--gx-note-size);
+  line-height: var(--gx-note-line);
+}
+.flow-note.hidden {
+  visibility: hidden;
 }
 .flow-error {
   color: var(--gx-danger);
@@ -158,7 +162,7 @@
   width: 48px;
   height: 48px;
   border: 1px solid var(--gx-outline);
-  border-radius: 24px;
+  border-radius: var(--gx-radius-button);
   background: transparent;
   color: var(--gx-text);
   cursor: pointer;
@@ -176,7 +180,7 @@
   border-radius: var(--gx-radius-button);
   background: transparent;
   color: var(--gx-text);
-  font: 400 var(--gx-button-size) var(--font-inter);
+  font: 400 var(--gx-button-size) var(--gx-font);
   cursor: pointer;
 }
 .flow-secondary:hover,
@@ -190,7 +194,7 @@
   border-radius: var(--gx-radius-button);
   background: var(--gx-button);
   color: var(--gx-button-ink);
-  font: 500 17px var(--font-inter);
+  font: 500 var(--gx-button-size) var(--gx-font);
   cursor: pointer;
 }
 .flow-primary:hover {
@@ -231,7 +235,8 @@
 }
 .flow-field-label {
   display: block;
-  font-size: 14px;
+  font-size: var(--gx-label-size);
+  line-height: var(--gx-label-line);
   color: var(--gx-muted);
 }
 .flow-line {
@@ -254,20 +259,20 @@
   outline: 0;
   background: transparent;
   color: var(--gx-text);
-  font: 400 var(--gx-field-size) var(--font-inter);
+  font: 400 var(--gx-field-size) var(--gx-font);
   caret-color: currentColor;
 }
 .flow-line input::placeholder {
   color: var(--gx-placeholder);
 }
 .flow-suffix {
-  font-size: 22px;
+  font-size: var(--gx-field-size);
   color: var(--gx-muted);
 }
 .flow-field-error {
   display: block;
   margin-top: 6px;
-  font-size: 14px;
+  font-size: var(--gx-label-size);
   color: var(--gx-danger);
 }
 .flow-pair {
@@ -285,7 +290,7 @@
   border: 0;
   background: none;
   color: var(--gx-text);
-  font: 400 17px var(--font-inter);
+  font: 400 var(--gx-button-size) var(--gx-font);
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
@@ -312,7 +317,7 @@
   background: none;
   color: var(--gx-text);
   text-align: left;
-  font-family: var(--font-inter);
+  font-family: var(--gx-font);
   cursor: pointer;
 }
 .flow-radio.last {
@@ -323,14 +328,14 @@
 }
 .flow-radio-title {
   display: block;
-  font-size: 20px;
-  line-height: 26px;
+  font-size: var(--gx-choice-size);
+  line-height: var(--gx-choice-line);
 }
 .flow-radio-sub {
   display: block;
   margin-top: 2px;
-  font-size: 15px;
-  line-height: 20px;
+  font-size: var(--gx-note-size);
+  line-height: var(--gx-note-line);
   color: var(--gx-muted);
 }
 .flow-radio-dot {
@@ -353,53 +358,89 @@
   background: var(--gx-text);
 }
 
-/* Things a step shows in type: a key, a link. */
-.flow-big {
-  margin: 0;
-  font-size: 24px;
-  line-height: 32px;
-  letter-spacing: 1px;
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-  user-select: all;
-}
-
-/* The server's icon in its row: the picture or the Gomex mark, and what to do with it. */
-.flow-icon-row {
+/* Something kept from before on this device, and what to do with it. */
+.flow-kept {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
   padding: 0;
   border: 0;
   background: none;
   color: var(--gx-text);
   text-align: left;
-  font-family: var(--font-inter);
+  font: 400 var(--gx-kept-size) var(--gx-font);
   cursor: pointer;
 }
-.flow-icon-row img,
-.flow-icon-row .mark {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
+.flow-kept span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.flow-icon-row img {
-  object-fit: cover;
-}
-.flow-icon-row b {
-  display: block;
-  font-size: 20px;
-  font-weight: 400;
-}
-.flow-icon-row u {
-  font-size: 15px;
+.flow-kept u {
   text-underline-offset: 3px;
 }
-.flow-crop {
-  height: min(52vh, 380px);
-  border-radius: 24px;
+.flow-kept:hover {
+  opacity: 0.7;
+}
+
+/* A long job's steps on a drum: the strip moves, rows fade and shrink away from the middle. */
+.flow-drum {
   overflow: hidden;
+}
+.flow-drum ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  transition: transform 520ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+.flow-drum li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 46px;
+  font-size: var(--gx-drum-size);
+  font-weight: 500;
+  letter-spacing: var(--gx-drum-tracking);
+  transform-origin: left center;
+  transition: opacity 520ms, transform 520ms;
+}
+.flow-drum li span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flow-drum li.fail svg {
+  color: var(--gx-danger);
+}
+.flow-drum .spin {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--gx-text);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: flow-spin 0.8s linear infinite;
+}
+
+/* Laid along the window's bottom edge to edge, under the column. */
+.flow-bottom {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+/* Things a step shows in type: a key, a link. */
+.flow-big {
+  margin: 0;
+  font-size: var(--gx-key-size);
+  line-height: var(--gx-key-line);
+  letter-spacing: var(--gx-key-tracking);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  user-select: all;
 }

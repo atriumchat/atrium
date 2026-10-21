@@ -1,7 +1,7 @@
 import { t } from '../i18n';
 import type { MyInvite, Session } from '../protocol';
 import type { Backend } from './backend';
-import { TASKS } from './Drum';
+import { TASKS } from './tasks';
 import type { Progress, StepState } from './setup';
 
 /**

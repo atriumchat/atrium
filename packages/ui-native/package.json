@@ -1,0 +1,29 @@
+{
+  "name": "@gomex/ui-native",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gomex Flow for React Native: the flow parts on @gomex/ui-common's tokens, geometry and contract.",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gomex/ui-common": "*"
+  },
+  "peerDependencies": {
+    "expo-haptics": "*",
+    "react": "^19.3.0",
+    "react-native": "*",
+    "react-native-reanimated": "*",
+    "react-native-safe-area-context": "*",
+    "react-native-svg": "*"
+  },
+  "devDependencies": {
+    "@types/react": "~19.3.0",
+    "typescript": "~6.0.3"
+  }
+}

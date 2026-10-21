@@ -44,6 +44,11 @@ export const color = {
   buttonHover: '#ffffff',
   buttonInk: '#0c0c0e',
 
+  // The install's game: the city far off, the dirt under the ground line, the line itself.
+  gameCity: 'rgba(255,255,255,0.12)',
+  gameDirt: 'rgba(255,255,255,0.3)',
+  gameGround: 'rgba(255,255,255,0.5)',
+
   // Rooms on the home screen: green is where you are, pink is somewhere to go.
   here: '#93e06b',
   hereInk: '#0b2a00',
@@ -51,7 +56,12 @@ export const color = {
   othersInk: '#1a0a1c',
 } as const;
 
-/** Onest throughout. Sizes and line heights in points (px on the web); tracking in points. */
+/** Onest throughout: the variable font on the web, its weight files on a phone (@gomex/ui-native picks them). */
+export const font = {
+  web: '"Onest Variable", "Onest", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+} as const;
+
+/** Sizes and line heights in points (px on the web); tracking in points. */
 export const type = {
   stage: { size: 15, line: 20 },
   title: { size: 34, line: 40, tracking: -0.8 },
@@ -60,6 +70,8 @@ export const type = {
   choice: { size: 20, line: 26 },
   big: { size: 64, line: 64, tracking: -3 },
   key: { size: 24, line: 32, tracking: 1 },
+  kept: { size: 18, line: 24 },
+  drum: { size: 19, line: 24, tracking: -0.2 },
   label: { size: 14, line: 18 },
   note: { size: 15, line: 20 },
   button: { size: 17, line: 22 },

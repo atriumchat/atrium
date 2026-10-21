@@ -1,5 +1,5 @@
 import { useStore } from '../src/store';
-import { FlowShell } from '../src/components/Flow';
+import { FlowShell } from '@gomex/ui-native';
 import { RecoveryKeyStep } from '../src/components/RecoveryKeyStep';
 
 /** The screen right after sign-up (and recovery): the recovery key to copy or save, the last step of signing up. */

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 
 /**
  * The Gomex Flow components' props, the same on every platform: @gomex/ui-web and @gomex/ui-native implement these
@@ -73,5 +73,57 @@ export type RadioRowProps = {
   last?: boolean;
 };
 
-/** The flow's components, by name: both implementations export each of them. */
-export const flowParts = ['FlowShell', 'FlowStep', 'FlowPrimary', 'FlowSecondary', 'TextAction', 'LineField', 'RadioRow'] as const;
+/** Something kept from before on this device, with what to do with it underlined on the right. */
+export type KeptRowProps = {
+  label: string;
+  go: string;
+  onPress: () => void;
+};
+
+/** A row on the drum: one of a long job's steps. */
+export type DrumItem = { id: string; label: string; state?: 'run' | 'done' | 'fail' };
+
+/** A long job's steps on a drum: the running one in the middle, the done ones fading above, the coming ones below. */
+export type DrumProps = {
+  items: readonly DrumItem[];
+  /** The step running now, by id; without one the drum stands after the last one done. */
+  current: string | null;
+  /** How many rows are in sight: odd, the running one in the middle. */
+  shown?: number;
+};
+
+/** The few words the parts say themselves, in the app's language. */
+export type FlowLabels = { back: string };
+
+export type FlowProviderProps = { labels: FlowLabels; children: ReactNode };
+
+/**
+ * The flow's components, by name, with the props each takes: both implementations declare
+ * `const parts = { … } satisfies FlowParts`, so a part missing or a prop different on one platform fails to compile.
+ */
+export type FlowParts = {
+  FlowProvider: ComponentType<FlowProviderProps>;
+  FlowShell: ComponentType<FlowShellProps>;
+  FlowStep: ComponentType<FlowStepProps>;
+  FlowPrimary: ComponentType<FlowPrimaryProps>;
+  FlowSecondary: ComponentType<FlowSecondaryProps>;
+  TextAction: ComponentType<TextActionProps>;
+  LineField: ComponentType<LineFieldProps>;
+  RadioRow: ComponentType<RadioRowProps>;
+  KeptRow: ComponentType<KeptRowProps>;
+  Drum: ComponentType<DrumProps>;
+};
+
+/** The same names as a list, for the parity test that reads each implementation's exports. */
+export const flowParts = [
+  'FlowProvider',
+  'FlowShell',
+  'FlowStep',
+  'FlowPrimary',
+  'FlowSecondary',
+  'TextAction',
+  'LineField',
+  'RadioRow',
+  'KeptRow',
+  'Drum',
+] as const satisfies readonly (keyof FlowParts)[];

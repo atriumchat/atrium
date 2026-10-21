@@ -1,0 +1,39 @@
+/* The server's icon in its row: the picture or the Gomex mark, and what to do with it. */
+.flow-icon-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gx-text);
+  text-align: left;
+  font-family: var(--font-inter);
+  cursor: pointer;
+}
+.flow-icon-row img,
+.flow-icon-row .mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+}
+.flow-icon-row img {
+  object-fit: cover;
+}
+.flow-icon-row b {
+  display: block;
+  font-size: 20px;
+  font-weight: 400;
+}
+.flow-icon-row u {
+  font-size: 15px;
+  text-underline-offset: 3px;
+}
+.flow-crop {
+  height: min(52vh, 380px);
+  border-radius: var(--gx-radius-popover);
+  overflow: hidden;
+}

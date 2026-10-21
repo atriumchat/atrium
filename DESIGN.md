@@ -4,8 +4,10 @@
 
 Gomex keeps Discord's structure and habits (server rail, channel list, voice rooms, controls where people expect
 them), so someone switching over finds their way at once. It does not keep Discord's look. This file is the look we
-are moving to. The first screen built in it is "Your own server" on the phone (`mobile/app/own.tsx`); its parts live
-in `mobile/src/components/Flow.tsx` for every flow that comes next.
+are moving to. The first screen built in it is "Your own server" on the phone (`mobile/app/own.tsx`). Its parts are
+the design system Gomex Flow, one package per platform with one contract (docs/adr/001-client-architecture.md):
+`@gomex/ui-common` (tokens, the scale's geometry, the parts' props), `@gomex/ui-web` (React DOM, shown in Storybook:
+`npm run storybook -w @gomex/ui-web`) and `@gomex/ui-native` (React Native, shown at `/design` in a development build).
 
 ## Principles
 
@@ -56,7 +58,7 @@ in a flow; add a token.
 - No accent colour in flows: no green buttons, links, radios or ticks. White carries the emphasis.
 - The only filled shape on a screen is the main button (white pill, dark text); disabled it turns graphite.
 
-## Parts (`mobile/src/components/Flow.tsx`)
+## Parts (`packages/ui-web`, `packages/ui-native`; props in `packages/ui-common/src/contract.ts`)
 
 - **FlowShell**: the black page, the part line over the step, `EdgeTicks` drawn last, and an optional `bottom` laid
   edge to edge and kept inside the ticks (fades into black towards them).
@@ -68,10 +70,12 @@ in a flow; add a token.
   main button. General errors and notes stand over the buttons; a field's own error goes under the field.
 - **LineField**: label, big text on a hairline (white while typing, red when wrong), placeholder always, error under it.
 - **RadioRow**: a choice between hairlines, radio on the right (as iOS marks a choice). One option preselected.
-- **CheckRow**: a square tick box (a round one reads as a radio).
+- **FlowPrimary**: the main button, the white pill; `busy` shows a spinner on it, disabled it turns graphite.
 - **FlowSecondary**: a small outlined button 2 points right of the main one, for the way round it (skip, later).
 - **TextAction**: white underlined text for other paths and small actions (forgot password, copy).
 - **KeptRow**: something remembered from before, with its action underlined on the right.
+- **Drum**: a long job's steps (the install), the running one in the middle, the done ones fading above.
+- **FlowProvider**: the app's words for what the parts say themselves (the back button's label).
 
 ## Motion
 
@@ -103,7 +107,7 @@ couple of minutes; you can close the app"). Not marketing, not jargon: people se
   `invite`) opens a step, `&fast=1` hurries the install. Sign-in: `localhost:8081/login?mock=1` (add
   `&invite=7F3K9QAB` for the invite branch). The web build stubs LiveKit and the Keychain (`mobile/web-stubs`).
 - Done on these parts: "Your own server", sign-in, invite and the recovery key on the phone (`RecoveryKeyStep`); the
-  server's setup wizard on the web and in the desktop app (`web/src/ui/flow`, the same parts in CSS; `#step=server`
+  server's setup wizard on the web and in the desktop app (`@gomex/ui-web`; `#step=server`
   and the like open a step on made-up answers in development). Next: the desktop app's own "Your own server" window,
   then settings. The main screens (rail, channels, chat, call) last,
   drawn in Figma first.

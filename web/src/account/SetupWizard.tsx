@@ -4,7 +4,8 @@ import { useT } from '../i18n';
 import { inviteLink } from '../people/invite';
 import { GomexMark } from '../ui/Logo';
 import { IconCropper, centred, cropToBlob, cropToUrl, loadImage, type Crop } from '../ui/IconCropper';
-import { FlowPrimary, FlowSecondary, FlowShell, FlowStep, LineField, TextAction } from '../ui/flow/Flow';
+import { FlowPrimary, FlowProvider, FlowSecondary, FlowShell, FlowStep, LineField, TextAction } from '@gomex/ui-web';
+import './setupWizard.css';
 
 /**
  * First run on a fresh server, shown while it has no accounts, in the flow look (DESIGN.md) as the phone app does it
@@ -272,7 +273,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             actions={
               <>
                 <FlowPrimary type="submit" disabled={!serverName.trim()}>{t('setup.next')}</FlowPrimary>
-                <FlowSecondary onClick={skipServer}>{t('setup.server.skip')}</FlowSecondary>
+                <FlowSecondary onPress={skipServer}>{t('setup.server.skip')}</FlowSecondary>
               </>
             }
           >
@@ -285,7 +286,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
                   <u>{icon ? t('setup.server.another') : t('setup.server.choose')}</u>
                 </span>
               </button>
-              {icon ? <TextAction onClick={dropIcon}>{t('setup.server.remove')}</TextAction> : null}
+              {icon ? <TextAction onPress={dropIcon}>{t('setup.server.remove')}</TextAction> : null}
             </div>
             <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => void pick(e.target.files?.[0])} />
           </FlowStep>
@@ -302,7 +303,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             actions={
               <>
                 <FlowPrimary type="submit">{t('setup.server.cropDone')}</FlowPrimary>
-                <FlowSecondary onClick={() => fileInput.current?.click()}>{t('setup.server.another')}</FlowSecondary>
+                <FlowSecondary onPress={() => fileInput.current?.click()}>{t('setup.server.another')}</FlowSecondary>
               </>
             }
           >
@@ -341,8 +342,8 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             <p className="flow-big">{key}</p>
             {/* "Next" opens once the key has been copied or downloaded; the action used says so. */}
             <div className="flow-actions">
-              <TextAction left onClick={() => void copyKey()}>{keyKept === 'copied' ? t('common.copy.done') : t('common.copy.label')}</TextAction>
-              <TextAction left onClick={downloadKey}>{keyKept === 'downloaded' ? t('setup.key.downloaded') : t('setup.key.download')}</TextAction>
+              <TextAction left onPress={() => void copyKey()}>{keyKept === 'copied' ? t('common.copy.done') : t('common.copy.label')}</TextAction>
+              <TextAction left onPress={downloadKey}>{keyKept === 'downloaded' ? t('setup.key.downloaded') : t('setup.key.download')}</TextAction>
             </div>
           </FlowStep>
         );
@@ -355,21 +356,21 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             error={error}
             actions={
               linkSent ? (
-                <FlowPrimary onClick={onDone}>{t('setup.done.start')}</FlowPrimary>
+                <FlowPrimary onPress={onDone}>{t('setup.done.start')}</FlowPrimary>
               ) : (
                 <>
                   {canShare ? (
-                    <FlowPrimary disabled={!link} onClick={() => void shareLink()}>{t('setup.invite.share')}</FlowPrimary>
+                    <FlowPrimary disabled={!link} onPress={() => void shareLink()}>{t('setup.invite.share')}</FlowPrimary>
                   ) : (
-                    <FlowPrimary disabled={!link} onClick={() => void copyLink()}>{t('setup.invite.copy')}</FlowPrimary>
+                    <FlowPrimary disabled={!link} onPress={() => void copyLink()}>{t('setup.invite.copy')}</FlowPrimary>
                   )}
-                  <FlowSecondary onClick={onDone}>{t('setup.invite.later')}</FlowSecondary>
+                  <FlowSecondary onPress={onDone}>{t('setup.invite.later')}</FlowSecondary>
                 </>
               )
             }
           >
             <p className="flow-big" style={{ fontSize: 22, lineHeight: '28px', letterSpacing: 0 }}>{link.replace(/^https?:\/\//, '') || t('setup.invite.loading')}</p>
-            {canShare ? <TextAction left onClick={() => void copyLink()}>{linkSent === 'copied' ? t('common.copy.done') : t('common.copy.label')}</TextAction> : null}
+            {canShare ? <TextAction left onPress={() => void copyLink()}>{linkSent === 'copied' ? t('common.copy.done') : t('common.copy.label')}</TextAction> : null}
           </FlowStep>
         );
     }
@@ -378,10 +379,12 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   const parts = [t('setup.done.server'), t('setup.progress.account'), t('setup.progress.friends')];
   const part = PART[step.id];
   return (
-    <FlowShell fill={FILL[step.id]} label={t('setup.stageOf', { stage: parts[part]!, n: part + 1, total: parts.length })}>
-      <div key={step.n} className={step.back ? 'flow-swap back-in' : 'flow-swap'}>
-        {render(step.id)}
-      </div>
-    </FlowShell>
+    <FlowProvider labels={{ back: t('setup.back') }}>
+      <FlowShell fill={FILL[step.id]} label={t('setup.stageOf', { stage: parts[part]!, n: part + 1, total: parts.length })}>
+        <div key={step.n} className={step.back ? 'flow-swap back-in' : 'flow-swap'}>
+          {render(step.id)}
+        </div>
+      </FlowShell>
+    </FlowProvider>
   );
 }

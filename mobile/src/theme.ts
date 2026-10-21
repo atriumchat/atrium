@@ -31,4 +31,4 @@ export const colors = {
 
 export { color, radius, space, type };
 
-export const fonts = { 400: 'Onest_400Regular', 500: 'Onest_500Medium', 600: 'Onest_600SemiBold', 700: 'Onest_700Bold' } as const;
+export { fonts } from '@gomex/ui-native';

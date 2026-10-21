@@ -4,7 +4,7 @@ import Animated, { runOnJS, useAnimatedStyle, useFrameCallback, useSharedValue }
 import Svg, { Path } from 'react-native-svg';
 import { useT } from '../i18n';
 import { Text } from '../text';
-import { colors } from '../theme';
+import { color, colors } from '../theme';
 
 /**
  * Something to do while the server installs, after Chrome's offline dinosaur: a white dinosaur runs along the ground,
@@ -254,52 +254,52 @@ export function DinoRun({ below = 0, last = false, onPlaying, onLeave }: { below
       <Animated.View style={[{ position: 'absolute', left: 0, top: GROUND - 88, flexDirection: 'row' }, cityStyle]}>
         {[0, 1, 2].map((i) => (
           <Svg key={i} width={CITY_W} height={88} viewBox="0 0 200 44">
-            <Path d={CITY} fill="rgba(255,255,255,0.12)" />
+            <Path d={CITY} fill={color.gameCity} />
           </Svg>
         ))}
       </Animated.View>
       {/* The ground: black down to the screen's edge (over the edge's ticks, so the line stands on something), its specks going by */}
-      <View style={{ position: 'absolute', left: 0, right: 0, top: GROUND, bottom: 0, backgroundColor: '#000', overflow: 'hidden' }}>
+      <View style={{ position: 'absolute', left: 0, right: 0, top: GROUND, bottom: 0, backgroundColor: color.page.phone, overflow: 'hidden' }}>
         <Animated.View style={[{ position: 'absolute', left: 0, top: 0, flexDirection: 'row' }, groundStyle]}>
           {[0, 1, 2].map((i) => (
             <Svg key={i} width={DIRT_W} height={dirtDepth * 2 + 4} viewBox={`0 0 200 ${dirtDepth + 2}`}>
-              <Path d={paths.dirt} fill="rgba(255,255,255,0.3)" />
+              <Path d={paths.dirt} fill={color.gameDirt} />
             </Svg>
           ))}
         </Animated.View>
       </View>
-      <View style={{ position: 'absolute', left: 0, right: 0, top: GROUND, height: 1, backgroundColor: 'rgba(255,255,255,0.5)' }} />
+      <View style={{ position: 'absolute', left: 0, right: 0, top: GROUND, height: 1, backgroundColor: color.gameGround }} />
       {rackX.map((_, i) => (
         <Animated.View key={i} style={[{ position: 'absolute', left: 0, top: 0 }, rackStyles[i]]}>
           <Animated.View style={[{ position: 'absolute', top: GROUND - RACK_SHORT.length * PX }, kindShort[i]]}>
-            <Svg width={12 * PX} height={RACK_SHORT.length * PX} viewBox={`0 0 12 ${RACK_SHORT.length}`}><Path d={paths.racks[0]} fill="#fff" /></Svg>
+            <Svg width={12 * PX} height={RACK_SHORT.length * PX} viewBox={`0 0 12 ${RACK_SHORT.length}`}><Path d={paths.racks[0]} fill={color.text.phone} /></Svg>
           </Animated.View>
           <Animated.View style={[{ position: 'absolute', top: GROUND - RACK_TALL.length * PX }, kindTall[i]]}>
-            <Svg width={12 * PX} height={RACK_TALL.length * PX} viewBox={`0 0 12 ${RACK_TALL.length}`}><Path d={paths.racks[1]} fill="#fff" /></Svg>
+            <Svg width={12 * PX} height={RACK_TALL.length * PX} viewBox={`0 0 12 ${RACK_TALL.length}`}><Path d={paths.racks[1]} fill={color.text.phone} /></Svg>
           </Animated.View>
         </Animated.View>
       ))}
       <Animated.View style={[{ position: 'absolute', left: DINO_X, top: GROUND - dinoH }, dinoStyle]}>
         <Svg width={19 * PX} height={dinoH} viewBox={`0 0 19 ${BODY.length + LEGS_A.length}`}>
-          <Path d={paths.body} fill="#fff" />
+          <Path d={paths.body} fill={color.text.phone} />
         </Svg>
         <Animated.View style={[{ position: 'absolute', left: 0, top: 0 }, legsA]}>
-          <Svg width={19 * PX} height={dinoH} viewBox={`0 0 19 ${BODY.length + LEGS_A.length}`}><Path d={paths.a} fill="#fff" /></Svg>
+          <Svg width={19 * PX} height={dinoH} viewBox={`0 0 19 ${BODY.length + LEGS_A.length}`}><Path d={paths.a} fill={color.text.phone} /></Svg>
         </Animated.View>
         <Animated.View style={[{ position: 'absolute', left: 0, top: 0 }, legsB]}>
-          <Svg width={19 * PX} height={dinoH} viewBox={`0 0 19 ${BODY.length + LEGS_A.length}`}><Path d={paths.b} fill="#fff" /></Svg>
+          <Svg width={19 * PX} height={dinoH} viewBox={`0 0 19 ${BODY.length + LEGS_A.length}`}><Path d={paths.b} fill={color.text.phone} /></Svg>
         </Animated.View>
       </Animated.View>
       <Text style={{ position: 'absolute', right: 40, top: 0, fontSize: 15, color: colors.muted, fontVariant: ['tabular-nums'] }}>{score > 0 ? String(score).padStart(4, '0') : ''}</Text>
       {state === 'over' && last ? (
         // The run is over and the server is waiting: on to it, as a button, not another run.
         <View style={{ position: 'absolute', left: 0, right: 0, top: 22, alignItems: 'center' }}>
-          <View style={{ height: 40, borderRadius: 20, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f2f2f4' }}>
-            <Text style={{ fontSize: 16, fontWeight: '500', color: '#0c0c0e' }}>{t('own.game.next')}</Text>
+          <View style={{ height: 40, borderRadius: 20, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: color.button }}>
+            <Text style={{ fontSize: 16, fontWeight: '500', color: color.buttonInk }}>{t('own.game.next')}</Text>
           </View>
         </View>
       ) : state === 'run' && last ? (
-        <Text style={{ position: 'absolute', left: 0, right: 0, top: 36, textAlign: 'center', fontSize: 15, color: '#fff' }}>{t('own.game.last')}</Text>
+        <Text style={{ position: 'absolute', left: 0, right: 0, top: 36, textAlign: 'center', fontSize: 15, color: color.text.phone }}>{t('own.game.last')}</Text>
       ) : state !== 'run' ? (
         <Text style={{ position: 'absolute', left: 0, right: 0, top: 36, textAlign: 'center', fontSize: 15, color: colors.muted }}>{state === 'over' ? t('own.game.again') : t('own.game.start')}</Text>
       ) : null}

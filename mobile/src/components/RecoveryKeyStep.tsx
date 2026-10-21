@@ -4,8 +4,8 @@ import * as Clipboard from 'expo-clipboard';
 import { useT } from '../i18n';
 import { Text } from '../text';
 import { haptic } from '../haptics';
-import { FlowStep, TextAction } from './Flow';
-import { Primary } from './Settings';
+import { type } from '../theme';
+import { FlowPrimary, FlowStep, TextAction } from '@gomex/ui-native';
 
 /**
  * The recovery key, shown once (DESIGN.md flow look): big, to copy or save through the share sheet; "Next" opens once
@@ -20,8 +20,8 @@ export function RecoveryKeyStep({ value, nick, place, onNext, busy = false }: { 
     if (result.action === Share.sharedAction) setKept('saved');
   }
   return (
-    <FlowStep title={t('setup.key.title')} sub={t('account.key.hint')} actions={<Primary busy={busy} disabled={!kept} onPress={onNext}>{t('setup.next')}</Primary>}>
-      <Text selectable style={{ fontSize: 24, lineHeight: 32, letterSpacing: 1, fontVariant: ['tabular-nums'] }}>{value}</Text>
+    <FlowStep title={t('setup.key.title')} sub={t('account.key.hint')} actions={<FlowPrimary busy={busy} disabled={!kept} onPress={onNext}>{t('setup.next')}</FlowPrimary>}>
+      <Text selectable style={{ fontSize: type.key.size, lineHeight: type.key.line, letterSpacing: type.key.tracking, fontVariant: ['tabular-nums'] }}>{value}</Text>
       <View style={{ flexDirection: 'row', gap: 24 }}>
         <TextAction left onPress={() => { void Clipboard.setStringAsync(value); haptic.tap(); setKept('copied'); }}>{kept === 'copied' ? t('common.copy.done') : t('common.copy.label')}</TextAction>
         <TextAction left onPress={() => void save()}>{kept === 'saved' ? t('setup.key.downloaded') : t('setup.key.download')}</TextAction>

@@ -7,9 +7,8 @@ import { normalizeServer } from '../src/protocol';
 import { signIn } from '../src/store';
 import { useT } from '../src/i18n';
 import { Text } from '../src/text';
-import { FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '../src/components/Flow';
+import { FlowPrimary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '@gomex/ui-native';
 import { RecoveryKeyStep } from '../src/components/RecoveryKeyStep';
-import { Primary } from '../src/components/Settings';
 import { MOCK_KEY } from '../src/own/mock';
 
 /**
@@ -109,7 +108,7 @@ export default function Login() {
           <FlowStep
             title="Gomex"
             sub={t('account.login.tagline')}
-            actions={<Primary onPress={() => (way === 'own' ? router.push('/own') : go(way))}>{t('setup.next')}</Primary>}
+            actions={<FlowPrimary onPress={() => (way === 'own' ? router.push('/own') : go(way))}>{t('setup.next')}</FlowPrimary>}
           >
             <View>
               <RadioRow title={t('m.start.have')} sub={t('m.start.haveSub')} on={way === 'login'} onPress={() => setWay('login')} />
@@ -126,7 +125,7 @@ export default function Login() {
             title={t('account.login.tabLogin')}
             sub={t('m.start.haveSub')}
             error={error}
-            actions={<Primary busy={busy} disabled={!ready} onPress={() => void submit()}>{t('account.login.submitLogin')}</Primary>}
+            actions={<FlowPrimary busy={busy} disabled={!ready} onPress={() => void submit()}>{t('account.login.submitLogin')}</FlowPrimary>}
             below={<TextAction onPress={() => go('recover')}>{t('account.login.forgotPassword')}</TextAction>}
           >
             {serverLine}
@@ -141,7 +140,7 @@ export default function Login() {
             onBack={() => go('start', true)}
             title={t('account.login.inviteLabel')}
             sub={t('m.inviteSub')}
-            actions={<Primary disabled={!inviter} onPress={() => go('account')}>{t('setup.next')}</Primary>}
+            actions={<FlowPrimary disabled={!inviter} onPress={() => go('account')}>{t('setup.next')}</FlowPrimary>}
           >
             <View>
               <LineField
@@ -164,7 +163,7 @@ export default function Login() {
             title={t('m.account')}
             sub={inviter ? t('account.login.invitedBy', { name: inviter }) : ''}
             error={error}
-            actions={<Primary busy={busy} disabled={!ready} onPress={() => void submit()}>{t('account.login.submitRegister')}</Primary>}
+            actions={<FlowPrimary busy={busy} disabled={!ready} onPress={() => void submit()}>{t('account.login.submitRegister')}</FlowPrimary>}
           >
             {nickField}
             <LineField label={t('account.login.password')} value={password} onChangeText={setPassword} placeholder={t('setup.admin.passwordHint')} secureTextEntry textContentType="newPassword" returnKeyType="go" onSubmitEditing={() => ready && void submit()} />
@@ -179,7 +178,7 @@ export default function Login() {
             title={t('account.login.recoverTitle')}
             sub={t('account.login.recoverHint')}
             error={error}
-            actions={<Primary busy={busy} disabled={!ready} onPress={() => void submit()}>{t('m.recoverGo')}</Primary>}
+            actions={<FlowPrimary busy={busy} disabled={!ready} onPress={() => void submit()}>{t('m.recoverGo')}</FlowPrimary>}
           >
             {serverLine}
             {nickField}

@@ -17,3 +17,4 @@ desktop/dist/
 deploy/downloads/
 *.tsbuildinfo
 .pytest_cache/
+storybook-static/

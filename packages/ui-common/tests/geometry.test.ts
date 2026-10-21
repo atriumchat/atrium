@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { concentricEdge, cornerRadius, edgeTicks, filled, flowFrame, rulerTicks, scale, space, tickState } from '../src/index';
+import { concentricEdge, cornerRadius, drum, drumAt, edgeTicks, filled, flowFrame, interpolate, rulerTicks, scale, space, tickState } from '../src/index';
 
 test('corner radius: known phones, the nearest for others, square with a home button', () => {
   assert.equal(cornerRadius(390, 844), 47.3);
@@ -58,4 +58,18 @@ test('fill lights ticks, the next one breathes', () => {
   assert.equal(filled(2, 10), 10);
   assert.deepEqual([3, 4, 5].map((i) => tickState(i, 4, 10)), ['on', 'next', 'off']);
   assert.equal(tickState(9, 10, 10), 'on');
+});
+
+test('the drum stands on the running step, else after the last one done', () => {
+  const items = [{ id: 'a', label: 'A', state: 'done' as const }, { id: 'b', label: 'B', state: 'run' as const }, { id: 'c', label: 'C' }];
+  assert.equal(drumAt(items, 'b'), 1);
+  assert.equal(drumAt(items, null), 1);
+  assert.equal(drumAt(items.map((i) => ({ ...i, state: 'done' as const })), null), 2);
+  assert.equal(drumAt([{ id: 'a', label: 'A' }], 'zzz'), 0);
+});
+
+test('interpolate clamps at the ends', () => {
+  assert.equal(interpolate(-1, drum.away, drum.opacity), 1);
+  assert.equal(interpolate(0.5, drum.away, drum.opacity), 0.75);
+  assert.equal(interpolate(9, drum.away, drum.opacity), 0);
 });

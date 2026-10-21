@@ -6,18 +6,17 @@ import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutLeft } from 'react-native-reanimated';
 import { ApiError, type Credentials } from '../src/api';
-import { useT } from '../src/i18n';
+import { useT, type Key } from '../src/i18n';
 import { Text } from '../src/text';
 import { colors } from '../src/theme';
 import { haptic } from '../src/haptics';
 import { GomexMark } from '../src/components/Logo';
-import { FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, RING, TextAction, useFlowFrame } from '../src/components/Flow';
+import { Drum, FlowPrimary, FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, RING, TextAction, useFlowFrame } from '@gomex/ui-native';
 import { RecoveryKeyStep } from '../src/components/RecoveryKeyStep';
-import { Primary } from '../src/components/Settings';
 import { real } from '../src/own/backend';
 import { capacity } from '../src/own/capacity';
 import { DinoRun } from '../src/own/DinoRun';
-import { Drum, TASKS } from '../src/own/Drum';
+import { TASKS } from '../src/own/tasks';
 import { MOCK_KEY, mock, mockInstall, mockPace } from '../src/own/mock';
 import { pickTurn, type Facts, type Progress, type Saved } from '../src/own/setup';
 
@@ -409,7 +408,7 @@ export default function OwnServer() {
             title={t('own.server.h')}
             sub={t('own.server.sub')}
             error={error}
-            actions={<Primary busy={busy} disabled={!host.trim() || !password} onPress={connectServer}>{t('own.connect')}</Primary>}
+            actions={<FlowPrimary busy={busy} disabled={!host.trim() || !password} onPress={connectServer}>{t('own.connect')}</FlowPrimary>}
           >
             {earlier?.started && !earlier.url ? <KeptRow label={t('own.resume', { host: earlier.domain ?? earlier.host })} go={t('own.resumeGo')} onPress={resumeEarlier} /> : null}
             {earlier?.url ? <KeptRow label={t('own.installed', { host: earlier.domain ?? earlier.host })} go={t('own.installedGo')} onPress={openEarlier} /> : null}
@@ -427,7 +426,7 @@ export default function OwnServer() {
             title={t('own.address.h')}
             sub={t('own.address.sub')}
             error={error}
-            actions={<Primary onPress={() => go(way)}>{t('own.next')}</Primary>}
+            actions={<FlowPrimary onPress={() => go(way)}>{t('own.next')}</FlowPrimary>}
           >
             <View accessibilityRole="radiogroup">
               <RadioRow title={t('own.free')} sub={t('own.freeSub')} on={way === 'free'} onPress={() => setWay('free')} />
@@ -442,7 +441,7 @@ export default function OwnServer() {
             title={t('own.free')}
             sub={t('own.free.sub')}
             error={error}
-            actions={<Primary busy={busy} disabled={!name || !emailOk} onPress={freeName}>{t('own.next')}</Primary>}
+            actions={<FlowPrimary busy={busy} disabled={!name || !emailOk} onPress={freeName}>{t('own.next')}</FlowPrimary>}
           >
             {saved?.desec ? <KeptRow label={t('own.savedName', { domain: `${saved.desec.name}.dedyn.io` })} go={t('own.useSaved')} onPress={useSavedName} /> : null}
             <LineField label={t('own.name')} value={name} onChangeText={(v) => setName(v.replace(/\s/g, '').toLowerCase())} placeholder="podval" suffix=".dedyn.io" />
@@ -456,7 +455,7 @@ export default function OwnServer() {
             title={t('own.mail.h')}
             sub={t('own.mail.sub')}
             error={error}
-            actions={<Primary onPress={() => void Linking.openURL('message://')}>{t('own.mail.open')}</Primary>}
+            actions={<FlowPrimary onPress={() => void Linking.openURL('message://')}>{t('own.mail.open')}</FlowPrimary>}
           >
             <View>
               <Text numberOfLines={1} style={{ fontSize: 22, lineHeight: 28 }}>{email.trim()}</Text>
@@ -475,7 +474,7 @@ export default function OwnServer() {
             title={t('own.own')}
             sub={t('own.own.sub')}
             error={error}
-            actions={<Primary busy={busy} disabled={!domain.trim()} onPress={ownDomain}>{t('own.check')}</Primary>}
+            actions={<FlowPrimary busy={busy} disabled={!domain.trim()} onPress={ownDomain}>{t('own.check')}</FlowPrimary>}
           >
             <LineField label={t('own.domain')} value={domain} onChangeText={setDomain} placeholder="chat.example.com" keyboardType="url" returnKeyType="go" onSubmitEditing={() => domain && ownDomain()} />
             <View style={{ gap: 6 }}>
@@ -497,11 +496,11 @@ export default function OwnServer() {
             title={reachable ? t('own.install.ready') : t('own.install.almost')}
             sub={saved?.domain ?? ''}
             error={error}
-            actions={<Primary busy={busy} disabled={!reachable} onPress={startSetup}>{reachable ? t('own.install.open') : t('own.install.waitButton')}</Primary>}
+            actions={<FlowPrimary busy={busy} disabled={!reachable} onPress={startSetup}>{reachable ? t('own.install.open') : t('own.install.waitButton')}</FlowPrimary>}
           >
             {!reachable ? (
               <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
-                <ActivityIndicator color="#fff" style={{ alignSelf: "flex-start", marginTop: 2 }} />
+                <ActivityIndicator color={colors.text} style={{ alignSelf: "flex-start", marginTop: 2 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 18, lineHeight: 24 }}>{t('own.install.waitAddress')}</Text>
                   <Text style={{ marginTop: 4, fontSize: 15, lineHeight: 20, color: colors.muted }}>{t('own.install.waitHint')}</Text>
@@ -518,7 +517,7 @@ export default function OwnServer() {
             title={t('setup.server.title')}
             sub={t('setup.server.sub')}
             error={error}
-            actions={<Primary disabled={!serverName.trim()} onPress={() => go('admin')}>{t('setup.next')}</Primary>}
+            actions={<FlowPrimary disabled={!serverName.trim()} onPress={() => go('admin')}>{t('setup.next')}</FlowPrimary>}
             aside={<FlowSecondary onPress={() => (setServerName(''), setIcon(null), go('admin'))}>{t('setup.server.skip')}</FlowSecondary>}
           >
             <LineField label={t('setup.server.nameLabel')} value={serverName} onChangeText={setServerName} maxLength={40} placeholder={t('setup.server.namePlaceholder')} autoComplete="off" textContentType="none" autoCapitalize="sentences" returnKeyType="next" onSubmitEditing={() => serverName.trim() && go('admin')} />
@@ -540,7 +539,7 @@ export default function OwnServer() {
             title={t('setup.admin.title')}
             sub={t('setup.admin.sub')}
             error={error}
-            actions={<Primary busy={busy} disabled={!nick.trim() || adminPassword.length < 8 || repeat !== adminPassword} onPress={createAdmin}>{t('setup.admin.create')}</Primary>}
+            actions={<FlowPrimary busy={busy} disabled={!nick.trim() || adminPassword.length < 8 || repeat !== adminPassword} onPress={createAdmin}>{t('setup.admin.create')}</FlowPrimary>}
           >
             <LineField label={t('setup.admin.nick')} value={nick} onChangeText={(v) => (setNick(v), setError(''))} maxLength={32} placeholder={t('setup.admin.nickPlaceholder')} textContentType="username" editable={!admin} returnKeyType="next" />
             <View style={{ flexDirection: 'row', gap: 20 }}>
@@ -558,7 +557,7 @@ export default function OwnServer() {
             title={t('setup.invite.title')}
             sub={t('setup.invite.sub')}
             error={error}
-            actions={linkSent ? <Primary busy={busy} onPress={finish}>{t('own.invite.done')}</Primary> : <Primary onPress={() => void shareLink()}>{t('setup.invite.share')}</Primary>}
+            actions={linkSent ? <FlowPrimary busy={busy} onPress={finish}>{t('own.invite.done')}</FlowPrimary> : <FlowPrimary onPress={() => void shareLink()}>{t('setup.invite.share')}</FlowPrimary>}
             aside={linkSent ? undefined : <FlowSecondary onPress={finish}>{t('setup.invite.later')}</FlowSecondary>}
           >
             <Text numberOfLines={2} style={{ fontSize: 22, lineHeight: 28 }}>{link.replace(/^https?:\/\//, '') || t('setup.invite.loading')}</Text>
@@ -593,9 +592,9 @@ export default function OwnServer() {
             sub={ready ? t('own.game.lastSub') : t('own.install.sub')}
             error={failed}
             note={lost ? t('own.install.reconnect') : undefined}
-            actions={failed && saved ? <Primary busy={busy} onPress={() => void run(() => install(saved))}>{t('own.install.retry')}</Primary> : undefined}
+            actions={failed && saved ? <FlowPrimary busy={busy} onPress={() => void run(() => install(saved))}>{t('own.install.retry')}</FlowPrimary> : undefined}
           >
-            <Drum steps={progress?.steps ?? {}} current={progress?.current ?? null} />
+            <Drum items={TASKS.map((id) => ({ id, label: t(`own.task.${id}` as Key), state: progress?.steps[id]?.state }))} current={progress?.current ?? null} />
           </FlowStep>
         ) : (
           screen()
