@@ -66,7 +66,7 @@ export function FlowStep({ title, sub, error, note, noteHidden = false, actions,
         {actions || onBack || aside ? (
           <div className="flow-buttons">
             {onBack ? (
-              <button type="button" className="flow-back" aria-label={labels.back} onClick={onBack}>
+              <button type="button" className="flow-back" aria-label={labels.back} onClick={() => onBack()}>
                 <ChevronLeft />
               </button>
             ) : null}
@@ -90,7 +90,7 @@ export function FlowStep({ title, sub, error, note, noteHidden = false, actions,
 /** The one main action: a white pill. In a step with `onSubmit`, `type="submit"` makes it the form's button. */
 export function FlowPrimary({ busy = false, disabled = false, type = 'button', onPress, children }: FlowPrimaryProps & { type?: 'button' | 'submit' }) {
   return (
-    <button type={type} className={`flow-primary${busy ? ' busy' : ''}`} disabled={disabled || busy} aria-busy={busy || undefined} onClick={onPress}>
+    <button type={type} className={`flow-primary${busy ? ' busy' : ''}`} disabled={disabled || busy} aria-busy={busy || undefined} onClick={onPress && (() => onPress())}>
       {children}
     </button>
   );
@@ -99,7 +99,7 @@ export function FlowPrimary({ busy = false, disabled = false, type = 'button', o
 /** A small outlined button right of the main one, 2px off, for the way round it: skip, later. */
 export function FlowSecondary({ onPress, children }: FlowSecondaryProps) {
   return (
-    <button type="button" className="flow-secondary" onClick={onPress}>
+    <button type="button" className="flow-secondary" onClick={() => onPress()}>
       {children}
     </button>
   );
@@ -123,7 +123,7 @@ export function LineField({ label, suffix, trailing, error, bad = false, ...inpu
 /** A text button: skip, later, copy. White and underlined, so it doesn't pass for a caption; centred unless `left`. */
 export function TextAction({ onPress, left = false, children }: TextActionProps) {
   return (
-    <button type="button" className={`flow-text-action${left ? ' left' : ''}`} onClick={onPress}>
+    <button type="button" className={`flow-text-action${left ? ' left' : ''}`} onClick={() => onPress()}>
       {children}
     </button>
   );
@@ -132,7 +132,7 @@ export function TextAction({ onPress, left = false, children }: TextActionProps)
 /** One of a few ways, picked with a radio button on the right: a row between hairlines. */
 export function RadioRow({ title, sub, on, onPress, last = false }: RadioRowProps) {
   return (
-    <button type="button" role="radio" aria-checked={on} className={`flow-radio${last ? ' last' : ''}`} onClick={onPress}>
+    <button type="button" role="radio" aria-checked={on} className={`flow-radio${last ? ' last' : ''}`} onClick={() => onPress()}>
       <span className="flow-radio-text">
         <span className="flow-radio-title">{title}</span>
         {sub ? <span className="flow-radio-sub">{sub}</span> : null}
@@ -145,7 +145,7 @@ export function RadioRow({ title, sub, on, onPress, last = false }: RadioRowProp
 /** Something kept from before on this device, with what to do with it underlined on the right. */
 export function KeptRow({ label, go, onPress }: KeptRowProps) {
   return (
-    <button type="button" className="flow-kept" onClick={onPress}>
+    <button type="button" className="flow-kept" onClick={() => onPress()}>
       <span>{label}</span>
       <u>{go}</u>
     </button>

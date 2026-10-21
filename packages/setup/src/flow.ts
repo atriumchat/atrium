@@ -82,7 +82,8 @@ export const ownOnDesktop = defineFlow<'server' | 'address' | 'free-name' | 'fre
     'free-mail': { fill: 0.5, part: 'address', back: 'free-name' },
     own: { fill: 0.4, part: 'address', back: 'address' },
     backup: { fill: 0.6, part: 'backup', back: ({ way }) => (way === 'free' ? 'free-name' : 'own') },
-    install: { fill: 0.8, part: 'install', back: 'backup' },
+    // No way back: from Backups, Next would run the installer again over the server.
+    install: { fill: 0.8, part: 'install' },
   },
 });
 

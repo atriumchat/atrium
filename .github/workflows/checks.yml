@@ -14,8 +14,11 @@ concurrency:
   group: checks-${{ github.ref }}
   cancel-in-progress: true
 
+# A branch push runs the checks; a pull request runs them only when it comes from a fork, so a PR from a branch here
+# isn't checked twice for the same commit.
 jobs:
   clients:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -30,6 +33,7 @@ jobs:
       - run: npm run check
 
   server:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

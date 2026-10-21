@@ -15,7 +15,7 @@ import { Drum, FlowPrimary, FlowSecondary, FlowShell, FlowStep, KeptRow, LineFie
 import { RecoveryKeyStep } from '../src/components/RecoveryKeyStep';
 import { real } from '../src/own/backend';
 import { DinoRun } from '../src/own/DinoRun';
-import { capacity, doneCount, emailOk as isEmail, jobFill, MOCK_KEY, OWN_READY, ownOnPhone, pickTurn, TASKS, type Facts, type OwnPhoneStep as Step, type Progress } from '@gomex/setup';
+import { adminForm, capacity, doneCount, emailOk as isEmail, jobFill, MOCK_DOMAIN, MOCK_INVITE, MOCK_KEY, MOCK_SETUP_CODE, OWN_READY, ownOnPhone, pickTurn, TASKS, type Facts, type OwnPhoneStep as Step, type Progress } from '@gomex/setup';
 import { mock, mockInstall, mockPace } from '../src/own/mock';
 import type { Saved } from '../src/own/setup';
 
@@ -91,7 +91,7 @@ export default function OwnServer() {
     const at = params.step;
     if (!mocked || !at) return;
     const ip = '203.0.113.10';
-    const domain = 'podval.dedyn.io';
+    const domain = MOCK_DOMAIN;
     setHost(ip);
     setFacts({ ip, os: 'Ubuntu 24.04 LTS · x86_64', root: true, cores: 1, memory: 1.9, disk: 17 });
     setSaved({ host: ip, ip, user: 'root', turn, cores: 1, memory: 1.9, domain: at === 'address' || at === 'free' || at === 'own' ? undefined : domain });
@@ -99,7 +99,7 @@ export default function OwnServer() {
     if (at === 'install') mockInstall('start', domain);
     if (['ready', 'name', 'admin', 'key', 'invite'].includes(at)) {
       mockInstall('done', domain);
-      setProgress({ steps: {}, current: null, doing: '', ready: `https://app.${domain}/?setup=MOCKCODE01`, exit: 0, failed: null });
+      setProgress({ steps: {}, current: null, doing: '', ready: `https://app.${domain}/?setup=${MOCK_SETUP_CODE}`, exit: 0, failed: null });
       setReachable(at !== 'ready');
     }
     if (at === 'admin' || at === 'key' || at === 'invite') setServerName('Подвал');
@@ -107,7 +107,7 @@ export default function OwnServer() {
       setNick('Тимур');
       setAdmin({ server: `https://app.${domain}`, token: 'mock', named: 'Подвал' });
       setRecoveryKey(MOCK_KEY);
-      setLink(`https://app.${domain}/?invite=7F3K9QAB`);
+      setLink(`https://app.${domain}/?invite=${MOCK_INVITE}`);
     }
     setStep(at === 'ready' ? 'install' : (at as Step));
   }, []);
@@ -513,14 +513,14 @@ export default function OwnServer() {
           </FlowStep>
         );
       case 'admin': {
-        const mismatch = repeat !== '' && repeat.length >= adminPassword.length && repeat !== adminPassword;
+        const { ready: adminReady, mismatch } = adminForm(nick, adminPassword, repeat);
         return (
           <FlowStep
             onBack={back}
             title={t('setup.admin.title')}
             sub={t('setup.admin.sub')}
             error={error}
-            actions={<FlowPrimary busy={busy} disabled={!nick.trim() || adminPassword.length < 8 || repeat !== adminPassword} onPress={createAdmin}>{t('setup.admin.create')}</FlowPrimary>}
+            actions={<FlowPrimary busy={busy} disabled={!adminReady} onPress={createAdmin}>{t('setup.admin.create')}</FlowPrimary>}
           >
             <LineField label={t('setup.admin.nick')} value={nick} onChangeText={(v) => (setNick(v), setError(''))} maxLength={32} placeholder={t('setup.admin.nickPlaceholder')} textContentType="username" editable={!admin} returnKeyType="next" />
             <View style={{ flexDirection: 'row', gap: 20 }}>

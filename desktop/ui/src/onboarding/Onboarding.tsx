@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { domainOk, emailOk, freeName, hostOk, jobFill, mailboxOf, nameOk, ownOnDesktop, pickTurn, TASKS, type OwnDesktopStep as Step } from '@gomex/setup';
+import { domainOk, emailOk, freeName, hostOk, jobFill, mailboxOf, MOCK_DOMAIN, nameOk, ownOnDesktop, pickTurn, TASKS, type OwnDesktopStep as Step } from '@gomex/setup';
 import { Drum, FlowPrimary, FlowProvider, FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '@gomex/ui-web';
 import type { DrumItem } from '@gomex/ui-common';
 import { t } from '../i18n';
@@ -51,7 +51,6 @@ export function Onboarding() {
   // 4. The install.
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [current, setCurrent] = useState<string | null>(null);
-  const [installing, setInstalling] = useState(false);
   const [failed, setFailed] = useState('');
   const [done, setDone] = useState<{ url: string; shown: string } | null>(null);
   const [open, setOpen] = useState(false);
@@ -97,7 +96,7 @@ export function Onboarding() {
     void setup.savedAddress().then(({ domain }) => setSavedDomain(domain));
   }, [step.id]);
 
-  const useSaved = () =>
+  const takeSaved = () =>
     void run(async () => {
       const answer = await setup.useSaved({ ip: facts?.ip ?? '' });
       if ('error' in answer) return setSavedError(answer.error);
@@ -124,6 +123,7 @@ export function Onboarding() {
   useEffect(() => {
     if (step.id !== 'free-mail' || mail !== 'waiting') return;
     let gone = false;
+    let onward = 0;
     const late = setTimeout(() => setMailLate(true), MAIL_LATE);
     void setup.waitMail({ ip: facts?.ip ?? '' }).then((answer) => {
       if (gone) return;
@@ -136,11 +136,12 @@ export function Onboarding() {
       setMail('confirmed');
       setMailLate(false);
       setAddress(`${freeName(name)}.dedyn.io`);
-      setTimeout(() => go('backup'), 900);
+      onward = window.setTimeout(() => go('backup'), 900);
     });
     return () => {
       gone = true;
       clearTimeout(late);
+      clearTimeout(onward);
     };
     // Waits once per visit to the step.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -172,19 +173,14 @@ export function Onboarding() {
 
   /* ---------- 4. the install ---------- */
 
-  function install() {
+  function install(domain = address ?? '') {
     setRows({});
     setCurrent(TASKS[0]);
     setFailed('');
     setDone(null);
     setOpen(false);
-    setInstalling(true);
     clearTimeout(opening.current);
     go('install');
-    const fail = (why: string) => {
-      setInstalling(false);
-      setFailed(why);
-    };
     // The installer reports its own steps; a row is done once a later one starts (a step the server didn't need is
     // simply passed by).
     const onEvent = (event: InstallEvent) => {
@@ -200,11 +196,10 @@ export function Onboarding() {
         }
         return;
       }
-      if (event.state === 'fail') fail(('why' in event && event.why) || t('ob.install.failed'));
+      if (event.state === 'fail') setFailed(('why' in event && event.why) || t('ob.install.failed'));
       if (event.state === 'ready') {
         setRows(Object.fromEntries(TASKS.map((id) => [id, 'done'])));
         setCurrent(null);
-        setInstalling(false);
         setDone({ url: event.url, shown: event.url.replace(/^https:\/\//, '').replace(/\/\?.*$/, '') });
         // The main window shows its own page if opened too early, so a name that stays away doesn't lock the button.
         opening.current = window.setTimeout(() => setOpen(true), OPEN_ANYWAY);
@@ -214,7 +209,7 @@ export function Onboarding() {
         setOpen(true);
       }
     };
-    setup.install({ domain: address ?? '', turn }, onEvent).catch(() => fail(t('ob.install.failed')));
+    setup.install({ domain, turn }, onEvent).catch(() => setFailed(t('ob.install.failed')));
   }
 
   /* ---------- design work in a browser: #step=address (or free-name, free-mail, own, backup, install) ---------- */
@@ -227,9 +222,9 @@ export function Onboarding() {
     setFacts({ ip: '2.27.52.78', os: 'Ubuntu 24.04 LTS · x86_64', size: t('ssh.size', { memory: 2, disk: 18 }) });
     setName('podval');
     setEmail('you@gmail.com');
-    setAddress('podval.dedyn.io');
+    setAddress(MOCK_DOMAIN);
     if (jump === 'own') setDomain('chat.podval.ru');
-    if (jump === 'install' || jump === 'done') install();
+    if (jump === 'install' || jump === 'done') install(MOCK_DOMAIN);
     else if (jump in ownOnDesktop.steps) go(jump as Step);
     // Once, on opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -240,7 +235,7 @@ export function Onboarding() {
   const doneRows = TASKS.filter((id) => rows[id] === 'done').length;
   const fill = step.id === 'install' ? jobFill(ownOnDesktop.fill('install'), 1, doneRows, TASKS.length, !!done) : ownOnDesktop.fill(step.id);
   const stage = ownOnDesktop.stage(step.id);
-  const backTo = installing ? null : ownOnDesktop.back(step.id, { way });
+  const backTo = ownOnDesktop.back(step.id, { way });
   const back = backTo ? () => go(backTo, true) : undefined;
 
   // The step's first field takes the focus once the step has settled (mid-animation it would drag the step to it).
@@ -306,7 +301,7 @@ export function Onboarding() {
           >
             {savedDomain ? (
               <div>
-                <KeptRow label={t('ob.savedName', { domain: savedDomain })} go={t('ob.useSaved')} onPress={useSaved} />
+                <KeptRow label={t('ob.savedName', { domain: savedDomain })} go={t('ob.useSaved')} onPress={takeSaved} />
                 {savedError ? <p className="flow-error" role="alert">{savedError}</p> : null}
               </div>
             ) : null}
@@ -363,7 +358,7 @@ export function Onboarding() {
             sub={t('ob.backup.sub')}
             error={error}
             onBack={back}
-            actions={<FlowPrimary disabled={!drive} onPress={install}>{t('ob.next')}</FlowPrimary>}
+            actions={<FlowPrimary disabled={!drive} onPress={() => install()}>{t('ob.next')}</FlowPrimary>}
             aside={<FlowSecondary onPress={() => (setDrive(null), install())}>{t('ob.backup.skip')}</FlowSecondary>}
           >
             <div className="drive">
@@ -393,7 +388,7 @@ export function Onboarding() {
             error={failed}
             actions={
               failed ? (
-                <FlowPrimary onPress={install}>{t('ob.install.retry')}</FlowPrimary>
+                <FlowPrimary onPress={() => install()}>{t('ob.install.retry')}</FlowPrimary>
               ) : (
                 <FlowPrimary disabled={!open} onPress={() => done && setup.openServer(done.url)}>{t('ob.install.open')}</FlowPrimary>
               )

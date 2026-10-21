@@ -8,7 +8,7 @@ COPY packages/ ./packages/
 COPY web/package.json ./web/
 COPY mobile/package.json ./mobile/
 COPY desktop/ui/package.json ./desktop/ui/
-RUN npm ci --no-audit --no-fund -w web --include-workspace-root
+RUN npm ci --no-audit --no-fund -w web
 COPY web/ ./web/
 RUN npm run build -w web
 

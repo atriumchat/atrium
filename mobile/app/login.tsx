@@ -9,7 +9,7 @@ import { useT } from '../src/i18n';
 import { Text } from '../src/text';
 import { FlowPrimary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '@gomex/ui-native';
 import { RecoveryKeyStep } from '../src/components/RecoveryKeyStep';
-import { MOCK_KEY } from '@gomex/setup';
+import { MIN_PASSWORD, MOCK_KEY } from '@gomex/setup';
 
 /**
  * Signing in, in the flow look (DESIGN.md), a short step at a time so nothing scrolls: what you're here for, then the
@@ -156,7 +156,7 @@ export default function Login() {
           </FlowStep>
         );
       case 'account': {
-        const ready = !!name.trim() && password.length >= 8;
+        const ready = !!name.trim() && password.length >= MIN_PASSWORD;
         return (
           <FlowStep
             onBack={() => go('invite', true)}
@@ -171,7 +171,7 @@ export default function Login() {
         );
       }
       case 'recover': {
-        const ready = !!server.trim() && !!name.trim() && !!key.trim() && password.length >= 8;
+        const ready = !!server.trim() && !!name.trim() && !!key.trim() && password.length >= MIN_PASSWORD;
         return (
           <FlowStep
             onBack={() => go('login', true)}
