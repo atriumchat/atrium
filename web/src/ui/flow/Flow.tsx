@@ -126,7 +126,7 @@ export function TextAction({ onClick, left = false, children }: { onClick: () =>
 /** One of a few ways, picked with a radio button on the right: a row between hairlines. */
 export function RadioRow({ title, sub, on, onClick, last = false }: { title: string; sub?: string; on: boolean; onClick: () => void; last?: boolean }) {
   return (
-    <button type="button" role="radio" aria-checked={on} className={`flow-radio${last ? ' last' : ''}${on ? ' on' : ''}`} onClick={onClick}>
+    <button type="button" role="radio" aria-checked={on} className={`flow-radio${last ? ' last' : ''}`} onClick={onClick}>
       <span className="flow-radio-text">
         <span className="flow-radio-title">{title}</span>
         {sub ? <span className="flow-radio-sub">{sub}</span> : null}

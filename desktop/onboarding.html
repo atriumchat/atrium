@@ -4,186 +4,200 @@
     <meta charset="UTF-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; font-src 'self'; script-src 'self'" />
     <title data-i18n="setup.title"></title>
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="flow.css" />
     <link rel="stylesheet" href="onboarding.css" />
   </head>
+  <!-- "Your own server" in the flow look (DESIGN.md), on the web's own parts: flow.css is web/src/ui/flow/flow.css,
+       copied by npm run design, so the classes are the ones web/src/ui/flow/Flow.tsx renders. onboarding.css has only
+       what this window has and the web doesn't (the drum, the DNS records, the Drive row). -->
   <body>
-    <div class="left">
-      <svg class="mark" viewBox="0 0 164 164" aria-label="Gomex">
-        <circle cx="82" cy="82" r="71.97" fill="none" stroke="currentColor" stroke-width="13.7" />
-        <path fill="currentColor" d="M116.1 78V120.9H107.1L105 111.3Q95.4 122.8 80 122.8Q63.1 122.8 52.5 111.3Q42 99.8 42 81.3Q42 63.2 52.6 51.1Q63.2 39 81.2 39Q94.3 39 104 46.3Q113.7 53.6 115.1 66.3H101.5Q100.2 59 94.8 54.9Q89.3 50.8 81.1 50.8Q69.5 50.8 62.8 58.9Q56.2 67 56.2 81.1Q56.2 95.3 62.9 103.4Q69.6 111.4 81.5 111.4Q92 111.4 97.7 104.9Q103.4 98.4 103.4 88.8H81.8V78Z" />
-      </svg>
+    <div class="flow">
+    <div class="flow-col">
+      <div class="flow-ruler" id="ruler" aria-hidden="true"></div>
+      <p class="flow-label" id="stage"></p>
 
       <main id="steps">
         <!-- 1. Getting in: the address and password the hosting company e-mailed. -->
-        <form class="step" data-step="server" id="f-server" autocomplete="off" hidden>
-          <h1 data-i18n="ob.server.h"></h1>
-          <p class="sub" data-i18n="ob.server.sub"></p>
-          <label class="label" for="ip" data-i18n="ob.ip"></label>
-          <input class="input" id="ip" placeholder="203.0.113.10" spellcheck="false" autocapitalize="off" />
-          <!-- The login is almost always root, so it's filled in; it's in plain sight, next to the password. -->
-          <div class="pair-fields">
-            <span>
-              <label class="label" for="user" data-i18n="ob.login"></label>
-              <input class="input" id="user" value="root" spellcheck="false" autocapitalize="off" />
-            </span>
-            <span>
-              <label class="label" for="pass" data-i18n="ob.password"></label>
-              <span class="with-eye">
-                <input class="input" id="pass" type="password" spellcheck="false" />
+        <form class="step flow-step flow-swap" data-step="server" id="f-server" autocomplete="off" hidden>
+          <h1 class="flow-title" data-i18n="ob.server.h"></h1>
+          <p class="flow-sub" data-i18n="ob.server.sub"></p>
+          <div class="flow-body">
+            <div class="flow-pair">
+              <label class="flow-field">
+                <span class="flow-field-label" data-i18n="ob.ip"></span>
+                <span class="flow-line"><input class="input" id="ip" placeholder="203.0.113.10" spellcheck="false" autocapitalize="off" /></span>
+              </label>
+              <!-- The login is almost always root, so it's filled in; it's in plain sight, next to the address. -->
+              <label class="flow-field">
+                <span class="flow-field-label" data-i18n="ob.login"></span>
+                <span class="flow-line"><input class="input" id="user" value="root" spellcheck="false" autocapitalize="off" /></span>
+              </label>
+            </div>
+            <label class="flow-field">
+              <span class="flow-field-label" data-i18n="ob.password"></span>
+              <span class="flow-line">
+                <input class="input" id="pass" type="password" spellcheck="false" data-i18n-attr="placeholder:ob.passwordHint" />
                 <button class="eye" id="eye" type="button" data-i18n-attr="aria-label:ob.showPassword">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
                 </button>
               </span>
-            </span>
+            </label>
           </div>
-          <p class="error" id="e-server" role="alert"></p>
-          <div class="actions">
-            <button class="primary" type="submit" id="go-server" disabled data-i18n="ob.connect"></button>
+          <div class="flow-spacer"></div>
+          <div class="flow-foot">
+            <p class="flow-error" id="e-server" role="alert"></p>
+            <div class="flow-buttons">
+              <button class="primary flow-primary" type="submit" id="go-server" disabled data-i18n="ob.connect"></button>
+            </div>
           </div>
         </form>
 
-        <!-- 2. The address people will open: a free DuckDNS name, or a domain of one's own. -->
-        <section class="step" data-step="address" hidden>
-          <h1 data-i18n="ob.address.h"></h1>
-          <p class="sub" data-i18n="ob.address.sub"></p>
-          <div class="rows" role="radiogroup" data-i18n-attr="aria-label:ob.address.aria">
-            <button class="row choice" type="button" role="radio" aria-checked="true" data-pick="free">
-              <span><b data-i18n="ob.free"></b><small data-i18n="ob.freeSub"></small></span>
-              <span class="radio"></span>
-            </button>
-            <button class="row choice" type="button" role="radio" aria-checked="false" data-pick="own">
-              <span><b data-i18n="ob.own"></b><small data-i18n="ob.ownSub"></small></span>
-              <span class="radio"></span>
-            </button>
+        <!-- 2. The address people will open: a free deSEC name, or a domain of one's own. -->
+        <section class="step flow-step flow-swap" data-step="address" hidden>
+          <h1 class="flow-title" data-i18n="ob.address.h"></h1>
+          <p class="flow-sub" data-i18n="ob.address.sub"></p>
+          <div class="flow-body">
+            <div role="radiogroup" data-i18n-attr="aria-label:ob.address.aria">
+              <button class="choice flow-radio" type="button" role="radio" aria-checked="true" data-pick="free">
+                <span class="flow-radio-text"><span class="flow-radio-title" data-i18n="ob.free"></span><span class="flow-radio-sub" data-i18n="ob.freeSub"></span></span>
+                <span class="flow-radio-dot"></span>
+              </button>
+              <button class="choice flow-radio last" type="button" role="radio" aria-checked="false" data-pick="own">
+                <span class="flow-radio-text"><span class="flow-radio-title" data-i18n="ob.own"></span><span class="flow-radio-sub" data-i18n="ob.ownSub"></span></span>
+                <span class="flow-radio-dot"></span>
+              </button>
+            </div>
           </div>
-          <div class="actions">
-            <button class="quiet back" type="button" data-i18n="ob.back"></button>
-            <button class="primary" type="button" id="go-address" data-i18n="ob.next"></button>
+          <div class="flow-spacer"></div>
+          <div class="flow-foot">
+            <div class="flow-buttons">
+              <button class="back flow-back" type="button" data-i18n-attr="aria-label:ob.back"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg></button>
+              <button class="primary flow-primary" type="button" id="go-address" data-i18n="ob.next"></button>
+            </div>
           </div>
         </section>
 
         <!-- 2a. A free address on deSEC (name.dedyn.io): name and e-mail here, then the letter. The app makes the deSEC
              account (its password stays in the app); deSEC's page behind the link asks the captcha and activates it;
              the app sees that and points the name here. -->
-        <section class="step" data-step="free-name" hidden>
-          <h1 data-i18n="ob.free"></h1>
-          <p class="sub" data-i18n="ob.free.sub"></p>
-          <div class="rows saved" id="saved" hidden>
-            <div class="row">
-              <span class="grow"><b id="saved-name"></b></span>
-              <button class="secondary" type="button" id="use-saved" data-i18n="ob.useSaved"></button>
+        <section class="step flow-step flow-swap" data-step="free-name" hidden>
+          <h1 class="flow-title" data-i18n="ob.free"></h1>
+          <p class="flow-sub" data-i18n="ob.free.sub"></p>
+          <div class="flow-body">
+            <div class="kept" id="saved" hidden>
+              <span id="saved-name"></span>
+              <button class="flow-text-action" type="button" id="use-saved" data-i18n="ob.useSaved"></button>
             </div>
+            <p class="flow-error" id="e-saved" role="alert"></p>
+            <label class="flow-field">
+              <span class="flow-field-label" data-i18n="ob.name"></span>
+              <span class="flow-line"><input class="input" id="free-name" placeholder="podval" spellcheck="false" autocapitalize="off" /><span class="flow-suffix">.dedyn.io</span></span>
+            </label>
+            <label class="flow-field">
+              <span class="flow-field-label" data-i18n="ob.email"></span>
+              <span class="flow-line"><input class="input" id="free-email" type="email" placeholder="you@gmail.com" spellcheck="false" autocapitalize="off" /></span>
+            </label>
           </div>
-          <p class="error" id="e-saved" role="alert"></p>
-          <label class="label" for="free-name" data-i18n="ob.name"></label>
-          <span class="with-suffix"><input class="input" id="free-name" placeholder="podval" spellcheck="false" autocapitalize="off" /><span class="suffix">.dedyn.io</span></span>
-          <label class="label" for="free-email" data-i18n="ob.email"></label>
-          <input class="input" id="free-email" type="email" placeholder="you@gmail.com" spellcheck="false" autocapitalize="off" />
-          <p class="error" id="e-free-name" role="alert"></p>
-          <div class="actions">
-            <button class="quiet back" type="button" data-i18n="ob.back"></button>
-            <button class="primary" type="button" id="go-free-name" disabled data-i18n="ob.next"></button>
+          <div class="flow-spacer"></div>
+          <div class="flow-foot">
+            <p class="flow-error" id="e-free-name" role="alert"></p>
+            <div class="flow-buttons">
+              <button class="back flow-back" type="button" data-i18n-attr="aria-label:ob.back"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg></button>
+              <button class="primary flow-primary" type="button" id="go-free-name" disabled data-i18n="ob.next"></button>
+            </div>
           </div>
         </section>
 
-        <section class="step" data-step="free-mail" hidden>
-          <h1 data-i18n="ob.mail.h"></h1>
-          <p class="sub" data-i18n="ob.mail.sub"></p>
-          <div class="rows">
-            <div class="row">
-              <span class="grow"><b id="mail-to">you@gmail.com</b><small data-i18n="ob.mail.spam"></small></span>
-              <button class="secondary" type="button" id="open-mail" hidden>
-                <span id="open-mail-label" data-i18n="ob.mail.open"></span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8" /></svg>
-              </button>
+        <section class="step flow-step flow-swap" data-step="free-mail" hidden>
+          <h1 class="flow-title" data-i18n="ob.mail.h"></h1>
+          <p class="flow-sub" data-i18n="ob.mail.sub"></p>
+          <div class="flow-body">
+            <div>
+              <p class="flow-big" id="mail-to">you@gmail.com</p>
+              <p class="wait" id="mail-wait"><span class="spinner"></span><span id="mail-state" data-i18n="ob.mail.waiting"></span></p>
+              <p class="late" id="mail-late" hidden data-i18n="ob.mail.late"></p>
             </div>
-            <div class="row wait" id="mail-wait"><span class="spinner"></span><span class="grow" id="mail-state" data-i18n="ob.mail.waiting"></span></div>
-            <div class="row" id="mail-late" hidden><span class="grow"><b data-i18n="ob.mail.late"></b></span></div>
+            <p class="flow-note" data-i18n="ob.mail.spam"></p>
           </div>
-          <p class="error" id="e-mail" role="alert"></p>
-          <div class="actions">
-            <button class="quiet" type="button" id="other-mail" data-i18n="ob.mail.other"></button>
-            <button class="quiet" type="button" id="own-instead" hidden data-i18n="ob.own"></button>
+          <div class="flow-spacer"></div>
+          <div class="flow-foot">
+            <p class="flow-error" id="e-mail" role="alert"></p>
+            <div class="flow-buttons">
+              <button class="primary flow-primary" type="button" id="open-mail" hidden><span id="open-mail-label" data-i18n="ob.mail.open"></span></button>
+              <button class="flow-secondary" type="button" id="other-mail" data-i18n="ob.mail.other"></button>
+              <button class="flow-secondary" type="button" id="own-instead" hidden data-i18n="ob.own"></button>
+            </div>
           </div>
         </section>
 
         <!-- 2b. A domain of one's own: the three records to add at the registrar, checked before going on. -->
-        <section class="step" data-step="own" hidden>
-          <h1 data-i18n="ob.own"></h1>
-          <p class="sub" data-i18n="ob.own.sub"></p>
-          <label class="label" for="domain" data-i18n="ob.domain"></label>
-          <input class="input" id="domain" placeholder="chat.example.com" spellcheck="false" autocapitalize="off" />
-          <div class="rows records" id="records" hidden></div>
-          <p class="error" id="e-own" role="alert"></p>
-          <div class="actions">
-            <button class="quiet back" type="button" data-i18n="ob.back"></button>
-            <button class="primary" type="button" id="go-own" disabled data-i18n="ob.check"></button>
+        <section class="step flow-step flow-swap" data-step="own" hidden>
+          <h1 class="flow-title" data-i18n="ob.own"></h1>
+          <p class="flow-sub" data-i18n="ob.own.sub"></p>
+          <div class="flow-body">
+            <label class="flow-field">
+              <span class="flow-field-label" data-i18n="ob.domain"></span>
+              <span class="flow-line"><input class="input" id="domain" placeholder="chat.example.com" spellcheck="false" autocapitalize="off" /></span>
+            </label>
+            <div class="records" id="records" hidden></div>
+          </div>
+          <div class="flow-spacer"></div>
+          <div class="flow-foot">
+            <p class="flow-error" id="e-own" role="alert"></p>
+            <div class="flow-buttons">
+              <button class="back flow-back" type="button" data-i18n-attr="aria-label:ob.back"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg></button>
+              <button class="primary flow-primary" type="button" id="go-own" disabled data-i18n="ob.check"></button>
+            </div>
           </div>
         </section>
 
         <!-- 3. Backups away from the server: a nightly encrypted copy on the admin's Google Drive. -->
-        <section class="step" data-step="backup" hidden>
-          <h1 data-i18n="ob.backup.h"></h1>
-          <p class="sub" data-i18n="ob.backup.sub"></p>
-          <div class="rows">
-            <div class="row">
-              <span class="logo">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8.6 3h6.8l6.1 10.5-3.4 6H5.9l-3.4-6z" /><path d="M8.6 3l6.4 10.5H2.5M15.4 3L9 13.5l-3.1 6M21.5 13.5H15l3.1 6" /></svg>
-              </span>
+        <section class="step flow-step flow-swap" data-step="backup" hidden>
+          <h1 class="flow-title" data-i18n="ob.backup.h"></h1>
+          <p class="flow-sub" data-i18n="ob.backup.sub"></p>
+          <div class="flow-body">
+            <div class="drive">
               <span class="grow"><b data-i18n="ob.drive"></b><small id="drive-sub" data-i18n="ob.driveSub"></small></span>
-              <button class="secondary" type="button" id="drive-connect" data-i18n="ob.connect"></button>
+              <button class="flow-text-action" type="button" id="drive-connect" data-i18n="ob.connect"></button>
               <span class="on" id="drive-on" hidden data-i18n="ob.driveOn"></span>
             </div>
             <!-- What a copy saves you from, not what it is. -->
-            <div class="row"><span><b data-i18n="ob.backup.b1"></b><small data-i18n="ob.backup.b1sub"></small></span></div>
-            <div class="row"><span><b data-i18n="ob.backup.b2"></b><small data-i18n="ob.backup.b2sub"></small></span></div>
-            <div class="row"><span><b data-i18n="ob.backup.b3"></b><small data-i18n="ob.backup.b3sub"></small></span></div>
+            <ul class="points">
+              <li><b data-i18n="ob.backup.b1"></b><small data-i18n="ob.backup.b1sub"></small></li>
+              <li><b data-i18n="ob.backup.b2"></b><small data-i18n="ob.backup.b2sub"></small></li>
+              <li><b data-i18n="ob.backup.b3"></b><small data-i18n="ob.backup.b3sub"></small></li>
+            </ul>
           </div>
-          <p class="error" id="e-backup" role="alert"></p>
-          <div class="actions">
-            <button class="quiet back" type="button" data-i18n="ob.back"></button>
-            <span class="pair">
-              <button class="quiet" type="button" id="skip-backup" data-i18n="ob.backup.skip"></button>
-              <button class="primary" type="button" id="go-backup" disabled data-i18n="ob.next"></button>
-            </span>
+          <div class="flow-spacer"></div>
+          <div class="flow-foot">
+            <p class="flow-error" id="e-backup" role="alert"></p>
+            <div class="flow-buttons">
+              <button class="back flow-back" type="button" data-i18n-attr="aria-label:ob.back"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg></button>
+              <button class="primary flow-primary" type="button" id="go-backup" disabled data-i18n="ob.next"></button>
+              <button class="flow-secondary" type="button" id="skip-backup" data-i18n="ob.backup.skip"></button>
+            </div>
           </div>
         </section>
 
         <!-- 4. The install itself, step by step; nothing to press. -->
-        <section class="step" data-step="install" hidden>
-          <div class="head">
-            <h1 id="install-title" data-i18n="ob.install.title"></h1>
-            <span class="elapsed" id="elapsed">0:00</span>
-          </div>
-          <p class="sub" id="install-sub" data-i18n="ob.install.sub"></p>
-          <!-- The installer's steps on a drum: the one that is on in the middle, the one done above, the next below. -->
+        <section class="step flow-step flow-swap" data-step="install" hidden>
+          <h1 class="flow-title" id="install-title" data-i18n="ob.install.title"></h1>
+          <p class="flow-sub" id="install-sub" data-i18n="ob.install.sub"></p>
+          <!-- The installer's steps on a drum: the one that is on in the middle, the ones done above, the next below. -->
           <div class="wheel"><ol class="tasks" id="tasks"></ol></div>
-          <p class="error" id="e-install" role="alert"></p>
-          <div class="actions start">
-            <button class="primary" type="button" id="go-install" disabled data-i18n="ob.install.open"></button>
-            <button class="quiet" type="button" id="retry" hidden data-i18n="ob.install.retry"></button>
+          <div class="flow-spacer"></div>
+          <div class="flow-foot">
+            <p class="flow-error" id="e-install" role="alert"></p>
+            <div class="flow-buttons">
+              <button class="primary flow-primary" type="button" id="go-install" disabled data-i18n="ob.install.open"></button>
+              <button class="primary flow-primary" type="button" id="retry" hidden data-i18n="ob.install.retry"></button>
+            </div>
           </div>
         </section>
       </main>
-
-      <!-- The whole setup in three short bars: the server here; the account and friends on the server's own wizard. -->
-      <nav class="progress" data-i18n-attr="aria-label:ob.steps">
-        <span class="part" data-part="server"><span class="track"><i></i></span><span class="name" data-i18n="ob.part.server"></span></span>
-        <span class="part" data-part="account"><span class="track"><i></i></span><span class="name" data-i18n="ob.part.account"></span></span>
-        <span class="part" data-part="friends"><span class="track"><i></i></span><span class="name" data-i18n="ob.part.friends"></span></span>
-      </nav>
     </div>
-
-    <!-- What the step is about, filmed like Linear's onboarding: a camera close over a whole screen of Gomex at work
-         (the server's terminal, the browser on the new address, the backups on the Drive), never showing its edges.
-         onboarding.js fills each screen with the person's own answers and films it from two angles. -->
-    <aside class="right" aria-hidden="true">
-      <div class="scene" data-scene="server"><div class="ui term" data-screen="server"></div></div>
-      <div class="scene" data-scene="address"><div class="ui browser" data-screen="address"></div></div>
-      <div class="scene" data-scene="mail"><div class="ui browser" data-screen="mail"></div></div>
-      <div class="scene" data-scene="backup"><div class="ui drive" data-screen="backup"></div></div>
-      <div class="scene" data-scene="install"><div class="ui term" data-screen="install"></div></div>
-    </aside>
+    </div>
     <script src="i18n.js"></script>
     <script src="i18n-page.js"></script>
     <script src="onboarding.js"></script>

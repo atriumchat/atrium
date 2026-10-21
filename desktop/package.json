@@ -10,6 +10,8 @@
     "start": "electron .",
     "dev": "GOMEX_URL=http://localhost:5180 electron .",
     "check:i18n": "node check-i18n.js",
+    "design": "node scripts/design.js",
+    "check:design": "node scripts/design.js --check",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win"
   },
@@ -31,6 +33,8 @@
       "address-preload.js",
       "onboarding.html",
       "onboarding.css",
+      "tokens.css",
+      "flow.css",
       "onboarding.js",
       "onboarding-preload.js",
       "server-setup.js",

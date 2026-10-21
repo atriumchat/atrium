@@ -161,7 +161,12 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
 
   function submitAdmin() {
     if (!adminReady || busy) return;
-    if (DEMO) return go('key');
+    if (DEMO) {
+      // Walked through on made-up answers: made-up results too.
+      setKey((k) => k || 'K7QM-2XPA-9DHR-T4WC-8NBE-3VLY');
+      setLink((l) => l || `${window.location.origin}/?invite=7F3K9QAB`);
+      return go('key');
+    }
     void run(async () => {
       let made = account;
       if (!made) {

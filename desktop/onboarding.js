@@ -1,6 +1,7 @@
 // "Your own server": a fresh VPS becomes a Gomex server from here, without a terminal. The app logs in over SSH with
 // the address and password from the hosting company's e-mail, asks for an address and backups, runs the installer
-// and then opens the server's own wizard (name, admin, recovery key, invites) in the same window.
+// and then opens the server's own wizard (name, admin, recovery key, invites) in the same window. The page is in the
+// flow look (DESIGN.md, flow.css): one step at a time, the scale as a ruler over the column.
 //
 // window.gomexSetup comes from onboarding-preload.js. Opened as a plain page (a browser, for design work) there is
 // none, and a stand-in below plays the whole thing with made-up answers.
@@ -8,183 +9,58 @@ const $ = (id) => document.getElementById(id);
 const setup = window.gomexSetup ?? fakeSetup();
 
 // The drum's rows, one per installer step (install.sh, "::gomex run|done STEP"), in the order they run:
-// [step, the row's words, the installer's own line it leaves in the picture, the installer's steps it covers]
+// [step, the row's words, the installer's steps it covers]
 const TASKS = [
-  ['check', t('ob.task.check'), t('ob.task.checkLog'), ['check']],
-  ['address', t('ob.task.address'), t('ob.task.addressLog'), ['address']],
-  ['docker', t('ob.task.docker'), t('ob.task.dockerLog'), ['docker']],
-  ['firewall', t('ob.task.firewall'), t('ob.task.firewallLog'), ['firewall']],
-  ['ssh', t('ob.task.ssh'), t('ob.task.sshLog'), ['ssh']],
-  ['files', t('ob.task.files'), t('ob.task.filesLog'), ['files']],
-  ['config', t('ob.task.config'), t('ob.task.configLog'), ['config']],
-  ['backups', t('ob.task.backups'), t('ob.task.backupsLog'), ['backups']],
-  ['pull', t('ob.task.pull'), t('ob.task.pullLog'), ['pull']],
-  ['up', t('ob.task.up'), t('ob.task.upLog'), ['up']],
-  ['https', t('ob.task.https'), t('ob.task.httpsLog'), ['https']],
+  ['check', t('ob.task.check'), ['check']],
+  ['address', t('ob.task.address'), ['address']],
+  ['docker', t('ob.task.docker'), ['docker']],
+  ['firewall', t('ob.task.firewall'), ['firewall']],
+  ['ssh', t('ob.task.ssh'), ['ssh']],
+  ['files', t('ob.task.files'), ['files']],
+  ['config', t('ob.task.config'), ['config']],
+  ['backups', t('ob.task.backups'), ['backups']],
+  ['pull', t('ob.task.pull'), ['pull']],
+  ['up', t('ob.task.up'), ['up']],
+  ['https', t('ob.task.https'), ['https']],
 ];
-const TASK_OF = Object.fromEntries(TASKS.flatMap(([id, , , steps]) => steps.map((step) => [step, id])));
+const TASK_OF = Object.fromEntries(TASKS.flatMap(([id, , steps]) => steps.map((step) => [step, id])));
 
-/* ---------- the pictures on the right: whole screens of Gomex at work ---------- */
+/* ---------- the scale: a ruler of ticks over the column (flow.css .flow-ruler) ---------- */
 
-const LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="3"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg>';
-const DRIVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8.6 3h6.8l6.1 10.5-3.4 6H5.9l-3.4-6z"/><path d="M8.6 3l6.4 10.5H2.5M15.4 3L9 13.5l-3.1 6M21.5 13.5H15l3.1 6"/></svg>';
-const IP = '<span data-bind="ip">203.0.113.10</span>';
-const HOST = '<span data-bind="host">podval.dedyn.io</span>';
-
-/** Terminal lines, numbered: [html, class] pairs. */
-const lines = (rows, from = 1) => rows.map(([html, cls = ''], i) => `<p class="ln ${cls}"><i>${from + i}</i><span>${html}</span></p>`).join('');
-
-// The server: logged in over SSH, the installer checking it (the same lines install.sh prints).
-const LOGIN = [
-  [`<span class="k">$</span> ssh <span data-bind="user">root</span>@${IP}`],
-  ['Welcome to Ubuntu 24.04 LTS (GNU/Linux 6.8.0-45-generic x86_64)', 'dim'],
-  [' * Documentation:  https://help.ubuntu.com', 'dim'],
-  [' * Management:     https://landscape.canonical.com', 'dim'],
-  [' System load:  0.08               Processes:             112', 'dim'],
-  [' Usage of /:   6.1% of 24.04GB    Users logged in:       0', 'dim'],
-  [` Memory usage: 9%                 IPv4 address for eth0: ${IP}`, 'dim'],
-  [' Swap usage:   0%', 'dim'],
-  [`<span class="k">root@vps:~#</span> curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh`],
-  ['Gomex 0.2.2'],
-];
-const CHECKS = [
-  [`<b class="ok">✓</b> ${t('sc.root')}`],
-  ['<b class="ok">✓</b> <span data-bind="os">Ubuntu 24.04 LTS · x86_64</span>'],
-  [`<b class="ok">✓</b> ${t('sc.ports')}`],
-  [`<b class="ok">✓</b> ${t('sc.dockerWill')}`],
-  [`<b class="ok">✓</b> <span data-bind="size">${t('ssh.size', { memory: 2, disk: 18 })}</span> ${t('sc.free')}`],
-  [`<b class="ok">✓</b> ${t('sc.sshKey')}`],
-  [`<b class="ok">✓</b> IP ${IP}`],
-  [`<b class="ok">✓</b> DNS: app.${HOST} → ${IP}`],
-];
-const STEPS_AHEAD = [t('ob.task.firewallLog'), t('ob.task.sshLog'), `${t('ob.task.filesLog')} 0.2.2`, t('ob.task.configLog'), t('ob.task.backupsLog'), t('sc.pulling'), t('ob.task.upLog'), t('ob.task.httpsLog')];
-
-const SCREENS = {
-  server: () =>
-    lines([...LOGIN, ...CHECKS.map(([html], i) => [html, i === 2 ? 'check focus' : 'check']), ...STEPS_AHEAD.map((text) => [`… ${text}`, 'dim'])]),
-  // The installer's run: the checks done, then its steps as they finish (logLine adds them).
-  install: () =>
-    lines([...LOGIN, ...CHECKS.map(([html], i) => [html, i === CHECKS.length - 1 ? 'focus' : ''])]) +
-    `<div class="log"></div>` +
-    // What's still to come, dim, one line fewer each time a step finishes; then the screen goes on.
-    `<div class="ahead">${lines(TASKS.map(([, , text]) => [`… ${text}`, 'dim']), 0).replace(/<i>\d+<\/i>/g, '<i></i>')}</div>` +
-    lines([['', ''], ['', ''], ['', ''], ['', ''], ['', ''], ['', '']], 0).replace(/<i>\d+<\/i>/g, '<i></i>'),
-  // The browser on the new address: Gomex open in it, a friend just shared the invite link.
-  address: () => `
-    <div class="tabs"><span class="tab on">Gomex</span><span class="tab">${t('sc.mail')}</span><span class="tab">${t('sc.newTab')}</span></div>
-    <div class="bar"><span class="nav">‹ ›</span><span class="url">${LOCK}app.${HOST}</span><span class="nav">⋯</span></div>
-    <div class="app">
-      <div class="rail"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="list"><p class="on"># ${t('sc.general')}</p><p># ${t('sc.games')}</p><p># ${t('sc.memes')}</p><p># ${t('sc.movies')}</p><p>🔊 ${t('sc.voiceGeneral')}</p><p>🔊 ${t('sc.voiceMatch')}</p><p>🔊 ${t('sc.voiceQuiet')}</p></div>
-      <div class="chat">
-        <div class="msg"><i></i><p><b>${t('sc.tim')}</b><span>${t('sc.m1')}</span></p></div>
-        <div class="msg"><i></i><p><b>${t('sc.anna')}</b><span>${t('sc.m2')}</span></p></div>
-        <div class="msg"><i></i><p><b>${t('sc.dan')}</b><span>${t('sc.m3')}</span></p></div>
-        <div class="msg focus hl-pink"><i></i><p><b>${t('sc.dan')}</b><span>app.${HOST}/?invite=7f3k9q</span></p></div>
-        <div class="msg"><i></i><p><b>${t('sc.anna')}</b><span>${t('sc.m4')}</span></p></div>
-        <div class="msg"><i></i><p><b>${t('sc.tim')}</b><span>${t('sc.m5')}</span></p></div>
-        <div class="msg"><i></i><p><b>${t('sc.alex')}</b><span>${t('sc.m6')}</span></p></div>
-      </div>
-    </div>`,
-  // The person's inbox: deSEC's letter at the top, waiting for its link to be pressed.
-  mail: () => `
-    <div class="tabs"><span class="tab">Gomex</span><span class="tab on">${t('sc.mail')}</span><span class="tab">${t('sc.newTab')}</span></div>
-    <div class="bar"><span class="nav">‹ ›</span><span class="url">${LOCK}<span data-bind="mailhost">mail.google.com</span></span><span class="nav">⋯</span></div>
-    <div class="inbox">
-      <div class="folders"><p class="on">${t('sc.inbox')}</p><p>${t('sc.starred')}</p><p>${t('sc.sent')}</p><p>${t('sc.spam')}</p><p>${t('sc.trash')}</p></div>
-      <div class="letters">
-        <p class="letter"><b>${t('sc.tim')}</b><span>${t('sc.l1')}</span><em>22:41</em></p>
-        <p class="letter focus hl-pink"><b>deSEC</b><span>Activate your account: <span data-bind="host">podval.dedyn.io</span></span><em>${t('sc.now')}</em></p>
-        <p class="letter"><b>${t('sc.anna')}</b><span>${t('sc.l3')}</span><em>21:07</em></p>
-        <p class="letter"><b>${t('sc.l4')}</b><span>${t('sc.l4s')}</span><em>${t('sc.yesterday')}</em></p>
-        <p class="letter"><b>${t('sc.alex')}</b><span>${t('sc.l5')}</span><em>${t('sc.yesterday')}</em></p>
-        <p class="letter"><b>${t('sc.tim')}</b><span>${t('sc.l6')}</span><em>${t('sc.oct16')}</em></p>
-        <p class="letter"><b>${t('sc.anna')}</b><span>${t('sc.l7')}</span><em>${t('sc.oct15')}</em></p>
-      </div>
-    </div>`,
-  // The backups on the Drive: other folders up top, then a nightly file each, the newest highlighted.
-  backup: () => {
-    const rows = Array.from({ length: 14 }, (_, i) => {
-      const size = [12, 12, 11, 11, 10, 10, 9, 9, 8, 8, 7, 7, 6, 6][i];
-      return `<p class="row file${i === 2 ? ' focus' : ''}"><span><span data-bind="day${i}">gomex</span>.age</span><em>${t('sc.me')}</em><em>${t('sc.todayAt')}</em><em>${t('sc.mb', { n: size })}</em></p>`;
-    }).join('');
-    return `
-      <div class="side"><p class="on">${t('sc.myDrive')}</p><p>${t('sc.computers')}</p><p>${t('sc.shared')}</p><p>${t('sc.recent')}</p><p>${t('sc.marked')}</p><p>${t('sc.trash')}</p><p>${t('sc.storage')}</p><p>${t('sc.quota')}</p></div>
-      <div class="main">
-        <p class="path">${DRIVE} ${t('sc.myDrive')} <span class="dim">/</span> Gomex</p>
-        <p class="head"><span>${t('sc.colName')}</span><span>${t('sc.colOwner')}</span><span>${t('sc.colModified')}</span><span>${t('sc.colSize')}</span></p>
-        <p class="row"><span>${t('sc.docs')}</span><em>${t('sc.me')}</em><em>${t('sc.sep12')}</em><em>—</em></p>
-        <p class="row"><span>${t('sc.photos')}</span><em>${t('sc.me')}</em><em>${t('sc.oct3')}</em><em>—</em></p>
-        ${rows}
-      </div>`;
-  },
-};
-
-// Each screen is filmed from two angles (onboarding.css, shot-a and shot-b). A camera holds two copies of it: a soft
-// one underneath and a sharp one around the highlighted spot, for depth of field.
-for (const scene of document.querySelectorAll('.scene')) {
-  const template = scene.querySelector(':scope > .ui');
-  template.innerHTML = SCREENS[template.dataset.screen]();
-  for (const angle of ['a', 'b']) {
-    const shot = Object.assign(document.createElement('div'), { className: `shot ${angle}` });
-    for (const look of ['soft', 'sharp']) {
-      const copy = template.cloneNode(true);
-      copy.classList.add(look);
-      shot.append(copy);
-    }
-    scene.append(shot);
-  }
+// As the web's TickRuler (web/src/ui/flow/EdgeTicks.tsx): a tick every 9px, every fifth taller, the filled ones white,
+// the next one breathing; a new value is swept to a tick at a time.
+const GAP = 9;
+let rulerOn = 0;
+let rulerTarget = 0;
+let rulerTimer = 0;
+function drawRuler() {
+  const box = $('ruler');
+  const width = box.clientWidth;
+  const count = Math.floor(width / GAP) + 1;
+  const ticks = Array.from({ length: count }, (_, i) => {
+    const cls = i === rulerOn && rulerOn < count ? 'next' : i < rulerOn ? 'on' : '';
+    return `<line x1="${i * GAP + 1}" x2="${i * GAP + 1}" y1="${i % 5 === 0 ? 0 : 4}" y2="12" class="${cls}" />`;
+  });
+  box.innerHTML = `<svg width="${width}" height="12">${ticks.join('')}</svg>`;
+  return count;
 }
-
-// The screens are alive, like the code in Linear's: a highlight walks down the installer's checks and the Drive's
-// files (what's below it still dim, not reached yet), and the chat's messages arrive one by one. Every copy of a
-// screen takes the same step at once, so the cameras agree.
-// items: what takes turns; lit: the highlight that walks over them; walk: how many it visits (all by default);
-// wait: what isn't reached yet waits dim (or, for messages, hasn't arrived); from: how many are there from the start.
-const LIVE = {
-  server: { items: '.check', lit: 'hl-green', every: 1300, wait: true },
-  address: { items: '.msg', every: 1400, wait: true, from: 4 },
-  backup: { items: '.file', lit: 'hl-green', every: 1200, walk: 6 },
-};
-for (const [name, live] of Object.entries(LIVE)) {
-  const scene = document.querySelector(`.scene[data-scene="${name}"]`);
-  const walk = live.walk ?? scene.querySelector('.ui').querySelectorAll(live.items).length;
-  let at = (live.from ?? 1) - 1;
-  setInterval(() => {
-    // Past the last one, everything stays as it is for two beats before it starts over.
-    at = at + 1 >= walk + 2 ? (live.from ?? 1) - 1 : at + 1;
-    for (const ui of scene.querySelectorAll('.ui')) {
-      ui.querySelectorAll(live.items).forEach((item, k) => {
-        if (live.lit) item.classList.toggle(live.lit, k === at);
-        if (live.wait) item.classList.toggle('later', k > at);
-      });
-    }
-  }, live.every);
+function ruler(fill) {
+  const count = drawRuler();
+  rulerTarget = Math.round(Math.max(0, Math.min(1, fill)) * count);
+  clearInterval(rulerTimer);
+  rulerTimer = setInterval(() => {
+    if (rulerOn === rulerTarget) return clearInterval(rulerTimer);
+    rulerOn += rulerOn < rulerTarget ? 1 : -1;
+    drawRuler();
+  }, 8);
 }
+window.addEventListener('resize', drawRuler);
 
-/** Where `el` sits inside `root`, in its untransformed layout. */
-function offsetIn(el, root) {
-  let x = 0;
-  let y = 0;
-  for (let node = el; node && node !== root; node = node.offsetParent) {
-    x += node.offsetLeft;
-    y += node.offsetTop;
-  }
-  return { x, y };
+/** Answers kept for the steps that show them again. */
+const bound = {};
+function bind(name, value) {
+  bound[name] = value;
 }
-
-/** Puts the scene's highlighted spot in the middle of the frame and the cameras' focus on it. Needs layout. */
-function frame(scene) {
-  const ui = scene?.querySelector('.shot .sharp');
-  if (!ui?.offsetHeight) return;
-  const focus = [...ui.querySelectorAll('.focus')].pop();
-  if (!focus) return;
-  const at = offsetIn(focus, ui);
-  // A little right of the spot's start, so the screen's left edge stays out of the frame.
-  scene.style.setProperty('--fx', `${Math.round(at.x + Math.min(focus.offsetWidth * 0.5, 320))}px`);
-  scene.style.setProperty('--fy', `${Math.round(at.y + focus.offsetHeight / 2)}px`);
-}
-window.addEventListener('resize', () => document.querySelectorAll('.scene.on').forEach(frame));
 
 // The relay's neutral subdomain, as install.sh picks it (TURN_NAMES); chosen here so own-domain records can show it.
 const TURN_NAMES = ['media', 'cdn', 'static', 'assets', 'files', 'img'];
@@ -201,18 +77,11 @@ const state = {
 
 /* ---------- moving between steps ---------- */
 
-// How far each step is into the "Server" part, out of five (the free-… steps and 'own' are the two ways on from 'address';
-// one is walked), and the picture it shows on the right.
+// How far each step is along the way, out of five (the free-… steps and 'own' are the two ways on from 'address'; one
+// is walked), and the part it's in, for the line over the title.
 const PLACE = { server: 0, address: 1, 'free-name': 2, 'free-mail': 2.5, own: 2, backup: 3, install: 4 };
-const SCENE = {
-  server: 'server',
-  address: 'address',
-  'free-name': 'address',
-  'free-mail': 'mail',
-  own: 'address',
-  backup: 'backup',
-  install: 'install',
-};
+const PARTS = ['server', 'address', 'backup', 'install'];
+const PART = { server: 'server', address: 'address', 'free-name': 'address', 'free-mail': 'address', own: 'address', backup: 'backup', install: 'install' };
 // One step back along the way actually walked.
 const PREVIOUS = {
   address: 'server',
@@ -239,20 +108,17 @@ function show(name, { back = false } = {}) {
   to.style.animation = 'none';
   void to.offsetWidth;
   to.style.animation = '';
-  for (const scene of document.querySelectorAll('.scene')) {
-    scene.classList.toggle('on', scene.dataset.scene === SCENE[name]);
-    if (scene.classList.contains('on')) frame(scene);
-  }
+  const part = PART[name];
+  $('stage').textContent = t('ob.stageOf', { stage: t(`ob.stage.${part}`), n: PARTS.indexOf(part) + 1, total: PARTS.length });
   progress(PLACE[name] / 5);
   if (name === 'free-name') offerSaved();
   // Focus once the step has settled, and without scrolling: a field focused mid-animation drags the step to it.
   setTimeout(() => to.querySelector('.input:not([disabled])')?.focus({ preventScroll: true }), 560);
 }
 
-/** The "Server" bar, filled to `part` (0..1). The other two fill on the server's own wizard. */
+/** The ruler, filled to `part` (0..1) of the way here; the server's own wizard has its own after it. */
 function progress(part) {
-  document.querySelector('.part[data-part="server"] .track i').style.setProperty('--fill', String(Math.min(1, part)));
-  document.querySelectorAll('.part').forEach((p) => p.classList.toggle('now', p.dataset.part === 'server'));
+  ruler(Math.min(1, part));
 }
 
 document.querySelectorAll('.back').forEach((button) =>
@@ -266,13 +132,6 @@ document.querySelectorAll('.back').forEach((button) =>
 function busy(button, on) {
   button.classList.toggle('busy', on);
   button.disabled = on;
-}
-
-/** Writes an answer into the picture on the right wherever it's named, and remembers it for screens drawn again. */
-const bound = {};
-function bind(name, value) {
-  bound[name] = value;
-  document.querySelectorAll(`[data-bind="${name}"]`).forEach((el) => (el.textContent = value));
 }
 
 /* ---------- 1. server ---------- */
@@ -319,7 +178,6 @@ $('f-server').addEventListener('submit', async (event) => {
   state.facts = answer.facts;
   bind('os', answer.facts.os);
   bind('size', answer.facts.size);
-  frame(document.querySelector('.scene[data-scene="server"]'));
   show('address');
 });
 
@@ -501,12 +359,6 @@ $('go-own').addEventListener('click', async () => {
 
 /* ---------- 3. backups ---------- */
 
-// The backups' file names in the picture: the last five nights.
-for (let i = 0; i < 5; i++) {
-  const day = new Date(Date.now() - i * 86400000);
-  bind(`day${i}`, `gomex-${String(day.getDate()).padStart(2, '0')}.${String(day.getMonth() + 1).padStart(2, '0')}`);
-}
-
 $('drive-connect').addEventListener('click', async () => {
   busy($('drive-connect'), true);
   const answer = await setup.connectDrive();
@@ -538,25 +390,6 @@ function renderTasks() {
       `<li class="task" data-task="${id}" data-state="wait"><span class="state">${CHECK}</span><span class="label">${label}</span></li>`,
   ).join('');
   current(TASKS[0][0]);
-  // A fresh run: the install screen as it was before any line came in.
-  document.querySelectorAll('[data-screen="install"]').forEach((ui) => (ui.innerHTML = SCREENS.install()));
-  Object.entries(bound).forEach(([name, value]) => bind(name, value));
-}
-
-/** The picture's terminal: the installer's lines as they come, numbered, the newest one highlighted. */
-function logLine(text, took) {
-  for (const log of document.querySelectorAll('.log')) {
-    log.parentElement.querySelectorAll('.focus').forEach((el) => el.classList.remove('hl-green', 'focus'));
-    const line = Object.assign(document.createElement('p'), { className: 'ln hl-green focus' });
-    const n = Object.assign(document.createElement('i'), { textContent: String(LOGIN.length + CHECKS.length + log.children.length + 1) });
-    const body = document.createElement('span');
-    body.append(Object.assign(document.createElement('b'), { className: 'ok', textContent: '✓ ' }), text);
-    if (took) body.append(Object.assign(document.createElement('span'), { className: 'dim', textContent: `  ${took}` }));
-    line.append(n, body);
-    log.append(line);
-    log.parentElement.querySelector('.ahead')?.firstElementChild?.remove();
-  }
-  frame(document.querySelector('.scene[data-scene="install"]'));
 }
 
 /** Rolls the drum to the step that is on (or failed): every row learns how far it is from the middle. */
@@ -571,16 +404,6 @@ function current(id) {
 }
 
 let opening = null; // the wait for the new address, as long as the button is held back
-let clock = null;
-function startClock() {
-  const started = Date.now();
-  clearInterval(clock);
-  $('elapsed').textContent = '0:00';
-  clock = setInterval(() => {
-    const s = Math.floor((Date.now() - started) / 1000);
-    $('elapsed').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-  }, 250);
-}
 
 function startInstall() {
   state.installing = true;
@@ -593,15 +416,10 @@ function startInstall() {
   $('install-title').textContent = t('ob.install.title');
   $('install-sub').textContent = t('ob.install.sub');
   show('install');
-  startClock();
-  const started = {};
   const finish = (id) => {
     const row = document.querySelector(`.task[data-task="${id}"]`);
     if (!row || row.dataset.state === 'done') return;
     row.dataset.state = 'done';
-    const s = Math.max(1, Math.round((Date.now() - (started[id] ?? Date.now())) / 1000));
-    const took = s < 60 ? t('ob.seconds', { n: s }) : t('ob.minutes', { n: Math.floor(s / 60) });
-    logLine(TASKS.find(([task]) => task === id)?.[2] ?? '', took);
     progress((PLACE.install + document.querySelectorAll('.task[data-state="done"]').length / TASKS.length) / 5);
   };
   // The installer reports its own steps; a row is done once a later one starts (a step the server didn't need is
@@ -614,10 +432,7 @@ function startInstall() {
       if (event.state === 'run') {
         TASKS.slice(0, at).forEach(([task]) => finish(task));
         const row = document.querySelector(`.task[data-task="${id}"]`);
-        if (row.dataset.state === 'wait') {
-          started[id] = Date.now();
-          row.dataset.state = 'run';
-        }
+        if (row.dataset.state === 'wait') row.dataset.state = 'run';
         current(id);
       } else if (event.state === 'fail') {
         document.querySelector(`.task[data-task="${id}"]`).dataset.state = 'fail';
@@ -626,7 +441,6 @@ function startInstall() {
       return;
     }
     if (event.state === 'fail') {
-      clearInterval(clock);
       state.installing = false;
       $('e-install').textContent = event.why ?? t('ob.install.failed');
       // A failed install has one way on, again: the server's button only gets in its way.
@@ -639,18 +453,9 @@ function startInstall() {
       const last = document.querySelector(`.task[data-task="${TASKS.at(-1)[0]}"]`);
       last.querySelector('.label').textContent = t('ob.install.all');
       current(last.dataset.task);
-      clearInterval(clock);
       state.installing = false;
       state.done = event;
       const shown = event.url.replace(/^https:\/\//, '').replace(/\/\?.*$/, '');
-      for (const log of document.querySelectorAll('.log')) {
-        log.parentElement.querySelectorAll('.focus').forEach((el) => el.classList.remove('hl-green', 'focus'));
-        const line = Object.assign(document.createElement('p'), { className: 'ln focus' });
-        const box = Object.assign(document.createElement('span'), { className: 'box', textContent: `https://${shown}` });
-        line.append(document.createElement('i'), box);
-        log.append(line);
-      }
-      frame(document.querySelector('.scene[data-scene="install"]'));
       state.done.shown = shown;
       $('install-title').textContent = t('ob.install.ready');
       // A name made minutes ago may not have reached this computer's DNS yet; the app checks it and says when it does
@@ -670,7 +475,6 @@ function startInstall() {
       $('go-install').focus({ preventScroll: true });
     }
   }).catch(() => {
-    clearInterval(clock);
     state.installing = false;
     $('e-install').textContent = t('ob.install.failed');
     $('go-install').hidden = true;
@@ -773,18 +577,6 @@ if (jump) {
     startInstall();
   } else if (jump !== 'server') {
     show(jump);
-  }
-  // #t=9000 stops the pictures' cameras at that moment of their 20 s loop, to look at one frame.
-  const at = Number(location.hash.match(/t=(\d+)/)?.[1]);
-  if (at) {
-    setTimeout(() => {
-      for (const a of document.getAnimations()) {
-        if (a.animationName?.startsWith('shot-')) {
-          a.pause();
-          a.currentTime = at;
-        }
-      }
-    }, 600);
   }
 }
 

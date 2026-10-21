@@ -342,10 +342,10 @@
   border: 1.5px solid var(--gx-control);
   border-radius: 50%;
 }
-.flow-radio.on .flow-radio-dot {
+.flow-radio[aria-checked='true'] .flow-radio-dot {
   border-color: var(--gx-text);
 }
-.flow-radio.on .flow-radio-dot::after {
+.flow-radio[aria-checked='true'] .flow-radio-dot::after {
   content: '';
   width: 12px;
   height: 12px;
