@@ -101,4 +101,7 @@ export const setup = {
   'setup.intro.title': 'Сервер готов',
   'setup.intro.start': 'Настроить',
   'setup.admin.show': 'Показать пароль',
+  'setup.stageOf': '{stage} ({n}/{total})',
+  'setup.admin.repeatHint': 'Тот же пароль',
+  'setup.invite.copy': 'Скопировать ссылку',
 } as const;

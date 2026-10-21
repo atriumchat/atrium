@@ -105,4 +105,7 @@ export const setup = {
   'setup.intro.title': 'Server is ready',
   'setup.intro.start': 'Set up',
   'setup.admin.show': 'Show password',
+  'setup.stageOf': '{stage} ({n}/{total})',
+  'setup.admin.repeatHint': 'Same password',
+  'setup.invite.copy': 'Copy the link',
 } satisfies Record<keyof typeof source, Entry>;

@@ -6,9 +6,9 @@ import { PushPage } from './PushPage';
 import { CheckIcon, ChevronRightIcon } from './icons';
 
 /*
- * The settings' look, after the setup wizard (account/setup.css) and the desktop app's "Your own server" window:
- * rows between hairlines, 46px fields with a 12px corner and a border inside, one white pill for the main action
- * and graphite for the rest. Fields are a faint white over whatever they sit on, so they read the same in the
+ * The settings' look, after the desktop app's "Your own server" window (the setup wizard has moved on to DESIGN.md's
+ * flow look): rows between hairlines, 46px fields with a 12px corner and a border inside, one white pill for the main
+ * action and graphite for the rest. Fields are a faint white over whatever they sit on, so they read the same in the
  * settings and in a window opened over them. On the phone the rows go into grouped cards (see Rows), and whatever a
  * row opens is a page of its own.
  */

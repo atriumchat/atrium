@@ -54,7 +54,9 @@ Content is always quieter than the title. Numbers are never put in fixed-width c
 - **FlowShell**: the black page, the part line over the step, `EdgeTicks` drawn last, and an optional `bottom` laid
   edge to edge and kept inside the ticks (fades into black towards them).
 - **EdgeTicks**: progress as ticks along the screen's own rounded edge, from the right of the camera island,
-  clockwise. One scale for the whole flow; it continues from step to step, never restarts.
+  clockwise. One scale for the whole flow; it continues from step to step, never restarts. In a window wider than a
+  phone (the web, the desktop app) the same scale is unrolled into a ruler over the column (`TickRuler`): the edge of a
+  monitor is too far from the reading and would take a thousand ticks.
 - **FlowStep**: title, line, content, and at the bottom (thumb reach) back as an outlined 48 circle 2 points from the
   main button. General errors and notes stand over the buttons; a field's own error goes under the field.
 - **LineField**: label, big text on a hairline (white while typing, red when wrong), placeholder always, error under it.
@@ -92,6 +94,8 @@ couple of minutes; you can close the app"). Not marketing, not jargon: people se
   `localhost:8081/own?mock=1`; `&step=address` (or `free`, `mail`, `own`, `install`, `ready`, `name`, `admin`, `key`,
   `invite`) opens a step, `&fast=1` hurries the install. Sign-in: `localhost:8081/login?mock=1` (add
   `&invite=7F3K9QAB` for the invite branch). The web build stubs LiveKit and the Keychain (`mobile/web-stubs`).
-- Done on these parts: "Your own server", sign-in, invite and the recovery key on the phone (`RecoveryKeyStep`).
-  Next: the setup wizard on desktop and web, then settings. The main screens (rail, channels, chat, call) last,
+- Done on these parts: "Your own server", sign-in, invite and the recovery key on the phone (`RecoveryKeyStep`); the
+  server's setup wizard on the web and in the desktop app (`web/src/ui/flow`, the same parts in CSS; `#step=server`
+  and the like open a step on made-up answers in development). Next: the desktop app's own "Your own server" window,
+  then settings. The main screens (rail, channels, chat, call) last,
   drawn in Figma first.

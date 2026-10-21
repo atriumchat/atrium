@@ -1,38 +1,25 @@
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
-import { InputOTP, REGEXP_ONLY_DIGITS_AND_CHARS } from '@heroui/react';
+import { useEffect, useRef, useState } from 'react';
 import { api, setToken } from '../api';
 import { useT } from '../i18n';
 import { inviteLink } from '../people/invite';
-import { CopyButton } from '../ui/CopyButton';
 import { GomexMark } from '../ui/Logo';
-import { CheckIcon, UserPlusIcon } from '../ui/icons';
 import { IconCropper, centred, cropToBlob, cropToUrl, loadImage, type Crop } from '../ui/IconCropper';
-import { SetupScenes, type Facts, type SceneName } from './SetupScenes';
-import { SetupStage } from './SetupStage';
-import './setup.css';
+import { FlowPrimary, FlowShell, FlowStep, LineField, TextAction } from '../ui/flow/Flow';
 
 /**
- * First run on a fresh server, shown while it has no accounts. The desktop app's "Your own server" sets the server up and
- * opens this page with the setup code in the address (?setup=CODE), in the same window: this is the second half of
- * that setup and looks the same (setup.css, after desktop/onboarding.css). The server's name and icon, the admin,
- * their recovery key, the first invite link, and done.
+ * First run on a fresh server, shown while it has no accounts, in the flow look (DESIGN.md) as the phone app does it
+ * in "Your own server" (mobile/app/own.tsx). The desktop app's "Your own server" and the installer open it with the
+ * setup code in the address (?setup=CODE). The server's name and icon, the admin, their recovery key, the first
+ * invite link; then the app.
  */
 
-type StepId = 'code' | 'server' | 'crop' | 'admin' | 'key' | 'invite' | 'done';
-
-// The picture on the right for each step (SetupScenes).
-const SCENE: Record<StepId, SceneName> = { code: 'code', server: 'server', crop: 'server', admin: 'admin', key: 'key', invite: 'invite', done: 'room' };
+type StepId = 'code' | 'server' | 'crop' | 'admin' | 'key' | 'invite';
 
 // install.sh makes the code 10 letters and digits (INVITE_CODE in .env).
 const CODE_LENGTH = 10;
-
-const EYE = (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
-    <circle cx="12" cy="12" r="3" />
-  </svg>
-);
-const DONE = <CheckIcon size={14} strokeWidth={2.5} />;
+// The edge (EdgeTicks) at each step, and the part of the way it belongs to.
+const FILL: Record<StepId, number> = { code: 0.1, server: 0.25, crop: 0.3, admin: 0.5, key: 0.72, invite: 0.9 };
+const PART: Record<StepId, 0 | 1 | 2> = { code: 0, server: 0, crop: 0, admin: 1, key: 1, invite: 2 };
 
 /** The code out of anything pasted: the whole link from the installer, or the code itself. */
 function codeFrom(text: string) {
@@ -45,67 +32,11 @@ function codeFrom(text: string) {
   return value.replace(/[^a-zA-Z0-9]/g, '').slice(0, CODE_LENGTH);
 }
 
-const letter = (name: string) => name.trim().charAt(0).toUpperCase() || '?';
-
-/** The key in two lines of groups (a long one), each breakable only between groups. */
-function keyLines(key: string) {
-  const groups = key.split('-');
-  const half = groups.length > 4 ? Math.ceil(groups.length / 2) : groups.length;
-  return [groups.slice(0, half), groups.slice(half)].filter((g) => g.length).map((g) => g.join('-'));
-}
-
-/** A long file name loses the middle of its name, never the extension: "32-351-785…jpg". */
-function FileName({ name }: { name: string }) {
-  const dot = name.lastIndexOf('.');
-  const cut = dot > 0 && name.length - dot <= 6 ? dot : name.length;
-  return (
-    <span className="file-name">
-      <span>{name.slice(0, cut)}</span>
-      {name.slice(cut)}
-    </span>
-  );
-}
-
-const WIDE = '(min-width: 821px)';
-
-function useWide() {
-  const query = WIDE;
-  const [wide, setWide] = useState(() => window.matchMedia(query).matches);
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    const sync = () => setWide(media.matches);
-    media.addEventListener('change', sync);
-    return () => media.removeEventListener('change', sync);
-  }, []);
-  return wide;
-}
-
-function Primary({
-  busy = false,
-  disabled = false,
-  type = 'button',
-  onClick,
-  children,
-}: {
-  busy?: boolean;
-  disabled?: boolean;
-  type?: 'button' | 'submit';
-  onClick?: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button type={type} className={`primary${busy ? ' busy' : ''}`} disabled={disabled || busy} onClick={onClick}>
-      {children}
-    </button>
-  );
-}
-
-// Design work, development only: #step=server (or code, admin, key, invite, done) opens that step with made-up answers
-// and nothing sent to the server, as desktop/onboarding.html does; #t=7000 also stops the cameras then (SetupScenes).
-// #step=intro is the phone's opening screen, then the name.
+// Design work, development only: #step=server (or code, admin, key, invite) opens that step with made-up answers and
+// nothing sent to the server.
 const DEMO_HASH = import.meta.env.DEV ? window.location.hash.match(/step=(intro|code|server|admin|key|invite|done)\b/)?.[1] : undefined;
-export const DEMO = (DEMO_HASH === 'intro' ? 'server' : DEMO_HASH) as StepId | undefined;
-const ORDER: StepId[] = ['code', 'server', 'crop', 'admin', 'key', 'invite', 'done'];
+export const DEMO = (DEMO_HASH === 'intro' ? 'server' : DEMO_HASH === 'done' ? 'invite' : DEMO_HASH) as StepId | undefined;
+const ORDER: StepId[] = ['code', 'server', 'crop', 'admin', 'key', 'invite'];
 const past = (id: StepId) => !!DEMO && ORDER.indexOf(DEMO) > ORDER.indexOf(id);
 
 export function SetupWizard({ onDone }: { onDone: () => void }) {
@@ -116,11 +47,6 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   const [code, setCode] = useState(fromUrl);
 
   const [step, setStep] = useState<{ id: StepId; back: boolean; n: number }>({ id: DEMO ?? (fromUrl ? 'server' : 'code'), back: false, n: 0 });
-  const current = useRef(step);
-  current.current = step;
-  const [leaving, setLeaving] = useState<{ id: StepId; n: number } | null>(null);
-  const leaveTimer = useRef(0);
-  const stepRef = useRef<HTMLElement>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -131,50 +57,28 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   const [icon, setIcon] = useState<{ image: HTMLImageElement; crop: Crop; name: string } | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ image: HTMLImageElement; crop: Crop; name: string } | null>(null);
-  const [draftPreview, setDraftPreview] = useState<string | null>(null);
 
   const [nick, setNick] = useState(past('crop') ? t('setup.admin.nickPlaceholder') : '');
   const [password, setPassword] = useState(nick && 'password');
   const [repeat, setRepeat] = useState(password);
-  const [showPassword, setShowPassword] = useState(false);
   // What's already done on the server, so a retry after an error doesn't do it twice.
-  const [account, setAccount] = useState<{ color: string; serverName: string } | null>(past('admin') ? { color: '#5865f2', serverName: t('setup.server.namePlaceholder') } : null);
+  const [account, setAccount] = useState<{ serverName: string } | null>(past('admin') ? { serverName: t('setup.server.namePlaceholder') } : null);
   const [iconSent, setIconSent] = useState(false);
 
-  const [key, setKey] = useState(account ? 'K7QM-2XPA-9DHR-T4WC' : '');
-  const [keyKept, setKeyKept] = useState<'copied' | 'downloaded' | 'kept' | null>(past('key') ? 'copied' : null);
+  const [key, setKey] = useState(account ? 'K7QM-2XPA-9DHR-T4WC-8NBE-3VLY' : '');
+  const [keyKept, setKeyKept] = useState<'copied' | 'downloaded' | null>(null);
   const [link, setLink] = useState(account ? `${window.location.origin}/?invite=7F3K9QAB` : '');
-  const [linkSent, setLinkSent] = useState<'copied' | 'shared' | null>(past('invite') ? 'copied' : null);
+  const [linkSent, setLinkSent] = useState<'copied' | 'shared' | null>(null);
 
-  const wide = useWide();
-  // A phone opens on the server, ready, before the first step (SetupStage); the desktop goes straight in.
-  const [intro, setIntro] = useState(() => !window.matchMedia(WIDE).matches && (!DEMO_HASH || DEMO_HASH === 'intro'));
   const name = serverName.trim() || defaultName;
-  const host = window.location.host;
 
-  // The step before goes out first, then this one comes in (setup.css): the two never show at once.
   function go(id: StepId, back = false, problem = '') {
-    const from = current.current;
-    current.current = { id, back, n: from.n + 1 };
     setError(problem);
-    setLeaving({ id: from.id, n: from.n });
-    setStep(current.current);
-    clearTimeout(leaveTimer.current);
-    leaveTimer.current = window.setTimeout(() => setLeaving(null), 160);
+    setStep((s) => ({ id, back, n: s.n + 1 }));
   }
 
-  // Focus once the step has settled, and without scrolling: a field focused mid-animation drags the step to it.
-  // Not on a phone: the keyboard would cover the picture before the step is even read.
   useEffect(() => {
-    if (!wide) return;
-    const timer = setTimeout(
-      () => stepRef.current?.querySelector<HTMLElement>('input:not([disabled]):not([readonly]):not([type="file"])')?.focus({ preventScroll: true }),
-      560,
-    );
-    return () => clearTimeout(timer);
-  }, [step.n]);
-
-  useEffect(() => {
+    if (DEMO) return;
     api.setupStatus().then(
       (s) => setDefaultName(s.serverName),
       () => undefined,
@@ -189,13 +93,6 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     }
   }, []);
 
-  // The crop as it will look, in the picture on the right while it's being made.
-  useEffect(() => {
-    if (!draft) return;
-    const frame = requestAnimationFrame(() => setDraftPreview(cropToUrl(draft.image, draft.crop)));
-    return () => cancelAnimationFrame(frame);
-  }, [draft]);
-
   async function run(action: () => Promise<void>) {
     setBusy(true);
     setError('');
@@ -208,24 +105,18 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     }
   }
 
-  /** Out of the opening screen: the step comes in as if just reached. */
-  function start() {
-    setIntro(false);
-    current.current = { ...current.current, back: false, n: current.current.n + 1 };
-    setStep(current.current);
-  }
+  /* ---------- the code ---------- */
 
-  /* ---------- 1. code ---------- */
-
-  function checkCode(value = code) {
-    if (!value || busy) return;
-    run(async () => {
-      await api.setupCheck(value);
+  function checkCode() {
+    if (!code || busy) return;
+    if (DEMO) return go('server');
+    void run(async () => {
+      await api.setupCheck(code);
       go('server');
     });
   }
 
-  /* ---------- 2. name and icon ---------- */
+  /* ---------- name and icon ---------- */
 
   async function pick(file: File | undefined) {
     if (fileInput.current) fileInput.current.value = '';
@@ -263,21 +154,22 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     go('admin');
   }
 
-  /* ---------- 3. admin ---------- */
+  /* ---------- the admin ---------- */
 
   const mismatch = repeat !== '' && repeat.length >= password.length && repeat !== password;
+  const adminReady = !!nick.trim() && password.length >= 8 && repeat === password;
 
-  function submitAdmin(e: FormEvent) {
-    e.preventDefault();
-    if (password !== repeat) return setError(t('setup.admin.mismatch'));
-    run(async () => {
+  function submitAdmin() {
+    if (!adminReady || busy) return;
+    if (DEMO) return go('key');
+    void run(async () => {
       let made = account;
       if (!made) {
-        const { token, user } = await api.setup(code, name, nick, password);
+        const { token } = await api.setup(code, name, nick, password);
         setToken(token);
         // The code did its job; don't leave it in the address bar or the history.
         window.history.replaceState(null, '', window.location.pathname);
-        made = { color: user.color, serverName: name };
+        made = { serverName: name };
         setAccount(made);
         api.myInvite().then(
           (i) => setLink(inviteLink(i.code)),
@@ -286,7 +178,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
       } else if (made.serverName !== name) {
         // Back to the name after the account was made: the name changes the admin's way.
         await api.renameServer(name);
-        made = { ...made, serverName: name };
+        made = { serverName: name };
         setAccount(made);
       }
       if (icon && !iconSent) {
@@ -298,7 +190,12 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     });
   }
 
-  /* ---------- 4. recovery key ---------- */
+  /* ---------- the recovery key ---------- */
+
+  async function copyKey() {
+    await navigator.clipboard.writeText(key).catch(() => undefined);
+    setKeyKept('copied');
+  }
 
   function downloadKey() {
     const text = [`Gomex · ${name}`, window.location.origin, t('setup.key.fileNick', { nick: nick.trim() }), t('setup.key.fileKey', { key }), ''].join('\n');
@@ -309,10 +206,10 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     setKeyKept('downloaded');
   }
 
-  /* ---------- 5. invite ---------- */
+  /* ---------- the invite ---------- */
 
   useEffect(() => {
-    if (step.id !== 'invite' || link) return;
+    if (step.id !== 'invite' || link || DEMO) return;
     api.myInvite().then(
       (i) => setLink(inviteLink(i.code)),
       (e) => setError(e instanceof Error ? e.message : t('setup.invite.loadFailed')),
@@ -330,439 +227,144 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     }
   }
 
+  async function copyLink() {
+    await navigator.clipboard.writeText(link).catch(() => undefined);
+    setLinkSent((sent) => sent ?? 'copied');
+  }
+
   /* ---------- the steps ---------- */
 
   function render(id: StepId) {
     switch (id) {
       case 'code':
         return (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              checkCode();
-            }}
+          <FlowStep
+            title={t('setup.code.title')}
+            sub={t('setup.code.sub')}
+            error={error}
+            onSubmit={checkCode}
+            actions={<FlowPrimary type="submit" busy={busy} disabled={code.length < CODE_LENGTH}>{t('setup.next')}</FlowPrimary>}
           >
-            <h1>{t('setup.code.title')}</h1>
-            <p className="sub">{t('setup.code.sub')}</p>
-            <label className="field-label" htmlFor="setup-code">
-              {t('setup.code.label')}
-            </label>
-            <InputOTP
-              id="setup-code"
-              maxLength={CODE_LENGTH}
-              pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
+            <LineField
+              label={t('setup.code.label')}
               value={code}
-              onChange={(value) => {
-                setCode(value);
-                setError('');
-              }}
-              onComplete={(value: string) => checkCode(value)}
-              pasteTransformer={codeFrom}
-              isInvalid={!!error}
-              spellCheck={false}
-              autoComplete="off"
-              className="otp"
-            >
-              <InputOTP.Group>
-                {[0, 1, 2, 3, 4].map((i) => (
-                  <InputOTP.Slot key={i} index={i} />
-                ))}
-              </InputOTP.Group>
-              <InputOTP.Separator />
-              <InputOTP.Group>
-                {[5, 6, 7, 8, 9].map((i) => (
-                  <InputOTP.Slot key={i} index={i} />
-                ))}
-              </InputOTP.Group>
-            </InputOTP>
-            <p className="error" role="alert">
-              {error}
-            </p>
-            <div className="actions">
-              <Primary type="submit" busy={busy} disabled={!code}>
-                {t('setup.next')}
-              </Primary>
-            </div>
-          </form>
+              onChange={(e) => (setCode(codeFrom(e.target.value)), setError(''))}
+              placeholder="A1B2C3D4E5"
+              autoFocus
+              style={{ letterSpacing: '2px', textTransform: 'uppercase' }}
+            />
+          </FlowStep>
         );
 
       case 'server':
         return (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (serverName.trim()) go('admin');
-            }}
+          <FlowStep
+            title={t('setup.server.title')}
+            sub={t('setup.server.sub')}
+            error={error}
+            onBack={askCode ? () => go('code', true) : undefined}
+            onSubmit={() => serverName.trim() && go('admin')}
+            actions={<FlowPrimary type="submit" disabled={!serverName.trim()}>{t('setup.next')}</FlowPrimary>}
+            below={<TextAction onClick={skipServer}>{t('setup.server.skip')}</TextAction>}
           >
-            <h1>{t('setup.server.title')}</h1>
-            <p className="sub">{t('setup.server.sub')}</p>
-            <div className="rows">
-              <div className="row">
-                <button
-                  type="button"
-                  className="logo icon-button"
-                  aria-label={t('setup.server.icon')}
-                  onClick={() => (icon ? (setDraft(icon), go('crop')) : fileInput.current?.click())}
-                >
-                  {preview ? <img src={preview} alt="" /> : <GomexMark size={18} />}
-                </button>
-                <span className="grow">
+            <LineField label={t('setup.server.nameLabel')} value={serverName} onChange={(e) => setServerName(e.target.value)} maxLength={40} placeholder={t('setup.server.namePlaceholder')} />
+            <div className="flow-actions" style={{ alignItems: 'center' }}>
+              <button type="button" className="flow-icon-row" onClick={() => (icon ? (setDraft(icon), go('crop')) : fileInput.current?.click())}>
+                {preview ? <img src={preview} alt="" /> : <span className="mark"><GomexMark size={56} /></span>}
+                <span>
                   <b>{t('setup.server.icon')}</b>
-                  <small>{icon ? <FileName name={icon.name} /> : t('setup.server.defaultIcon')}</small>
+                  <u>{icon ? t('setup.server.another') : t('setup.server.choose')}</u>
                 </span>
-                {icon && (
-                  <button type="button" className="quiet" onClick={dropIcon}>
-                    {t('setup.server.remove')}
-                  </button>
-                )}
-                <button type="button" className="secondary" onClick={() => fileInput.current?.click()}>
-                  {icon ? t('setup.server.another') : t('setup.server.choose')}
-                </button>
-              </div>
+              </button>
+              {icon ? <TextAction onClick={dropIcon}>{t('setup.server.remove')}</TextAction> : null}
             </div>
-            <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => pick(e.target.files?.[0])} />
-            <label className="field-label gap" htmlFor="setup-name">
-              {t('setup.server.nameLabel')}
-            </label>
-            <input
-              id="setup-name"
-              className="field"
-              value={serverName}
-              onChange={(e) => setServerName(e.target.value)}
-              maxLength={40}
-              placeholder={t('setup.server.namePlaceholder')}
-              spellCheck={false}
-              autoComplete="off"
-            />
-            <p className="error" role="alert">
-              {error}
-            </p>
-            <div className="actions">
-              {askCode && (
-                <button type="button" className="quiet" onClick={() => go('code', true)}>
-                  {t('setup.back')}
-                </button>
-              )}
-              <span className="pair">
-                <button type="button" className="quiet" onClick={skipServer}>
-                  {t('setup.server.skip')}
-                </button>
-                <Primary type="submit" disabled={!serverName.trim()}>
-                  {t('setup.next')}
-                </Primary>
-              </span>
-            </div>
-          </form>
+            <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => void pick(e.target.files?.[0])} />
+          </FlowStep>
         );
 
       case 'crop':
         if (!draft) return null;
         return (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              keepCrop();
-            }}
+          <FlowStep
+            title={t('setup.server.icon')}
+            sub={draft.name}
+            onBack={() => go('server', true)}
+            onSubmit={keepCrop}
+            actions={<FlowPrimary type="submit">{t('setup.server.cropDone')}</FlowPrimary>}
+            below={<TextAction onClick={() => fileInput.current?.click()}>{t('setup.server.another')}</TextAction>}
           >
-            <h1>{t('setup.server.icon')}</h1>
-            <p className="sub">{draft.name}</p>
-            <IconCropper image={draft.image} crop={draft.crop} onChange={(crop) => setDraft((d) => d && { ...d, crop })} className="crop" />
-            <div className="actions">
-              <button type="button" className="quiet" onClick={() => go('server', true)}>
-                {t('setup.back')}
-              </button>
-              <Primary type="submit">{t('setup.server.cropDone')}</Primary>
-            </div>
-          </form>
+            <IconCropper image={draft.image} crop={draft.crop} onChange={(crop) => setDraft((d) => d && { ...d, crop })} className="flow-crop" />
+            <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => void pick(e.target.files?.[0])} />
+          </FlowStep>
         );
 
       case 'admin':
         return (
-          <form onSubmit={submitAdmin}>
-            <h1>{t('setup.admin.title')}</h1>
-            <p className="sub">{t('setup.admin.sub')}</p>
-            <label className="field-label" htmlFor="setup-nick">
-              {t('setup.admin.nick')}
-            </label>
-            <input
-              id="setup-nick"
-              className="field"
-              value={nick}
-              onChange={(e) => {
-                setNick(e.target.value);
-                setError('');
-              }}
-              maxLength={32}
-              placeholder={t('setup.admin.nickPlaceholder')}
-              autoComplete="username"
-              spellCheck={false}
-              autoCapitalize="off"
-              readOnly={!!account}
-            />
-            <label className="field-label" htmlFor="setup-password">
-              {t('setup.admin.password')}
-            </label>
-            <span className="with-eye">
-              <input
-                id="setup-password"
-                className="field"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={t('setup.admin.passwordHint')}
-                autoComplete="new-password"
-                readOnly={!!account}
-              />
-              <button type="button" className="eye" aria-label={showPassword ? t('setup.admin.hide') : t('setup.admin.show')} onClick={() => setShowPassword((s) => !s)}>
-                {EYE}
-              </button>
-            </span>
-            <label className="field-label" htmlFor="setup-repeat">
-              {t('setup.admin.repeat')}
-            </label>
-            <input
-              id="setup-repeat"
-              className={`field${mismatch ? ' bad' : ''}`}
-              type={showPassword ? 'text' : 'password'}
-              value={repeat}
-              onChange={(e) => setRepeat(e.target.value)}
-              autoComplete="new-password"
-              readOnly={!!account}
-            />
-            <p className="error" role="alert">
-              {error || (mismatch ? t('setup.admin.mismatch') : '')}
-            </p>
-            <div className="actions">
-              <button type="button" className="quiet" onClick={() => go('server', true)}>
-                {t('setup.back')}
-              </button>
-              <Primary type="submit" busy={busy} disabled={!nick.trim() || password.length < 8 || repeat !== password}>
-                {t('setup.admin.create')}
-              </Primary>
+          <FlowStep
+            title={t('setup.admin.title')}
+            sub={t('setup.admin.sub')}
+            error={error}
+            onBack={() => go('server', true)}
+            onSubmit={submitAdmin}
+            actions={<FlowPrimary type="submit" busy={busy} disabled={!adminReady}>{t('setup.admin.create')}</FlowPrimary>}
+          >
+            <LineField label={t('setup.admin.nick')} value={nick} onChange={(e) => (setNick(e.target.value), setError(''))} maxLength={32} placeholder={t('setup.admin.nickPlaceholder')} autoComplete="username" autoCapitalize="off" readOnly={!!account} />
+            <div className="flow-pair">
+              <LineField label={t('setup.admin.password')} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('setup.admin.passwordHint')} autoComplete="new-password" readOnly={!!account} />
+              <LineField label={t('setup.admin.repeat')} type="password" value={repeat} onChange={(e) => setRepeat(e.target.value)} placeholder={t('setup.admin.repeatHint')} autoComplete="new-password" readOnly={!!account} error={mismatch && t('setup.admin.mismatch')} />
             </div>
-          </form>
+          </FlowStep>
         );
 
       case 'key':
         return (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              go('invite');
-            }}
+          <FlowStep
+            title={t('setup.key.title')}
+            sub={t('setup.key.sub')}
+            error={error}
+            onSubmit={() => keyKept && go('invite')}
+            actions={<FlowPrimary type="submit" disabled={!keyKept}>{t('setup.next')}</FlowPrimary>}
           >
-            <h1>{t('setup.key.title')}</h1>
-            <p className="sub">{t('setup.key.sub')}</p>
-            <div className="relative">
-              <p className="key pr-12">
-                {keyLines(key).map((line) => (
-                  <span key={line} className="block">
-                    {line}
-                  </span>
-                ))}
-              </p>
-              <CopyButton text={key} onCopied={() => setKeyKept((k) => k ?? 'copied')} className="absolute right-2 top-2" />
+            <p className="flow-big">{key}</p>
+            {/* "Next" opens once the key has been copied or downloaded; the action used says so. */}
+            <div className="flow-actions">
+              <TextAction left onClick={() => void copyKey()}>{keyKept === 'copied' ? t('common.copy.done') : t('common.copy.label')}</TextAction>
+              <TextAction left onClick={downloadKey}>{keyKept === 'downloaded' ? t('setup.key.downloaded') : t('setup.key.download')}</TextAction>
             </div>
-            <div className="tools">
-              <button type="button" className={`secondary${keyKept === 'downloaded' ? ' did' : ''}`} onClick={downloadKey}>
-                {keyKept === 'downloaded' && DONE}
-                {keyKept === 'downloaded' ? t('setup.key.downloaded') : t('setup.key.download')}
-              </button>
-            </div>
-            <p className="error" role="alert" style={{ marginTop: 10 }}>
-              {error}
-            </p>
-            {/* Ticked by itself once the key is copied or downloaded; "Next" waits for it. */}
-            <label className="check">
-              <input type="checkbox" checked={!!keyKept} onChange={(e) => setKeyKept(e.target.checked ? 'kept' : null)} />
-              <span>{t('setup.key.kept')}</span>
-            </label>
-            <div className="actions">
-              <span className="pair">
-                <Primary type="submit" disabled={!keyKept}>
-                  {t('setup.next')}
-                </Primary>
-              </span>
-            </div>
-          </form>
+          </FlowStep>
         );
 
       case 'invite':
         return (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              go('done');
-            }}
+          <FlowStep
+            title={t('setup.invite.title')}
+            sub={t('setup.invite.sub')}
+            error={error}
+            actions={
+              linkSent ? (
+                <FlowPrimary onClick={onDone}>{t('setup.done.start')}</FlowPrimary>
+              ) : canShare ? (
+                <FlowPrimary disabled={!link} onClick={() => void shareLink()}>{t('setup.invite.share')}</FlowPrimary>
+              ) : (
+                <FlowPrimary disabled={!link} onClick={() => void copyLink()}>{t('setup.invite.copy')}</FlowPrimary>
+              )
+            }
+            below={linkSent ? undefined : <TextAction onClick={onDone}>{t('setup.invite.later')}</TextAction>}
           >
-            <h1>{t('setup.invite.title')}</h1>
-            <p className="sub">{t('setup.invite.sub')}</p>
-            <label className="field-label" htmlFor="setup-link">
-              {t('setup.invite.label')}
-            </label>
-            <div className="relative">
-              <input
-                id="setup-link"
-                className="field pr-12"
-                readOnly
-                value={link.replace(/^https?:\/\//, '') || t('setup.invite.loading')}
-                onFocus={(e) => e.currentTarget.select()}
-              />
-              <CopyButton text={link} onCopied={() => setLinkSent('copied')} className="absolute right-[5px] top-[5px]" />
-            </div>
-            <div className="tools">
-              {canShare && (
-                <button type="button" className={`secondary${linkSent === 'shared' ? ' did' : ''}`} disabled={!link} onClick={shareLink}>
-                  {linkSent === 'shared' && DONE}
-                  {t('setup.invite.share')}
-                </button>
-              )}
-            </div>
-            <p className="error" role="alert" style={{ marginTop: 10 }}>
-              {error}
-            </p>
-            <div className="actions">
-              <button type="button" className="quiet" onClick={() => go('key', true)}>
-                {t('setup.back')}
-              </button>
-              <span className="pair">
-                {!linkSent && (
-                  <button type="button" className="quiet" onClick={() => go('done')}>
-                    {t('setup.invite.later')}
-                  </button>
-                )}
-                <Primary type="submit" disabled={!linkSent}>
-                  {t('setup.next')}
-                </Primary>
-              </span>
-            </div>
-          </form>
-        );
-
-      case 'done':
-        return (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              onDone();
-            }}
-          >
-            <h1>{t('setup.done.title')}</h1>
-            <p className="sub">{host}</p>
-            <div className="rows">
-              <div className="row">
-                <span className="logo">{preview ? <img src={preview} alt="" /> : <GomexMark size={18} />}</span>
-                <span className="grow">
-                  <b>{name}</b>
-                  <small>{t('setup.done.server')}</small>
-                </span>
-              </div>
-              <div className="row">
-                <span className="logo person" style={{ background: account?.color }}>
-                  {letter(nick)}
-                </span>
-                <span className="grow">
-                  <b>{nick.trim()}</b>
-                  <small>{t('setup.done.admin')}</small>
-                </span>
-              </div>
-              <div className="row">
-                <span className="logo ok">{DONE}</span>
-                <span className="grow">
-                  <b>{t('setup.key.title')}</b>
-                  <small>{keyKept === 'copied' ? t('setup.done.copied') : keyKept === 'downloaded' ? t('setup.key.downloaded') : t('setup.done.saved')}</small>
-                </span>
-              </div>
-              <div className="row">
-                <span className={`logo${linkSent ? ' ok' : ''}`}>{linkSent ? DONE : <UserPlusIcon size={18} />}</span>
-                <span className="grow">
-                  <b>{t('setup.done.invite')}</b>
-                  <small>{linkSent === 'copied' ? t('setup.done.linkCopied') : linkSent === 'shared' ? t('setup.done.linkSent') : t('setup.invite.later')}</small>
-                </span>
-              </div>
-            </div>
-            <div className="actions">
-              <button type="button" className="quiet" onClick={() => go('invite', true)}>
-                {t('setup.back')}
-              </button>
-              <Primary type="submit">{t('setup.done.start')}</Primary>
-            </div>
-          </form>
+            <p className="flow-big" style={{ fontSize: 22, lineHeight: '28px', letterSpacing: 0 }}>{link.replace(/^https?:\/\//, '') || t('setup.invite.loading')}</p>
+            {canShare ? <TextAction left onClick={() => void copyLink()}>{linkSent === 'copied' ? t('common.copy.done') : t('common.copy.label')}</TextAction> : null}
+          </FlowStep>
         );
     }
   }
 
-  // The three bars: the server was set up in the desktop app (or by the installer), so it's full; the account
-  // fills over its steps, friends with the link and the end.
-  const at = step.id === 'crop' ? 'server' : step.id;
-  const accountSteps: StepId[] = askCode ? ['code', 'server', 'admin', 'key'] : ['server', 'admin', 'key'];
-  const onAccount = accountSteps.includes(at);
-  const fill = {
-    server: 1,
-    account: onAccount ? accountSteps.indexOf(at) / accountSteps.length : 1,
-    friends: at === 'done' ? 1 : at === 'invite' && linkSent ? 0.5 : 0,
-  };
-  const now = onAccount ? 'account' : 'friends';
-  // The phone's dial: the whole way from the first step to the end.
-  const path: StepId[] = askCode ? ['code', 'server', 'admin', 'key', 'invite', 'done'] : ['server', 'admin', 'key', 'invite', 'done'];
-  const dial = at === 'done' ? 1 : Math.max(0, path.indexOf(at)) / (path.length - 1) + (at === 'invite' && linkSent ? 0.5 / (path.length - 1) : 0);
-
-  const facts: Facts = {
-    host,
-    code,
-    serverName: name,
-    icon: step.id === 'crop' ? draftPreview : preview,
-    nick: nick.trim(),
-    color: account?.color ?? '#5865f2',
-    passwordLength: password.length,
-    key,
-    link: link.replace(/^https?:\/\//, ''),
-  };
-
+  const parts = [t('setup.done.server'), t('setup.progress.account'), t('setup.progress.friends')];
+  const part = PART[step.id];
   return (
-    <div className={`setup${intro ? ' intro' : ''}`}>
-      <div className="left">
-        <GomexMark size={26} className="mark" />
-        {!wide && <SetupStage step={intro ? 'intro' : at} facts={facts} fill={intro ? 0 : dial} />}
-        <main className="steps">
-          {intro && (
-            <section key="intro" className="step hello">
-              <h1>{t('setup.intro.title')}</h1>
-              <p className="sub">{host}</p>
-              <div className="actions">
-                <Primary onClick={start}>{t('setup.intro.start')}</Primary>
-              </div>
-            </section>
-          )}
-          {!intro && leaving && (
-            <section key={leaving.n} className="step leaving" aria-hidden="true">
-              {render(leaving.id)}
-            </section>
-          )}
-          {!intro && (
-            <section key={step.n} ref={stepRef} className={`step${step.back ? ' back-in' : ''}`}>
-              {render(step.id)}
-            </section>
-          )}
-        </main>
-        <nav className="progress" aria-label={t('setup.steps')}>
-          {(
-            [
-              ['server', t('setup.done.server')],
-              ['account', t('setup.progress.account')],
-              ['friends', t('setup.progress.friends')],
-            ] as const
-          ).map(([part, label]) => (
-            <span key={part} className={`part${now === part ? ' now' : ''}`}>
-              <span className="track">
-                <i style={{ '--fill': fill[part] } as CSSProperties} />
-              </span>
-              <span className="name">{label}</span>
-            </span>
-          ))}
-        </nav>
+    <FlowShell fill={FILL[step.id]} label={t('setup.stageOf', { stage: parts[part]!, n: part + 1, total: parts.length })}>
+      <div key={step.n} className={step.back ? 'flow-swap back-in' : 'flow-swap'}>
+        {render(step.id)}
       </div>
-      {wide && <SetupScenes scene={SCENE[step.id]} facts={facts} />}
-    </div>
+    </FlowShell>
   );
 }
