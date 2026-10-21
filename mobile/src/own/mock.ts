@@ -37,7 +37,7 @@ export const mock: Backend = {
   connect: async ({ host, password }) => {
     await wait(1400);
     if (password === 'wrong') return fail(t('own.ssh.badLogin'));
-    return { facts: { ip: host.trim() || '203.0.113.10', os: 'Ubuntu 24.04 LTS · x86_64', root: true, cores: 1, memory: 1.9, disk: 17 } };
+    return { facts: { ip: host.trim() || '203.0.113.10', os: 'Ubuntu 24.04 LTS · x86_64', root: true, cores: 1, memory: 1.9, disk: 17 }, hostKey: 'ssh-ed25519 MOCK' };
   },
   resume: async () => {
     await wait(800);

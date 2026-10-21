@@ -53,6 +53,8 @@ export type Saved = {
   memory?: number;
   /** The setup link once the install is done (https://app.DOMAIN/?setup=CODE). */
   url?: string;
+  /** The server's SSH host key as first seen (an OpenSSH line): a different one later stops the connection. */
+  hostKey?: string;
 };
 
 export const loadSaved = async (): Promise<Saved | null> => {
@@ -63,16 +65,26 @@ export const loadSaved = async (): Promise<Saved | null> => {
     return null;
   }
 };
-export const save = (saved: Saved) => SecureStore.setItemAsync(SAVED, JSON.stringify(saved)).catch(() => undefined);
+// It holds the server's root key and the deSEC password: readable while the phone is unlocked, never in a backup or on
+// another device (as the session, api.ts).
+export const save = (saved: Saved) =>
+  SecureStore.setItemAsync(SAVED, JSON.stringify(saved), { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY }).catch(() => undefined);
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /* ---------- SSH ---------- */
 
-let session: { id: string; host: string; user: string; password: string | null } | null = null;
+let session: { id: string; host: string; user: string; password: string | null; hostKey: string } | null = null;
+
+/** Connects with the key or the password, accepting only the host key the server showed before, if any. */
+const open = (host: string, user: string, auth: { password?: string | null; key?: string | null }, hostKey: string | null | undefined) =>
+  ssh.connect(host, 22, user, auth.password ?? null, auth.key ?? null, hostKey || null);
+/** A refusal that isn't about the login: another machine answers for this server. */
+const changedKey = (error: unknown) => error instanceof Error && error.message.includes('hostKey');
 
 function sshError(error: unknown): { error: string; field?: 'host' } {
   const code = error instanceof Error ? error.message : String(error);
+  if (code.includes('hostKey')) return { error: t('own.ssh.hostKeyChanged'), field: 'host' };
   if (code.includes('auth')) return { error: t('own.ssh.badLogin') };
   if (code.includes('noHost')) return { error: t('own.ssh.noHost'), field: 'host' };
   if (code.includes('noReply')) return { error: t('own.ssh.noReply'), field: 'host' };
@@ -95,52 +107,53 @@ async function reconnect() {
   const { host, user, password } = session;
   const saved = await loadSaved();
   const key = saved?.host === host ? saved.privateKey : undefined;
+  const pinned = session.hostKey;
   void ssh.close(session.id);
-  let id: string | null = null;
-  if (key) id = await ssh.connect(host, 22, user, null, key).catch(() => null);
-  if (!id && password) id = await ssh.connect(host, 22, user, password, null);
-  if (!id) throw new Error('auth');
-  session = { id, host, user, password };
+  let opened: { id: string; hostKey: string } | null = null;
+  if (key) opened = await open(host, user, { key }, pinned).catch((error) => (changedKey(error) ? Promise.reject(error) : null));
+  if (!opened && password) opened = await open(host, user, { password }, pinned);
+  if (!opened) throw new Error('auth');
+  session = { id: opened.id, host, user, password, hostKey: pinned };
 }
 
 /** Back to a server whose install was started earlier (the app was closed): its key, or the password if asked again. */
 export async function resume(saved: Saved, password: string | null = null) {
   close();
-  let id: string | null = null;
-  if (saved.privateKey) id = await ssh.connect(saved.host, 22, saved.user, null, saved.privateKey).catch(() => null);
-  if (!id && password) {
-    try {
-      id = await ssh.connect(saved.host, 22, saved.user, password, null);
-    } catch (error) {
-      return sshError(error);
-    }
+  let opened: { id: string; hostKey: string } | null = null;
+  try {
+    if (saved.privateKey) opened = await open(saved.host, saved.user, { key: saved.privateKey }, saved.hostKey).catch((error) => (changedKey(error) ? Promise.reject(error) : null));
+    if (!opened && password) opened = await open(saved.host, saved.user, { password }, saved.hostKey);
+  } catch (error) {
+    return sshError(error);
   }
-  if (!id) return { error: t('own.ssh.needPassword') };
-  session = { id, host: saved.host, user: saved.user, password };
+  if (!opened) return { error: t('own.ssh.needPassword') };
+  session = { id: opened.id, host: saved.host, user: saved.user, password, hostKey: saved.hostKey || opened.hostKey };
   return { ok: true as const };
 }
 
 export type { Facts };
 
 /** Logs in with the password and looks at the server (probeCommand): it has to be root. */
-export async function connect({ host, user, password }: { host: string; user: string; password: string }): Promise<{ facts: Facts } | { error: string; field?: 'host' }> {
+export async function connect({ host, user, password }: { host: string; user: string; password: string }): Promise<{ facts: Facts; hostKey: string } | { error: string; field?: 'host' }> {
   close();
   host = host.trim();
   user = user.trim() || 'root';
-  let id: string;
+  let opened: { id: string; hostKey: string };
   try {
-    id = await ssh.connect(host, 22, user, password, null);
+    // A login typed afresh trusts the key the server shows, as on first sight (a VPS reinstalled at the same address
+    // gets a new one); from here on the session and a resumed install accept only that key.
+    opened = await open(host, user, { password }, null);
   } catch (error) {
     return sshError(error);
   }
-  session = { id, host, user, password };
+  session = { id: opened.id, host, user, password, hostKey: opened.hostKey };
   try {
     const facts = parseProbe((await exec(probeCommand(host))).output);
     if (!facts.root) {
       close();
       return { error: t('own.ssh.needRoot') };
     }
-    return { facts };
+    return { facts, hostKey: opened.hostKey };
   } catch (error) {
     close();
     return sshError(error);

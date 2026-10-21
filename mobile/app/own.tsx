@@ -140,7 +140,7 @@ export default function OwnServer() {
       haptic.success();
       setFacts(result.facts);
       // The key and the deSEC account of an earlier server stay; a new server gets its own key.
-      setSaved({ host: host.trim(), ip: result.facts.ip, user: user.trim() || 'root', turn, cores: result.facts.cores, memory: result.facts.memory, desec: earlier?.desec });
+      setSaved({ host: host.trim(), ip: result.facts.ip, user: user.trim() || 'root', turn, cores: result.facts.cores, memory: result.facts.memory, desec: earlier?.desec, hostKey: result.hostKey });
       go('address');
     });
   }

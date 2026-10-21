@@ -3,6 +3,7 @@ import CryptoKit
 import ExpoModulesCore
 import Foundation
 import NIOCore
+import NIOSSH
 
 /// Open sessions by id: the setup screens keep one for the server they're setting up.
 private actor Sessions {
@@ -19,9 +20,39 @@ private actor Sessions {
   func remove(_ id: String) -> SSHClient? { clients.removeValue(forKey: id) }
 }
 
+/// The server answered with another host key than the one pinned for it.
+private struct HostKeyChanged: Error {}
+
+/**
+ * The server's host key, pinned: a fresh VPS can only be trusted on first sight (its key has never been seen), but
+ * from then on, on a reconnect or after the app was closed, the same server must show the same key, or the
+ * connection fails before the password or a command goes anywhere.
+ */
+private final class HostKeyPin: NIOSSHClientServerAuthenticationDelegate, @unchecked Sendable {
+  private let expected: String?
+  private let lock = NSLock()
+  private var shown: String?
+
+  init(expected: String?) { self.expected = expected }
+
+  /// The key the server showed, as an OpenSSH line ("ssh-ed25519 AAAA…").
+  var seen: String? { lock.withLock { shown } }
+
+  func validateHostKey(hostKey: NIOSSHPublicKey, validationCompletePromise: EventLoopPromise<Void>) {
+    let line = String(openSSHPublicKey: hostKey)
+    lock.withLock { shown = line }
+    if let expected, !expected.isEmpty, expected != line {
+      validationCompletePromise.fail(HostKeyChanged())
+    } else {
+      validationCompletePromise.succeed(())
+    }
+  }
+}
+
 /// Why a connection failed, as a short code the JS side turns into words (desktop/server-setup.js sshError).
 private func reason(_ error: Error) -> String {
   let text = String(describing: error).lowercased()
+  if error is HostKeyChanged || text.contains("hostkeychanged") { return "hostKey" }
   if text.contains("auth") { return "auth" }
   if text.contains("unknown host") || text.contains("nodename") || text.contains("resolve") || text.contains("no address") { return "noHost" }
   if text.contains("timeout") || text.contains("timed out") || text.contains("refused") || text.contains("unreachable")
@@ -67,25 +98,26 @@ public class GomexSshModule: Module {
         .replacingOccurrences(of: "=", with: "")
     }
 
-    /// Logs in with a password or the app's key; resolves with the session's id, or rejects with a reason code.
-    /// The host key isn't pinned: a fresh VPS has never been seen before, as in the desktop app.
-    AsyncFunction("connect") { (host: String, port: Int, user: String, password: String?, privateKey: String?) async throws -> String in
+    /// Logs in with a password or the app's key; resolves with the session's id and the server's host key, or rejects
+    /// with a reason code. `hostKey`: the key this server showed before (HostKeyPin); none on first sight.
+    AsyncFunction("connect") { (host: String, port: Int, user: String, password: String?, privateKey: String?, hostKey: String?) async throws -> [String: String] in
       let auth: SSHAuthenticationMethod
       if let privateKey, let raw = Data(base64Encoded: privateKey) {
         auth = .ed25519(username: user, privateKey: try Curve25519.Signing.PrivateKey(rawRepresentation: raw))
       } else {
         auth = .passwordBased(username: user, password: password ?? "")
       }
+      let pin = HostKeyPin(expected: hostKey)
       do {
         let client = try await SSHClient.connect(
           host: host,
           port: port,
           authenticationMethod: auth,
-          hostKeyValidator: .acceptAnything(),
+          hostKeyValidator: .custom(pin),
           reconnect: .never,
           connectTimeout: .seconds(20)
         )
-        return await sessions.add(client)
+        return ["id": await sessions.add(client), "hostKey": pin.seen ?? ""]
       } catch {
         throw Exception(name: "SSHConnect", description: reason(error))
       }

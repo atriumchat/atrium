@@ -4,7 +4,8 @@ import { requireOptionalNativeModule } from 'expo-modules-core';
 type GomexSsh = {
   generateKey(): { publicKey: string; privateKey: string };
   randomToken(bytes: number): string;
-  connect(host: string, port: number, user: string, password: string | null, privateKey: string | null): Promise<string>;
+  /** `hostKey`: the server's key seen before (an OpenSSH line); a different one fails with the code "hostKey". */
+  connect(host: string, port: number, user: string, password: string | null, privateKey: string | null, hostKey: string | null): Promise<{ id: string; hostKey: string }>;
   exec(id: string, command: string): Promise<{ code: number; output: string }>;
   close(id: string): Promise<void>;
 };
