@@ -29,7 +29,6 @@ import { CallGlow, Ripples } from '../../src/voice/Effects';
  */
 export default function Room() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { t } = useT();
   const insets = useSafeAreaInsets();
   const channel = useStore((s) => s.data?.channels.find((c) => c.id === id));
   const dm = useStore((s) => s.dms.find((d) => d.id === id));

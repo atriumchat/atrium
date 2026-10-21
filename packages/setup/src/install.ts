@@ -82,6 +82,8 @@ export function parseProgress(output: string): Progress {
   if (!progress.doing) {
     const last = tail
       .split('\n')
+      // The installer's colours (ANSI escapes) out of its plain lines.
+      // eslint-disable-next-line no-control-regex
       .map((line) => line.replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, '').trim())
       .filter((line) => line && !/^[…✓✗!•]/.test(line))
       .pop();

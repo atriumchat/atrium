@@ -74,7 +74,7 @@ function Section({ title, kind, children }: { title: string; kind: Channel['kind
   );
 }
 
-function ItemRow({ onPress, strong, dim, children, label }: { onPress: () => void; strong?: boolean; dim?: boolean; children: React.ReactNode; label?: string }) {
+function ItemRow({ onPress, dim, children, label }: { onPress: () => void; dim?: boolean; children: React.ReactNode; label?: string }) {
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => ({ height: 44, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 22, paddingHorizontal: 12, opacity: dim ? 0.45 : 1, backgroundColor: pressed ? 'rgba(30,30,34,0.5)' : 'transparent' })}>
       {children}

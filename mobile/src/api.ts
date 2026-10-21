@@ -42,7 +42,7 @@ export async function request<T>(path: string, init: RequestInit = {}, target = 
     return await res.json() as T;
   } catch (e) {
     if (e instanceof ApiError) throw e;
-    throw new Error(t('noConnection'));
+    throw new Error(t('noConnection'), { cause: e });
   } finally { clearTimeout(timer); }
 }
 const post = (body?: unknown): RequestInit => ({ method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });

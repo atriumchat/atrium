@@ -50,12 +50,12 @@ GOMEX_URL=http://localhost:5190 npm start
 
 `GOMEX_LANG=ru` или `GOMEX_LANG=en` задаёт язык десктопа; по умолчанию — язык системы.
 
-Проверки перед коммитом:
+Проверки перед коммитом (CI гоняет то же, .github/workflows/checks.yml):
 
 ```bash
-npm run build -w web        # tsc и сборка
-(cd desktop && npm run check:i18n)   # в английском и русском одни и те же ключи
-deploy/release.sh lint      # bash -n и shellcheck на всех скриптах deploy/
+npm run check              # ESLint (границы пакетов, хуки, никаких цветов руками в Gomex Flow), типы, тесты, сборки
+server/.venv/bin/python -m pytest -q server/tests  # изолированный SQLite и фикстуры деплоя
+deploy/release.sh lint     # bash -n и shellcheck по всем скриптам deploy/
 ```
 
 ## Релизы

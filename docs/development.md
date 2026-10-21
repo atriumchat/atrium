@@ -51,14 +51,12 @@ work, on made-up answers without the main process (`onboarding.html#step=install
 
 `GOMEX_LANG=ru` or `GOMEX_LANG=en` forces the desktop language; by default it follows the system's.
 
-Checks before a commit:
+Checks before a commit (CI runs the same, .github/workflows/checks.yml):
 
 ```bash
-npm run build -w web        # tsc and build
-(cd desktop && npm run check:i18n)   # English and Russian have the same keys
-(cd desktop && node --test tests/*.test.cjs)  # SSH transport failures
+npm run check              # ESLint (package boundaries, hooks, no hand-written colours in Gomex Flow), types, tests, builds
 server/.venv/bin/python -m pytest -q server/tests  # isolated SQLite and deploy fixtures
-deploy/release.sh lint      # bash -n and shellcheck on all scripts in deploy/
+deploy/release.sh lint     # bash -n and shellcheck on all scripts in deploy/
 ```
 
 Browser regressions: run `bash web/tests/run-regressions.sh`, open the printed localhost URL and click

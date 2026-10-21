@@ -5,3 +5,5 @@ server/.venv
 server/data
 deploy
 .git
+**/storybook-static
+desktop/ui-dist

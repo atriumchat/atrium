@@ -1,4 +1,5 @@
 import { t } from '../i18n';
+import { color } from '../theme';
 import type { MyInvite, Session } from '../protocol';
 import type { Backend } from './backend';
 import { MOCK_DOMAIN, MOCK_INVITE, MOCK_KEY, mockProgress, type Progress } from '@gomex/setup';
@@ -85,7 +86,7 @@ export const mock: Backend = {
   setupStatus: async () => ({ needed: true, serverName: 'Gomex' }),
   setup: async (_server, _code, _serverName, nick) => {
     await wait(1100);
-    return { token: 'mock', user: { id: 'mock', name: nick, color: '#5865f2' } } as unknown as Session;
+    return { token: 'mock', user: { id: 'mock', name: nick, color: color.here } } as unknown as Session;
   },
   renameServer: async () => wait(300),
   uploadServerIcon: async () => wait(600),

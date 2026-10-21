@@ -28,7 +28,8 @@ jobs:
             context: .
             file: Dockerfile
             # Everything the image is built from: the Dockerfile copies only these.
-            sources: Dockerfile .dockerignore server web
+            # The web client is an npm workspace: the root lock, the shared packages and the other manifests count too.
+            sources: Dockerfile .dockerignore server web packages package.json package-lock.json mobile/package.json desktop/ui/package.json
           - image: gomex-caddy
             context: deploy/caddy
             file: deploy/caddy/Dockerfile

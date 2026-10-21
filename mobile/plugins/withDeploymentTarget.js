@@ -5,7 +5,7 @@ module.exports = function withDeploymentTarget(config) {
   return withPodfile(config, (result) => {
     const marker = '# Gomex: align dependency resource bundles with the RN minimum';
     // Remove an earlier generated block when rerunning prebuild after an update.
-    result.modResults.contents = result.modResults.contents.replace(/    # Gomex: align dependency resource bundles with the RN minimum[\s\S]*?\n    end\n/g, '');
+    result.modResults.contents = result.modResults.contents.replace(/ {4}# Gomex: align dependency resource bundles with the RN minimum[\s\S]*?\n {4}end\n/g, '');
     const hook = 'post_install do |installer|';
     if (!result.modResults.contents.includes(hook)) throw new Error('Missing CocoaPods post_install hook');
     result.modResults.contents = result.modResults.contents.replace(hook, `${hook}

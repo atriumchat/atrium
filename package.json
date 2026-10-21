@@ -16,6 +16,20 @@
   "scripts": {
     "web": "npm run dev -w web",
     "mobile": "npm run start -w mobile",
-    "desktop-ui": "npm run dev -w @gomex/desktop-ui"
+    "desktop-ui": "npm run dev -w @gomex/desktop-ui",
+    "storybook": "npm run storybook -w @gomex/ui-web",
+    "lint": "eslint .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm test --workspaces --if-present && node --test desktop/tests/*.test.cjs && node desktop/check-i18n.js",
+    "build": "npm run build -w web && npm run build -w @gomex/desktop-ui && npm run build-storybook -w @gomex/ui-web",
+    "check": "npm run lint && npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.12.0",
+    "eslint-plugin-boundaries": "7.2.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.13.0",
+    "typescript-eslint": "8.71.1"
   }
 }

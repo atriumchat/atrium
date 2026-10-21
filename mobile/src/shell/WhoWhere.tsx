@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { ScrollView, useWindowDimensions, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { appear, move, vanish } from '../motion';
 import { useStore } from '../store';
