@@ -26,9 +26,8 @@ python3.13 -m venv .venv
 The client on http://localhost:5190, with `/api` and `/socket.io` going to the server:
 
 ```bash
-cd web
-npm ci
-npm run dev
+npm ci              # from the repo root: web, mobile and packages/* are npm workspaces
+npm run dev -w web
 ```
 
 On an empty database the first-run wizard opens. The default code is `friends`.
@@ -46,7 +45,7 @@ GOMEX_URL=http://localhost:5190 npx electron .
 Checks before a commit:
 
 ```bash
-(cd web && npm run build)   # tsc and build
+npm run build -w web        # tsc and build
 (cd desktop && npm run check:i18n)   # English and Russian have the same keys
 (cd desktop && node --test tests/*.test.cjs)  # SSH transport failures
 server/.venv/bin/python -m pytest -q server/tests  # isolated SQLite and deploy fixtures

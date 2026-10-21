@@ -1,10 +1,15 @@
 # Build the web client. Plain JS comes out, the same for every CPU: build it once, natively, even for arm64 images.
-FROM --platform=$BUILDPLATFORM node:22-slim AS web
-WORKDIR /web
-COPY web/package.json web/package-lock.json ./
-RUN npm ci --no-audit --no-fund
-COPY web/ ./
-RUN npm run build
+# The clients are npm workspaces (docs/adr/001-client-architecture.md): the root lock, the shared packages and every
+# workspace's manifest go in so `npm ci` can resolve, then only the web workspace is installed and built.
+FROM --platform=$BUILDPLATFORM node:24-slim AS web
+WORKDIR /src
+COPY package.json package-lock.json ./
+COPY packages/ ./packages/
+COPY web/package.json ./web/
+COPY mobile/package.json ./mobile/
+RUN npm ci --no-audit --no-fund -w web --include-workspace-root
+COPY web/ ./web/
+RUN npm run build -w web
 
 # Backend; also serves the built client from the same origin.
 FROM python:3.13-slim
@@ -15,7 +20,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin gomex
 COPY server/app.py ./
 COPY server/gomex ./gomex
-COPY --from=web /web/dist ./web
+COPY --from=web /src/web/dist ./web
 ENV WEB_DIST=/app/web \
     DATA_DIR=/data \
     PYTHONUNBUFFERED=1 \

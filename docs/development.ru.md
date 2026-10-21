@@ -26,9 +26,8 @@ python3.13 -m venv .venv
 Клиент на http://localhost:5190, `/api` и `/socket.io` уходят на сервер:
 
 ```bash
-cd web
-npm ci
-npm run dev
+npm ci              # из корня репозитория: web, mobile и packages/* — npm-воркспейсы
+npm run dev -w web
 ```
 
 На пустой базе откроется мастер первого запуска. Код по умолчанию — `friends`.
@@ -46,7 +45,7 @@ GOMEX_URL=http://localhost:5190 npx electron .
 Проверки перед коммитом:
 
 ```bash
-(cd web && npm run build)   # tsc и сборка
+npm run build -w web        # tsc и сборка
 (cd desktop && npm run check:i18n)   # в английском и русском одни и те же ключи
 deploy/release.sh lint      # bash -n и shellcheck на всех скриптах deploy/
 ```

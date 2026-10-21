@@ -1,0 +1,19 @@
+{
+  "name": "gomex",
+  "private": true,
+  "description": "Gomex clients and their shared packages (docs/adr/001-client-architecture.md). The server, deploy and the Electron shell are outside the workspaces.",
+  "packageManager": "npm@11.3.0",
+  "engines": {
+    "node": ">=24.3",
+    "npm": ">=11"
+  },
+  "workspaces": [
+    "packages/*",
+    "web",
+    "mobile"
+  ],
+  "scripts": {
+    "web": "npm run dev -w web",
+    "mobile": "npm run start -w mobile"
+  }
+}
