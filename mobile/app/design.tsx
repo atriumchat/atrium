@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { Drum, FlowPrimary, FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '@gomex/ui-native';
 
@@ -18,7 +18,7 @@ export default function Design() {
   const step = () => setDone((d) => (d + 1) % (TASKS.length + 1));
   return (
     <FlowShell fill={done / TASKS.length} label={`Gomex Flow (${done}/${TASKS.length})`}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <FlowStep
           title="Части"
           sub="Каждая в своих состояниях"
@@ -34,8 +34,10 @@ export default function Design() {
           <LineField label="С ошибкой" placeholder="you@gmail.com" suffix=".dedyn.io" error="Ошибка под полем" />
           <KeptRow label="podval.dedyn.io" go="Взять" onPress={step} />
           <FlowPrimary disabled>Недоступна</FlowPrimary>
-          <RadioRow title="Бесплатный" sub="имя.dedyn.io" on={way === 'free'} onPress={() => setWay('free')} />
-          <RadioRow title="Свой домен" sub="Показывает общую ошибку" on={way === 'own'} onPress={() => setWay('own')} last />
+          <View accessibilityRole="radiogroup">
+            <RadioRow title="Бесплатный" sub="имя.dedyn.io" on={way === 'free'} onPress={() => setWay('free')} />
+            <RadioRow title="Свой домен" sub="Показывает общую ошибку" on={way === 'own'} onPress={() => setWay('own')} last />
+          </View>
           <Drum items={TASKS.map((label, i) => ({ id: String(i), label, state: i < done ? 'done' : i === done ? 'run' : undefined }))} current={String(done)} />
         </FlowStep>
       </ScrollView>

@@ -17,9 +17,10 @@ export function Drum({ items, current, shown = 5 }: DrumProps) {
               key={item.id}
               className={item.state}
               aria-current={i === at ? 'step' : undefined}
-              style={{ opacity: interpolate(away, drum.away, drum.opacity), transform: `scale(${interpolate(away, drum.scaleAway, drum.scale)})` }}
+              style={{ opacity: interpolate(away, drum.away, drum.opacity) }}
             >
-              <span>{item.label}</span>
+              {/* Only the words shrink away from the middle: the marks keep one column. */}
+              <span style={{ transform: `scale(${interpolate(away, drum.scaleAway, drum.scale)})` }}>{item.label}</span>
               {item.state === 'run' ? <i className="spin" aria-hidden="true" /> : null}
               {item.state === 'done' ? <Check /> : null}
               {item.state === 'fail' ? <Cross /> : null}

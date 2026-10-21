@@ -404,8 +404,7 @@
   font-size: var(--gx-drum-size);
   font-weight: 500;
   letter-spacing: var(--gx-drum-tracking);
-  transform-origin: left center;
-  transition: opacity 520ms, transform 520ms;
+  transition: opacity 520ms;
 }
 .flow-drum li span {
   flex: 1;
@@ -413,6 +412,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transform-origin: left center;
+  transition: transform 520ms;
 }
 .flow-drum li.fail svg {
   color: var(--gx-danger);

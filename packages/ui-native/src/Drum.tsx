@@ -11,17 +11,14 @@ import { Text } from './Text';
  */
 
 function Row({ i, at, item }: { i: number; at: SharedValue<number>; item: DrumItem }) {
-  const style = useAnimatedStyle(() => {
-    const away = Math.abs(i - at.value);
-    return {
-      opacity: interpolate(away, [...drum.away], [...drum.opacity], Extrapolation.CLAMP),
-      transform: [{ scale: interpolate(away, [...drum.scaleAway], [...drum.scale], Extrapolation.CLAMP) }],
-    };
-  });
+  const fade = useAnimatedStyle(() => ({ opacity: interpolate(Math.abs(i - at.value), [...drum.away], [...drum.opacity], Extrapolation.CLAMP) }));
+  const shrink = useAnimatedStyle(() => ({ transform: [{ scale: interpolate(Math.abs(i - at.value), [...drum.scaleAway], [...drum.scale], Extrapolation.CLAMP) }] }));
   return (
-    // Shrinking from the left edge, the rows stay lined up under each other.
-    <Animated.View style={[{ height: drum.row, flexDirection: 'row', alignItems: 'center', gap: 12, transformOrigin: 'left center' }, style]}>
-      <Text numberOfLines={1} style={{ flex: 1, fontSize: type.drum.size, fontWeight: '500', letterSpacing: type.drum.tracking }}>{item.label}</Text>
+    <Animated.View style={[{ height: drum.row, flexDirection: 'row', alignItems: 'center', gap: 12 }, fade]}>
+      {/* Only the words shrink away from the middle, from their left edge: the rows stay lined up, the marks in one column. */}
+      <Animated.View style={[{ flex: 1, transformOrigin: 'left center' }, shrink]}>
+        <Text numberOfLines={1} style={{ fontSize: type.drum.size, fontWeight: '500', letterSpacing: type.drum.tracking }}>{item.label}</Text>
+      </Animated.View>
       {item.state === 'run' ? <ActivityIndicator color={color.text.phone} /> : null}
       {item.state === 'done' ? <Check /> : null}
       {item.state === 'fail' ? <Cross /> : null}
