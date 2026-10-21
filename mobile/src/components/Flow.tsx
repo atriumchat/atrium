@@ -7,7 +7,8 @@ import { Text } from '../text';
 import { color, colors, radius, space, type } from '../theme';
 import { haptic } from '../haptics';
 import { ChevronLeftIcon } from '../icons';
-import { cornerRadius, EdgeTicks } from './EdgeTicks';
+import { flowFrame } from '@gomex/ui-common';
+import { EdgeTicks } from './EdgeTicks';
 
 /**
  * The flow look (DESIGN.md): a screen at a time in type alone on OLED black, one scale of ticks along the screen's edge
@@ -28,9 +29,7 @@ export function useFlowFrame() {
   const real = useSafeAreaInsets();
   const insets = phone ? { top: 62, bottom: 34 } : real;
   const { width, height } = useWindowDimensions();
-  const corner = cornerRadius(width, height);
-  const edge = Math.max(space.edgeMin, corner - radius.button);
-  return { phone, insets, radius: corner, edge, top: Math.max(insets.top + 8, RING + 22), bottom: Math.max(edge, insets.bottom + 8) };
+  return { phone, insets, ...flowFrame(width, height, insets) };
 }
 
 /**
@@ -50,7 +49,7 @@ export function FlowShell({ fill, label, bottom, children }: { fill: number; lab
           </View>
         ) : null}
       </View>
-      <EdgeTicks fill={fill} island={frame.insets.top >= 59} />
+      <EdgeTicks fill={fill} island={frame.island} />
       {frame.phone ? <View style={{ position: 'absolute', top: 11, alignSelf: 'center', width: 126, height: 37, borderRadius: 19, backgroundColor: color.page.phone, zIndex: 10 }} /> : null}
     </KeyboardAvoidingView>
   );

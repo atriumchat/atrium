@@ -58,7 +58,7 @@
   /*
    * Bubble look: pure black under everything, one near-black card for the content and graphite for
    * anything you can press or type into. White is the accent; no blue anywhere. Colours that are design
-   * tokens (src/tokens.ts) come from their --gx- variables.
+   * tokens (@gomex/ui-common) come from their --gx- variables.
    */
   --accent: #ffffff;
   --accent-foreground: #000000;

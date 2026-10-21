@@ -1,7 +1,7 @@
 /**
  * Gomex's design tokens: the one place for colours, type, spacing and radii (DESIGN.md). The web turns them into CSS
- * variables at start-up (applyTokens, main.tsx) for its own styles and the HeroUI theme to read; the phone app imports
- * them as they are (mobile/src/theme.ts). Change a value here and both follow.
+ * variables (tokenCss, css.ts) for its own styles and the HeroUI theme to read; the phone app uses them as they are.
+ * Change a value here and every client follows.
  *
  * The page and its text differ by screen: an OLED phone shows true black (the pixels go dark, the screen melts into
  * its frame); a monitor's backlight shows #000 as a grey with glow at the corners, and white on it halates over a long
@@ -85,78 +85,3 @@ export const radius = {
 
 /** Wider than this is a wide window: near-black page, the ticks as a ruler. */
 export const wideFrom = 821;
-
-/**
- * The tokens as CSS: `--gx-…` variables on :root, the page and its text switching at `wideFrom`. Pure, so the web
- * (applyTokens) and the desktop app's pages (desktop/scripts/tokens.js writes desktop/tokens.css) make the same CSS.
- */
-export function tokenCss() {
-  const vars: Record<string, string | number> = {
-    'page-phone': color.page.phone,
-    'page-wide': color.page.wide,
-    'text-phone': color.text.phone,
-    'text-wide': color.text.wide,
-    muted: color.muted,
-    faint: color.faint,
-    danger: color.danger,
-    success: color.success,
-    warning: color.warning,
-    surface: color.surface,
-    overlay: color.overlay,
-    graphite: color.graphite,
-    hover: color.hover,
-    tertiary: color.tertiary,
-    separator: color.separator,
-    edge: color.edge,
-    border: color.border,
-    hairline: color.hairline,
-    'field-line': color.fieldLine,
-    placeholder: color.placeholder,
-    outline: color.outline,
-    control: color.control,
-    tick: color.tick,
-    'tick-on': color.tickOn,
-    button: color.button,
-    'button-hover': color.buttonHover,
-    'button-ink': color.buttonInk,
-    here: color.here,
-    'here-ink': color.hereInk,
-    others: color.others,
-    'others-ink': color.othersInk,
-    'title-size': `${type.title.size}px`,
-    'title-line': `${type.title.line}px`,
-    'title-tracking': `${type.title.tracking}px`,
-    'sub-size': `${type.sub.size}px`,
-    'sub-line': `${type.sub.line}px`,
-    'field-size': `${type.field.size}px`,
-    'choice-size': `${type.choice.size}px`,
-    'choice-line': `${type.choice.line}px`,
-    'label-size': `${type.label.size}px`,
-    'note-size': `${type.note.size}px`,
-    'stage-size': `${type.stage.size}px`,
-    'stage-line': `${type.stage.line}px`,
-    'key-size': `${type.key.size}px`,
-    'key-line': `${type.key.line}px`,
-    'button-size': `${type.button.size}px`,
-    'in-block': `${space.inBlock}px`,
-    between: `${space.between}px`,
-    column: `${space.column}px`,
-    'radius-button': `${radius.button}px`,
-    'radius-field': `${radius.field}px`,
-    'radius-popover': `${radius.popover}px`,
-  };
-  const lines = Object.entries(vars).map(([name, value]) => `  --gx-${name}: ${value};`);
-  return [
-    ':root {',
-    ...lines,
-    '  --gx-page: var(--gx-page-phone);',
-    '  --gx-text: var(--gx-text-phone);',
-    '}',
-    `@media (min-width: ${wideFrom}px) {`,
-    '  :root {',
-    '    --gx-page: var(--gx-page-wide);',
-    '    --gx-text: var(--gx-text-wide);',
-    '  }',
-    '}',
-  ].join('\n');
-}

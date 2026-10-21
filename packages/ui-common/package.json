@@ -1,0 +1,25 @@
+{
+  "name": "@gomex/ui-common",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gomex Flow, the part every platform shares: design tokens, the scale's geometry, the components' props.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "test": "node --import tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/react": "~19.3.0",
+    "tsx": "^4.20.6",
+    "typescript": "~6.0.3"
+  }
+}

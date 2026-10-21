@@ -1,7 +1,7 @@
-import { color, radius, space, type } from '../../web/src/tokens';
+import { color, radius, space, type } from '@gomex/ui-common';
 
 /**
- * The app's colours, from the design tokens shared with the web (web/src/tokens.ts, DESIGN.md). `window` is the
+ * The app's colours, from the design tokens shared with the web (@gomex/ui-common, DESIGN.md). `window` is the
  * near-black of the main screens, `page` the true black of the flows (sign-in, "Your own server") on an OLED screen.
  */
 export const colors = {

@@ -45,9 +45,10 @@ Content is always quieter than the title. Numbers are never put in fixed-width c
 
 ## Colour
 
-All values live in one file, `web/src/tokens.ts`: the web turns it into `--gx-` CSS variables at start-up
-(`applyTokens`, also read by the HeroUI theme), the phone app imports it (`mobile/src/theme.ts`). Never write a colour,
-size or radius by hand in a flow; add a token.
+All values live in one package, `@gomex/ui-common` (`packages/ui-common/src/tokens.ts`), with the scale's geometry
+next to them (`geometry.ts`): the web turns the tokens into `--gx-` CSS variables at start-up (`applyTokens`, also read
+by the HeroUI theme), the phone app imports them (`mobile/src/theme.ts`). Never write a colour, size or radius by hand
+in a flow; add a token.
 
 - Page true black on a phone (OLED: the pixels go dark), near-black `#0c0c0e` in a window wider than a phone (a
   monitor's backlight shows `#000` as glowing grey). Text white on a phone, `#ededef` on a monitor (white on black
