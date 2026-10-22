@@ -23,8 +23,7 @@ export type Setup = {
   savedAddress(): Promise<{ domain: string | null }>;
   useSaved(where: { ip: string }): Promise<{ ok: true; domain: string } | Failure>;
   checkDomain(input: { domain: string; turn: string; ip: string }): Promise<{ ok: true } | Failure>;
-  connectDrive(): Promise<{ email: string } | Failure>;
-  install(options: { domain: string; turn: string; drive?: unknown }, onEvent: (event: InstallEvent) => void): Promise<unknown>;
+  install(options: { domain: string; turn: string }, onEvent: (event: InstallEvent) => void): Promise<unknown>;
   openServer(url: string): void;
 };
 
@@ -59,10 +58,6 @@ const fake: Setup = {
   async checkDomain() {
     await wait(800);
     return { ok: true };
-  },
-  async connectDrive() {
-    await wait(1400);
-    return { email: 'admin@gmail.com' };
   },
   async install(_options, onEvent) {
     for (const step of TASKS) {

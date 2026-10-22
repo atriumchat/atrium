@@ -16,7 +16,6 @@ contextBridge.exposeInMainWorld('atriumSetup', {
   /** Points that saved address at the new server: { ok, domain } or { error }. */
   useSaved: (where) => call('use-saved', where),
   checkDomain: (domain) => call('check-domain', domain),
-  connectDrive: () => call('connect-drive'),
   /**
    * Runs the installer; `onEvent` gets each step as it goes ({ step, state: run|done|fail|sub }, { state: 'out', text }),
    * then { state: 'ready', url } and, once the address answers from this computer, { state: 'open' }, or a failure.

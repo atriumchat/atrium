@@ -207,11 +207,15 @@ body::before {
   }
 }
 
-/* In a window (not a phone) the step stands in the middle of it, the ruler, title and buttons as one block. */
+/*
+ * In a window (not a phone) the step stands in the middle of it, the ruler, title and buttons as one block. The
+ * margins are just the strip on top and a little air below, so the tallest step (backups, with an error under it)
+ * still fits main.js's window without a scroll.
+ */
 .flow .flow-col {
   justify-content: safe center;
-  padding-top: 56px;
-  padding-bottom: 56px;
+  padding-top: 44px;
+  padding-bottom: 32px;
 }
 .flow .flow-swap {
   flex: 0 0 auto;

@@ -46,7 +46,6 @@ export function Onboarding() {
   const [address, setAddress] = useState<string | null>(null);
 
   // 3. Backups.
-  const [drive, setDrive] = useState<string | null>(null);
 
   // 4. The install.
   const [rows, setRows] = useState<Record<string, RowState>>({});
@@ -101,7 +100,7 @@ export function Onboarding() {
       const answer = await setup.useSaved({ ip: facts?.ip ?? '' });
       if ('error' in answer) return setSavedError(answer.error);
       setAddress(answer.domain);
-      go('backup');
+      install(answer.domain);
     });
 
   // Whether the name is free is deSEC's answer to the sign-up itself; then the letter.
@@ -135,8 +134,9 @@ export function Onboarding() {
       }
       setMail('confirmed');
       setMailLate(false);
-      setAddress(`${freeName(name)}.dedyn.io`);
-      onward = window.setTimeout(() => go('backup'), 900);
+      const confirmed = `${freeName(name)}.dedyn.io`;
+      setAddress(confirmed);
+      onward = window.setTimeout(() => install(confirmed), 900);
     });
     return () => {
       gone = true;
@@ -159,19 +159,10 @@ export function Onboarding() {
       const answer = await setup.checkDomain({ domain: domainName, turn, ip: facts?.ip ?? '' });
       if ('error' in answer) return setError(answer.error);
       setAddress(domainName);
-      go('backup');
+      install(domainName);
     });
 
-  /* ---------- 3. backups ---------- */
-
-  const connectDrive = () =>
-    void run(async () => {
-      const answer = await setup.connectDrive();
-      if ('error' in answer) return setError(answer.error);
-      setDrive(answer.email);
-    });
-
-  /* ---------- 4. the install ---------- */
+  /* ---------- 3. the install ---------- */
 
   function install(domain = address ?? '') {
     setRows({});
@@ -212,7 +203,7 @@ export function Onboarding() {
     setup.install({ domain, turn }, onEvent).catch(() => setFailed(t('ob.install.failed')));
   }
 
-  /* ---------- design work in a browser: #step=address (or free-name, free-mail, own, backup, install) ---------- */
+  /* ---------- design work in a browser: #step=address (or free-name, free-mail, own, install) ---------- */
 
   useEffect(() => {
     const jump = standIn && (location.hash.match(/step=([\w-]+)/)?.[1] as Step | 'done' | undefined);
@@ -358,35 +349,6 @@ export function Onboarding() {
           >
             <LineField label={t('ob.domain')} value={domain} onChange={(e) => (setDomain(e.target.value), setError(''))} placeholder="chat.example.com" />
             {domainOk(domainName) ? <Records names={[domainName, `app.${domainName}`, `${turn}.${domainName}`]} ip={facts?.ip ?? ''} /> : null}
-          </FlowStep>
-        );
-
-      case 'backup':
-        return (
-          <FlowStep
-            title={t('ob.backup.h')}
-            sub={t('ob.backup.sub')}
-            error={error}
-            onBack={back}
-            actions={<FlowPrimary disabled={!drive} onPress={() => install()}>{t('ob.next')}</FlowPrimary>}
-            aside={<FlowSecondary onPress={() => (setDrive(null), install())}>{t('ob.backup.skip')}</FlowSecondary>}
-          >
-            <div className="drive">
-              <span className="grow">
-                <b>{t('ob.drive')}</b>
-                <small>{drive ?? t('ob.driveSub')}</small>
-              </span>
-              {drive ? <span className="on">{t('ob.driveOn')}</span> : <TextAction onPress={connectDrive}>{t('ob.connect')}</TextAction>}
-            </div>
-            {/* What a copy saves you from, not what it is. */}
-            <ul className="points">
-              {(['b1', 'b2', 'b3'] as const).map((b) => (
-                <li key={b}>
-                  <b>{t(`ob.backup.${b}`)}</b>
-                  <small>{t(`ob.backup.${b}sub`)}</small>
-                </li>
-              ))}
-            </ul>
           </FlowStep>
         );
 

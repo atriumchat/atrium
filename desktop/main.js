@@ -88,7 +88,7 @@ function frameless(background) {
     : { titleBarStyle: 'hidden', titleBarOverlay: { color: background, symbolColor: '#ededef', height: 36 } };
 }
 /** The first window and "Your own server" are one size, so going from one to the other doesn't jump. */
-const FLOW_WINDOW = { width: 1040, height: 680, minWidth: 420, minHeight: 600 };
+const FLOW_WINDOW = { width: 1040, height: 720, minWidth: 420, minHeight: 600 };
 /**
  * Where a new window of this size stands dead in the middle of the screen the pointer is on. Left to itself macOS puts
  * a new window a little above the middle.
@@ -617,7 +617,6 @@ setupCall('use-saved', async ({ ip }) => {
   return answer.ok ? { ok: true, domain: answer.domain } : answer;
 });
 setupCall('check-domain', (domain) => serverSetup.checkDomain(domain));
-setupCall('connect-drive', () => ({ error: t('setup.driveSoon') }));
 
 /**
  * After the install: tells the setup window when the new address answers from this computer. A name made minutes ago

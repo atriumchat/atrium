@@ -118,49 +118,15 @@ body::before {
   height: 16px;
 }
 
-/* The Drive: its name and account, connect underlined; then what a copy saves you from, in type. */
-.drive {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 0;
-  border-top: 1px solid var(--gx-hairline);
-  border-bottom: 1px solid var(--gx-hairline);
-}
-.drive .grow {
-  flex: 1;
-}
-.drive b,
-.points b {
-  display: block;
-  font-size: var(--gx-choice-size);
-  line-height: var(--gx-choice-line);
-  font-weight: 400;
-}
-.drive small,
-.points small {
-  display: block;
-  margin-top: 2px;
-  font-size: var(--gx-note-size);
-  color: var(--gx-muted);
-}
-.drive .on {
-  color: var(--gx-muted);
-}
-.points {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* In a window (not a phone) the step stands in the middle of it, the ruler, title and buttons as one block. */
+/*
+ * In a window (not a phone) the step stands in the middle of it, the ruler, title and buttons as one block. The
+ * margins are just the strip on top and a little air below, so the tallest step (with an error under it) still
+ * fits main.js's window without a scroll.
+ */
 .flow .flow-col {
   justify-content: safe center;
-  padding-top: 56px;
-  padding-bottom: 56px;
+  padding-top: 44px;
+  padding-bottom: 32px;
 }
 .flow .flow-swap {
   flex: 0 0 auto;
