@@ -106,8 +106,12 @@ http://app.{$DOMAIN} {
 (app) {
 	@livekit path /rtc /rtc/*
 	route @livekit {
+		# The check is a plain GET: the WebSocket's Upgrade headers stay off it, or the Python server takes it for a
+		# WebSocket to a route that has none and refuses every call with 403, whatever the token.
 		forward_auth 127.0.0.1:8000 {
 			uri /api/rtc/authorize
+			header_up -Connection
+			header_up -Upgrade
 		}
 		reverse_proxy 127.0.0.1:7880
 	}
