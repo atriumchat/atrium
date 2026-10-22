@@ -9,6 +9,10 @@
 export const RENT = {
   host: 'HostVDS',
   url: 'https://hostvds.com',
+  /** Straight to the pages of their panel a person needs: signing up, paying in, the API's login and password. */
+  signUp: 'https://hostvds.com/sign-up',
+  pay: 'https://hostvds.com/control/billing/make-payment',
+  key: 'https://hostvds.com/control/account/api',
   api: 'https://os-api.hostvds.com',
   /** Helsinki: the closest to Russia of their places. */
   region: 'eu-north3',

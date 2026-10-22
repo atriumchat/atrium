@@ -49,6 +49,8 @@ export default function OwnServer() {
   const [apiLogin, setApiLogin] = useState('');
   const [apiPassword, setApiPassword] = useState('');
   const [renting, setRenting] = useState<RentStage | 'connect' | null>(null);
+  // Which of the host's pages has been opened: its step's button turns from "Open …" into "Next".
+  const [opened, setOpened] = useState<Partial<Record<'rent' | 'rent-pay', boolean>>>({});
   const [facts, setFacts] = useState<Facts | null>(null);
   const [saved, setSaved] = useState<Saved | null>(null);
   const [earlier, setEarlier] = useState<Saved | null>(null);
@@ -428,33 +430,36 @@ export default function OwnServer() {
           </FlowStep>
         );
       case 'rent':
+      case 'rent-pay': {
+        // One thing to do at the host per step: its page opens from the button, which then goes on.
+        const pay = step === 'rent-pay';
+        const page = pay ? RENT.pay : RENT.signUp;
+        const wasOpened = !!opened[step];
         return (
           <FlowStep
             onBack={back}
-            title={t('own.rent.h')}
-            sub={t('own.rent.sub', { host: RENT.host })}
+            title={t(pay ? 'own.rent.pay.h' : 'own.rent.signUp.h')}
+            sub={t(pay ? 'own.rent.pay.sub' : 'own.rent.signUp.sub', { host: RENT.host })}
+            actions={
+              <FlowPrimary onPress={() => (wasOpened ? go(pay ? 'rent-key' : 'rent-pay') : (void Linking.openURL(page), setOpened((o) => ({ ...o, [step]: true }))))}>
+                {wasOpened ? t('own.next') : t(pay ? 'own.rent.pay.go' : 'own.rent.signUp.go', { host: RENT.host })}
+              </FlowPrimary>
+            }
+            below={<TextAction onPress={() => go(pay ? 'rent-key' : 'rent-pay')}>{t(pay ? 'own.rent.pay.done' : 'own.rent.signUp.done')}</TextAction>}
+          />
+        );
+      }
+      case 'rent-key':
+        return (
+          <FlowStep
+            onBack={back}
+            title={t('own.rent.key.h')}
+            sub={t('own.rent.key.sub', { host: RENT.host })}
             error={error}
             note={renting ? t(`own.rent.stage.${renting}` as Key) : undefined}
             actions={<FlowPrimary busy={busy} disabled={!apiLogin.trim() || !apiPassword} onPress={rentServer}>{t('own.rent.create')}</FlowPrimary>}
-            below={<TextAction onPress={() => go('server', true)}>{t('own.rent.manual')}</TextAction>}
+            below={<TextAction onPress={() => void Linking.openURL(RENT.key)}>{t('own.rent.key.go')}</TextAction>}
           >
-            <View style={{ gap: 16 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 17 }}>{t('own.rent.signUp')}</Text>
-                  <Text style={{ fontSize: 14, color: colors.muted }}>{t('own.rent.signUpSub', { host: RENT.host })}</Text>
-                </View>
-                <TextAction onPress={() => void Linking.openURL(RENT.url)}>{t('own.rent.open')}</TextAction>
-              </View>
-              <View>
-                <Text style={{ fontSize: 17 }}>{t('own.rent.topUp')}</Text>
-                <Text style={{ fontSize: 14, color: colors.muted }}>{t('own.rent.topUpSub')}</Text>
-              </View>
-              <View>
-                <Text style={{ fontSize: 17 }}>{t('own.rent.api')}</Text>
-                <Text style={{ fontSize: 14, color: colors.muted }}>{t('own.rent.apiSub')}</Text>
-              </View>
-            </View>
             <LineField label={t('own.rent.login')} value={apiLogin} onChangeText={(v) => (setApiLogin(v), setError(''))} placeholder="hostvds-…" autoCapitalize="none" autoCorrect={false} />
             <LineField label={t('own.rent.password')} value={apiPassword} onChangeText={(v) => (setApiPassword(v), setError(''))} secureTextEntry autoCapitalize="none" autoCorrect={false} returnKeyType="go" onSubmitEditing={() => apiLogin.trim() && apiPassword && rentServer()} />
           </FlowStep>

@@ -37,6 +37,8 @@ export function Onboarding() {
   const [apiLogin, setApiLogin] = useState('');
   const [apiPassword, setApiPassword] = useState('');
   const [renting, setRenting] = useState<RentStage | 'connect' | null>(null);
+  // Which of the host's pages has been opened: its step's button turns from "Open …" into "Next".
+  const [opened, setOpened] = useState<Partial<Record<'rent' | 'rent-pay', boolean>>>({});
 
   // 2. The address.
   const [way, setWay] = useState<'free' | 'own'>('free');
@@ -307,33 +309,34 @@ export function Onboarding() {
         );
 
       case 'rent':
+      case 'rent-pay': {
+        // One thing to do at the host per step: its page opens from the button, which then goes on.
+        const pay = step.id === 'rent-pay';
+        const page = pay ? RENT.pay : RENT.signUp;
         return (
           <FlowStep
-            title={t('ob.rent.h')}
-            sub={t('ob.rent.sub', { host: RENT.host })}
+            title={t(pay ? 'ob.rent.pay.h' : 'ob.rent.signUp.h')}
+            sub={t(pay ? 'ob.rent.pay.sub' : 'ob.rent.signUp.sub', { host: RENT.host })}
+            onBack={back}
+            onSubmit={() => (opened[step.id as 'rent' | 'rent-pay'] ? go(pay ? 'rent-key' : 'rent-pay') : (setup.openExternal(page), setOpened((o) => ({ ...o, [step.id]: true }))))}
+            actions={<FlowPrimary type="submit">{opened[step.id as 'rent' | 'rent-pay'] ? t('ob.next') : t(pay ? 'ob.rent.pay.go' : 'ob.rent.signUp.go', { host: RENT.host })}</FlowPrimary>}
+            below={<TextAction onPress={() => go(pay ? 'rent-key' : 'rent-pay')}>{t(pay ? 'ob.rent.pay.done' : 'ob.rent.signUp.done')}</TextAction>}
+          />
+        );
+      }
+
+      case 'rent-key':
+        return (
+          <FlowStep
+            title={t('ob.rent.key.h')}
+            sub={t('ob.rent.key.sub', { host: RENT.host })}
             error={error}
             note={renting ? t(`ob.rent.stage.${renting}`) : undefined}
             onBack={back}
             onSubmit={rent}
             actions={<FlowPrimary type="submit" busy={busy} disabled={!rentReady}>{t('ob.rent.create')}</FlowPrimary>}
-            below={<TextAction onPress={() => go('server', true)}>{t('ob.rent.manual')}</TextAction>}
+            below={<TextAction onPress={() => setup.openExternal(RENT.key)}>{t('ob.rent.key.go')}</TextAction>}
           >
-            {/* One line each: what to do at the host, the first with its link; then the API's login and password side by side. */}
-            <ol className="rent">
-              <li>
-                <b>{t('ob.rent.signUp')}</b>
-                <small>{t('ob.rent.signUpSub', { host: RENT.host })}</small>
-                <TextAction onPress={() => setup.openExternal(RENT.url)}>{t('ob.rent.open')}</TextAction>
-              </li>
-              <li>
-                <b>{t('ob.rent.topUp')}</b>
-                <small>{t('ob.rent.topUpSub')}</small>
-              </li>
-              <li>
-                <b>{t('ob.rent.api')}</b>
-                <small>{t('ob.rent.apiSub')}</small>
-              </li>
-            </ol>
             <div className="flow-pair">
               <LineField label={t('ob.rent.login')} value={apiLogin} onChange={(e) => (setApiLogin(e.target.value), setError(''))} placeholder="hostvds-…" autoCapitalize="off" spellCheck={false} />
               <LineField label={t('ob.rent.password')} type="password" value={apiPassword} onChange={(e) => (setApiPassword(e.target.value), setError(''))} />
