@@ -52,13 +52,13 @@ shopt -u patsub_replacement 2>/dev/null || true
 umask 022
 
 # == The release this installer puts on the server. deploy/release.sh rewrites these lines.
-RELEASE_VERSION=0.7.1
-RELEASE_SHA256=a731cb23ffd5a273796c3ffffde28ea9da6b62a5abeb80e3ca9b571fbc16b90b
+RELEASE_VERSION=0.7.2
+RELEASE_SHA256=36f0ee977dc5bc784b541d270830179e924eefe691a5164463a302f896d04907
 RELEASE_REPO=atriumchat/atrium
 # The npm package that mirrors each release's install.sh and tarball (deploy/release.sh publishes it).
 RELEASE_NPM=@atriumchat/install
 RELEASE_REGISTRY=ghcr.io/atriumchat
-RELEASE_APP_DIGEST=sha256:d4f63d2b370a9fe686e2f01c92092fa7730b2baef045c42b1f3d4cbce0463f24
+RELEASE_APP_DIGEST=sha256:7e0aa37b22725f7cd1ce91b882a0c0611fdc214cb2c2b1937363ea398c9b15e1
 RELEASE_CADDY_DIGEST=sha256:cd2cf5a7985bb21afa94786e9779dcf972b89e7e281a0a9b616acc659ce30bbf
 
 # == gum, for this run only.
