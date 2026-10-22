@@ -4,17 +4,17 @@ import { api } from '../api';
 import { showError, useStore } from '../store';
 import { useVoice } from '../voice';
 import { useT } from '../i18n';
-import { Text, TextInput } from '../text';
+import { Text } from '../text';
 import { colors } from '../theme';
 import { Avatar } from '../components/Avatar';
 import { RoundButton } from '../components/ui';
 import { EmptyState } from '../components/LineArt';
-import { BellSlashIcon, HashIcon, UserPlusIcon, HeadphonesSlashIcon, MicSlashIcon, PlusIcon, SearchIcon, SpeakerIcon, VideoIcon } from '../icons';
+import { BellSlashIcon, HashIcon, UserPlusIcon, HeadphonesSlashIcon, MicSlashIcon, PlusIcon, SpeakerIcon, VideoIcon } from '../icons';
 import { voiceMembers } from '../format';
 import { openChat, openRoom } from '../nav';
 import { shareInvite } from '../invite';
 import { CallDuration } from './CallPill';
-import { TabHeader } from './TabHeader';
+import { SearchRow, TabHeader } from './TabHeader';
 import type { Channel, VoiceEntry } from '../protocol';
 
 /** The server's channels: a search field, then text channels and voice rooms in two sections. */
@@ -27,16 +27,17 @@ export function ServerTab() {
   return (
     <View style={{ flex: 1 }}>
       <TabHeader />
-      <View style={{ height: 72, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12 }}>
-        <View style={{ flex: 1, height: 48, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 24, paddingHorizontal: 16, backgroundColor: colors.graphite }}>
-          <SearchIcon size={16} color={colors.faint} />
-          <TextInput value={filter} onChangeText={setFilter} placeholder={t('shell.sidebar.search')} accessibilityLabel={t('shell.sidebar.search')} returnKeyType="search" clearButtonMode="while-editing" autoCorrect={false} autoCapitalize="none" style={{ flex: 1, fontSize: 17, color: '#fff', height: 48 }} />
-        </View>
-        {/* An invite is to this server: it sits by the server's channels. */}
-        <Pressable accessibilityRole="button" accessibilityLabel={t('m.invite')} onPress={() => void shareInvite()} style={({ pressed }) => ({ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? colors.hover : colors.graphite })}>
-          <UserPlusIcon size={21} />
-        </Pressable>
-      </View>
+      <SearchRow
+        value={filter}
+        onChange={setFilter}
+        placeholder={t('shell.sidebar.search')}
+        aside={
+          // An invite is to this server: it sits by the server's channels.
+          <Pressable accessibilityRole="button" accessibilityLabel={t('m.invite')} onPress={() => void shareInvite()} style={({ pressed }) => ({ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? colors.hover : colors.graphite })}>
+            <UserPlusIcon size={21} />
+          </Pressable>
+        }
+      />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 12, flexGrow: 1 }} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
         {query && visible.length === 0 ? (
           <EmptyState compact art="search" title={t('shell.sidebar.noResults.title')} text={t('shell.sidebar.noResults.text')} />

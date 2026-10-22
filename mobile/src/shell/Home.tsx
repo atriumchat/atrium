@@ -5,17 +5,17 @@ import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useStore, dmTitle, getSocket, refresh, showError } from '../store';
 import { joinVoice, useVoice } from '../voice';
 import { useT, type TFn } from '../i18n';
-import { Text, TextInput } from '../text';
+import { Text } from '../text';
 import { colors } from '../theme';
 import { DmAvatar } from '../components/Avatar';
 import { PhoneDownIcon, PhoneIcon as PhoneGlyph } from '../icons';
 import { Badge, Press, RoundButton } from '../components/ui';
 import { EmptyState } from '../components/LineArt';
-import { PhoneIcon, PlusIcon, SearchIcon } from '../icons';
+import { PhoneIcon, PlusIcon } from '../icons';
 import { shortStamp, plainText } from '../format';
 import { openChat, openGroupPicker, openRoom } from '../nav';
 import { haptic } from '../haptics';
-import { TabHeader } from './TabHeader';
+import { SearchRow, TabHeader } from './TabHeader';
 import { RoomCards } from './WhoWhere';
 import type { Dm } from '../protocol';
 
@@ -34,7 +34,8 @@ export function HomeTab() {
   const dms = query ? all.filter((dm) => dmTitle(dm, users, meId).toLowerCase().includes(query)) : all;
   return (
     <View style={{ flex: 1 }}>
-      <TabHeader friends />
+      <TabHeader title={t('shell.tab.home')} friends />
+      <SearchRow value={filter} onChange={setFilter} placeholder={t('m.searchDms')} />
       <IncomingCalls />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
@@ -43,12 +44,6 @@ export function HomeTab() {
         contentContainerStyle={{ paddingTop: 4, paddingBottom: 16, gap: 16, flexGrow: 1 }}
         refreshControl={<RefreshControl tintColor="#fff" refreshing={refreshing} onRefresh={() => { haptic.firm(); setRefreshing(true); void refresh().catch(showError).finally(() => setRefreshing(false)); }} />}
       >
-        <View style={{ paddingHorizontal: 12 }}>
-          <View style={{ height: 44, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 22, paddingHorizontal: 16, backgroundColor: colors.graphite }}>
-            <SearchIcon size={17} color={colors.faint} />
-            <TextInput value={filter} onChangeText={setFilter} placeholder={t('m.searchDms')} accessibilityLabel={t('m.searchDms')} returnKeyType="search" clearButtonMode="while-editing" autoCorrect={false} autoCapitalize="none" style={{ flex: 1, fontSize: 17, color: '#fff', height: 44 }} />
-          </View>
-        </View>
         {query ? null : <Animated.View entering={appear} layout={move}><RoomCards /></Animated.View>}
         <View style={{ paddingHorizontal: 12, flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 4, paddingLeft: 12 }}>
