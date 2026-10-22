@@ -1,5 +1,5 @@
 /**
- * Gomex's design tokens: the one place for colours, type, spacing and radii (DESIGN.md). The web turns them into CSS
+ * Atrium's design tokens: the one place for colours, type, spacing and radii (DESIGN.md). The web turns them into CSS
  * variables (tokenCss, css.ts) for its own styles and the HeroUI theme to read; the phone app uses them as they are.
  * Change a value here and every client follows.
  *

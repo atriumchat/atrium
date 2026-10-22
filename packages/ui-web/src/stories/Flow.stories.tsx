@@ -64,7 +64,7 @@ export const Install: StoryObj<{ done: number }> = {
   argTypes: { done: { control: { type: 'range', min: 0, max: TASKS.length } } },
   render: ({ done }) => (
     <FlowShell fill={0.5 + (0.3 * done) / TASKS.length} label="Установка (3/5)">
-      <FlowStep title="Ставим Gomex" sub="Пара минут" actions={<FlowPrimary busy>Открыть</FlowPrimary>}>
+      <FlowStep title="Ставим Atrium" sub="Пара минут" actions={<FlowPrimary busy>Открыть</FlowPrimary>}>
         <Drum
           items={TASKS.map((label, i) => ({ id: String(i), label, state: i < done ? 'done' : i === done ? 'run' : undefined }))}
           current={String(done)}

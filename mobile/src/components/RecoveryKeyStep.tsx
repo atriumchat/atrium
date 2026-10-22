@@ -16,7 +16,7 @@ export function RecoveryKeyStep({ value, nick, place, onNext, busy = false }: { 
   const { t } = useT();
   const [kept, setKept] = useState<'copied' | 'saved' | null>(null);
   async function save() {
-    const result = await Share.share({ message: [`Gomex · ${place}`, t('setup.key.fileNick', { nick }), t('setup.key.fileKey', { key: value })].join('\n') });
+    const result = await Share.share({ message: [`Atrium · ${place}`, t('setup.key.fileNick', { nick }), t('setup.key.fileKey', { key: value })].join('\n') });
     if (result.action === Share.sharedAction) setKept('saved');
   }
   return (

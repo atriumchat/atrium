@@ -4,7 +4,7 @@ import { Redirect } from 'expo-router';
 import { Drum, FlowPrimary, FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '@gomex/ui-native';
 
 /**
- * Gomex Flow's native parts on one screen, every state a tap away (the web's are in Storybook, @gomex/ui-web).
+ * Atrium Flow's native parts on one screen, every state a tap away (the web's are in Storybook, @gomex/ui-web).
  * Development builds only: /design.
  */
 
@@ -17,7 +17,7 @@ export default function Design() {
   if (!__DEV__) return <Redirect href="/" />;
   const step = () => setDone((d) => (d + 1) % (TASKS.length + 1));
   return (
-    <FlowShell fill={done / TASKS.length} label={`Gomex Flow (${done}/${TASKS.length})`}>
+    <FlowShell fill={done / TASKS.length} label={`Atrium Flow (${done}/${TASKS.length})`}>
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <FlowStep
           title="Части"

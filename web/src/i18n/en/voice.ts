@@ -32,7 +32,7 @@ export const voice = {
   'voice.call.joinShort': 'Join',
   'voice.call.incoming': 'Incoming call',
   'voice.call.incomingDots': 'Incoming call…',
-  'voice.call.pageTitle': 'Incoming call · Gomex',
+  'voice.call.pageTitle': 'Incoming call · Atrium',
   'voice.call.someone': 'Someone',
   'voice.call.groupCalling': '{name} is calling the group',
   'voice.audio.enable': 'Enable audio',

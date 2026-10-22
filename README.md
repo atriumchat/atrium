@@ -1,4 +1,4 @@
-<h1 align="center">Gomex</h1>
+<h1 align="center">Atrium</h1>
 
 <p align="center"><b>Private chat and calls for friends, on your own server.</b><br>Voice rooms, screen share, push-to-talk. One cheap VPS, one command, about 120 MB of memory.</p>
 
@@ -8,7 +8,7 @@
 
 <p align="center"><img src="docs/screenshots/en/voice-room.png" alt="A voice room with four people" width="900"></p>
 
-Gomex is a closed Discord for a small group: text and voice channels, DMs and group chats, video, screen share,
+Atrium is a closed Discord for a small group: text and voice channels, DMs and group chats, video, screen share,
 files, reactions, mentions. One server, one group, invite-only sign-up. Calls hold up on difficult networks: when a
 direct connection fails, LiveKit falls back to TURN on port 443 (TLS over TCP, or UDP). The whole stack takes about
 120 MB of memory: one Python app with SQLite, LiveKit and Caddy. The interface is in English and Russian.
@@ -119,7 +119,7 @@ Report vulnerabilities to the maintainer privately, not in public discussions.
 - [Installation](docs/install.md): from the app or by command, update, restore, remove, installer options.
 - [Operation](docs/operations.md): first run and invites, settings, ports, maintenance and backups.
 - [Development](docs/development.md): local setup, checks, releases.
-- [Client architecture](docs/adr/001-client-architecture.md) and [design](DESIGN.md): the packages, Gomex Flow, why so.
+- [Client architecture](docs/adr/001-client-architecture.md) and [design](DESIGN.md): the packages, Atrium Flow, why so.
 
 ## Maintenance
 
@@ -141,6 +141,6 @@ House rules:
 
 ## License
 
-[GNU AGPL-3.0](LICENSE), this version only (`AGPL-3.0-only`). Gomex can be installed, changed and distributed, for
-money too. If a modified Gomex is available to people over a network, its source must be opened to them on the same
+[GNU AGPL-3.0](LICENSE), this version only (`AGPL-3.0-only`). Atrium can be installed, changed and distributed, for
+money too. If a modified Atrium is available to people over a network, its source must be opened to them on the same
 terms.

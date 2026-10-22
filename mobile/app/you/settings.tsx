@@ -4,7 +4,7 @@ import { getCredentials } from '../../src/api';
 import { endSession, showError, useStore } from '../../src/store';
 import { setLanguage, useLanguage, useT, type Lang } from '../../src/i18n';
 import { colors } from '../../src/theme';
-import { GomexMark } from '../../src/components/Logo';
+import { AtriumMark } from '../../src/components/Logo';
 import { Row, RowIcon, RowValue, Rows } from '../../src/components/Settings';
 import { GlobeIcon, LogoutIcon, UserPlusIcon } from '../../src/icons';
 import { shareInvite } from '../../src/invite';
@@ -31,7 +31,7 @@ export default function Settings() {
           <RowValue>{langLabel}</RowValue>
         </Row>
         <Row icon={<RowIcon><UserPlusIcon size={20} /></RowIcon>} title={t('people.invite.title')} onPress={() => void shareInvite()} last={!isAdmin} />
-        {isAdmin ? <Row icon={<RowIcon><GomexMark size={18} /></RowIcon>} title={t('shell.you.server')} value={getCredentials()?.server.replace(/^https?:\/\//, '')} last /> : null}
+        {isAdmin ? <Row icon={<RowIcon><AtriumMark size={18} /></RowIcon>} title={t('shell.you.server')} value={getCredentials()?.server.replace(/^https?:\/\//, '')} last /> : null}
       </Rows>
       <Rows>
         <Row

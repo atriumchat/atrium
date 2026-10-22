@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import { sketch, type Drawing, type Point, type Sketch } from './iso';
 
 /*
- * Gomex's illustrations, in the landing's technique (gomex-site, the `step-art` drawings): white isometric line
+ * Atrium's illustrations, in the landing's technique (gomex-site, the `step-art` drawings): white isometric line
  * drawings, a 0.9 line in the current colour, every face filled with the surface it sits on so it hides what is
  * behind it, secondary lines faint, dashes for whatever moves. The geometry is computed (iso.ts), not drawn by
  * hand. Each empty place in the app has its own object.

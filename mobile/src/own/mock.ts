@@ -83,7 +83,7 @@ export const mock: Backend = {
   },
   // The address spreads for a few seconds after the install.
   reachable: async () => !!readyAt && Date.now() - readyAt > 5000,
-  setupStatus: async () => ({ needed: true, serverName: 'Gomex' }),
+  setupStatus: async () => ({ needed: true, serverName: 'Atrium' }),
   setup: async (_server, _code, _serverName, nick) => {
     await wait(1100);
     return { token: 'mock', user: { id: 'mock', name: nick, color: color.here } } as unknown as Session;

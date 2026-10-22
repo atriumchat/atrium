@@ -1,4 +1,4 @@
-// Gomex desktop: the web app of a Gomex server in its own window, plus what a browser tab can't do —
+// Atrium desktop: the web app of an Atrium server in its own window, plus what a browser tab can't do —
 // stay alive in the menu bar / tray so calls always ring, bring itself up on a call, keep mic and
 // camera permission, badge the icon and show system notifications.
 const {
@@ -25,6 +25,16 @@ const devEnv = (name) => (app.isPackaged ? undefined : process.env[name]);
 
 // A separate settings folder, to run a second copy next to the installed one.
 if (devEnv('GOMEX_USER_DATA')) app.setPath('userData', devEnv('GOMEX_USER_DATA'));
+// Atrium used to be called Gomex. An install from then keeps that name inside: the settings folder and the keychain
+// key that seals the saved servers' SSH keys both come from the app's name, and a new name would lose them.
+const legacyData = path.join(app.getPath('appData'), 'Gomex');
+if (!devEnv('GOMEX_USER_DATA') && fs.existsSync(legacyData)) {
+  app.setName('Gomex');
+  app.setPath('userData', legacyData);
+}
+// Servers released before the rename know the desktop app by "Gomex/<version>" in its user agent (deploy/Caddyfile,
+// `(desktop)`) and give it the app at the root address instead of the cover page; keep saying so to them.
+app.userAgentFallback = app.userAgentFallback.replace(/\bAtrium\//, 'Gomex/');
 const updater = require('./updater');
 const ptt = require('./ptt');
 const serverSetup = require('./server-setup');
@@ -33,7 +43,7 @@ const reachable = require('./reachable');
 const i18n = require('./i18n');
 const { t } = i18n;
 
-// The server address can be changed from the tray ("Server address…") if Gomex ever has to move to a
+// The server address can be changed from the tray ("Server address…") if Atrium ever has to move to a
 // new domain — no reinstall. Stored in the app's settings folder.
 const CONFIG_FILE = path.join(app.getPath('userData'), 'config.json');
 function readConfig() {
@@ -91,7 +101,7 @@ let tray = null;
 let callNotification = null;
 let quitting = false;
 
-const fromGomex = (url) => {
+const fromAtrium = (url) => {
   if (!ORIGIN) return false;
   try {
     return new URL(url).origin === ORIGIN;
@@ -113,7 +123,7 @@ function createWindow() {
     height: 820,
     minWidth: 380,
     minHeight: 560,
-    title: 'Gomex',
+    title: 'Atrium',
     backgroundColor: '#0b0b0d',
     show: false,
     autoHideMenuBar: true,
@@ -136,7 +146,7 @@ function createWindow() {
   setupLinkStart(win);
   win.once('ready-to-show', () => win?.show());
 
-  // Closing the window only hides it: Gomex keeps running in the menu bar / tray so calls still come in.
+  // Closing the window only hides it: Atrium keeps running in the menu bar / tray so calls still come in.
   win.on('close', (event) => {
     if (quitting) return;
     event.preventDefault();
@@ -177,16 +187,16 @@ function showTextMenu(params) {
   if (items.length > 0) Menu.buildFromTemplate(items).popup();
 }
 
-// Every window — the main one, a Gomex pop-up (e.g. a chat image) and pop-ups of pop-ups — stays on Gomex:
+// Every window — the main one, an Atrium pop-up (e.g. a chat image) and pop-ups of pop-ups — stays on Atrium:
 // other links open in the normal browser, never inside the app.
 function guardNavigation(contents) {
   contents.setWindowOpenHandler(({ url }) => {
-    if (fromGomex(url)) return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, backgroundColor: '#000000' } };
+    if (fromAtrium(url)) return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, backgroundColor: '#000000' } };
     if (url.startsWith('https://') || url.startsWith('http://')) shell.openExternal(url);
     return { action: 'deny' };
   });
   contents.on('will-navigate', (event, url) => {
-    if (fromGomex(url)) return;
+    if (fromAtrium(url)) return;
     event.preventDefault();
     if (url.startsWith('https://') || url.startsWith('http://')) shell.openExternal(url);
   });
@@ -194,24 +204,24 @@ function guardNavigation(contents) {
 app.on('web-contents-created', (_event, contents) => guardNavigation(contents));
 
 function setUpPermissions() {
-  // Mic, camera, screen share and notifications are granted to Gomex itself, once and for good —
+  // Mic, camera, screen share and notifications are granted to Atrium itself, once and for good —
   // no browser prompt on every call. Every other site and every other permission is refused.
   const allowed = new Set(['media', 'display-capture', 'notifications', 'fullscreen', 'clipboard-sanitized-write']);
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback, details) => {
-    callback(allowed.has(permission) && fromGomex(details.requestingUrl));
+    callback(allowed.has(permission) && fromAtrium(details.requestingUrl));
   });
   // Electron passes the origin here with a trailing slash ("https://chat.example.com/"), so compare parsed origins.
   session.defaultSession.setPermissionCheckHandler((_wc, permission, requestingOrigin) => {
-    return allowed.has(permission) && fromGomex(requestingOrigin);
+    return allowed.has(permission) && fromAtrium(requestingOrigin);
   });
 
-  // Screen sharing: the system picker where the OS has one (macOS); everywhere else Gomex's own (screen-picker.js),
-  // with the computer's sound as a switch on Windows. Only Gomex itself may ask. GOMEX_PICKER=1 (development)
-  // turns the system picker off to try Gomex's on a Mac.
+  // Screen sharing: the system picker where the OS has one (macOS); everywhere else Atrium's own (screen-picker.js),
+  // with the computer's sound as a switch on Windows. Only Atrium itself may ask. GOMEX_PICKER=1 (development)
+  // turns the system picker off to try Atrium's on a Mac.
   const ownPickerForced = Boolean(devEnv('GOMEX_PICKER'));
   session.defaultSession.setDisplayMediaRequestHandler(
     (request, callback) => {
-      if (!fromGomex(request.securityOrigin || request.frame?.url || '')) return callback(null);
+      if (!fromAtrium(request.securityOrigin || request.frame?.url || '')) return callback(null);
       screenPicker
         .choose(win, { sound: process.platform === 'win32' || ownPickerForced })
         .then((choice) =>
@@ -228,7 +238,7 @@ function createTray() {
   const icon = nativeImage.createFromPath(path.join(__dirname, 'assets', isMac ? 'trayTemplate.png' : 'tray.png'));
   if (isMac) icon.setTemplateImage(true);
   tray = new Tray(icon);
-  tray.setToolTip('Gomex');
+  tray.setToolTip('Atrium');
   updateTrayMenu();
   // Windows/Linux: a click on the tray icon opens the window (macOS shows the menu).
   tray.on('click', () => {
@@ -290,7 +300,7 @@ function updateTrayMenu() {
 
 /**
  * The language choice: 'ru', 'en' or null (follow the system). Kept in the config, applied at once to the tray, the
- * open windows and, from the tray, the Gomex page (which tells its own language setting through the bridge).
+ * open windows and, from the tray, the Atrium page (which tells its own language setting through the bridge).
  */
 function setLanguage(choice, { fromPage }) {
   const config = readConfig();
@@ -300,7 +310,7 @@ function setLanguage(choice, { fromPage }) {
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
   i18n.setLang(choice ?? i18n.pick(app.getLocale()));
   updateTrayMenu();
-  addressWindow?.setTitle(firstRunAddress ? 'Gomex' : t('address.windowTitle'));
+  addressWindow?.setTitle(firstRunAddress ? 'Atrium' : t('address.windowTitle'));
   setupWindow?.setTitle(t('setup.title'));
   relocalize(addressWindow?.webContents);
   // The setup window holds a half-made server's answers in the page, so it only reloads while nothing is filled in
@@ -312,7 +322,7 @@ function setLanguage(choice, { fromPage }) {
   screenPicker.relocalize();
   reachable.relocalize();
   // The page learns of a change made here; one it made itself needs no echo.
-  if (!fromPage && win && !win.isDestroyed() && fromGomex(win.webContents.getURL())) {
+  if (!fromPage && win && !win.isDestroyed() && fromAtrium(win.webContents.getURL())) {
     win.webContents.executeJavaScript(
       `window.dispatchEvent(new CustomEvent('gomex-language', { detail: ${JSON.stringify(choice)} }))`,
     ).catch(() => undefined);
@@ -341,7 +351,7 @@ function openAddressWindow({ firstRun = false } = {}) {
     resizable: false,
     minimizable: false,
     maximizable: false,
-    title: firstRun ? 'Gomex' : t('address.windowTitle'),
+    title: firstRun ? 'Atrium' : t('address.windowTitle'),
     backgroundColor: '#0b0b0d',
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'address-preload.js'), contextIsolation: true, sandbox: true },
@@ -594,9 +604,9 @@ async function setupLinkStart(window) {
   if (!window.isDestroyed() && !window.webContents.getURL().includes('setup=')) window.loadURL(link);
 }
 
-/** IPC from the page; only the Gomex page itself may send these. */
+/** IPC from the page; only the Atrium page itself may send these. */
 function listenToPage() {
-  const trusted = (event) => fromGomex(event.senderFrame?.url ?? '');
+  const trusted = (event) => fromAtrium(event.senderFrame?.url ?? '');
 
   ipcMain.on('call:incoming', (event, { title, body }) => {
     if (!trusted(event)) return;

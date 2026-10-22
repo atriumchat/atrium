@@ -32,7 +32,7 @@ export default function Chat() {
   const channel = useStore((s) => s.data?.channels.find((c) => c.id === id));
   const dm = useStore((s) => s.dms.find((d) => d.id === id));
   const meId = useStore((s) => s.data?.me.id);
-  const title = useStore((s) => (dm ? dmTitle(dm, s.users, meId) : channel?.name ?? 'Gomex'));
+  const title = useStore((s) => (dm ? dmTitle(dm, s.users, meId) : channel?.name ?? 'Atrium'));
   const messages = useStore((s) => s.messages[id] ?? EMPTY);
   const loaded = useStore((s) => s.hasMore[id] !== undefined);
   const hasMore = useStore((s) => s.hasMore[id] ?? false);

@@ -76,7 +76,7 @@ function intelMac() {
 }
 
 /**
- * "Where to use Gomex", in the flow look, shown once after signing up: the desktop app on a computer, the Home Screen
+ * "Where to use Atrium", in the flow look, shown once after signing up: the desktop app on a computer, the Home Screen
  * on an iPhone, installing on Android, or simply carrying on in the browser.
  * `inWindow`: opened from the rail, where the window's own close is the way out, so no "Stay in browser".
  */

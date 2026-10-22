@@ -2,7 +2,7 @@ import { useStore } from './store';
 import { desktop } from './desktop';
 
 /*
- * Keeping people on the latest Gomex.
+ * Keeping people on the latest Atrium.
  *
  * The site: every deploy changes it, but a tab or desktop window opened before keeps running the old code — the
  * desktop app can sit in the tray for weeks. So we compare the build we're running with the server's (after each

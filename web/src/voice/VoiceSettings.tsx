@@ -17,7 +17,7 @@ export function VoiceSettings() {
   return (
     <Rows title={t('voice.settings.title')} className="mt-6">
       <NoiseRow />
-      {/* In the browser the key only works while Gomex's window is open; the desktop app hears it from anywhere. */}
+      {/* In the browser the key only works while Atrium's window is open; the desktop app hears it from anywhere. */}
       <ChoiceRow<'voice' | 'ptt'>
         title={t('voice.settings.mic')}
         value={prefs.ptt ? 'ptt' : 'voice'}

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, setToken } from '../api';
 import { useT } from '../i18n';
 import { inviteLink } from '../people/invite';
-import { GomexMark } from '../ui/Logo';
+import { AtriumMark } from '../ui/Logo';
 import { IconCropper, centred, cropToBlob, cropToUrl, loadImage, type Crop } from '../ui/IconCropper';
 import { KeyStep } from './KeyStep';
 import { adminForm, codeFrom, CODE_LENGTH, firstRun, type FirstRunStep } from '@gomex/setup';
@@ -36,7 +36,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const [defaultName, setDefaultName] = useState('Gomex');
+  const [defaultName, setDefaultName] = useState('Atrium');
   const [serverName, setServerName] = useState(past('code') ? t('setup.server.namePlaceholder') : '');
   const fileInput = useRef<HTMLInputElement>(null);
   // The icon as chosen, and the picture being cropped right now (a new one, or the chosen one again).
@@ -253,7 +253,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             <LineField label={t('setup.server.nameLabel')} value={serverName} onChange={(e) => setServerName(e.target.value)} maxLength={40} placeholder={t('setup.server.namePlaceholder')} />
             <div className="flow-actions" style={{ alignItems: 'center' }}>
               <button type="button" className="flow-icon-row" onClick={() => (icon ? (setDraft(icon), go('crop')) : fileInput.current?.click())}>
-                {preview ? <img src={preview} alt="" /> : <span className="mark"><GomexMark size={56} /></span>}
+                {preview ? <img src={preview} alt="" /> : <span className="mark"><AtriumMark size={56} /></span>}
                 <span>
                   <b>{t('setup.server.icon')}</b>
                   <u>{icon ? t('setup.server.another') : t('setup.server.choose')}</u>

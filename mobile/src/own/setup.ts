@@ -24,7 +24,7 @@ import {
 import { t, type Key } from '../i18n';
 
 /**
- * "Your own server" on the phone, after desktop/server-setup.js: a fresh VPS becomes a Gomex server with no terminal.
+ * "Your own server" on the phone, after desktop/server-setup.js: a fresh VPS becomes an Atrium server with no terminal.
  * - SSH in with the address and root password from the hosting company's e-mail; the password stays in memory for
  *   this screen. The installer adds the app's own key and switches password login off.
  * - The address: a free name on deSEC (name.dedyn.io), or the person's own domain, checked from the server.

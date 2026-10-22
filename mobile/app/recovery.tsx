@@ -6,7 +6,7 @@ import { RecoveryKeyStep } from '../src/components/RecoveryKeyStep';
 export default function Recovery() {
   const key = useStore((s) => s.recoveryKey) ?? '';
   const name = useStore((s) => s.data?.me.name ?? '');
-  const serverName = useStore((s) => s.data?.serverName ?? 'Gomex');
+  const serverName = useStore((s) => s.data?.serverName ?? 'Atrium');
   return (
     <FlowShell fill={1}>
       <RecoveryKeyStep value={key} nick={name} place={serverName} onNext={() => useStore.setState({ recoveryKey: null })} />

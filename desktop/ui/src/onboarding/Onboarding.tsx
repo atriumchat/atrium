@@ -7,8 +7,8 @@ import { setup, standIn, type InstallEvent } from './bridge';
 import './onboarding.css';
 
 /**
- * "Your own server" in the desktop app: a fresh VPS becomes a Gomex server, then the app opens its first-run wizard.
- * The steps, their scale and the way back are @gomex/setup's ownOnDesktop; the parts are Gomex Flow's (DESIGN.md);
+ * "Your own server" in the desktop app: a fresh VPS becomes an Atrium server, then the app opens its first-run wizard.
+ * The steps, their scale and the way back are @gomex/setup's ownOnDesktop; the parts are Atrium Flow's (DESIGN.md);
  * the SSH, deSEC and the install run in the main process (server-setup.js) through the bridge.
  */
 

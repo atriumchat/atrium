@@ -21,7 +21,7 @@ export function TabHeader({ title, friends = false }: { title?: string; friends?
   return (
     <View style={{ height: 64, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16 }}>
       {title ? null : <ServerMark icon={icon} size={36} />}
-      <Text numberOfLines={1} style={{ flex: 1, fontSize: 24, fontWeight: '700' }}>{title ?? name ?? 'Gomex'}</Text>
+      <Text numberOfLines={1} style={{ flex: 1, fontSize: 24, fontWeight: '700' }}>{title ?? name ?? 'Atrium'}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
         {friends ? <HeaderButton label={t('shell.home.friends')} count={incoming} onPress={openFriends}><UsersIcon size={21} /></HeaderButton> : null}
         <HeaderButton label={mentions ? t('people.inbox.titleNew', { n: mentions }) : t('people.inbox.title')} count={mentions} onPress={openInbox}><BellIcon size={21} /></HeaderButton>

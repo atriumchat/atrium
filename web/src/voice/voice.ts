@@ -264,7 +264,7 @@ export async function toggleDeafen() {
   await applyMic();
 }
 
-// The shared system sound without Gomex's own: otherwise everyone in the call hears their own voice back. Chrome and
+// The shared system sound without Atrium's own: otherwise everyone in the call hears their own voice back. Chrome and
 // the desktop app honour it on Windows 11 (elsewhere it is ignored); livekit's types don't list it yet.
 const sharedSound: AudioCaptureOptions & { restrictOwnAudio: boolean } = { restrictOwnAudio: true };
 

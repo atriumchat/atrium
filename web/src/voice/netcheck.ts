@@ -7,7 +7,7 @@ import { t } from '../i18n';
 const CHECKED = 'gomex_net_checked';
 
 /**
- * The first time Gomex runs on a device (right after sign-up, or a new device), quietly try a call: if it
+ * The first time Atrium runs on a device (right after sign-up, or a new device), quietly try a call: if it
  * goes through directly, leave things as they are; if only the relay on 443 gets through — a restrictive
  * network — switch the relay on so the person's first call just works. Once per device: the network depends
  * on where they sit, and they can flip the switch themselves any time.

@@ -7,7 +7,7 @@ import { showError, useStore } from '../store';
 import { AccountSettings } from '../account/Account';
 import { VoiceSettings } from '../voice/VoiceSettings';
 import { ServerSettings } from './ServerSettings';
-import { GomexMark } from '../ui/Logo';
+import { AtriumMark } from '../ui/Logo';
 import { Row, Rows, Secondary } from '../ui/settings';
 import { LogoutIcon, MicIcon, RefreshIcon, UserIcon } from '../ui/icons';
 
@@ -25,7 +25,7 @@ export function useSettingsPages() {
     { id: 'voice', label: t('settings.page.voice'), icon: <MicIcon size={18} />, content: <VoiceSettings /> },
   ];
   // The server's icon and name: the admin's alone, the server refuses anyone else.
-  if (isAdmin) pages.push({ id: 'server', label: t('settings.page.server'), icon: <GomexMark size={18} />, content: <ServerSettings /> });
+  if (isAdmin) pages.push({ id: 'server', label: t('settings.page.server'), icon: <AtriumMark size={18} />, content: <ServerSettings /> });
   if (desktop?.update) pages.push({ id: 'app', label: t('settings.page.app'), icon: <RefreshIcon size={18} />, content: <AppSettings /> });
   return pages;
 }

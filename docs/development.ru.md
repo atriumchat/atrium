@@ -53,7 +53,7 @@ GOMEX_URL=http://localhost:5190 npm start
 Проверки перед коммитом (CI гоняет то же, .github/workflows/checks.yml):
 
 ```bash
-npm run check              # ESLint (границы пакетов, хуки, никаких цветов руками в Gomex Flow), типы, тесты, сборки
+npm run check              # ESLint (границы пакетов, хуки, никаких цветов руками в Atrium Flow), типы, тесты, сборки
 server/.venv/bin/python -m pytest -q server/tests  # изолированный SQLite и фикстуры деплоя
 deploy/release.sh lint     # bash -n и shellcheck по всем скриптам deploy/
 ```

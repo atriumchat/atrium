@@ -54,7 +54,7 @@ work, on made-up answers without the main process (`onboarding.html#step=install
 Checks before a commit (CI runs the same, .github/workflows/checks.yml):
 
 ```bash
-npm run check              # ESLint (package boundaries, hooks, no hand-written colours in Gomex Flow), types, tests, builds
+npm run check              # ESLint (package boundaries, hooks, no hand-written colours in Atrium Flow), types, tests, builds
 server/.venv/bin/python -m pytest -q server/tests  # isolated SQLite and deploy fixtures
 deploy/release.sh lint     # bash -n and shellcheck on all scripts in deploy/
 ```

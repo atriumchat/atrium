@@ -1,6 +1,6 @@
 // One lint for the clients and their packages (docs/adr/001-client-architecture.md): the TypeScript rules, the rules of
 // hooks, the packages' boundaries (dependencies point down, only through a package's index) and no colours written by
-// hand in Gomex Flow. The server, deploy and the Electron shell's plain scripts are outside it.
+// hand in Atrium Flow. The server, deploy and the Electron shell's plain scripts are outside it.
 import js from '@eslint/js';
 import boundaries from 'eslint-plugin-boundaries';
 import reactHooks from 'eslint-plugin-react-hooks';
@@ -124,9 +124,9 @@ export default tseslint.config(
         'error',
         {
           selector: 'Literal[value=/^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/]',
-          message: 'A colour in Gomex Flow is a token (@gomex/ui-common color).',
+          message: 'A colour in Atrium Flow is a token (@gomex/ui-common color).',
         },
-        { selector: 'Literal[value=/^rgba?\\(/]', message: 'A colour in Gomex Flow is a token (@gomex/ui-common color).' },
+        { selector: 'Literal[value=/^rgba?\\(/]', message: 'A colour in Atrium Flow is a token (@gomex/ui-common color).' },
       ],
     },
   },

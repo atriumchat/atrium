@@ -13,7 +13,7 @@ import { CheckIcon, ChevronRightIcon, GearIcon, LogoutIcon, PencilIcon, UserIcon
 import { RoundButton } from '../ui/ui';
 import { Badge } from './HomeSidebar';
 import { dateOnly } from '../chat/format';
-import { GomexMark } from '../ui/Logo';
+import { AtriumMark } from '../ui/Logo';
 import { AccountSettings, LanguageRow, NickRow } from '../account/Account';
 import { CallsGroup } from '../voice/VoiceSettings';
 import { ServerSettings } from './ServerSettings';
@@ -113,7 +113,7 @@ export function YouTab() {
             <Row
               icon={
                 <RowIcon>
-                  <GomexMark size={18} />
+                  <AtriumMark size={18} />
                 </RowIcon>
               }
               title={t('shell.you.server')}

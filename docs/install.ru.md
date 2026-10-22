@@ -76,7 +76,7 @@ curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.s
 
 Удалённый канал возвращать так не нужно: он неделю лежит в «Сервер → Удалённые каналы», оттуда его возвращает админ.
 
-Снять Gomex с сервера:
+Снять Atrium с сервера:
 
 ```bash
 curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh -s uninstall
@@ -106,7 +106,7 @@ www.{$DOMAIN}, http://www.{$DOMAIN} {
 
 Свои маршруты внутри приложения (`app.DOMAIN`) кладутся файлами `*.caddy` в `/opt/gomex/deploy/routes/app`, раньше
 маршрутов самого приложения; обновления их не трогают, по умолчанию их нет. Каждая страница приложения загружает
-`/owner.js`, в Gomex он пустой; свой скрипт отдаётся маршрутом оттуда же:
+`/owner.js`, в Atrium он пустой; свой скрипт отдаётся маршрутом оттуда же:
 
 ```caddy
 handle /owner.js {

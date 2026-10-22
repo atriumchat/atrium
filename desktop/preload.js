@@ -1,4 +1,4 @@
-// The only bridge between the Gomex web app and the desktop shell. The page gets these few calls and
+// The only bridge between the Atrium web app and the desktop shell. The page gets these few calls and
 // nothing else: no Node, no file system, no Electron internals.
 const { contextBridge, ipcRenderer } = require('electron');
 

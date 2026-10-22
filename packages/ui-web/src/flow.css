@@ -1,5 +1,5 @@
 /*
- * Gomex Flow on the web (DESIGN.md), the same parts as @gomex/ui-native: OLED black, type first, the ticks along the
+ * Atrium Flow on the web (DESIGN.md), the same parts as @gomex/ui-native: OLED black, type first, the ticks along the
  * window's edge, one white button. Colours, type and radii are --gx- tokens (@gomex/ui-common, tokenCss). The column keeps 38px
  * from the edge on a phone (the phone app's concentric margin) and stands 480px wide in the middle of a bigger window.
  */

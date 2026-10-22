@@ -70,7 +70,7 @@ export const people = {
   'people.invite.bannerNoLimit': 'Invite only · No limit',
   'people.invite.bannerLeft': { one: 'Invite only · {n} place left', other: 'Invite only · {n} places left' },
   'people.invite.copyFailed': 'Failed to copy link',
-  'people.invite.shareText': 'My Gomex invite',
+  'people.invite.shareText': 'My Atrium invite',
   'people.invite.link': 'Invite link',
   'people.invite.copied': 'Copied',
   'people.invite.share': 'Share',

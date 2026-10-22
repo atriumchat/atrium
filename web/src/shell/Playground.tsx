@@ -82,7 +82,7 @@ const EMPTY: { art: ArtName; id: string; where: 'main' | 'list' | 'dialog' }[] =
 
 /**
  * Development only (open the app with #art): the line drawings at any size, every empty state at the size it has
- * in the app (the content panel, the list on the left, a dialog), the "where to use Gomex" screen for each system
+ * in the app (the content panel, the list on the left, a dialog), the "where to use Atrium" screen for each system
  * and the phone sign-in's picture.
  */
 export function ArtPlayground() {

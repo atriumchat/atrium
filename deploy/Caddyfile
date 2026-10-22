@@ -114,9 +114,10 @@ http://app.{$DOMAIN} {
 	reverse_proxy 127.0.0.1:8000
 }
 
-# The desktop app opens whatever address it was given, often the root domain: it gets the app itself there.
+# The desktop app opens whatever address it was given, often the root domain: it gets the app itself there. Its
+# user agent says Gomex/<version> (desktop/main.js keeps the old name for servers before this), Atrium/ later.
 (desktop) {
-	@desktop header_regexp User-Agent \bGomex/[0-9]\S*\s.*\bElectron/
+	@desktop header_regexp User-Agent \b(Atrium|Gomex)/[0-9]\S*\s.*\bElectron/
 }
 
 # The cover page as a plain static site (its own few headers, a 404 for any other path): the root domain

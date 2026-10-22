@@ -105,7 +105,7 @@ export type Bootstrap = {
   channels: Channel[];
   livekitUrl: string;
   serverName: string;
-  /** The server's own icon (/api/server/icon?v=…), or null for Gomex's mark. */
+  /** The server's own icon (/api/server/icon?v=…), or null for Atrium's mark. */
   serverIcon?: string | null;
   canManageChannels: boolean;
   mutedChannels: string[];

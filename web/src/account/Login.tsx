@@ -98,7 +98,7 @@ export function Login({ onLoggedIn }: { onLoggedIn: (session: Session, signedUp:
     switch (step.id) {
       case 'start':
         return (
-          <FlowStep title="Gomex" sub={t('account.login.tagline')} onSubmit={() => go(way)} actions={<FlowPrimary type="submit">{t('setup.next')}</FlowPrimary>}>
+          <FlowStep title="Atrium" sub={t('account.login.tagline')} onSubmit={() => go(way)} actions={<FlowPrimary type="submit">{t('setup.next')}</FlowPrimary>}>
             <div role="radiogroup">
               <RadioRow title={t('account.start.have')} sub={t('account.start.haveSub')} on={way === 'login'} onPress={() => setWay('login')} />
               <RadioRow title={t('account.start.invited')} sub={t('account.login.invitePlaceholder')} on={way === 'invite'} onPress={() => setWay('invite')} last />

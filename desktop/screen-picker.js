@@ -78,7 +78,7 @@ ipcMain.on('picker:cancel', (event) => {
 function choose(parent, { sound }) {
   if (picker) return Promise.resolve(null);
   return new Promise((resolve) => {
-    // A sheet on the Gomex window; with no window to hold it (hidden to the tray), a window of its own.
+    // A sheet on the Atrium window; with no window to hold it (hidden to the tray), a window of its own.
     const modal = Boolean(parent) && !parent.isDestroyed() && parent.isVisible() && !parent.isMinimized();
     picker = new BrowserWindow({
       ...(modal ? { parent, modal: true } : {}),

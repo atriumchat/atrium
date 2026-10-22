@@ -105,7 +105,7 @@ export default function Login() {
       case 'start':
         return (
           <FlowStep
-            title="Gomex"
+            title="Atrium"
             sub={t('account.login.tagline')}
             actions={<FlowPrimary onPress={() => (way === 'own' ? router.push('/own') : go(way))}>{t('setup.next')}</FlowPrimary>}
           >

@@ -1,4 +1,4 @@
-// "Your own server": a fresh VPS becomes a Gomex server from the app (desktop/ui's onboarding page), with no terminal.
+// "Your own server": a fresh VPS becomes an Atrium server from the app (desktop/ui's onboarding page), with no terminal.
 //   - SSH in with the address and root password from the hosting company's e-mail; the password is only kept in
 //     memory for this window. The installer then switches password login off, and the app keeps its own key.
 //   - The address: a free name on deSEC (name.dedyn.io), registered and pointed here through deSEC's API, or the

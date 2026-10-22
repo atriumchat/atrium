@@ -25,7 +25,7 @@ import { ChevronLeft } from './icons';
 import { fonts, Text } from './Text';
 
 /**
- * Gomex Flow in React Native (DESIGN.md), the props from @gomex/ui-common's contract, the same parts as @gomex/ui-web:
+ * Atrium Flow in React Native (DESIGN.md), the props from @gomex/ui-common's contract, the same parts as @gomex/ui-web:
  * a screen at a time in type alone on OLED black, one scale of ticks along the screen's edge for the whole way, the
  * main button white at the bottom with back as an outlined icon beside it.
  */

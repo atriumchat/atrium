@@ -2,7 +2,7 @@
   "name": "@gomex/ui-common",
   "version": "0.1.0",
   "private": true,
-  "description": "Gomex Flow, the part every platform shares: design tokens, the scale's geometry, the components' props.",
+  "description": "Atrium Flow, the part every platform shares: design tokens, the scale's geometry, the components' props.",
   "type": "module",
   "main": "./src/index.ts",
   "exports": {

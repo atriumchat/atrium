@@ -22,7 +22,7 @@ Everything is in `deploy/.env`. The installer writes it; after a manual edit, `d
 | Variable | Default | What it does |
 |---|---|---|
 | `DOMAIN` | — | Root domain; the app is on `app.DOMAIN` |
-| `SERVER_NAME` | `Gomex` | Server name until it's set in the browser |
+| `SERVER_NAME` | `Atrium` | Server name until it's set in the browser |
 | `TURN_HOST` | random | Subdomain of the call relay |
 | `INVITE_CODE` | random | Code for the first account on an empty server |
 | `APP_SECRET`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` | random | Session signing and LiveKit keys; `livekit.yaml` is built from them |

@@ -9,7 +9,7 @@
 // anything the release key didn't sign.
 // deploy/release-desktop.sh builds, signs and publishes it. We check at start and every few hours, download this
 // platform's file in the background and check its SHA-256, then install on "Restart" or when the app quits:
-// - macOS: the new Gomex.app is copied out of the DMG next to the running one, and a small script swaps the two
+// - macOS: the new Atrium.app is copied out of the DMG next to the running one, and a small script swaps the two
 //   once we've exited. (Electron's built-in updater, Squirrel, only accepts a paid Developer ID signature.)
 // - Windows: the installer runs silently and starts the new version.
 const { app, net, shell } = require('electron');
@@ -201,7 +201,7 @@ async function download(url, dest, expected) {
   }
 }
 
-/** The running Gomex.app, if this copy can replace itself; otherwise null (and the user gets the download). */
+/** The running Atrium.app, if this copy can replace itself; otherwise null (and the user gets the download). */
 function ownBundle() {
   const bundle = path.resolve(process.execPath, '..', '..', '..');
   // Started from the DMG, or from Downloads under macOS's "App Translocation": there's nothing to replace.
@@ -229,7 +229,7 @@ async function detach(mount) {
   await run('hdiutil', ['detach', mount, '-force']).catch(() => run('diskutil', ['eject', mount])).catch(() => {});
 }
 
-/** Copies the new Gomex.app out of the DMG to a hidden folder next to the running one, ready to swap in. */
+/** Copies the new Atrium.app out of the DMG to a hidden folder next to the running one, ready to swap in. */
 async function stageMac(dmg, version, bundle) {
   const staged = path.join(path.dirname(bundle), '.Gomex-update.app');
   const mount = fs.mkdtempSync(path.join(DIR, 'mnt-'));
@@ -339,7 +339,7 @@ function startInstall(relaunch) {
     spawn('/bin/sh', args, { detached: true, stdio: 'ignore' }).unref();
   } else if (process.platform === 'win32') {
     if (!ready.file || !fs.existsSync(ready.file)) return false;
-    // The NSIS installer: --updated marks it as an update, /S keeps it silent, --force-run starts Gomex after.
+    // The NSIS installer: --updated marks it as an update, /S keeps it silent, --force-run starts Atrium after.
     const args = relaunch ? ['--updated', '/S', '--force-run'] : ['--updated', '/S'];
     spawn(ready.file, args, { detached: true, stdio: 'ignore' }).unref();
   } else {

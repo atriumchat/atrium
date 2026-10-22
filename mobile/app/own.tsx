@@ -10,7 +10,7 @@ import { useT, type Key } from '../src/i18n';
 import { Text } from '../src/text';
 import { colors } from '../src/theme';
 import { haptic } from '../src/haptics';
-import { GomexMark } from '../src/components/Logo';
+import { AtriumMark } from '../src/components/Logo';
 import { Drum, FlowPrimary, FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, RING, TextAction, useFlowFrame } from '@gomex/ui-native';
 import { RecoveryKeyStep } from '../src/components/RecoveryKeyStep';
 import { real } from '../src/own/backend';
@@ -20,7 +20,7 @@ import { mock, mockInstall, mockPace } from '../src/own/mock';
 import type { Saved } from '../src/own/setup';
 
 /**
- * "Your own server" on the phone (src/own/setup.ts): the VPS from the host's e-mail becomes a Gomex server, then its
+ * "Your own server" on the phone (src/own/setup.ts): the VPS from the host's e-mail becomes an Atrium server, then its
  * first run happens here too, as the web wizard does it in a browser (web/src/account/SetupWizard.tsx): the server's
  * name and icon, the admin, the recovery key, the first invite link. One scale along the screen's edge for the whole
  * way (EdgeTicks), the part with its number above it ("Адрес (2/5)"); the screens in type alone on black, no plates,
@@ -65,7 +65,7 @@ export default function OwnServer() {
 
   // The server's first run. The admin's session is made at "Create" and only signed in with at the end.
   const [serverName, setServerName] = useState('');
-  const [defaultName, setDefaultName] = useState('Gomex');
+  const [defaultName, setDefaultName] = useState('Atrium');
   const [icon, setIcon] = useState<string | null>(null);
   const [iconSent, setIconSent] = useState(false);
   const [nick, setNick] = useState('');
@@ -503,7 +503,7 @@ export default function OwnServer() {
           >
             <LineField label={t('setup.server.nameLabel')} value={serverName} onChangeText={setServerName} maxLength={40} placeholder={t('setup.server.namePlaceholder')} autoComplete="off" textContentType="none" autoCapitalize="sentences" returnKeyType="next" onSubmitEditing={() => serverName.trim() && go('admin')} />
             <Pressable accessibilityRole="button" onPress={() => void pickIcon()} style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-              {icon ? <Image source={{ uri: icon }} style={{ width: 56, height: 56, borderRadius: 28 }} /> : <GomexMark size={56} />}
+              {icon ? <Image source={{ uri: icon }} style={{ width: 56, height: 56, borderRadius: 28 }} /> : <AtriumMark size={56} />}
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 20 }}>{t('setup.server.icon')}</Text>
                 <Text style={{ fontSize: 15, textDecorationLine: 'underline' }}>{icon ? t('setup.server.another') : t('setup.server.choose')}</Text>

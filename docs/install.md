@@ -79,7 +79,7 @@ data back, starts it and checks that it answers. A wrong choice is undone by the
 A deleted channel doesn't need this: it sits for a week in "Server → Deleted channels", and an admin restores it
 from there.
 
-Remove Gomex from the server:
+Remove Atrium from the server:
 
 ```bash
 curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh -s uninstall
@@ -109,7 +109,7 @@ www.{$DOMAIN}, http://www.{$DOMAIN} {
 
 Own routes inside the app (`app.DOMAIN`) go in `*.caddy` files in `/opt/gomex/deploy/routes/app`, ahead of the
 app's own; updates leave them alone, and there are none by default. Every page of the app loads `/owner.js`, empty in
-Gomex; to run a script of one's own, serve it from a route there:
+Atrium; to run a script of one's own, serve it from a route there:
 
 ```caddy
 handle /owner.js {

@@ -46,7 +46,7 @@ export function App() {
     setPhase('key');
   }
 
-  // The order after sign-up is: the key, then the "where to use Gomex" screen (not in the desktop app or a Home
+  // The order after sign-up is: the key, then the "where to use Atrium" screen (not in the desktop app or a Home
   // Screen app, and not after a recovery), then the app.
   function keySeen() {
     const newcomer = newKey?.newcomer;

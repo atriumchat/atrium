@@ -18,7 +18,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('keydown', unlock);
 }
 
-// What each moment in Gomex sounds like. Paired moments use paired cues (on/off, start/stop).
+// What each moment in Atrium sounds like. Paired moments use paired cues (on/off, start/stop).
 const CUES = {
   join: 'connect',
   leave: 'disconnect',

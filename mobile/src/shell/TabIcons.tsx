@@ -3,7 +3,7 @@ import { PixelRatio, View } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, Image as SvgImage, Text as SvgText } from 'react-native-svg';
 import { mediaSource } from '../api';
 import { useStore } from '../store';
-import { GomexMark } from '../components/Logo';
+import { AtriumMark } from '../components/Logo';
 import { HomeFilledIcon, HomeIcon } from '../icons';
 import type { User } from '../protocol';
 
@@ -15,7 +15,7 @@ const SIZE = 26;
 
 /**
  * The native tab bar takes images, not views. So our own glyphs and your avatar are drawn here, out of sight, as
- * <Svg> and handed over as PNGs: the bar keeps Gomex's icons and your face, and the system draws the rest.
+ * <Svg> and handed over as PNGs: the bar keeps Atrium's icons and your face, and the system draws the rest.
  */
 export function TabIconShots({ onShot }: { onShot: (name: TabIconName, icon: TabIcon) => void }) {
   const me = useStore((s) => s.data?.me);
@@ -29,8 +29,8 @@ export function TabIconShots({ onShot }: { onShot: (name: TabIconName, icon: Tab
         <Shot key={`server:${serverIcon}`} wait onShot={take('server')}>{(ref, loaded) => <Picture ref={ref} path={serverIcon} onLoad={loaded} />}</Shot>
       ) : (
         <>
-          <Shot key="server" onShot={take('server')}>{(ref) => <GomexMark ref={ref} size={SIZE} color="#fff" />}</Shot>
-          <Shot key="serverOn" onShot={take('serverOn')}>{(ref) => <GomexMark ref={ref} size={SIZE} color="#fff" filled />}</Shot>
+          <Shot key="server" onShot={take('server')}>{(ref) => <AtriumMark ref={ref} size={SIZE} color="#fff" />}</Shot>
+          <Shot key="serverOn" onShot={take('serverOn')}>{(ref) => <AtriumMark ref={ref} size={SIZE} color="#fff" filled />}</Shot>
         </>
       )}
       <Shot key={`you:${me?.avatarUrl ?? ''}:${me?.color ?? ''}:${me?.name ?? ''}`} wait={!!me?.avatarUrl} onShot={take('you')}>

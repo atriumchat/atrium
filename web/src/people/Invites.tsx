@@ -59,7 +59,7 @@ export function useMyInvite(enabled = true) {
 
 /**
  * "Bring your people" banner at the bottom of the DM list. It lives with people, not next to the channels,
- * so nobody reads it as Discord's "invite to this server": it invites into Gomex itself. Gone once every
+ * so nobody reads it as Discord's "invite to this server": it invites into Atrium itself. Gone once every
  * place on the link is taken, or after it's closed.
  */
 export function InviteBanner() {
@@ -187,7 +187,7 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
     // On a phone, the system share sheet (Telegram, WhatsApp, …); on a computer, just copy.
     if (isMobile && navigator.share) {
       try {
-        await navigator.share({ title: 'Gomex', text: t('people.invite.shareText'), url: link });
+        await navigator.share({ title: 'Atrium', text: t('people.invite.shareText'), url: link });
       } catch {
         // Closed the sheet: nothing to do.
       }

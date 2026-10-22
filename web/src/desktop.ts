@@ -11,7 +11,7 @@ export type DesktopUpdate = {
   code?: 'no-key';
 };
 
-/** What the Gomex desktop app (desktop/preload.js) exposes to the page. In a normal browser it's undefined. */
+/** What the Atrium desktop app (desktop/preload.js) exposes to the page. In a normal browser it's undefined. */
 type DesktopBridge = {
   platform: string;
   incomingCall(title: string, body: string): void;

@@ -2,7 +2,7 @@
   "name": "@gomex/ui-web",
   "version": "0.1.0",
   "private": true,
-  "description": "Gomex Flow for React DOM: the flow parts on @gomex/ui-common's tokens, geometry and contract.",
+  "description": "Atrium Flow for React DOM: the flow parts on @gomex/ui-common's tokens, geometry and contract.",
   "type": "module",
   "main": "./src/index.ts",
   "exports": {

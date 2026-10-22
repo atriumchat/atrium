@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from 'react';
 
 /**
- * The Gomex Flow components' props, the same on every platform: @gomex/ui-web and @gomex/ui-native implement these
+ * The Atrium Flow components' props, the same on every platform: @gomex/ui-web and @gomex/ui-native implement these
  * names and add only what their platform has (a DOM input's attributes, a TextInput's). Handlers are `onPress` on both,
  * as in React Native.
  */

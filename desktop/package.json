@@ -1,8 +1,8 @@
 {
   "name": "gomex-desktop",
-  "productName": "Gomex",
+  "productName": "Atrium",
   "version": "1.6.0",
-  "description": "Gomex for desktop: chat and calls that arrive even when the window is closed",
+  "description": "Atrium for desktop: chat and calls that arrive even when the window is closed",
   "main": "main.js",
   "license": "AGPL-3.0-only",
   "private": true,
@@ -20,7 +20,7 @@
   },
   "build": {
     "appId": "io.github.gomex-inc.gomex",
-    "productName": "Gomex",
+    "productName": "Atrium",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -75,14 +75,14 @@
       "category": "public.app-category.social-networking",
       "icon": "build/icon.png",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Gomex uses the microphone for calls.",
-        "NSCameraUsageDescription": "Gomex uses the camera for video calls."
+        "NSMicrophoneUsageDescription": "Atrium uses the microphone for calls.",
+        "NSCameraUsageDescription": "Atrium uses the camera for video calls."
       },
       "identity": "-",
       "hardenedRuntime": false
     },
     "dmg": {
-      "title": "Gomex"
+      "title": "Atrium"
     },
     "win": {
       "target": [
@@ -98,7 +98,7 @@
     "nsis": {
       "oneClick": true,
       "perMachine": false,
-      "shortcutName": "Gomex"
+      "shortcutName": "Atrium"
     }
   },
   "devDependencies": {

@@ -38,7 +38,7 @@ export function DownloadRailButton() {
   );
 }
 
-/** The same "where to use Gomex" screen as after sign-up, in a window; it brings its own title and buttons. */
+/** The same "where to use Atrium" screen as after sign-up, in a window; it brings its own title and buttons. */
 function DownloadDialog({ onClose }: { onClose: () => void }) {
   const { t } = useT();
   return (

@@ -28,7 +28,7 @@ export const voice = {
   'voice.call.joinShort': 'Присоединиться',
   'voice.call.incoming': 'Входящий звонок',
   'voice.call.incomingDots': 'Входящий звонок…',
-  'voice.call.pageTitle': 'Входящий звонок · Gomex',
+  'voice.call.pageTitle': 'Входящий звонок · Atrium',
   'voice.call.someone': 'Кто-то',
   'voice.call.groupCalling': '{name} звонит в группу',
   'voice.audio.enable': 'Включить звук',

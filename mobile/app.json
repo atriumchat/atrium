@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Gomex",
+    "name": "Atrium",
     "slug": "gomex-mobile",
     "scheme": "gomex",
     "version": "0.1.0",
@@ -14,8 +14,8 @@
         "UIBackgroundModes": [
           "audio"
         ],
-        "NSMicrophoneUsageDescription": "Gomex использует микрофон для звонков.",
-        "NSCameraUsageDescription": "Gomex использует камеру для видеозвонков.",
+        "NSMicrophoneUsageDescription": "Atrium использует микрофон для звонков.",
+        "NSCameraUsageDescription": "Atrium использует камеру для видеозвонков.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -37,8 +37,8 @@
       [
         "@config-plugins/react-native-webrtc",
         {
-          "microphonePermission": "Gomex использует микрофон для звонков.",
-          "cameraPermission": "Gomex использует камеру для видеозвонков."
+          "microphonePermission": "Atrium использует микрофон для звонков.",
+          "cameraPermission": "Atrium использует камеру для видеозвонков."
         }
       ],
       "expo-web-browser"

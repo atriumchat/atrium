@@ -21,7 +21,7 @@ const homeBadge = (s: ReturnType<typeof useStore.getState>) => s.dms.reduce((n, 
 const badge = (n: number) => (n > 0 ? <NativeTabs.Trigger.Badge>{n > 99 ? '99+' : String(n)}</NativeTabs.Trigger.Badge> : null);
 
 /**
- * Phone layout: the system's tab bar (Liquid Glass from iOS 26) with home, the server and you, drawn with Gomex's
+ * Phone layout: the system's tab bar (Liquid Glass from iOS 26) with home, the server and you, drawn with Atrium's
  * own glyphs and your avatar. Conversations are screens of the root stack, so they slide in over the bar.
  */
 export default function TabsLayout() {
@@ -47,7 +47,7 @@ export default function TabsLayout() {
         <NativeTabs.Trigger name="server">
           {/* The tab is your server: its own name, the generic word only while it has none. */}
           <NativeTabs.Trigger.Label>{data.serverName?.trim() || t('shell.tab.server')}</NativeTabs.Trigger.Label>
-          {/* The server's own icon is a picture, kept in its colours; Gomex's mark is a glyph the bar tints. */}
+          {/* The server's own icon is a picture, kept in its colours; Atrium's mark is a glyph the bar tints. */}
           {icons.server ? <NativeTabs.Trigger.Icon src={custom ? icons.server : { default: icons.server, selected: icons.serverOn ?? icons.server }} renderingMode={custom ? 'original' : 'template'} /> : null}
           {badge(server)}
         </NativeTabs.Trigger>
