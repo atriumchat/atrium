@@ -263,7 +263,8 @@ export function Onboarding() {
   const fill = step.id === 'install' ? jobFill(ownOnDesktop.fill('install'), 1, doneRows, TASKS.length, !!done) : ownOnDesktop.fill(step.id);
   const stage = ownOnDesktop.stage(step.id);
   const backTo = ownOnDesktop.back(step.id, { way });
-  const back = backTo ? () => go(backTo, true) : undefined;
+  // From the first step back leaves "Your own server" for the first window's choice.
+  const back = backTo ? () => go(backTo, true) : step.id === 'server' ? () => setup.leave() : undefined;
 
   // The step's first field takes the focus once the step has settled (mid-animation it would drag the step to it).
   const box = useRef<HTMLDivElement>(null);
@@ -280,6 +281,7 @@ export function Onboarding() {
             title={t('ob.server.h')}
             sub={t('ob.server.sub')}
             error={error}
+            onBack={back}
             onSubmit={connect}
             actions={<FlowPrimary type="submit" busy={busy} disabled={!serverReady}>{t('ob.connect')}</FlowPrimary>}
             below={<TextAction onPress={() => go('rent')}>{t('ob.rent.link')}</TextAction>}

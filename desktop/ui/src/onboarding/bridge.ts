@@ -22,6 +22,8 @@ export type Setup = {
   connectKey(host: string): Promise<{ facts: { ip: string; os: string; size: string } } | Failure>;
   /** HostVDS's API, through the main process (rentServer drives it). */
   hostvds: Http;
+  /** Back from the first step: to the first window's choice. */
+  leave(): void;
   /** The globe: the app's language (as the tray's menu does); `onLanguage` hears it, from here or the tray. */
   language(choice: 'ru' | 'en'): Promise<void>;
   onLanguage(callback: (lang: 'ru' | 'en') => void): void;
@@ -54,6 +56,7 @@ const fake: Setup = {
     return { facts: { ip: host, os: 'Ubuntu 24.04 LTS · x86_64', size: t('ssh.size', { memory: 2, disk: 18 }) } };
   },
   appKey: async () => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIStandIn atrium-app',
+  leave: () => void (location.href = `start.html?first=1&step=choose${location.search.replace('?', '&')}`),
   language: async (choice) => {
     for (const listen of languageListeners) listen(choice);
   },

@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('atriumSetup', {
   connectKey: (host) => call('connect-key', String(host)),
   /** One request to HostVDS's API ({ method, url, body?, token? } → { status, token?, json }). */
   hostvds: (request) => call('hostvds', request),
+  /** Back from the first step: to the first window's choice (or the setup just closes). */
+  leave: () => call('leave'),
   /** The globe: the app's language ('ru' | 'en'); `onLanguage` hears every change (from here or the tray menu). */
   language: (choice) => call('language', choice),
   onLanguage: (callback) => ipcRenderer.on('setup:language', (_event, lang) => callback(lang)),

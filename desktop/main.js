@@ -437,12 +437,14 @@ function fadeIn(win, ms) {
 }
 
 /** firstRun: no server address yet, so this window is the whole app; closing it quits. `show: false`: made hidden. */
-function openAddressWindow({ firstRun = false, show = true } = {}) {
+/** The first window; `bounds` opens it where another stood, `step` on one of its steps (back from "Your own server"). */
+function openAddressWindow({ firstRun = false, show = true, bounds = null, step = '' } = {}) {
   if (addressWindow) return addressWindow.focus();
   firstRunAddress = firstRun;
   addressWindow = new BrowserWindow({
     ...FLOW_WINDOW,
     ...centred(FLOW_WINDOW.width, FLOW_WINDOW.height),
+    ...(bounds ?? {}),
     title: firstRun ? 'Atrium' : t('address.windowTitle'),
     backgroundColor: '#0c0c0e',
     ...frameless('#0c0c0e'),
@@ -451,7 +453,7 @@ function openAddressWindow({ firstRun = false, show = true } = {}) {
     webPreferences: { preload: path.join(__dirname, 'address-preload.js'), contextIsolation: true, sandbox: true },
   });
   addressWindow.loadFile(path.join(__dirname, 'ui-dist', 'start.html'), {
-    query: { lang: i18n.getLang(), current: APP_URL, first: firstRun ? '1' : '', placeholder: DEFAULT_URL || 'https://app.example.com' },
+    query: { lang: i18n.getLang(), current: APP_URL, first: firstRun ? '1' : '', step, placeholder: DEFAULT_URL || 'https://app.example.com' },
   });
   addressWindow.on('closed', () => {
     addressWindow = null;
@@ -554,6 +556,18 @@ setupCall('open-external', (url) => {
 });
 setupCall('connect', (login) => serverSetup.connect(login));
 setupCall('app-key', () => serverSetup.newAppKey());
+// Back from "Your own server"'s first step: on the first start, to the first window's choice, in its place; opened from
+// the tray, the setup just closes.
+setupCall('leave', () => {
+  if (!setupWindow) return;
+  if (win && !win.isDestroyed()) {
+    setupWindow.close();
+    showWindow();
+    return;
+  }
+  openAddressWindow({ firstRun: !APP_URL, bounds: setupWindow.getBounds(), step: 'choose' });
+  setupWindow.destroy();
+});
 setupCall('language', (choice) => {
   if (choice === 'ru' || choice === 'en') setLanguage(choice, { fromPage: false });
 });

@@ -34,13 +34,14 @@ type AddressBridge = {
 };
 
 export function Start() {
-  const [step, setStep] = useState<Step>(first ? 'welcome' : 'move');
+  // Back from "Your own server" lands on the choice again (?step=choose), coming in as a step back does.
+  const [step, setStep] = useState<Step>(params.get('step') === 'choose' ? 'choose' : first ? 'welcome' : 'move');
   const [way, setWay] = useState<Way>('account');
   const [value, setValue] = useState(first ? '' : (params.get('current') ?? ''));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // Which way the last move went: a step forward slides in, a step back fades in (flow.css, .flow-swap).
-  const [backward, setBackward] = useState(false);
+  const [backward, setBackward] = useState(params.get('step') === 'choose');
 
   function go(next: Step, isBack = false) {
     setError(null);
