@@ -91,8 +91,8 @@ body {
 /*
  * Concentric corners, as Apple builds them: an inner radius is the outer radius minus the gap between the
  * two edges, so corners run parallel. Popovers and menus: 24 outside, 8 of padding, 16 on the items, whose
- * text sits 20 from the edge so nothing feels pressed into the curve. Panels are 36 (see Shell): rail
- * circles 24 at 12, header pills 28 at 8, list pills 20 at 16, your card 28 at 8.
+ * text sits 20 from the edge so nothing feels pressed into the curve. Panels are 20 (see Shell): list rows
+ * 16 at 4, your card 14 at 8, call tiles 16.
  */
 .popover,
 .dropdown__popover {

@@ -9,9 +9,13 @@ import { UserProfile } from '../people/UserProfile';
 import { RoundButton } from '../ui/ui';
 import { ChevronLeftIcon } from '../ui/icons';
 
-/** Round grey badge for a channel glyph in the header. */
+/** A channel's glyph in the header: a round grey badge on a phone, a quiet glyph before the big name on a computer. */
 export function HeaderIcon({ children }: { children: ReactNode }) {
-  return <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-muted [&_svg]:size-[18px]">{children}</span>;
+  return (
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-muted [&_svg]:size-[18px] md:-mr-1 md:w-auto md:bg-transparent md:text-faint md:[&_svg]:size-7">
+      {children}
+    </span>
+  );
 }
 
 /** On a phone, the way back from a conversation to its list. */
@@ -26,7 +30,10 @@ export function BackButton() {
   );
 }
 
-/** Content header: leading icon/avatar and title on the left, actions and people online on the right. */
+/**
+ * Content header: leading icon/avatar and title on the left, actions and people online on the right. On a computer the
+ * name is big and light on the panel itself (the Metro part of the look); on a phone it's a graphite pill.
+ */
 export function ChannelHeader(props: {
   leading: ReactNode;
   title: string;
@@ -38,13 +45,15 @@ export function ChannelHeader(props: {
   const { leading, title, subtitle, showOnline = true, actions } = props;
   return (
     <header
-      className="mx-2 mt-2 flex h-14 shrink-0 items-center gap-3 rounded-full bg-default pl-2 pr-2 max-md:gap-2"
+      className="mx-2 mt-2 flex h-14 shrink-0 items-center gap-3 rounded-full bg-default pl-2 pr-2 max-md:gap-2 md:mx-0 md:mt-0 md:h-auto md:rounded-none md:bg-transparent md:px-6 md:pb-3 md:pt-5"
     >
       <BackButton />
       {leading}
       <div className="min-w-0 flex-1">
-        <h1 className="truncate text-[16px] font-medium leading-5">{title}</h1>
-        {subtitle && <div className="truncate text-[12px] leading-4 text-muted">{subtitle}</div>}
+        <h1 className="truncate text-[16px] font-medium leading-5 md:text-[32px] md:font-light md:leading-[38px] md:tracking-[-0.8px]">
+          {title}
+        </h1>
+        {subtitle && <div className="truncate text-[12px] leading-4 text-muted md:text-[14px] md:leading-5">{subtitle}</div>}
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {actions}

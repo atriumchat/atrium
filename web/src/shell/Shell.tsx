@@ -95,9 +95,9 @@ export function Shell() {
 function DesktopShell() {
   const mode = useStore((s) => s.mode);
   const playground = usePlayground();
-  // Three floating panels on black with an 8px gap, as in the new Telegram: the rail, the list with your
-  // card at its foot, and the content.
-  const panel = 'overflow-hidden rounded-[36px] border-[0.5px] border-edge bg-window';
+  // Three panels on black with an 8px gap: the rail, the list with your card at its foot, and the content.
+  // Modest 20px corners, no edge line; everything inside is concentric to them.
+  const panel = 'overflow-hidden rounded-[20px] bg-window';
   return (
     <div className="flex h-full gap-2 bg-background p-2">
       <ServerRail className={`${panel} w-[72px] shrink-0`} />
@@ -166,7 +166,7 @@ function ServerRail({ className }: { className: string }) {
           <span
             className={`flex h-12 w-12 items-center justify-center ${mode === 'server' ? 'bg-white text-black' : 'bg-default group-hover:bg-[#28282d]'} ${railShape(mode === 'server')}`}
           >
-            <AtriumMark size={27} />
+            <AtriumMark size={27} filled={mode === 'server'} />
           </span>
         )}
       </RailItem>

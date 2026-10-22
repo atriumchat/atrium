@@ -26,7 +26,7 @@ export function UserPanel() {
   const island = useRef<HTMLDivElement>(null);
   return (
     <div className="shrink-0 px-2">
-      <div ref={island} className="overflow-hidden rounded-[28px] border-[0.5px] border-[#26262b] bg-[#141417]">
+      <div ref={island} className="overflow-hidden rounded-[14px] bg-[#141417]">
         <VoiceStatus />
         <MeRow island={island} />
       </div>
@@ -56,7 +56,7 @@ function VoiceStatus() {
       <div className="flex items-center gap-2 pl-1.5">
         <CallQuality stats={stats} connected={connected} />
         <button onClick={() => (isDmId(channelId) ? openDm(channelId) : selectChannel(channelId))} className="min-w-0 flex-1 text-left">
-          <span className={`block text-[14px] font-medium ${connected ? 'text-success' : 'text-warning'}`}>
+          <span className={`block text-[14px] font-medium ${connected ? 'text-foreground' : 'text-warning'}`}>
             {connected ? t('shell.call.connected') : t('shell.call.connecting')}
           </span>
           <span className="block truncate text-[12px] text-muted hover:underline">{where}</span>

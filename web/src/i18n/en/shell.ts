@@ -142,4 +142,13 @@ export const shell = {
   'shell.time.now': 'now',
   'shell.time.minutes': '{n}m',
   'shell.time.hours': '{n}h',
+  'shell.list.people': {
+    one: '{n} person',
+    other: '{n} people',
+  },
+  'shell.list.online': '{n} online',
+  'shell.list.chats': {
+    one: '{n} conversation',
+    other: '{n} conversations',
+  },
 } satisfies Record<keyof typeof source, Entry>;

@@ -105,4 +105,12 @@ export const voice = {
   'voice.room.joinVoice': 'Join voice',
   'voice.room.sharing': '{name} is sharing their screen',
   'voice.call.chat': 'Chat',
+  'voice.controls.mic': 'Mic',
+  'voice.controls.camera': 'Camera',
+  'voice.controls.screen': 'Screen',
+  'voice.controls.sound': 'Sound',
+  'voice.controls.leave': 'Leave',
+  'voice.people.title': 'People · {n}',
+  'voice.people.open': 'Everyone in the call',
+  'voice.people.close': 'Close',
 } satisfies Record<keyof typeof source, Entry>;

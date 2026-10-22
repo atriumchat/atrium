@@ -23,8 +23,8 @@ export function SettingsMenu() {
   );
 }
 
-/** The chevron glued to the mic / headphones button: pick the input or output device. */
-export function DeviceMenu({ kind, label }: { kind: AudioDeviceKind; label: string }) {
+/** The chevron glued to the mic / headphones button: pick the input or output device. `className` restyles it. */
+export function DeviceMenu({ kind, label, className }: { kind: AudioDeviceKind; label: string; className?: string }) {
   const { t } = useT();
   const [devices, setDevices] = useState<MediaDeviceInfo[] | null>(null);
   const [current, setCurrent] = useState(() => getPreferredDevice(kind) ?? 'default');
@@ -33,7 +33,10 @@ export function DeviceMenu({ kind, label }: { kind: AudioDeviceKind; label: stri
     <Dropdown onOpenChange={(open) => open && listDevices(kind).then(setDevices)}>
       <Dropdown.Trigger
         aria-label={label}
-        className="flex h-9 w-5 items-center justify-center rounded-r-[10px] text-muted outline-none transition-colors hover:bg-default hover:text-foreground data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus"
+        className={
+          className ??
+          'flex h-9 w-5 items-center justify-center rounded-r-[10px] text-muted outline-none transition-colors hover:bg-default hover:text-foreground data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus'
+        }
       >
         <ChevronDownIcon size={14} strokeWidth={2.5} />
       </Dropdown.Trigger>

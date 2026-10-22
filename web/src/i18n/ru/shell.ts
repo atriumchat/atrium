@@ -142,4 +142,17 @@ export const shell = {
   'shell.time.now': 'сейчас',
   'shell.time.minutes': '{n} мин',
   'shell.time.hours': '{n} ч',
+  'shell.list.people': {
+    one: '{n} человек',
+    few: '{n} человека',
+    many: '{n} человек',
+    other: '{n} человека',
+  },
+  'shell.list.online': '{n} в сети',
+  'shell.list.chats': {
+    one: '{n} переписка',
+    few: '{n} переписки',
+    many: '{n} переписок',
+    other: '{n} переписки',
+  },
 } as const;

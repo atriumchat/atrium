@@ -195,13 +195,13 @@ export function ChatView({ conversation }: { conversation: Conversation }) {
             {isGroup && dm ? (
               <>
                 <DmAvatar dm={dm} size={72} />
-                <h2 className="mt-3 text-[28px] font-bold leading-9">{channel.title}</h2>
+                <h2 className="mt-3 truncate text-[28px] font-light leading-9 tracking-[-0.6px]">{channel.title}</h2>
                 <p className="text-[15px] text-muted">{t('chat.intro.group', { title: channel.title })}</p>
               </>
             ) : isDm ? (
               <>
                 <Avatar user={peer} size={72} />
-                <h2 className="mt-3 text-[28px] font-bold leading-9">{channel.title}</h2>
+                <h2 className="mt-3 truncate text-[28px] font-light leading-9 tracking-[-0.6px]">{channel.title}</h2>
                 <p className="text-[15px] text-muted">{t('chat.intro.dm', { title: channel.title })}</p>
               </>
             ) : (
@@ -209,7 +209,7 @@ export function ChatView({ conversation }: { conversation: Conversation }) {
                 <span className="flex h-16 w-16 items-center justify-center rounded-full bg-default text-foreground">
                   <HashIcon size={32} />
                 </span>
-                <h2 className="mt-3 text-[28px] font-bold leading-9">{t('chat.intro.welcome', { title: channel.title })}</h2>
+                <h2 className="mt-3 truncate text-[28px] font-light leading-9 tracking-[-0.6px]">{t('chat.intro.welcome', { title: channel.title })}</h2>
                 <p className="text-[15px] text-muted">{t('chat.intro.channel')}</p>
               </>
             )}
@@ -406,7 +406,7 @@ function OngoingCall() {
   const inside = room.channel.id === myRoom;
 
   return (
-    <div className="mx-2 mt-2 flex shrink-0 items-center gap-4 rounded-full bg-default py-2 pl-2 pr-2 max-md:gap-3">
+    <div className="mx-2 mt-2 flex shrink-0 items-center gap-4 rounded-full bg-default py-2 pl-2 pr-2 max-md:gap-3 md:mx-6 md:mt-1">
       {/* On a phone only the first three faces, so the room name and the button still fit. */}
       <div className="flex shrink-0 items-center gap-1 max-md:[&>*:nth-child(n+4)]:hidden">
         {room.members.slice(0, 5).map((m) => (
@@ -427,7 +427,7 @@ function OngoingCall() {
         </div>
       </div>
       {!inside && (
-        <Button onPress={() => joinVoice(room.channel.id)} className="h-10 shrink-0 rounded-full px-5 font-medium max-md:px-4 [--button-bg-hover:#2a9a45] [--button-bg:#248a3d] [--button-fg:#fff]">
+        <Button onPress={() => joinVoice(room.channel.id)} className="h-10 shrink-0 whitespace-nowrap rounded-full px-5 font-medium max-md:px-4 [--button-bg-hover:#ffffff] [--button-bg:#f2f2f4] [--button-fg:#0c0c0e]">
           <span className="max-md:hidden">{t('chat.call.join')}</span>
           <span className="md:hidden">{t('chat.call.joinShort')}</span>
         </Button>
@@ -868,7 +868,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
   }
 
   return (
-    <div className="relative flex items-end gap-3 px-3 pb-3 max-md:gap-2 max-md:px-2 max-md:pb-[max(8px,env(safe-area-inset-bottom))]">
+    <div className="relative flex items-end gap-3 px-6 pb-5 max-md:gap-2 max-md:px-2 max-md:pb-[max(8px,env(safe-area-inset-bottom))]">
       {showMentions && (
         <div role="listbox" aria-label={t('chat.mention')} className="absolute bottom-[calc(100%-8px)] left-[88px] right-[88px] z-20 rounded-[20px] border-[0.5px] border-white/10 bg-default p-1.5 shadow-[0_12px_32px_rgba(0,0,0,.5)] max-md:left-2 max-md:right-2">
           {options.map((o, i) => (
@@ -995,7 +995,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
           }}
           placeholder={placeholder}
           aria-label={placeholder}
-          className="max-h-[220px] w-full resize-none bg-transparent py-3 text-[16px] leading-6 text-foreground outline-none placeholder:text-faint"
+          className="max-h-[220px] w-full resize-none bg-transparent py-3 text-[16px] leading-6 text-foreground outline-none placeholder:text-faint placeholder-shown:overflow-hidden placeholder-shown:text-ellipsis placeholder-shown:whitespace-nowrap"
         />
       </div>
       <RoundButton size={isMobile ? 'md' : 'lg'} tone={canSend ? 'accent' : 'plain'} label={t('chat.send')} isDisabled={!canSend} onPress={send} className="max-md:mb-1">

@@ -13,20 +13,33 @@ import { Avatar } from '../ui/Avatar';
 import { BubblePair, BubblePeanut } from './Bubbles';
 import { DmAvatar } from '../ui/DmAvatar';
 import { CallDuration } from './CallDuration';
+import { useIsMobile } from '../hooks';
 import { CallControls, MediaStage, useLiveVideo } from './VoiceView';
 import { RoundButton } from '../ui/ui';
 import { PhoneDownIcon, PhoneIcon, SignalIcon, VideoIcon } from '../ui/icons';
 import { t as tr, useT } from '../i18n';
 
-/** Phone and camera buttons in a DM/group header, like Discord's. Hidden once you're in that call. */
+/**
+ * Phone and camera buttons in a DM/group header. On a computer the call is the white pill with its name (from Webex),
+ * the camera a quiet icon beside it; on a phone both are icons. Hidden once you're in that call.
+ */
 export function CallButtons({ dm }: { dm: Dm }) {
   const { t } = useT();
   const inThisCall = useStore((s) => s.voiceChannelId === dm.id);
   const live = useStore((s) => !!s.calls[dm.id]);
   if (inThisCall) return null;
+  const label = live ? t('voice.call.join') : t('voice.call.start');
   return (
     <>
-      <RoundButton tone="ghost" label={live ? t('voice.call.join') : t('voice.call.start')} onPress={() => joinVoice(dm.id)}>
+      <button
+        onClick={() => joinVoice(dm.id)}
+        aria-label={label}
+        className="mr-1 flex h-10 items-center gap-2 whitespace-nowrap rounded-full bg-[#f2f2f4] px-4 text-[15px] font-medium text-[#0c0c0e] transition-colors hover:bg-white max-md:hidden"
+      >
+        <PhoneIcon size={16} />
+        {live ? t('chat.call.joinShort') : t('voice.call.start')}
+      </button>
+      <RoundButton tone="ghost" label={label} onPress={() => joinVoice(dm.id)} className="md:hidden">
         <PhoneIcon />
       </RoundButton>
       <RoundButton tone="ghost" label={t('voice.call.video')} onPress={() => joinVoice(dm.id, { video: true })}>
@@ -60,10 +73,14 @@ function LiveCall({ dm, call }: { dm: Dm; call: CallState | undefined }) {
   const alone = (call?.participants.length ?? 1) <= 1;
   const ringing = (call?.ringing.length ?? 0) > 0;
   const missing = dm.members.some((id) => !call?.participants.some((p) => p.userId === id));
+  const isMobile = useIsMobile();
+  // Tiles, as in a room, once someone else is in or anyone shows video; on a computer that's the rule, on a phone
+  // only for video. Waiting for an answer stays bubbles: they show who's being rung.
+  const tiles = media.length > 0 || (!isMobile && !alone);
 
   return (
-    <div className={`flex flex-col ${media.length > 0 ? 'h-[min(66vh,600px)] pt-4' : ''}`}>
-      {media.length > 0 ? (
+    <div className={`flex flex-col ${tiles ? (media.length > 0 ? 'h-[min(66vh,600px)] pt-4' : 'h-[min(50vh,440px)] pt-4') : ''}`}>
+      {tiles ? (
         <div className="flex min-h-0 flex-1 flex-col">
           <MediaStage />
         </div>

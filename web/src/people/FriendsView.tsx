@@ -32,7 +32,7 @@ export function FriendsView() {
       key={id}
       onClick={() => setTab(id)}
       className={`h-9 shrink-0 rounded-full px-4 text-[14px] transition-colors ${
-        tab === id ? 'bg-white/10 text-foreground' : 'text-muted hover:text-foreground'
+        tab === id ? 'bg-default font-medium text-foreground' : 'text-muted hover:text-foreground'
       }`}
     >
       {label}
@@ -65,30 +65,32 @@ export function FriendsView() {
           </div>
         </header>
       ) : (
-        // A narrow window turns "Add friend" into a round icon; narrower still, the tabs scroll sideways.
-        <header className="@container mx-2 mt-2 flex h-14 shrink-0 items-center gap-2 rounded-full bg-default pl-5 pr-2">
-          <h1 className="mr-3 shrink-0 text-[16px] font-medium">{t('people.friends.title')}</h1>
-          <div className="no-scrollbar flex min-w-0 items-center gap-2 overflow-x-auto">
-            {tabButton('online', t('people.friends.online'))}
-            {tabButton('all', t('people.friends.all'))}
-            {tabButton('pending', pendingLabel)}
+        // A computer: the title big and light like every other screen's, "Add friend" and the inbox beside it, the tabs
+        // under it. A narrow window turns "Add friend" into a round icon.
+        <header className="@container shrink-0 px-6 pb-2 pt-5">
+          <div className="flex items-center gap-2">
+            <h1 className="min-w-0 flex-1 truncate text-[32px] font-light leading-[38px] tracking-[-0.8px]">{t('people.friends.title')}</h1>
             <button
               onClick={() => setTab('add')}
               aria-label={t('people.friends.add')}
-              className={`ml-1 flex h-9 shrink-0 items-center justify-center rounded-full text-[14px] font-medium transition-colors @max-[38rem]:w-9 @min-[38rem]:px-4 ${
-                tab === 'add' ? 'bg-white/10 text-foreground' : 'bg-accent text-accent-foreground hover:opacity-90'
+              className={`flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-full text-[15px] font-medium transition-colors @max-[34rem]:w-10 @min-[34rem]:px-5 ${
+                tab === 'add' ? 'bg-default text-foreground' : 'bg-accent text-accent-foreground hover:opacity-90'
               }`}
             >
-              <UserPlusIcon size={18} className="@min-[38rem]:hidden" />
-              <span className="@max-[38rem]:hidden">{t('people.friends.add')}</span>
+              <UserPlusIcon size={18} className="@min-[34rem]:hidden" />
+              <span className="@max-[34rem]:hidden">{t('people.friends.add')}</span>
             </button>
+            <InboxButton />
           </div>
-          <span className="flex-1" />
-          <InboxButton />
+          <div className="no-scrollbar mt-3 flex items-center gap-1 overflow-x-auto">
+            {tabButton('online', t('people.friends.online'))}
+            {tabButton('all', t('people.friends.all'))}
+            {tabButton('pending', pendingLabel)}
+          </div>
         </header>
       )}
 
-      <div className="flex flex-1 flex-col overflow-y-auto px-3 pb-4 pt-3 max-md:px-1">
+      <div className="flex flex-1 flex-col overflow-y-auto px-5 pb-4 pt-2 max-md:px-1 max-md:pt-3">
         {/* The rooms first: where people are talking right now, a tap away. On the phone they're on the home tab. */}
         {tab !== 'add' && !isMobile && (
           <div className="px-1 pb-4">

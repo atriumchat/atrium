@@ -101,4 +101,12 @@ export const voice = {
   'voice.room.joinVoice': 'Войти в голосовой',
   'voice.room.sharing': '{name} показывает экран',
   'voice.call.chat': 'Чат',
+  'voice.controls.mic': 'Микрофон',
+  'voice.controls.camera': 'Камера',
+  'voice.controls.screen': 'Экран',
+  'voice.controls.sound': 'Звук',
+  'voice.controls.leave': 'Выйти',
+  'voice.people.title': 'Участники · {n}',
+  'voice.people.open': 'Все участники',
+  'voice.people.close': 'Закрыть',
 } as const;

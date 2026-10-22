@@ -8,6 +8,8 @@ import { FlowProvider } from '@atrium/ui-web';
 import { Login } from './account/Login';
 import { DEMO_KEY, DEMO_RESET_TOKEN, demo, demoPlatform } from './account/demo';
 import { Shell } from './shell/Shell';
+import { MetroShell } from './metro/MetroShell';
+import { TruncationHint } from './ui/TruncationHint';
 import { DEMO, SetupWizard } from './account/SetupWizard';
 import { RecoveryKeyScreen, loadNewKey, storeNewKey, type NewKey } from './account/RecoveryKey';
 import { ResetPassword } from './account/ResetPassword';
@@ -30,7 +32,7 @@ export function App() {
 
   // Signed out on a server with no accounts yet: that's a fresh install, so the setup wizard instead of sign-in.
   useEffect(() => {
-    if (getToken() || resetToken) return;
+    if (getToken() || resetToken || demo) return;
     api.setupStatus().then((s) => s.needed && setPhase('setup'), () => undefined);
   }, [resetToken]);
 
@@ -85,6 +87,7 @@ export function App() {
     // The flows' own words (the back button's label) in the app's language, for every flow screen below.
     <FlowProvider labels={{ back: t('setup.back') }}>
       <Toast.Provider placement="top" />
+      <TruncationHint />
       {demo ? (
         // Design work, development only (account/demo.ts): one screen on made-up answers.
         demo === 'signin' ? (
@@ -93,6 +96,8 @@ export function App() {
           <RecoveryKeyScreen value={DEMO_KEY} onDone={() => undefined} />
         ) : demo === 'reset' ? (
           <ResetPassword token={DEMO_RESET_TOKEN} onDone={() => undefined} onCancel={() => undefined} />
+        ) : demo === 'metro' ? (
+          <MetroShell />
         ) : (
           <WhereToUse platform={demoPlatform} onDone={() => undefined} />
         )

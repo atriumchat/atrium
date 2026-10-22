@@ -8,7 +8,10 @@ import { ensureHistory } from '../chat/history';
 import { plainText } from '../ui/Markdown';
 import { RoundButton } from '../ui/ui';
 import { EmptyState } from '../ui/Illustrations';
-import { PhoneIcon, PlusIcon, SearchIcon, UsersIcon } from '../ui/icons';
+import { PhoneIcon, PlusIcon, UsersIcon } from '../ui/icons';
+import { ListHead } from './ListHead';
+import { CallPill } from './CallPill';
+import { CallDuration } from '../voice/CallDuration';
 
 /**
  * Left list on the home screen: friends on top, then your direct messages and groups, newest first.
@@ -26,21 +29,21 @@ export function HomeSidebar() {
 
   return (
     <aside className="flex min-h-0 min-w-0 flex-1 flex-col">
-      {/* The same 72px band, inset and pill height as the server list's search, so switching doesn't jump. */}
-      <div className="flex h-[72px] shrink-0 items-center px-4 max-md:px-3">
-        <NavItem active={view === 'friends'} onPress={openFriends} icon={<UsersIcon size={18} />} label={t('shell.home.friends')} extra={incoming > 0 && <Badge count={incoming} />} />
-      </div>
-      <nav className="flex-1 overflow-y-auto px-2 pb-3">
-        <label className="mx-2 mb-2 flex h-9 items-center gap-2 rounded-full bg-default px-3.5 text-faint focus-within:ring-2 focus-within:ring-focus">
-          <SearchIcon size={15} />
-          <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('shell.home.searchDms')} aria-label={t('shell.home.searchDms')} className="min-w-0 flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-faint" />
-        </label>
-        <div className="flex items-center justify-between pb-1 pl-3 pt-1">
-          <h2 className="text-[14px] font-medium text-muted">{t('shell.home.dms')}</h2>
-          <RoundButton size="sm" tone="ghost" label={t('shell.home.createGroup')} onPress={() => openPicker({ mode: 'create' })} className="h-7 w-7 min-w-7 [&_svg]:size-4">
+      <ListHead
+        title={t('shell.tab.home')}
+        sub={t('shell.list.chats', { n: all.length })}
+        action={
+          <RoundButton size="sm" tone="ghost" label={t('shell.home.createGroup')} onPress={() => openPicker({ mode: 'create' })} className="h-9 w-9 min-w-9 [&_svg]:size-5">
             <PlusIcon />
           </RoundButton>
-        </div>
+        }
+        search={filter}
+        onSearch={setFilter}
+        placeholder={t('shell.home.searchDms')}
+      />
+      <nav className="flex-1 overflow-y-auto px-2 pb-3">
+        <NavItem active={view === 'friends'} onPress={openFriends} icon={<UsersIcon size={19} />} label={t('shell.home.friends')} extra={incoming > 0 && <Badge count={incoming} />} />
+        <h2 className="px-3 pb-1 pt-3 text-[14px] font-medium text-muted">{t('shell.home.dms')}</h2>
         {dms.length === 0 ? (
           query ? <EmptyState compact art="search" title={t('people.picker.noResults')} /> : <EmptyState compact art="messages" title={t('shell.home.empty.title')} text={t('shell.home.empty.text')} />
         ) : (
@@ -90,6 +93,7 @@ export function FeedDm({ dm, big = false }: { dm: Dm; big?: boolean }) {
   const online = useStore((s) => dm.kind === 'dm' && s.online.includes(dm.userId ?? ''));
   const unread = useStore((s) => (active ? 0 : (s.unread[dm.id] ?? 0)));
   const inCall = useStore((s) => !!s.calls[dm.id]);
+  const callStart = useStore((s) => s.calls[dm.id]?.startedAt ?? null);
   const who = dm.preview ? (dm.preview.userId === meId ? t('shell.home.you') : dm.kind === 'group' ? `${users[dm.preview.userId]?.name ?? '…'}: ` : '') : '';
   const text = dm.preview
     ? who + (plainText(dm.preview.text, users) || (dm.preview.images > 1 ? t('shell.home.attachments', { n: dm.preview.images }) : t('shell.home.attachment')))
@@ -105,7 +109,15 @@ export function FeedDm({ dm, big = false }: { dm: Dm; big?: boolean }) {
       title={dmTitle(dm, users, meId)}
       text={text}
       stamp={dm.preview ? relativeStamp(dm.lastMessageAt) : ''}
-      after={inCall ? <PhoneIcon size={16} className="shrink-0 text-success" aria-label={t('shell.home.callActive')} /> : unread > 0 && <Badge count={unread} />}
+      after={
+        inCall ? (
+          <span aria-label={t('shell.home.callActive')}>
+            <CallPill>{callStart ? <CallDuration since={callStart} /> : <PhoneIcon size={12} />}</CallPill>
+          </span>
+        ) : (
+          unread > 0 && <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-foreground" />
+        )
+      }
       bold={unread > 0}
       big={big}
     />
@@ -118,12 +130,12 @@ function FeedRow(props: { active: boolean; onPress: () => void; onWarm: () => vo
       onClick={props.onPress}
       onPointerEnter={props.onWarm}
       onFocus={props.onWarm}
-      className={`flex w-full items-center gap-3 text-left transition-colors ${props.big ? 'h-[68px] rounded-[20px] px-3 active:bg-default/60' : 'h-[60px] rounded-[20px] px-2.5'} ${props.active ? 'bg-default' : 'hover:bg-default/50'}`}
+      className={`flex w-full items-center gap-3 text-left transition-colors ${props.big ? 'h-[68px] rounded-[20px] px-3 active:bg-default/60' : 'h-[60px] rounded-[16px] px-2.5'} ${props.active ? 'bg-default' : 'hover:bg-white/[0.04]'}`}
     >
       {props.avatar}
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline gap-2">
-          <span className={`min-w-0 flex-1 truncate font-medium leading-5 ${props.big ? 'text-[17px]' : 'text-[16px]'} ${props.bold || props.active ? 'text-foreground' : 'text-foreground/85'}`}>{props.title}</span>
+          <span className={`min-w-0 flex-1 truncate leading-5 ${props.big ? 'text-[17px]' : 'text-[16px]'} ${props.bold ? 'font-semibold text-foreground' : props.active ? 'font-medium text-foreground' : 'font-medium text-foreground/85'}`}>{props.title}</span>
           <span className="shrink-0 text-[13px] leading-4 text-faint tabular-nums">{props.stamp}</span>
         </span>
         <span className="mt-0.5 flex items-center gap-2">

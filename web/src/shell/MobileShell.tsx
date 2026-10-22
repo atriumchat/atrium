@@ -287,7 +287,7 @@ function Tab({ id, label, icon, badge = 0 }: { id: MobileTab; label: string; ico
       </span>
       <span
         aria-hidden
-        className={`overflow-hidden whitespace-nowrap text-[15px] font-medium transition-[max-width,opacity,margin] duration-[350ms] ease-[cubic-bezier(.2,.8,.2,1)] ${
+        className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-medium transition-[max-width,opacity,margin] duration-[350ms] ease-[cubic-bezier(.2,.8,.2,1)] ${
           active ? 'ml-2 max-w-[120px] opacity-100' : 'ml-0 max-w-0 opacity-0'
         }`}
       >

@@ -1,5 +1,7 @@
 import { useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
 import { InviteButton } from '../people/Invites';
+import { ListHead } from './ListHead';
+import { CallPill, FaceStack } from './CallPill';
 import { Popover } from '@heroui/react';
 import { api } from '../api';
 import { selectChannel, setChannels, showError, useStore, voiceMembers } from '../store';
@@ -12,11 +14,14 @@ import { CallDuration } from '../voice/CallDuration';
 import { ChannelMenu } from './ChannelMenu';
 import { RoundButton, VolumeSlider } from '../ui/ui';
 import { EmptyState } from '../ui/Illustrations';
-import { BellSlashIcon, HashIcon, HeadphonesSlashIcon, MicSlashIcon, PlusIcon, SearchIcon, SpeakerIcon, VideoIcon } from '../ui/icons';
+import { BellSlashIcon, HashIcon, HeadphonesSlashIcon, MicSlashIcon, PlusIcon, SpeakerIcon, VideoIcon } from '../ui/icons';
 
 export function Sidebar() {
   const { t } = useT();
   const channels = useStore((s) => s.channels);
+  const serverName = useStore((s) => s.serverName);
+  const people = useStore((s) => Object.keys(s.users).length);
+  const online = useStore((s) => s.online.length);
   const [filter, setFilter] = useState('');
   const query = filter.trim().toLowerCase();
   const visible = query ? channels.filter((c) => c.name.toLowerCase().includes(query)) : channels;
@@ -26,19 +31,14 @@ export function Sidebar() {
 
   return (
     <aside className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="flex h-[72px] shrink-0 items-center gap-2 px-4 max-md:px-3">
-        <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full bg-default px-4 text-faint focus-within:ring-2 focus-within:ring-focus max-md:h-12">
-          <SearchIcon size={16} />
-          <input
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder={t('shell.sidebar.search')}
-            aria-label={t('shell.sidebar.search')}
-            className="min-w-0 flex-1 bg-transparent text-[15px] text-foreground outline-none placeholder:text-faint max-md:text-[17px]"
-          />
-        </label>
-        <InviteButton />
-      </div>
+      <ListHead
+        title={serverName}
+        sub={`${t('shell.list.people', { n: people })} · ${t('shell.list.online', { n: online })}`}
+        action={<InviteButton />}
+        search={filter}
+        onSearch={setFilter}
+        placeholder={t('shell.sidebar.search')}
+      />
       <nav className="flex-1 overflow-y-auto px-2 pb-3 max-md:px-3">
         {/* A search that finds nothing shows only that, without the two empty sections under it. */}
         {query && visible.length === 0 ? (
@@ -207,10 +207,10 @@ function Section({ title, kind, children }: { title: string; kind: Channel['kind
   );
 }
 
-/** A pill row: 44px, plain 20px icon, 15px label; the open one gets the graphite fill. */
+/** A pill row: 40px, plain 18px icon, 16px label; the open one gets the graphite fill, a new one is bold. */
 function itemClass(active: boolean, strong = false) {
-  return `flex h-9 w-full items-center gap-2.5 rounded-full px-3 text-left text-[16px] font-medium transition-colors max-md:h-11 ${
-    active ? 'bg-default text-foreground' : strong ? 'text-foreground hover:bg-default/50' : 'text-muted hover:text-foreground'
+  return `flex h-10 w-full items-center gap-2.5 rounded-full px-4 text-left text-[16px] transition-colors max-md:h-11 ${
+    active ? 'bg-default font-medium text-foreground' : strong ? 'font-semibold text-foreground hover:bg-white/[0.04]' : 'font-medium text-muted hover:bg-white/[0.04] hover:text-foreground'
   }`;
 }
 
@@ -236,7 +236,7 @@ function TextItem({ channel }: { channel: Channel }) {
   const unread = useStore((s) => s.unread[channel.id] ?? 0);
   const mentions = useStore((s) => s.mentions[channel.id] ?? 0);
   const muted = useStore((s) => s.mutedChannels.includes(channel.id));
-  // Like Discord: new messages make the name bright and bold; only mentions of you get a red number,
+  // New messages make the name bright and bold with a white dot at the end; only mentions of you get a red number,
   // and they still do in a muted channel, which otherwise stays quiet and dimmed.
   const showUnread = unread > 0 && !active && !muted;
   const showMentions = mentions > 0 && !active;
@@ -247,8 +247,6 @@ function TextItem({ channel }: { channel: Channel }) {
       : undefined;
   return (
     <div className="group relative">
-      {/* Discord's pill at the edge of the list: something new here, easier to catch than a bolder name alone. */}
-      {(showUnread || showMentions) && <span aria-hidden className="absolute -left-2 top-1/2 h-2 w-1 -translate-y-1/2 rounded-r-full bg-foreground max-md:-left-3" />}
       <button
         onClick={() => selectChannel(channel.id)}
         onPointerEnter={() => void ensureHistory(channel.id, 'channel', { quiet: true })}
@@ -258,10 +256,12 @@ function TextItem({ channel }: { channel: Channel }) {
         <HashIcon size={18} className="shrink-0 opacity-60" />
         <span className="min-w-0 flex-1 truncate">{channel.name}</span>
         {muted && !showMentions && <BellSlashIcon size={14} className="shrink-0 md:group-hover:hidden" />}
-        {showMentions && (
+        {showMentions ? (
           <span className="min-w-5 rounded-full bg-danger px-1.5 text-center text-[11px] font-medium leading-5 text-white md:group-hover:hidden">
             {mentions > 99 ? '99+' : mentions}
           </span>
+        ) : (
+          showUnread && <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-foreground md:group-hover:hidden" />
         )}
       </button>
       <RowMenu channelId={channel.id} />
@@ -269,31 +269,52 @@ function TextItem({ channel }: { channel: Channel }) {
   );
 }
 
+/**
+ * A voice room in one row: its name, and when people are in it their faces and names under it with the running time
+ * (yours) or the headcount in a pill. The room you're in lists everyone under it instead, to set each one's volume.
+ */
 function VoiceItem({ channel }: { channel: Channel }) {
   const active = useStore((s) => s.selectedChannelId === channel.id);
   const connectedHere = useStore((s) => s.voiceChannelId === channel.id && s.voiceStatus === 'connected');
   const voiceState = useStore((s) => s.voiceState);
+  const users = useStore((s) => s.users);
   const isMobile = useStore((s) => s.isMobile);
   const members = voiceMembers(voiceState, channel.id);
+  const lit = active && !isMobile;
+  const names = members.map((m) => users[m.userId]?.name ?? '…').join(', ');
 
   return (
     <div className="group relative">
       {/* A click joins on a computer; on a phone it opens the room first, with a Join button, like Discord's app. */}
       <button
         onClick={() => (isMobile ? selectChannel(channel.id) : joinVoice(channel.id))}
-        className={`${itemClass(active && !isMobile)} ${ROW_MENU_ROOM}`}
+        className={`flex w-full items-center gap-2.5 rounded-[18px] px-4 text-left transition-colors ${members.length && !connectedHere ? 'py-2' : 'h-10 max-md:h-11'} ${ROW_MENU_ROOM} ${
+          lit || connectedHere ? 'bg-default text-foreground' : members.length ? 'text-foreground hover:bg-white/[0.04]' : 'text-muted hover:bg-white/[0.04] hover:text-foreground'
+        }`}
       >
         <SpeakerIcon size={18} className={`shrink-0 ${connectedHere ? 'text-success' : 'opacity-60'}`} />
-        <span className="min-w-0 flex-1 truncate">{channel.name}</span>
-        {connectedHere && (
-          <span className="font-mono text-[12px] text-success">
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[16px] font-medium leading-5">{channel.name}</span>
+          {members.length > 0 && !connectedHere && (
+            <span className="mt-1.5 flex items-center gap-2">
+              <FaceStack users={members.map((m) => users[m.userId])} ringBg={lit || connectedHere ? 'var(--default)' : 'var(--app-side)'} />
+              <span className="min-w-0 truncate text-[13px] text-muted">
+                {names}
+              </span>
+            </span>
+          )}
+        </span>
+        {connectedHere ? (
+          <CallPill>
             <CallDuration />
-          </span>
+          </CallPill>
+        ) : (
+          members.length > 0 && <CallPill>{members.length}</CallPill>
         )}
       </button>
       <RowMenu channelId={channel.id} />
-      {members.length > 0 && (
-        <ul className="pb-1 pl-8">
+      {connectedHere && members.length > 0 && (
+        <ul className="pb-1 pl-8 pt-1">
           {members.map((m) => (
             <VoiceMember key={m.userId} entry={m} />
           ))}
