@@ -25,7 +25,8 @@ The wizard asks for a domain, sets everything up and prints a link to create the
 personal invite link.
 
 No terminal, no domain of your own? Use the [desktop app](docs/install.md#your-own-server-from-the-app): it needs only the server's
-IP and root password.
+IP and root password. The password isn't stored; once installed, the app's key can only check the status, update,
+back up and read logs ([`deploy/atrium-agent`](deploy/atrium-agent)), nothing else as root.
 
 ## Features
 

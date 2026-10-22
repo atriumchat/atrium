@@ -411,12 +411,26 @@ add_app_key() {
   chmod 700 /root/.ssh
   touch /root/.ssh/authorized_keys
   chmod 600 /root/.ssh/authorized_keys
-  grep -qxF "$key" /root/.ssh/authorized_keys || printf '%s\n' "$key" >>/root/.ssh/authorized_keys
+  # Already there (a run again from the app), maybe already pinned to the agent: once is enough.
+  grep -qF "${key#ssh-ed25519 }" /root/.ssh/authorized_keys || printf '%s\n' "$key" >>/root/.ssh/authorized_keys
   log "desktop app key added for root"
 }
 
+# Once Atrium runs, the desktop app's key (the line with the comment atrium-app) stops being root: it is pinned to
+# deploy/atrium-agent, which only understands status, update, backup and logs, and loses forwarding and a terminal.
+# The install itself still had the full key (it may need running again); an update pins servers installed before.
+lock_app_key() {
+  local f=/root/.ssh/authorized_keys agent=$ATRIUM_DIR/deploy/atrium-agent
+  [[ -f $f && -x $agent ]] || return 0
+  grep -Eq '^ssh-ed25519 [^ ]+ atrium-app[[:space:]]*$' "$f" || return 0
+  sed -i -E "s|^(ssh-ed25519 [^ ]+ atrium-app)[[:space:]]*\$|restrict,command=\"$agent\" \\1|" "$f"
+  log "desktop app key pinned to $agent"
+}
+
 # The desktop app sets the address up just before it installs (a free name on dedyn.io, or the person's own
-# records), so the installer waits for the names to answer here: the certificates can then come at once.
+# records), and a new name can take minutes to reach every resolver. Only the start and the certificates need it, so
+# the installer waits here after everything else is done (install_all): the wait mostly hides behind Docker and the
+# images instead of holding the install up from its second step.
 wait_dns() {
   [[ ${ATRIUM_PROGRESS:-} == 1 ]] || return 0
   local i
@@ -810,7 +824,7 @@ step_files() {
   progress sub "Раскладываем файлы"
   mkdir -p "$stage" || return
   tar -xzf "$tgz" -C "$stage" --strip-components=1 --no-same-owner || return
-  for f in deploy/docker-compose.yml deploy/Caddyfile deploy/backup.sh deploy/livekit.yaml.tmpl; do
+  for f in deploy/docker-compose.yml deploy/Caddyfile deploy/backup.sh deploy/atrium-agent deploy/livekit.yaml.tmpl; do
     [[ -f $stage/$f ]] || { echo "Release has no $f"; return 1; }
   done
   mkdir -p "$ATRIUM_DIR/deploy" "$ATRIUM_DIR/landing" || return
@@ -819,7 +833,7 @@ step_files() {
     touch "$ATRIUM_TMP/caddyfile-changed" || return
   fi
   install -m 644 "$stage/deploy/docker-compose.yml" "$stage/deploy/Caddyfile" "$stage/deploy/livekit.yaml.tmpl" "$ATRIUM_DIR/deploy/" || return
-  install -m 755 "$stage/deploy/backup.sh" "$ATRIUM_DIR/deploy/" || return
+  install -m 755 "$stage/deploy/backup.sh" "$stage/deploy/atrium-agent" "$ATRIUM_DIR/deploy/" || return
   return 0
 }
 
@@ -1120,6 +1134,10 @@ install_all() {
   run "Настройки и ключи" step_config
   if [[ -d /run/systemd/system ]]; then run "Ночные бэкапы" step_backups; fi
   run "Скачиваем образы" step_pull
+  if [[ ${ATRIUM_PROGRESS:-} == 1 ]]; then
+    wait_dns
+    check_dns
+  fi
   run "Запуск" step_up
   HTTPS_OK=0
   if (( DNS_OK )); then
@@ -1387,14 +1405,15 @@ run_quiet() {
     die "Сервер не готов."
   fi
   progress "done" check
-  wait_dns
+  # From the desktop app the address is waited for later, right before the start (install_all).
   check_dns
-  if (( ! DNS_OK )); then
+  if (( ! DNS_OK )) && [[ ${ATRIUM_PROGRESS:-} != 1 ]]; then
     say
     warn "DNS ещё не готов:"
     print_dns
   fi
   install_all
+  lock_app_key
   screen_done
 }
 
@@ -1432,6 +1451,7 @@ wizard() {
         header 4
         title "Установка"
         install_all
+        lock_app_key
         screen_done
         return
         ;;

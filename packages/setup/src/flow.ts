@@ -71,20 +71,19 @@ export const ownOnPhone = defineFlow({
 export const OWN_READY = 0.68;
 
 /**
- * "Your own server" in the desktop app: the VPS, its address, backups to the admin's Drive, the install. The server's
- * first run follows in the web wizard, with its own scale.
+ * "Your own server" in the desktop app: the VPS, its address, the install. The server's first run follows in the web
+ * wizard, with its own scale.
  */
-export const ownOnDesktop = defineFlow<'server' | 'address' | 'free-name' | 'free-mail' | 'own' | 'backup' | 'install', 'server' | 'address' | 'backup' | 'install', Way>({
-  parts: ['server', 'address', 'backup', 'install'],
+export const ownOnDesktop = defineFlow<'server' | 'address' | 'free-name' | 'free-mail' | 'own' | 'install', 'server' | 'address' | 'install', Way>({
+  parts: ['server', 'address', 'install'],
   steps: {
     server: { fill: 0, part: 'server' },
     address: { fill: 0.2, part: 'address', back: 'server' },
     'free-name': { fill: 0.4, part: 'address', back: 'address' },
     'free-mail': { fill: 0.5, part: 'address', back: 'free-name' },
     own: { fill: 0.4, part: 'address', back: 'address' },
-    backup: { fill: 0.6, part: 'backup', back: ({ way }) => (way === 'free' ? 'free-name' : 'own') },
-    // No way back: from Backups, Next would run the installer again over the server.
-    install: { fill: 0.8, part: 'install' },
+    // No way back: the installer is already at work on the server.
+    install: { fill: 0.6, part: 'install' },
   },
 });
 

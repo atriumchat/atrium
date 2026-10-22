@@ -15,7 +15,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 INSTALLER=deploy/install.sh
 # What a server gets besides the images: exactly what install.sh unpacks.
-FILES=(deploy/docker-compose.yml deploy/Caddyfile deploy/backup.sh deploy/livekit.yaml.tmpl)
+FILES=(deploy/docker-compose.yml deploy/Caddyfile deploy/backup.sh deploy/atrium-agent deploy/livekit.yaml.tmpl)
 # What the images are built from: a release must not leave any of it uncommitted.
 SOURCES=(Dockerfile .dockerignore server web deploy/caddy .github/workflows/images.yml "${FILES[@]}")
 cd "$ROOT"

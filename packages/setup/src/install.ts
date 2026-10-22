@@ -5,8 +5,8 @@ import { IPV4 } from './validate';
  * lines read, and what the first look at the server asks. Strings in, strings out: the SSH itself is the platform's.
  */
 
-/** The installer's steps, in the order they run ("::atrium run|done STEP"). */
-export const TASKS = ['check', 'address', 'docker', 'firewall', 'ssh', 'files', 'config', 'backups', 'pull', 'up', 'https'] as const;
+/** The installer's steps, in the order they run ("::atrium run|done STEP"): the address is waited for late, just before the start. */
+export const TASKS = ['check', 'docker', 'firewall', 'ssh', 'files', 'config', 'backups', 'pull', 'address', 'up', 'https'] as const;
 export type Task = (typeof TASKS)[number];
 
 /** The relay's neutral subdomain, as install.sh picks it (TURN_NAMES); picked here so own-domain records can show it. */

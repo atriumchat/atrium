@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# The desktop app's only way into the server once Atrium is installed. install.sh (lock_app_key) pins the app's SSH key
+# to this script in /root/.ssh/authorized_keys (`restrict,command="…/atrium-agent"`), so whatever the app asks for,
+# sshd runs this instead, with the request in SSH_ORIGINAL_COMMAND. Only the few words below are understood, with no
+# arguments: no shell, no files, no forwarding. Even a broken or stolen copy of the app can do nothing here but these.
+set -euo pipefail
+
+dir=$(cd "$(dirname "$0")/.." && pwd)
+installer=https://github.com/atriumchat/atrium/releases/latest/download/install.sh
+
+case ${SSH_ORIGINAL_COMMAND:-} in
+  status)
+    # The running version and each container's state.
+    cd "$dir"
+    grep -E '^ATRIUM_VERSION=' .env || echo 'ATRIUM_VERSION=?'
+    docker compose ps --format '{{.Service}} {{.State}}'
+    ;;
+  update)
+    # The latest release's installer, as on the site; it checks the files it fetches against the release's hashes.
+    curl -fsSL --retry 3 "$installer" -o /root/atrium-install.sh
+    exec env ATRIUM_PROGRESS=1 bash /root/atrium-install.sh update
+    ;;
+  backup)
+    # A backup now, the same as the nightly one.
+    exec "$dir/deploy/backup.sh"
+    ;;
+  logs)
+    cd "$dir"
+    exec docker compose logs --no-color --tail 200 app
+    ;;
+  *)
+    echo "atrium-agent: only status, update, backup or logs" >&2
+    exit 126
+    ;;
+esac

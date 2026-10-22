@@ -54,7 +54,7 @@ test('mailboxes, capacity, the made-up install', () => {
   assert.deepEqual(capacity({ cores: 1, memory: 1 }), { call: 12, screen: 6 });
   assert.deepEqual(capacity({ cores: 4, memory: 8 }), { call: 60, screen: 30 });
   assert.equal(mockProgress(0).current, 'check');
-  assert.equal(mockProgress(2.5).current, 'address');
+  assert.equal(mockProgress(2.5).current, 'docker');
   const done = mockProgress(1000);
   assert.equal(done.current, null);
   assert.equal(doneCount(done), TASKS.length);

@@ -29,12 +29,6 @@ test('the scale never goes back along the phone way forward', () => {
   assert.ok(ownOnPhone.fill('install') < OWN_READY && OWN_READY < ownOnPhone.fill('name'));
 });
 
-test('the desktop: back from backups depends on the address way', () => {
-  assert.equal(ownOnDesktop.back('backup', { way: 'free' }), 'free-name');
-  assert.equal(ownOnDesktop.back('backup', { way: 'own' }), 'own');
-  assert.deepEqual(ownOnDesktop.stage('free-mail'), { part: 'address', n: 2, total: 4 });
-});
-
 test('the web: back to the code only when it was asked', () => {
   assert.equal(firstRun.back('server', { askCode: true }), 'code');
   assert.equal(firstRun.back('server', { askCode: false }), null);
@@ -53,4 +47,9 @@ test('getting in: only signing up is counted, back goes the way walked', () => {
   assert.equal(signInFlow.back('recover', undefined), 'login');
   assert.equal(signInFlow.back('start', undefined), null);
   assert.ok(signInFlow.fill('invite') < signInFlow.fill('account'));
+});
+
+test('the desktop: three parts, the address second', () => {
+  assert.deepEqual(ownOnDesktop.stage('free-mail'), { part: 'address', n: 2, total: 3 });
+  assert.equal(ownOnDesktop.back('install', { way: 'free' }), null);
 });
