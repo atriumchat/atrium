@@ -824,6 +824,13 @@ app.whenReady().then(async () => {
   // The system's language (a developer can force one with ATRIUM_LANG=ru|en); the windows below open in it.
   i18n.setLang(devEnv('ATRIUM_LANG') ?? readConfig().language ?? i18n.pick(app.getLocale()));
   app.setAppUserModelId('club.atriumchat.desktop'); // Windows notifications need it
+  // Names are asked over HTTPS from Cloudflare or Google first, the system's DNS only when they can't be reached. A
+  // router or provider that asked for a new server's name before it existed keeps "no such name" for up to an hour
+  // (dedyn.io's negative TTL); asked directly, the name answers the moment it's there.
+  app.configureHostResolver({
+    secureDnsMode: 'automatic',
+    secureDnsServers: ['https://cloudflare-dns.com/dns-query', 'https://dns.google/dns-query'],
+  });
   setUpPermissions();
   listenToPage();
   if (!APP_URL) {
