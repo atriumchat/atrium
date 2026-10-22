@@ -419,14 +419,18 @@ export function Onboarding() {
       case 'install':
         return (
           <FlowStep
-            title={done ? t('ob.install.ready') : t('ob.install.title')}
+            // Installed but the address not answering yet: said as "almost", the button busy waiting, not a grey one.
+            title={done ? t(open ? 'ob.install.ready' : 'ob.install.almost') : t('ob.install.title')}
             sub={done ? (open ? done.shown : t('ob.install.spreading')) : t('ob.install.sub')}
             error={failed}
+            note={done && !open ? t('ob.install.waitNote') : undefined}
             actions={
               failed ? (
                 <FlowPrimary onPress={() => install()}>{t('ob.install.retry')}</FlowPrimary>
               ) : (
-                <FlowPrimary disabled={!open} onPress={() => done && setup.openServer(done.url)}>{t('ob.install.open')}</FlowPrimary>
+                <FlowPrimary disabled={!open} busy={!!done && !open} onPress={() => done && setup.openServer(done.url)}>
+                  {done && !open ? t('ob.install.waitButton') : t('ob.install.open')}
+                </FlowPrimary>
               )
             }
           >
