@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import Animated from 'react-native-reanimated';
 import { appear, move, vanish } from '../motion';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore, dmTitle, getSocket, refresh, showError } from '../store';
 import { joinVoice, useVoice } from '../voice';
 import { useT, type TFn } from '../i18n';
@@ -37,26 +38,36 @@ export function HomeTab() {
       <TabHeader title={t('shell.tab.home')} friends />
       <SearchRow value={filter} onChange={setFilter} placeholder={t('m.searchDms')} />
       <IncomingCalls />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        keyboardDismissMode="on-drag"
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingTop: 4, paddingBottom: 16, gap: 16, flexGrow: 1 }}
-        refreshControl={<RefreshControl tintColor="#fff" refreshing={refreshing} onRefresh={() => { haptic.firm(); setRefreshing(true); void refresh().catch(showError).finally(() => setRefreshing(false)); }} />}
-      >
+      {/* Who's in voice and the list's heading stay put; only the conversations under them scroll. */}
+      <View style={{ paddingTop: 4, gap: 16 }}>
         {query ? null : <Animated.View entering={appear} layout={move}><RoomCards /></Animated.View>}
-        <View style={{ paddingHorizontal: 12, flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 4, paddingLeft: 12 }}>
-            <Text style={{ fontSize: 18, fontWeight: '600' }}>{t('shell.home.dms')}</Text>
-            <RoundButton size="sm" tone="ghost" label={t('shell.home.newGroup')} onPress={openGroupPicker}>{(c) => <PlusIcon size={20} color={c} />}</RoundButton>
-          </View>
-          {dms.length > 0 ? dms.map((dm) => <Animated.View key={dm.id} layout={move}><FeedDm dm={dm} /></Animated.View>) : query ? (
-            <EmptyState compact art="search" title={t('people.picker.noResults')} />
-          ) : (
-            <EmptyState compact art="messages" title={t('shell.home.empty.title')} text={t('shell.home.empty.text')} />
-          )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 4, paddingLeft: 24, paddingRight: 12 }}>
+          <Text style={{ fontSize: 18, fontWeight: '600' }}>{t('shell.home.dms')}</Text>
+          <RoundButton size="sm" tone="ghost" label={t('shell.home.newGroup')} onPress={openGroupPicker}>{(c) => <PlusIcon size={20} color={c} />}</RoundButton>
         </View>
-      </ScrollView>
+      </View>
+      {dms.length > 0 ? (
+        <ScrollView
+          style={{ flex: 1 }}
+          contentInsetAdjustmentBehavior="automatic"
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 16 }}
+          refreshControl={<RefreshControl tintColor="#fff" refreshing={refreshing} onRefresh={() => { haptic.firm(); setRefreshing(true); void refresh().catch(showError).finally(() => setRefreshing(false)); }} />}
+        >
+          {dms.map((dm) => <Animated.View key={dm.id} layout={move}><FeedDm dm={dm} /></Animated.View>)}
+        </ScrollView>
+      ) : (
+        // Nothing to scroll: the empty state in the middle of what's left, above the tab bar (a native SafeAreaView's
+        // bottom inset includes the bar inside a tab).
+        <SafeAreaView edges={['bottom']} style={{ flex: 1 }}>
+          {query ? (
+            <EmptyState fill compact art="search" title={t('people.picker.noResults')} />
+          ) : (
+            <EmptyState fill compact art="messages" title={t('shell.home.empty.title')} text={t('shell.home.empty.text')} />
+          )}
+        </SafeAreaView>
+      )}
     </View>
   );
 }

@@ -38,7 +38,7 @@ export function ServerTab() {
           </Pressable>
         }
       />
-      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 12, flexGrow: 1 }} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 12 }} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
         {query && visible.length === 0 ? (
           <EmptyState compact art="search" title={t('shell.sidebar.noResults.title')} text={t('shell.sidebar.noResults.text')} />
         ) : (
