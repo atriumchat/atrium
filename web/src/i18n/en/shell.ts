@@ -3,11 +3,11 @@ import type { shell as source } from '../ru/shell';
 
 /** Same keys as ru/shell.ts: `satisfies` fails tsc on a missing or extra key. */
 export const shell = {
-  'shell.sidebar.search': 'Find channel',
+  'shell.sidebar.search': 'Find a channel or room',
   'shell.sidebar.noResults.title': 'Nothing found',
-  'shell.sidebar.noResults.text': 'No matching channels',
-  'shell.sidebar.textChannels': 'Text channels',
-  'shell.sidebar.voiceRooms': 'Voice rooms',
+  'shell.sidebar.noResults.text': 'No channels or rooms by that name',
+  'shell.sidebar.textChannels': 'Channels',
+  'shell.sidebar.voiceRooms': 'Rooms',
   'shell.sidebar.reorderFailed': 'Reorder failed',
   'shell.sidebar.createFailed': 'Could not create channel',
   'shell.sidebar.createText': 'Create text channel',
@@ -25,10 +25,10 @@ export const shell = {
   'shell.sidebar.volume': 'Volume: {name}',
 
   'shell.home.friends': 'Friends',
-  'shell.home.dms': 'Direct messages',
+  'shell.home.dms': 'Conversations',
   'shell.home.createGroup': 'Create group',
   'shell.home.newGroup': 'New group',
-  'shell.home.empty.title': 'No messages yet',
+  'shell.home.empty.title': 'No conversations yet',
   'shell.home.empty.text': 'Direct messages and groups',
   'shell.home.you': 'You: ',
   'shell.home.attachments': '{n} attachments',
@@ -58,9 +58,9 @@ export const shell = {
   'shell.call.pickMic': 'Select microphone',
   'shell.call.pickOutput': 'Select output device',
 
-  'shell.tab.home': 'Home',
+  'shell.tab.home': 'Chats',
   'shell.tab.server': 'Server',
-  'shell.tab.you': 'You',
+  'shell.tab.you': 'Profile',
 
   'shell.content.noChannel.title': 'No channel selected',
   'shell.content.noChannel.text': 'Channel opens here',

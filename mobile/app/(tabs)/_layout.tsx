@@ -45,7 +45,8 @@ export default function TabsLayout() {
           {badge(home)}
         </NativeTabs.Trigger>
         <NativeTabs.Trigger name="server">
-          <NativeTabs.Trigger.Label>{t('shell.tab.server')}</NativeTabs.Trigger.Label>
+          {/* The tab is your server: its own name, the generic word only while it has none. */}
+          <NativeTabs.Trigger.Label>{data.serverName?.trim() || t('shell.tab.server')}</NativeTabs.Trigger.Label>
           {/* The server's own icon is a picture, kept in its colours; Gomex's mark is a glyph the bar tints. */}
           {icons.server ? <NativeTabs.Trigger.Icon src={custom ? icons.server : { default: icons.server, selected: icons.serverOn ?? icons.server }} renderingMode={custom ? 'original' : 'template'} /> : null}
           {badge(server)}

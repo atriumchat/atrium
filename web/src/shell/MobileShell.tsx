@@ -251,12 +251,13 @@ function TabBar() {
   const serverUnread = useStore(serverBadgeCount);
   const homeBadge = useStore(homeBadgeCount);
   const me = useStore((s) => s.me);
+  const serverName = useStore((s) => s.serverName);
   const serverIcon = useStore((s) => s.serverIcon);
   return (
     <nav className="shrink-0 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-2">
       <div className="flex h-16 items-center gap-1 rounded-full border-[0.5px] border-white/10 bg-default p-1.5">
         <Tab id="home" label={t('shell.tab.home')} badge={homeBadge} icon={(on) => (on ? <HomeFilledIcon size={24} /> : <HomeIcon size={24} />)} />
-        <Tab id="server" label={t('shell.tab.server')} badge={serverUnread} icon={(on) => <ServerMark icon={serverIcon} size={24} filled={on} />} />
+        <Tab id="server" label={serverName?.trim() || t('shell.tab.server')} badge={serverUnread} icon={(on) => <ServerMark icon={serverIcon} size={24} filled={on} />} />
         <Tab id="you" label={t('shell.tab.you')} icon={() => <Avatar user={me ?? undefined} size={28} ringBg="var(--default)" />} />
       </div>
     </nav>

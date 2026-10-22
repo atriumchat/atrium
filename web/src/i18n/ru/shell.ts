@@ -1,9 +1,9 @@
 export const shell = {
-  'shell.sidebar.search': 'Найти канал',
+  'shell.sidebar.search': 'Найти канал или комнату',
   'shell.sidebar.noResults.title': 'Ничего не нашлось',
-  'shell.sidebar.noResults.text': 'Каналов с таким названием нет',
-  'shell.sidebar.textChannels': 'Текстовые каналы',
-  'shell.sidebar.voiceRooms': 'Голосовые комнаты',
+  'shell.sidebar.noResults.text': 'Нет каналов и комнат с таким названием',
+  'shell.sidebar.textChannels': 'Каналы',
+  'shell.sidebar.voiceRooms': 'Комнаты',
   'shell.sidebar.reorderFailed': 'Не получилось переставить',
   'shell.sidebar.createFailed': 'Не удалось создать канал',
   'shell.sidebar.createText': 'Создать текстовый канал',
@@ -23,10 +23,10 @@ export const shell = {
   'shell.sidebar.volume': 'Громкость: {name}',
 
   'shell.home.friends': 'Друзья',
-  'shell.home.dms': 'Личные сообщения',
+  'shell.home.dms': 'Переписки',
   'shell.home.createGroup': 'Создать группу',
   'shell.home.newGroup': 'Новая группа',
-  'shell.home.empty.title': 'Сообщений пока нет',
+  'shell.home.empty.title': 'Переписок пока нет',
   'shell.home.empty.text': 'Здесь будут лички и группы',
   'shell.home.you': 'Вы: ',
   'shell.home.attachments': '{n} вложения',
@@ -58,9 +58,9 @@ export const shell = {
   'shell.call.pickMic': 'Выбрать микрофон',
   'shell.call.pickOutput': 'Выбрать устройство вывода',
 
-  'shell.tab.home': 'Главная',
+  'shell.tab.home': 'Чаты',
   'shell.tab.server': 'Сервер',
-  'shell.tab.you': 'Вы',
+  'shell.tab.you': 'Профиль',
 
   'shell.content.noChannel.title': 'Канал не выбран',
   'shell.content.noChannel.text': 'Здесь откроется канал',
