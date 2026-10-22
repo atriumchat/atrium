@@ -406,7 +406,7 @@ export function Onboarding() {
 
   return (
     <FlowProvider labels={{ back: t('ob.back') }}>
-      <FlowShell fill={fill} label={t('ob.stageOf', { stage: t(`ob.stage.${stage.part}`), n: stage.n, total: stage.total })}>
+      <FlowShell fill={fill} label={stage ? t('ob.stageOf', { stage: t(`ob.stage.${stage.part}`), n: stage.n, total: stage.total }) : undefined}>
         <div ref={box} key={step.n} className={step.back ? 'flow-swap back-in' : 'flow-swap'}>
           {screen()}
         </div>

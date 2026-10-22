@@ -5,7 +5,7 @@ import { inviteLink } from '../people/invite';
 import { GomexMark } from '../ui/Logo';
 import { IconCropper, centred, cropToBlob, cropToUrl, loadImage, type Crop } from '../ui/IconCropper';
 import { adminForm, codeFrom, CODE_LENGTH, firstRun, type FirstRunStep } from '@gomex/setup';
-import { FlowPrimary, FlowProvider, FlowSecondary, FlowShell, FlowStep, LineField, TextAction } from '@gomex/ui-web';
+import { FlowPrimary, FlowSecondary, FlowShell, FlowStep, LineField, TextAction } from '@gomex/ui-web';
 import './setupWizard.css';
 
 /**
@@ -368,12 +368,10 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   const parts = { server: t('setup.done.server'), account: t('setup.progress.account'), friends: t('setup.progress.friends') };
   const stage = firstRun.stage(step.id);
   return (
-    <FlowProvider labels={{ back: t('setup.back') }}>
-      <FlowShell fill={firstRun.fill(step.id)} label={t('setup.stageOf', { stage: parts[stage.part], n: stage.n, total: stage.total })}>
-        <div key={step.n} className={step.back ? 'flow-swap back-in' : 'flow-swap'}>
-          {render(step.id)}
-        </div>
-      </FlowShell>
-    </FlowProvider>
+    <FlowShell fill={firstRun.fill(step.id)} label={stage ? t('setup.stageOf', { stage: parts[stage.part], n: stage.n, total: stage.total }) : undefined}>
+      <div key={step.n} className={step.back ? 'flow-swap back-in' : 'flow-swap'}>
+        {render(step.id)}
+      </div>
+    </FlowShell>
   );
 }

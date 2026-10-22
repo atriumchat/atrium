@@ -551,7 +551,7 @@ export default function OwnServer() {
   return (
     <FlowShell
       fill={fill}
-      label={t('own.stageOf', { stage: t(`own.stage.${stage.part}`), n: stage.n, total: stage.total })}
+      label={stage ? t('own.stageOf', { stage: t(`own.stage.${stage.part}`), n: stage.n, total: stage.total }) : undefined}
       // While it installs (and hasn't failed), the game takes the bottom of the screen, edge to edge.
       bottom={
         installing && !failed ? (

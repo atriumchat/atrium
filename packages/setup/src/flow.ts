@@ -6,7 +6,8 @@
 
 export type StepSpec<Part extends string, Ctx> = {
   fill: number;
-  part: Part;
+  /** The part it's in, for "Адрес (2/5)"; null for a step outside the counted parts (no line over its title). */
+  part: Part | null;
   /** One step back along the way actually walked; none where back leaves the flow. */
   back?: string | ((ctx: Ctx) => string | null);
 };
@@ -19,10 +20,10 @@ export type Flow<Step extends string, Part extends string, Ctx = void> = {
 export function defineFlow<Step extends string, Part extends string, Ctx = void>(flow: Flow<Step, Part, Ctx>) {
   return {
     ...flow,
-    /** The part a step is in, with its number and the count, for "Адрес (2/5)". */
-    stage(step: Step) {
+    /** The part a step is in, with its number and the count, for "Адрес (2/5)"; null where no line is shown. */
+    stage(step: Step): { part: Part; n: number; total: number } | null {
       const part = flow.steps[step].part;
-      return { part, n: flow.parts.indexOf(part) + 1, total: flow.parts.length };
+      return part === null ? null : { part, n: flow.parts.indexOf(part) + 1, total: flow.parts.length };
     },
     fill(step: Step) {
       return flow.steps[step].fill;
@@ -101,6 +102,23 @@ export const firstRun = defineFlow<'code' | 'server' | 'crop' | 'admin' | 'key' 
   },
 });
 
+/**
+ * Getting in, on a server one already knows: what you're here for, then the nickname and password; by invite the
+ * link first (whose it is shows under it), then the account; or the recovery key. Signing up is the counted way
+ * ("Приглашение (1/2)"); signing in goes half the scale, signing up all of it.
+ */
+export const signInFlow = defineFlow<'start' | 'login' | 'recover' | 'invite' | 'account', 'invite' | 'account'>({
+  parts: ['invite', 'account'],
+  steps: {
+    start: { fill: 0, part: null },
+    login: { fill: 0.5, part: null, back: 'start' },
+    recover: { fill: 0.5, part: null, back: 'login' },
+    invite: { fill: 0.34, part: 'invite', back: 'start' },
+    account: { fill: 0.67, part: 'account', back: 'invite' },
+  },
+});
+
 export type OwnPhoneStep = keyof typeof ownOnPhone.steps;
+export type SignInStep = keyof typeof signInFlow.steps;
 export type OwnDesktopStep = keyof typeof ownOnDesktop.steps;
 export type FirstRunStep = keyof typeof firstRun.steps;

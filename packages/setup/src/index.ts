@@ -1,4 +1,4 @@
-export { defineFlow, jobFill, ownOnPhone, ownOnDesktop, firstRun, OWN_READY, type Flow, type StepSpec, type OwnPhoneStep, type OwnDesktopStep, type FirstRunStep } from './flow';
+export { defineFlow, jobFill, ownOnPhone, ownOnDesktop, firstRun, signInFlow, OWN_READY, type Flow, type StepSpec, type OwnPhoneStep, type OwnDesktopStep, type FirstRunStep, type SignInStep } from './flow';
 export { NAME, DOMAIN, EMAIL, IPV4, hostOk, freeName, nameOk, emailOk, domainOk, CODE_LENGTH, codeFrom, MIN_PASSWORD, adminForm } from './validate';
 export {
   TASKS,

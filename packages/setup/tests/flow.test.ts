@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { firstRun, jobFill, OWN_READY, ownOnDesktop, ownOnPhone } from '../src/index';
+import { firstRun, jobFill, OWN_READY, ownOnDesktop, ownOnPhone, signInFlow } from '../src/index';
 
-for (const [name, flow] of Object.entries({ ownOnPhone, ownOnDesktop, firstRun })) {
+for (const [name, flow] of Object.entries({ ownOnPhone, ownOnDesktop, firstRun, signInFlow })) {
   test(`${name}: every step's part is a part, its fill on the scale, back leads to a step`, () => {
     const steps = Object.keys(flow.steps) as (keyof typeof flow.steps)[];
     for (const step of steps) {
-      const spec = flow.steps[step] as { fill: number; part: string; back?: unknown };
-      assert.ok((flow.parts as readonly string[]).includes(spec.part), `${step}: ${spec.part}`);
+      const spec = flow.steps[step] as { fill: number; part: string | null; back?: unknown };
+      if (spec.part !== null) assert.ok((flow.parts as readonly string[]).includes(spec.part), `${step}: ${spec.part}`);
       assert.ok(spec.fill >= 0 && spec.fill < 1, `${step}: ${spec.fill}`);
       if (typeof spec.back === 'string') assert.ok(steps.includes(spec.back as never), `${step} → ${spec.back}`);
     }
@@ -45,4 +45,12 @@ test('a long job fills its stretch of the scale', () => {
   assert.ok(Math.abs(jobFill(0.32, 0.68, 11, 11, false) - 0.68) < 1e-9);
   assert.equal(jobFill(0.32, 0.68, 3, 11, true), 0.68);
   assert.equal(jobFill(0.32, 0.68, 99, 11, false), jobFill(0.32, 0.68, 11, 11, false));
+});
+
+test('getting in: only signing up is counted, back goes the way walked', () => {
+  assert.equal(signInFlow.stage('login'), null);
+  assert.deepEqual(signInFlow.stage('account'), { part: 'account', n: 2, total: 2 });
+  assert.equal(signInFlow.back('recover', undefined), 'login');
+  assert.equal(signInFlow.back('start', undefined), null);
+  assert.ok(signInFlow.fill('invite') < signInFlow.fill('account'));
 });

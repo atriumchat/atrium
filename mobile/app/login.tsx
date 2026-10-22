@@ -9,7 +9,7 @@ import { useT } from '../src/i18n';
 import { Text } from '../src/text';
 import { FlowPrimary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '@gomex/ui-native';
 import { RecoveryKeyStep } from '../src/components/RecoveryKeyStep';
-import { MIN_PASSWORD, MOCK_KEY } from '@gomex/setup';
+import { MIN_PASSWORD, MOCK_KEY, signInFlow, type SignInStep } from '@gomex/setup';
 
 /**
  * Signing in, in the flow look (DESIGN.md), a short step at a time so nothing scrolls: what you're here for, then the
@@ -17,10 +17,9 @@ import { MIN_PASSWORD, MOCK_KEY } from '@gomex/setup';
  * The server is remembered and shown as a line to change, not a field to fill every time.
  */
 
-type Step = 'start' | 'login' | 'invite' | 'account' | 'recover' | 'key';
+// The steps, their scale and the way back are @gomex/setup's signInFlow; 'key' is the mocks' end of a sign-up.
+type Step = SignInStep | 'key';
 type Way = 'login' | 'invite' | 'own';
-// The edge (EdgeTicks) for each step: signing up goes round once, signing in half way.
-const FILL: Record<Step, number> = { start: 0, login: 0.5, recover: 0.5, invite: 0.34, account: 0.67, key: 1 };
 
 /** Invite links look like https://app.example.com/?invite=CODE; a bare code works too. */
 function parseInvite(text: string): { server?: string; code: string } {
@@ -111,8 +110,8 @@ export default function Login() {
             actions={<FlowPrimary onPress={() => (way === 'own' ? router.push('/own') : go(way))}>{t('setup.next')}</FlowPrimary>}
           >
             <View>
-              <RadioRow title={t('m.start.have')} sub={t('m.start.haveSub')} on={way === 'login'} onPress={() => setWay('login')} />
-              <RadioRow title={t('m.start.invited')} sub={t('account.login.invitePlaceholder')} on={way === 'invite'} onPress={() => setWay('invite')} />
+              <RadioRow title={t('account.start.have')} sub={t('account.start.haveSub')} on={way === 'login'} onPress={() => setWay('login')} />
+              <RadioRow title={t('account.start.invited')} sub={t('account.login.invitePlaceholder')} on={way === 'invite'} onPress={() => setWay('invite')} />
               <RadioRow title={t('own.entry')} sub={t('own.entrySub')} on={way === 'own'} onPress={() => setWay('own')} last />
             </View>
           </FlowStep>
@@ -123,7 +122,7 @@ export default function Login() {
           <FlowStep
             onBack={() => go('start', true)}
             title={t('account.login.tabLogin')}
-            sub={t('m.start.haveSub')}
+            sub={t('account.start.haveSub')}
             error={error}
             actions={<FlowPrimary busy={busy} disabled={!ready} onPress={() => void submit()}>{t('account.login.submitLogin')}</FlowPrimary>}
             below={<TextAction onPress={() => go('recover')}>{t('account.login.forgotPassword')}</TextAction>}
@@ -139,12 +138,12 @@ export default function Login() {
           <FlowStep
             onBack={() => go('start', true)}
             title={t('account.login.inviteLabel')}
-            sub={t('m.inviteSub')}
+            sub={t('account.invite.sub')}
             actions={<FlowPrimary disabled={!inviter} onPress={() => go('account')}>{t('setup.next')}</FlowPrimary>}
           >
             <View>
               <LineField
-                label={t('m.inviteField')}
+                label={t('account.invite.field')}
                 value={invite}
                 onChangeText={setInvite}
                 placeholder={t('account.login.invitePlaceholder')}
@@ -160,7 +159,7 @@ export default function Login() {
         return (
           <FlowStep
             onBack={() => go('invite', true)}
-            title={t('m.account')}
+            title={t('account.account')}
             sub={inviter ? t('account.login.invitedBy', { name: inviter }) : ''}
             error={error}
             actions={<FlowPrimary busy={busy} disabled={!ready} onPress={() => void submit()}>{t('account.login.submitRegister')}</FlowPrimary>}
@@ -178,7 +177,7 @@ export default function Login() {
             title={t('account.login.recoverTitle')}
             sub={t('account.login.recoverHint')}
             error={error}
-            actions={<FlowPrimary busy={busy} disabled={!ready} onPress={() => void submit()}>{t('m.recoverGo')}</FlowPrimary>}
+            actions={<FlowPrimary busy={busy} disabled={!ready} onPress={() => void submit()}>{t('account.recoverGo')}</FlowPrimary>}
           >
             {serverLine}
             {nickField}
@@ -193,11 +192,11 @@ export default function Login() {
     }
   }
 
-  const label = step === 'invite' || step === 'account' || step === 'key'
-    ? t('own.stageOf', { stage: step === 'invite' ? t('account.login.inviteLabel') : t('m.account'), n: step === 'invite' ? 1 : 2, total: 2 })
-    : undefined;
+  const stage = signInFlow.stage(step === 'key' ? 'account' : step);
+  const parts = { invite: t('account.login.inviteLabel'), account: t('account.account') };
+  const label = stage ? t('own.stageOf', { stage: parts[stage.part], n: stage.n, total: stage.total }) : undefined;
   return (
-    <FlowShell fill={FILL[step]} label={label}>
+    <FlowShell fill={step === 'key' ? 1 : signInFlow.fill(step)} label={label}>
       <Animated.View key={step} entering={(backwards ? FadeIn : SlideInRight).duration(320)} exiting={(backwards ? FadeOut : SlideOutLeft).duration(160)} style={{ flex: 1 }}>
         {screen()}
       </Animated.View>

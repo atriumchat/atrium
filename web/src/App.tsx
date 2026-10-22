@@ -4,7 +4,8 @@ import { api, ApiError, getToken } from './api';
 import { initStore } from './store';
 import { connectSocket } from './socket';
 import { clearInviteFromUrl } from './people/invite';
-import { Login } from './account/Login';
+import { FlowProvider } from '@gomex/ui-web';
+import { Login, SIGN_IN_DEMO } from './account/Login';
 import { Shell } from './shell/Shell';
 import { DEMO, SetupWizard } from './account/SetupWizard';
 import { RecoveryKeyScreen, loadNewKey, storeNewKey, type NewKey } from './account/RecoveryKey';
@@ -18,6 +19,7 @@ import { useT } from './i18n';
 type Phase = 'loading' | 'login' | 'setup' | 'reset' | 'key' | 'where' | 'ready' | 'offline';
 
 export function App() {
+  const { t } = useT();
   // Opened from an admin's reset link; or reloaded on the recovery key's screen, where the key waits (see RecoveryKey).
   const [resetToken] = useState(resetFromUrl);
   const [newKey, setNewKey] = useState<NewKey | null>(() => (getToken() ? loadNewKey() : null));
@@ -78,9 +80,12 @@ export function App() {
   }, [phase, start]);
 
   return (
-    <>
+    // The flows' own words (the back button's label) in the app's language, for every flow screen below.
+    <FlowProvider labels={{ back: t('setup.back') }}>
       <Toast.Provider placement="top" />
-      {phase === 'setup' ? (
+      {SIGN_IN_DEMO ? (
+        <Login onLoggedIn={signedIn} />
+      ) : phase === 'setup' ? (
         <SetupWizard onDone={() => setPhase('loading')} />
       ) : phase === 'reset' && resetToken ? (
         <ResetPassword
@@ -102,7 +107,7 @@ export function App() {
       ) : (
         <Splash offline={phase === 'offline'} retry={() => setPhase('loading')} />
       )}
-    </>
+    </FlowProvider>
   );
 }
 
