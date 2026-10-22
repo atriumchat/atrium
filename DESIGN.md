@@ -107,7 +107,7 @@ couple of minutes; you can close the app"). Not marketing, not jargon: people se
   `invite`) opens a step, `&fast=1` hurries the install. Sign-in: `localhost:8081/login?mock=1` (add
   `&invite=7F3K9QAB` for the invite branch). The web build stubs LiveKit and the Keychain (`mobile/web-stubs`).
 - Done on these parts: "Your own server", sign-in, invite and the recovery key on the phone (`RecoveryKeyStep`); the
-  server's setup wizard and the sign-in on the web and in the desktop app (`@gomex/ui-web`; `#signin`, `#step=server`
+  server's setup wizard, the sign-in, the recovery key, the reset link and "where to use Gomex" on the web and in the desktop app (`@gomex/ui-web`; `#signin`, `#key`, `#reset`, `#where=ios`, `#step=server`
   and the like open a step on made-up answers in development); the desktop app's own "Your own server" window
   (`desktop/ui`, `npm run desktop-ui` and `onboarding.html?lang=ru#step=install` on made-up answers). Next: settings. The main screens (rail, channels, chat, call) last,
   drawn in Figma first.

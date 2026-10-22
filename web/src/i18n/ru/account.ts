@@ -25,9 +25,6 @@ export const account = {
 
   'account.key.title': 'Ключ восстановления',
   'account.key.hint': 'Нужен, если забудется пароль. Показывается один раз.',
-  'account.key.download': 'Скачать',
-  'account.key.saved': 'Ключ сохранён',
-  'account.key.next': 'Дальше',
   'account.key.fileNick': 'Ник: {name}',
   'account.key.fileKey': 'Ключ восстановления: {key}',
   'account.key.fileName': '{title} — ключ восстановления.txt',
@@ -42,7 +39,6 @@ export const account = {
   'account.reset.forName': 'Для {name}',
   'account.reset.newPassword': 'Новый пароль',
   'account.reset.repeat': 'Ещё раз',
-  'account.reset.minLength': 'Пароль — от 8 символов.',
   'account.reset.save': 'Сохранить и войти',
 
   'account.resetLink.failed': 'Не получилось',

@@ -29,9 +29,6 @@ export const account = {
 
   'account.key.title': 'Recovery key',
   'account.key.hint': 'Shown once',
-  'account.key.download': 'Download',
-  'account.key.saved': 'Key saved',
-  'account.key.next': 'Next',
   'account.key.fileNick': 'Nickname: {name}',
   'account.key.fileKey': 'Recovery key: {key}',
   'account.key.fileName': '{title} — recovery key.txt',
@@ -46,7 +43,6 @@ export const account = {
   'account.reset.forName': 'For {name}',
   'account.reset.newPassword': 'New password',
   'account.reset.repeat': 'Repeat password',
-  'account.reset.minLength': 'Password: 8+ characters',
   'account.reset.save': 'Save and sign in',
 
   'account.resetLink.failed': 'Failed',

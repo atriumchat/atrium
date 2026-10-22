@@ -1,8 +1,6 @@
-import { useState } from 'react';
-import { Button, Checkbox, Label } from '@heroui/react';
-import { CopyButton } from '../ui/CopyButton';
-import { GomexMark } from '../ui/Logo';
+import { FlowShell } from '@gomex/ui-web';
 import { t, useT } from '../i18n';
+import { KeyStep } from './KeyStep';
 
 /** A recovery key on its way to the person: the key itself and what the saved file should say. */
 // `newcomer`: made at sign-up (not by a recovery), so the "where to use Gomex" screen follows it.
@@ -42,52 +40,16 @@ export function downloadKey({ key, name, serverName }: NewKey) {
   URL.revokeObjectURL(url);
 }
 
-const white = 'h-11 flex-1 rounded-full px-5 text-[15px] [--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]';
-
 /**
  * The screen right after sign-up (and after recovery or a reset link, which spend the old key): the recovery key to
- * copy or download. "Next" opens once it's been copied or downloaded, or "Key saved" is ticked.
+ * copy or download (KeyStep), at the end of the way in, so the scale stands full.
  */
 export function RecoveryKeyScreen({ value, onDone }: { value: NewKey; onDone: () => void }) {
   const { t } = useT();
-  const [saved, setSaved] = useState(false);
-
   return (
-    <div className="flex h-full overflow-y-auto bg-background">
-      <div className="m-auto flex w-full max-w-[380px] flex-col items-center gap-5 px-4 py-8">
-        <GomexMark size={56} />
-        <div className="text-center">
-          <h1 className="text-[24px] font-medium leading-tight">{t('account.key.title')}</h1>
-          <p className="mt-1.5 text-balance text-[14px] leading-snug text-muted">{t('account.key.hint')}</p>
-        </div>
-        <div className="flex w-full items-center rounded-[18px] bg-surface-tertiary py-2 pl-12 pr-2">
-          <span className="flex-1 select-all py-2 text-center font-mono text-[20px] tracking-wider">{value.key}</span>
-          <CopyButton text={value.key} onCopied={() => setSaved(true)} />
-        </div>
-        <div className="flex w-full gap-2">
-          <Button
-            onPress={() => {
-              downloadKey(value);
-              setSaved(true);
-            }}
-            className={white}
-          >
-            {t('account.key.download')}
-          </Button>
-        </div>
-        <Checkbox isSelected={saved} onChange={setSaved}>
-          <Checkbox.Content>
-            <Checkbox.Control>
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-            <Label>{t('account.key.saved')}</Label>
-          </Checkbox.Content>
-        </Checkbox>
-        {/* Next in the order after the key is the "where to use Gomex" screen: it takes over from this onDone. */}
-        <Button fullWidth isDisabled={!saved} onPress={onDone} className="h-12 rounded-full text-[16px]">
-          {t('account.key.next')}
-        </Button>
-      </div>
-    </div>
+    <FlowShell fill={1}>
+      {/* Next in the order after the key is the "where to use Gomex" screen: it takes over from this onDone. */}
+      <KeyStep value={value} title={t('account.key.title')} sub={t('account.key.hint')} onNext={onDone} />
+    </FlowShell>
   );
 }

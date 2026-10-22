@@ -5,6 +5,7 @@ import { api, setToken } from '../api';
 import { clearInviteFromUrl, inviteFromUrl, parseInvite } from '../people/invite';
 import type { Session } from '../types';
 import { useT } from '../i18n';
+import { demo } from './demo';
 
 /**
  * Getting in, in the flow look (DESIGN.md), as the phone app does it (mobile/app/login.tsx): what you're here for,
@@ -13,8 +14,8 @@ import { useT } from '../i18n';
  * the page's own, so there's nothing to choose.
  */
 
-// Design work, development only: #signin opens this screen with no server behind it (whose invite: made up).
-export const SIGN_IN_DEMO = import.meta.env.DEV && window.location.hash.includes('signin');
+// Design work, development only (demo.ts): #signin opens this screen with no server behind it, whose invite made up.
+const SIGN_IN_DEMO = demo === 'signin';
 
 type Way = 'login' | 'invite';
 

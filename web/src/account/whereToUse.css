@@ -1,0 +1,42 @@
+/* "Where to use Gomex" (WhereToUse.tsx), in the flow look: what @gomex/ui-web's parts don't have. Tokens only. */
+
+/* In the rail's download window: the step sized to its content, inside the window's own padding. */
+.where-window {
+  display: flex;
+  flex-direction: column;
+  padding: 40px 32px 32px;
+  color: var(--gx-text);
+  font-family: var(--gx-font);
+}
+
+/* Adding to the Home Screen: numbered rows between hairlines, the system's own icon on the right. */
+.where-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.where-steps li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 0;
+  border-top: 1px solid var(--gx-hairline);
+  font-size: var(--gx-choice-size);
+  line-height: var(--gx-choice-line);
+}
+.where-steps li:last-child {
+  border-bottom: 1px solid var(--gx-hairline);
+}
+.where-steps .n {
+  width: 16px;
+  font-size: var(--gx-note-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--gx-faint);
+}
+.where-steps .label {
+  flex: 1;
+}
+.where-steps .icon {
+  display: grid;
+  color: var(--gx-muted);
+}

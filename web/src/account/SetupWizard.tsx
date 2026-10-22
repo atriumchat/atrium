@@ -4,6 +4,7 @@ import { useT } from '../i18n';
 import { inviteLink } from '../people/invite';
 import { GomexMark } from '../ui/Logo';
 import { IconCropper, centred, cropToBlob, cropToUrl, loadImage, type Crop } from '../ui/IconCropper';
+import { KeyStep } from './KeyStep';
 import { adminForm, codeFrom, CODE_LENGTH, firstRun, type FirstRunStep } from '@gomex/setup';
 import { FlowPrimary, FlowSecondary, FlowShell, FlowStep, LineField, TextAction } from '@gomex/ui-web';
 import './setupWizard.css';
@@ -51,7 +52,6 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   const [iconSent, setIconSent] = useState(false);
 
   const [key, setKey] = useState(account ? 'K7QM-2XPA-9DHR-T4WC-8NBE-3VLY' : '');
-  const [keyKept, setKeyKept] = useState<'copied' | 'downloaded' | null>(null);
   const [link, setLink] = useState(account ? `${window.location.origin}/?invite=7F3K9QAB` : '');
   const [linkSent, setLinkSent] = useState<'copied' | 'shared' | null>(null);
 
@@ -185,22 +185,6 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     });
   }
 
-  /* ---------- the recovery key ---------- */
-
-  async function copyKey() {
-    await navigator.clipboard.writeText(key).catch(() => undefined);
-    setKeyKept('copied');
-  }
-
-  function downloadKey() {
-    const text = [`Gomex · ${name}`, window.location.origin, t('setup.key.fileNick', { nick: nick.trim() }), t('setup.key.fileKey', { key }), ''].join('\n');
-    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
-    const a = Object.assign(document.createElement('a'), { href: url, download: `gomex-${window.location.hostname}-key.txt` });
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setKeyKept('downloaded');
-  }
-
   /* ---------- the invite ---------- */
 
   useEffect(() => {
@@ -320,22 +304,8 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
         );
 
       case 'key':
-        return (
-          <FlowStep
-            title={t('setup.key.title')}
-            sub={t('setup.key.sub')}
-            error={error}
-            onSubmit={() => keyKept && go('invite')}
-            actions={<FlowPrimary type="submit" disabled={!keyKept}>{t('setup.next')}</FlowPrimary>}
-          >
-            <p className="flow-big">{key}</p>
-            {/* "Next" opens once the key has been copied or downloaded; the action used says so. */}
-            <div className="flow-actions">
-              <TextAction left onPress={() => void copyKey()}>{keyKept === 'copied' ? t('common.copy.done') : t('common.copy.label')}</TextAction>
-              <TextAction left onPress={downloadKey}>{keyKept === 'downloaded' ? t('setup.key.downloaded') : t('setup.key.download')}</TextAction>
-            </div>
-          </FlowStep>
-        );
+        // Copied or downloaded, then on; the file says the server and the nick (downloadKey).
+        return <KeyStep value={{ key, name: nick.trim(), serverName: name }} title={t('setup.key.title')} sub={t('setup.key.sub')} error={error} onNext={() => go('invite')} />;
 
       case 'invite':
         return (

@@ -1,9 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { FlowPrimary, FlowShell, FlowStep, TextAction } from '@gomex/ui-web';
 import { desktop } from '../desktop';
-import { AppleLogo, DOWNLOADS, WindowsLogo } from '../shell/Downloads';
-import { LineArt, type ArtName } from '../ui/Illustrations';
+import { DOWNLOADS } from '../shell/Downloads';
 import { DotsIcon, PlusSquareIcon, ShareIcon } from '../ui/icons';
 import { useT } from '../i18n';
+import './whereToUse.css';
 
 export type Platform = 'mac' | 'windows' | 'ios' | 'android' | 'other';
 
@@ -55,6 +56,11 @@ function useInstallPrompt() {
 
 const file = (id: (typeof DOWNLOADS)[number]['id']) => DOWNLOADS.find((d) => d.id === id)!.file;
 
+/** Starts a download, as a link with `download` would. */
+function fetchFile(href: string) {
+  Object.assign(document.createElement('a'), { href, download: '' }).click();
+}
+
 /**
  * Which Mac: Apple's own chip unless the graphics say Intel. Safari keeps the chip to itself, so this only ever
  * moves an Intel Mac off the default, and nearly every Mac sold since 2021 is Apple's.
@@ -69,48 +75,15 @@ function intelMac() {
   }
 }
 
-/*
- * The column of the desktop app's setup window (desktop/ui): 46 px controls, a white pill for the
- * main action, a quiet one under it.
- */
-const primary = 'flex h-[46px] w-full items-center justify-center gap-2 rounded-full bg-[#f2f2f4] text-[15px] font-medium text-[#0c0c0e] transition-colors hover:bg-white';
-const quiet = 'flex h-[46px] w-full items-center justify-center rounded-full text-[15px] text-muted transition-colors hover:text-foreground';
-
 /**
- * "Where to use Gomex", shown once after signing up: the desktop app on a computer, the Home Screen on an
- * iPhone, installing on Android, or simply carrying on in the browser.
+ * "Where to use Gomex", in the flow look, shown once after signing up: the desktop app on a computer, the Home Screen
+ * on an iPhone, installing on Android, or simply carrying on in the browser.
+ * `inWindow`: opened from the rail, where the window's own close is the way out, so no "Stay in browser".
  */
-/** `inWindow`: opened from the rail, where the window's own close is the way out, so no "Stay in browser". */
 export function WhereToUse({ onDone, platform = detectPlatform(), inWindow = false }: { onDone: () => void; platform?: Platform; inWindow?: boolean }) {
-  if (platform === 'ios') return <OnIPhone onDone={onDone} />;
-  if (platform === 'android') return <OnAndroid onDone={onDone} />;
-  return <OnComputer onDone={onDone} platform={platform} inWindow={inWindow} />;
-}
-
-/** `inWindow`: inside the rail's download window — sized to its content, on the window's colour, centred. */
-function Column({ art, title, text, children, inWindow = false }: { art: ArtName; title: string; text?: string; children: ReactNode; inWindow?: boolean }) {
-  if (inWindow) {
-    return (
-      <div className="flex flex-col items-center px-8 pb-8 pt-10 text-center">
-        <LineArt art={art} scale={1.5} plate="var(--overlay)" />
-        <h1 className="mt-6 text-[21px] font-medium leading-[1.3] tracking-[-0.01em]">{title}</h1>
-        {text && <p className="mt-1.5 text-[15px] text-muted">{text}</p>}
-        <div className="mt-6 flex w-full flex-col gap-2">{children}</div>
-      </div>
-    );
-  }
-  return (
-    <div className="flex h-full overflow-y-auto bg-background">
-      <div className="m-auto flex w-full max-w-[400px] flex-col px-6 pb-10 pt-[max(40px,env(safe-area-inset-top))]">
-        <div className="mb-10 flex justify-center">
-          <LineArt art={art} scale={2} plate="var(--background)" />
-        </div>
-        <h1 className="text-[21px] font-medium leading-[1.3] tracking-[-0.01em]">{title}</h1>
-        {text && <p className="mt-1.5 text-[15px] text-muted">{text}</p>}
-        <div className="mt-7 flex flex-col gap-2">{children}</div>
-      </div>
-    </div>
-  );
+  const step = platform === 'ios' ? <OnIPhone onDone={onDone} /> : platform === 'android' ? <OnAndroid onDone={onDone} /> : <OnComputer onDone={onDone} platform={platform} inWindow={inWindow} />;
+  // After sign-up it's the end of the way in, the scale full; in the rail's window, a step sized to its content.
+  return inWindow ? <div className="where-window">{step}</div> : <FlowShell fill={1}>{step}</FlowShell>;
 }
 
 function OnComputer({ onDone, platform, inWindow }: { onDone: () => void; platform: Platform; inWindow: boolean }) {
@@ -119,68 +92,63 @@ function OnComputer({ onDone, platform, inWindow }: { onDone: () => void; platfo
   const [started, setStarted] = useState(false);
   const known = platform === 'mac' || platform === 'windows';
   // The rest of the installers, quietly under the main one: the other chip on a Mac, the other system's files.
-  const others =
-    platform === 'mac'
-      ? DOWNLOADS.filter((d) => d.id !== mac)
-      : platform === 'windows'
-        ? DOWNLOADS.filter((d) => d.id !== 'windows')
-        : DOWNLOADS;
+  const others = platform === 'mac' ? DOWNLOADS.filter((d) => d.id !== mac) : platform === 'windows' ? DOWNLOADS.filter((d) => d.id !== 'windows') : DOWNLOADS;
+  const download = (href: string) => (fetchFile(href), setStarted(true));
 
   return (
-    <Column art="computer" title={t('account.where.computerTitle')} text={t('account.where.computerText')} inWindow={inWindow}>
-      {started ? (
-        <button onClick={onDone} className={primary}>
-          {t('account.where.done')}
-        </button>
-      ) : (
-        <>
-          {known && (
-            <a href={file(platform === 'mac' ? mac : 'windows')} download onClick={() => setStarted(true)} className={primary}>
-              {platform === 'mac' ? <AppleLogo size={17} /> : <WindowsLogo size={15} />}
-              {platform === 'mac' ? t('account.where.downloadMac') : t('account.where.downloadWindows')}
-            </a>
-          )}
-          {!inWindow && (
-            <button onClick={onDone} className={known ? quiet : primary}>
-              {t('account.where.stayInBrowser')}
-            </button>
-          )}
-        </>
-      )}
-      <p className="mt-3 flex justify-center gap-4 text-[13px] text-faint">
+    <FlowStep
+      title={t('account.where.computerTitle')}
+      sub={t('account.where.computerText')}
+      actions={
+        started ? (
+          <FlowPrimary onPress={onDone}>{t('account.where.done')}</FlowPrimary>
+        ) : known ? (
+          <FlowPrimary onPress={() => download(file(platform === 'mac' ? mac : 'windows'))}>
+            {platform === 'mac' ? t('account.where.downloadMac') : t('account.where.downloadWindows')}
+          </FlowPrimary>
+        ) : (
+          <FlowPrimary onPress={onDone}>{t('account.where.stayInBrowser')}</FlowPrimary>
+        )
+      }
+      below={!started && known && !inWindow ? <TextAction onPress={onDone}>{t('account.where.stayInBrowser')}</TextAction> : undefined}
+    >
+      <div className="flow-actions">
         {others.map((d) => (
-          <a key={d.id} href={d.file} download onClick={() => setStarted(true)} className="transition-colors hover:text-foreground">
+          <TextAction key={d.id} left onPress={() => download(d.file)}>
             {d.id === 'windows' ? d.label : `${d.label} ${d.detail}`}
-          </a>
+          </TextAction>
         ))}
-      </p>
-    </Column>
+      </div>
+    </FlowStep>
   );
 }
 
-/** A step of adding to the Home Screen, written as the system writes it, with the system's own icon. */
-function Step({ n, label, icon }: { n: number; label: string; icon: ReactNode }) {
+/** Adding to the Home Screen, step by step as the system writes it, with the system's own icon. */
+function Steps({ steps }: { steps: { label: string; icon: ReactNode }[] }) {
   return (
-    <li className="flex h-[46px] items-center gap-3 rounded-[12px] border border-white/[0.07] bg-[#141417] pl-4 pr-3.5">
-      <span className="w-3 text-[13px] tabular-nums text-faint">{n}</span>
-      <span className="flex-1 text-[15px]">{label}</span>
-      <span className="text-muted">{icon}</span>
-    </li>
+    <ol className="where-steps">
+      {steps.map((s, i) => (
+        <li key={s.label}>
+          <span className="n">{i + 1}</span>
+          <span className="label">{s.label}</span>
+          <span className="icon">{s.icon}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
 function OnIPhone({ onDone }: { onDone: () => void }) {
   const { t } = useT();
   return (
-    <Column art="iphone" title={t('account.where.iphoneTitle')}>
-      <ol className="mb-5 flex flex-col gap-2">
-        <Step n={1} label={t('account.where.share')} icon={<ShareIcon size={19} strokeWidth={1.7} />} />
-        <Step n={2} label={t('account.where.addToHome')} icon={<PlusSquareIcon size={19} strokeWidth={1.7} />} />
-      </ol>
-      <button onClick={onDone} className={primary}>
-        {t('account.where.continue')}
-      </button>
-    </Column>
+    <FlowStep title={t('account.where.iphoneTitle')} onSubmit={onDone} actions={<FlowPrimary type="submit">{t('account.where.continue')}</FlowPrimary>}>
+      <Steps
+        steps={[
+          { label: t('account.where.share'), icon: <ShareIcon size={19} strokeWidth={1.7} /> },
+          { label: t('account.where.addToHome'), icon: <PlusSquareIcon size={19} strokeWidth={1.7} /> },
+        ]}
+      />
+    </FlowStep>
   );
 }
 
@@ -205,29 +173,22 @@ function OnAndroid({ onDone }: { onDone: () => void }) {
     }
   }
 
-  return (
-    <Column art="android" title={t('account.where.androidTitle')} text={prompt ? t('account.where.androidText') : undefined}>
-      {prompt ? (
-        <>
-          <button onClick={install} disabled={busy} className={`${primary} disabled:opacity-60`}>
-            {t('account.where.install')}
-          </button>
-          <button onClick={onDone} className={quiet}>
-            {t('account.where.stayInBrowser')}
-          </button>
-        </>
-      ) : (
-        <>
-          {/* No install offer from this browser: its own menu does the same. */}
-          <ol className="mb-5 flex flex-col gap-2">
-            <Step n={1} label={t('account.where.browserMenu')} icon={<DotsIcon size={19} className="rotate-90" />} />
-            <Step n={2} label={t('account.where.addToHomeAndroid')} icon={<PlusSquareIcon size={19} strokeWidth={1.7} />} />
-          </ol>
-          <button onClick={onDone} className={primary}>
-            {t('account.where.continue')}
-          </button>
-        </>
-      )}
-    </Column>
+  return prompt ? (
+    <FlowStep
+      title={t('account.where.androidTitle')}
+      sub={t('account.where.androidText')}
+      actions={<FlowPrimary busy={busy} onPress={() => void install()}>{t('account.where.install')}</FlowPrimary>}
+      below={<TextAction onPress={onDone}>{t('account.where.stayInBrowser')}</TextAction>}
+    />
+  ) : (
+    // No install offer from this browser: its own menu does the same.
+    <FlowStep title={t('account.where.androidTitle')} onSubmit={onDone} actions={<FlowPrimary type="submit">{t('account.where.continue')}</FlowPrimary>}>
+      <Steps
+        steps={[
+          { label: t('account.where.browserMenu'), icon: <DotsIcon size={19} className="rotate-90" /> },
+          { label: t('account.where.addToHomeAndroid'), icon: <PlusSquareIcon size={19} strokeWidth={1.7} /> },
+        ]}
+      />
+    </FlowStep>
   );
 }

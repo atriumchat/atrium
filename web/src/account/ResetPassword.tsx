@@ -1,14 +1,16 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { Button, Input, Label, TextField } from '@heroui/react';
+import { useEffect, useState } from 'react';
+import { adminForm } from '@gomex/setup';
+import { FlowPrimary, FlowShell, FlowStep, LineField } from '@gomex/ui-web';
 import { api, setToken } from '../api';
 import type { Session } from '../types';
-import { GomexMark } from '../ui/Logo';
 import { clearResetFromUrl } from './resetLink';
 import { useT } from '../i18n';
+import { DEMO_RESET_TOKEN, demo } from './demo';
 
 /**
- * The page a reset link opens: a new password, twice. The link belongs to one person (the admin made it for them);
- * it works once, ends their other sessions and signs this one in.
+ * The page a reset link opens, in the flow look: a new password, twice. The link belongs to one person (the admin
+ * made it for them); it works once, ends their other sessions and signs this one in. A link that doesn't work says
+ * why and leads to the sign-in.
  */
 export function ResetPassword({ token, onDone, onCancel }: { token: string; onDone: (session: Session) => void; onCancel: () => void }) {
   const { t } = useT();
@@ -18,20 +20,19 @@ export function ResetPassword({ token, onDone, onCancel }: { token: string; onDo
   const [repeat, setRepeat] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const mismatch = repeat !== '' && repeat !== password;
+  // The same rules as the admin's password: 8 and more, the repeat wrong only once it's as long as the first.
+  const { ready, mismatch } = adminForm(name ?? '', password, repeat);
 
   useEffect(() => {
+    if (token === DEMO_RESET_TOKEN && demo === 'reset') return setName('Тимур');
     api.checkReset(token).then(
       (r) => setName(r.name),
       (e) => setProblem(e instanceof Error ? e.message : t('account.reset.linkFailed')),
     );
   }, [token, t]);
 
-  const forName = t('account.reset.forName', { name: '\u0000' }).split('\u0000');
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    if (password !== repeat) return setError(t('account.reset.mismatch'));
+  async function submit() {
+    if (!ready || busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -47,47 +48,30 @@ export function ResetPassword({ token, onDone, onCancel }: { token: string; onDo
   }
 
   return (
-    <div className="flex h-full overflow-y-auto bg-background">
-      <div className="m-auto flex w-full max-w-[380px] flex-col items-center gap-5 px-4 py-8">
-        <GomexMark size={56} />
-        <h1 className="text-[24px] font-medium leading-tight">{t('account.reset.title')}</h1>
-        {problem ? (
-          <>
-            <p className="w-full rounded-[12px] bg-danger/15 px-4 py-3 text-[14px] text-danger">{t('account.login.askNewLink', { problem })}</p>
-            <Button fullWidth onPress={onCancel} className="h-12 rounded-full text-[16px]">
-              {t('account.reset.toLogin')}
-            </Button>
-          </>
-        ) : (
-          <form onSubmit={submit} className="flex w-full flex-col gap-4">
-            {name && (
-              <p className="text-center text-[15px] text-muted">
-                {forName[0]}
-                <b className="text-foreground">{name}</b>
-                {forName[1]}
-              </p>
-            )}
-            {/* So a password manager saves the new password under the right nick. */}
-            <input type="text" value={name ?? ''} readOnly autoComplete="username" tabIndex={-1} aria-hidden className="sr-only" />
-            <TextField isRequired fullWidth type="password" value={password} onChange={setPassword} minLength={8} autoComplete="new-password" autoFocus>
-              <Label>{t('account.reset.newPassword')}</Label>
-              <Input className="h-11 bg-default text-[16px]" />
-            </TextField>
-            <TextField isRequired fullWidth type="password" value={repeat} onChange={setRepeat} minLength={8} autoComplete="new-password">
-              <Label>{t('account.reset.repeat')}</Label>
-              <Input className="h-11 bg-default text-[16px]" />
-            </TextField>
-            {error || mismatch ? (
-              <p className="text-[14px] text-danger">{error ?? t('account.reset.mismatch')}</p>
-            ) : (
-              <p className="text-[13px] text-muted">{t('account.reset.minLength')}</p>
-            )}
-            <Button type="submit" fullWidth isPending={busy} isDisabled={!name} className="h-12 rounded-full text-[16px]">
-              {t('account.reset.save')}
-            </Button>
-          </form>
-        )}
-      </div>
-    </div>
+    <FlowShell fill={0.5}>
+      {problem ? (
+        <FlowStep
+          title={t('account.reset.title')}
+          error={t('account.login.askNewLink', { problem })}
+          onSubmit={onCancel}
+          actions={<FlowPrimary type="submit">{t('account.reset.toLogin')}</FlowPrimary>}
+        />
+      ) : (
+        <FlowStep
+          title={t('account.reset.title')}
+          sub={name ? t('account.reset.forName', { name }) : undefined}
+          error={error}
+          onSubmit={() => void submit()}
+          actions={<FlowPrimary type="submit" busy={busy} disabled={!ready}>{t('account.reset.save')}</FlowPrimary>}
+        >
+          {/* So a password manager saves the new password under the right nick. */}
+          <input type="text" value={name ?? ''} readOnly autoComplete="username" tabIndex={-1} aria-hidden className="sr-only" />
+          <div className="flow-pair">
+            <LineField label={t('account.reset.newPassword')} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('setup.admin.passwordHint')} autoComplete="new-password" />
+            <LineField label={t('account.reset.repeat')} type="password" value={repeat} onChange={(e) => setRepeat(e.target.value)} placeholder={t('setup.admin.repeatHint')} autoComplete="new-password" error={mismatch && t('account.reset.mismatch')} />
+          </div>
+        </FlowStep>
+      )}
+    </FlowShell>
   );
 }

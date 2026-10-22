@@ -37,7 +37,7 @@ const FLOW = [
   'mobile/app/{own,login,recovery,design}.tsx',
   'mobile/src/own/**',
   'mobile/src/components/RecoveryKeyStep.tsx',
-  'web/src/account/SetupWizard.tsx',
+  'web/src/account/{SetupWizard,Login,KeyStep,RecoveryKey,ResetPassword,WhereToUse}.tsx',
 ];
 
 export default tseslint.config(

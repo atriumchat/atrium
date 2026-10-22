@@ -5,7 +5,8 @@ import { initStore } from './store';
 import { connectSocket } from './socket';
 import { clearInviteFromUrl } from './people/invite';
 import { FlowProvider } from '@gomex/ui-web';
-import { Login, SIGN_IN_DEMO } from './account/Login';
+import { Login } from './account/Login';
+import { DEMO_KEY, DEMO_RESET_TOKEN, demo, demoPlatform } from './account/demo';
 import { Shell } from './shell/Shell';
 import { DEMO, SetupWizard } from './account/SetupWizard';
 import { RecoveryKeyScreen, loadNewKey, storeNewKey, type NewKey } from './account/RecoveryKey';
@@ -76,15 +77,25 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (phase === 'loading') start();
+    // A design mock (account/demo.ts) has no server to ask.
+    if (phase === 'loading' && !demo) start();
   }, [phase, start]);
 
   return (
     // The flows' own words (the back button's label) in the app's language, for every flow screen below.
     <FlowProvider labels={{ back: t('setup.back') }}>
       <Toast.Provider placement="top" />
-      {SIGN_IN_DEMO ? (
-        <Login onLoggedIn={signedIn} />
+      {demo ? (
+        // Design work, development only (account/demo.ts): one screen on made-up answers.
+        demo === 'signin' ? (
+          <Login onLoggedIn={signedIn} />
+        ) : demo === 'key' ? (
+          <RecoveryKeyScreen value={DEMO_KEY} onDone={() => undefined} />
+        ) : demo === 'reset' ? (
+          <ResetPassword token={DEMO_RESET_TOKEN} onDone={() => undefined} onCancel={() => undefined} />
+        ) : (
+          <WhereToUse platform={demoPlatform} onDone={() => undefined} />
+        )
       ) : phase === 'setup' ? (
         <SetupWizard onDone={() => setPhase('loading')} />
       ) : phase === 'reset' && resetToken ? (
