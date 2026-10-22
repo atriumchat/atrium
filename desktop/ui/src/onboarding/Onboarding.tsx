@@ -318,12 +318,11 @@ export function Onboarding() {
             actions={<FlowPrimary type="submit" busy={busy} disabled={!rentReady}>{t('ob.rent.create')}</FlowPrimary>}
             below={<TextAction onPress={() => go('server', true)}>{t('ob.rent.manual')}</TextAction>}
           >
+            {/* One line each: what to do at the host, the first with its link; then the API's login and password side by side. */}
             <ol className="rent">
               <li>
-                <span className="grow">
-                  <b>{t('ob.rent.signUp')}</b>
-                  <small>{t('ob.rent.signUpSub', { host: RENT.host })}</small>
-                </span>
+                <b>{t('ob.rent.signUp')}</b>
+                <small>{t('ob.rent.signUpSub', { host: RENT.host })}</small>
                 <TextAction onPress={() => setup.openExternal(RENT.url)}>{t('ob.rent.open')}</TextAction>
               </li>
               <li>
@@ -335,8 +334,10 @@ export function Onboarding() {
                 <small>{t('ob.rent.apiSub')}</small>
               </li>
             </ol>
-            <LineField label={t('ob.rent.login')} value={apiLogin} onChange={(e) => (setApiLogin(e.target.value), setError(''))} placeholder="hostvds-…" autoCapitalize="off" spellCheck={false} />
-            <LineField label={t('ob.rent.password')} type="password" value={apiPassword} onChange={(e) => (setApiPassword(e.target.value), setError(''))} />
+            <div className="flow-pair">
+              <LineField label={t('ob.rent.login')} value={apiLogin} onChange={(e) => (setApiLogin(e.target.value), setError(''))} placeholder="hostvds-…" autoCapitalize="off" spellCheck={false} />
+              <LineField label={t('ob.rent.password')} type="password" value={apiPassword} onChange={(e) => (setApiPassword(e.target.value), setError(''))} />
+            </div>
           </FlowStep>
         );
 

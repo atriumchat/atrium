@@ -118,36 +118,35 @@ body::before {
   height: 16px;
 }
 
-/* Renting a server: the three things to do at the host, each a name and a line, the first with its link. */
+/* Renting a server: the three things to do at the host, one line each, the first with its link at the end. */
 .rent {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.rent li:has(.grow) {
+.rent li {
   display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.rent b,
-.rent small {
-  display: block;
-}
-.rent .grow {
-  flex: 1;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
 }
 .rent b {
+  flex: none;
   font-size: var(--gx-choice-size);
   line-height: var(--gx-choice-line);
   font-weight: 400;
 }
 .rent small {
-  margin-top: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
   font-size: var(--gx-note-size);
   color: var(--gx-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /*
