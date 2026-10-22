@@ -7,6 +7,11 @@ contextBridge.exposeInMainWorld('atriumSetup', {
   openExternal: (url) => call('open-external', String(url)),
   /** { host, user, password } → { facts: { ip, os, size } } or { error, field? }. */
   connect: (login) => call('connect', login),
+  /** "No server?": a new key for the app (its public line), the server rented with it, then into it as root. */
+  appKey: () => call('app-key'),
+  connectKey: (host) => call('connect-key', String(host)),
+  /** One request to HostVDS's API ({ method, url, body?, token? } → { status, token?, json }). */
+  hostvds: (request) => call('hostvds', request),
   register: (form) => call('register', form),
   /** Resolves once the link in deSEC's letter is pressed and the name points at the server. */
   waitMail: (where) => call('wait-mail', where),

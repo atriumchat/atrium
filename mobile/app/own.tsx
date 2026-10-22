@@ -15,7 +15,7 @@ import { Drum, FlowPrimary, FlowSecondary, FlowShell, FlowStep, KeptRow, LineFie
 import { RecoveryKeyStep } from '../src/components/RecoveryKeyStep';
 import { real } from '../src/own/backend';
 import { DinoRun } from '../src/own/DinoRun';
-import { adminForm, capacity, doneCount, emailOk as isEmail, jobFill, MOCK_DOMAIN, MOCK_INVITE, MOCK_KEY, MOCK_SETUP_CODE, OWN_READY, ownOnPhone, pickTurn, readServerLetter, RENT, TASKS, type Facts, type OwnPhoneStep as Step, type Progress } from '@atrium/setup';
+import { adminForm, capacity, doneCount, emailOk as isEmail, jobFill, MOCK_DOMAIN, MOCK_INVITE, MOCK_KEY, MOCK_SETUP_CODE, OWN_READY, ownOnPhone, pickTurn, RENT, TASKS, type Facts, type OwnPhoneStep as Step, type Progress, type RentStage } from '@atrium/setup';
 import { mock, mockInstall, mockPace } from '../src/own/mock';
 import type { Saved } from '../src/own/setup';
 
@@ -45,9 +45,10 @@ export default function OwnServer() {
   const [host, setHost] = useState('');
   const [user, setUser] = useState('root');
   const [password, setPassword] = useState('');
-  // No server yet: the host's letter, pasted, gives the fields above.
-  const [letter, setLetter] = useState('');
-  const found = readServerLetter(letter);
+  // No server yet: the login and password of the host's API, and how far the rent has got.
+  const [apiLogin, setApiLogin] = useState('');
+  const [apiPassword, setApiPassword] = useState('');
+  const [renting, setRenting] = useState<RentStage | 'connect' | null>(null);
   const [facts, setFacts] = useState<Facts | null>(null);
   const [saved, setSaved] = useState<Saved | null>(null);
   const [earlier, setEarlier] = useState<Saved | null>(null);
@@ -144,6 +145,28 @@ export default function OwnServer() {
       setFacts(result.facts);
       // The key and the deSEC account of an earlier server stay; a new server gets its own key.
       setSaved({ host: host.trim(), ip: result.facts.ip, user: user.trim() || 'root', turn, cores: result.facts.cores, memory: result.facts.memory, desec: earlier?.desec, hostKey: result.hostKey });
+      go('address');
+    });
+  }
+
+  /** "No server?": the server made in the person's HostVDS account with the app's key, then straight to the address. */
+  function rentServer() {
+    void run(async () => {
+      const result = await own.rent({ login: apiLogin, password: apiPassword, onStage: setRenting });
+      setRenting(null);
+      if ('error' in result) {
+        haptic.error();
+        return setError(result.error);
+      }
+      haptic.success();
+      setApiPassword('');
+      setHost(result.host);
+      setUser('root');
+      setFacts(result.facts);
+      const next = { host: result.host, ip: result.facts.ip, user: 'root', turn, cores: result.facts.cores, memory: result.facts.memory, desec: earlier?.desec, hostKey: result.hostKey, privateKey: result.privateKey, publicKey: result.publicKey };
+      // Kept at once: the key is the only way into this server.
+      await own.save(next);
+      setSaved(next);
       go('address');
     });
   }
@@ -410,21 +433,9 @@ export default function OwnServer() {
             onBack={back}
             title={t('own.rent.h')}
             sub={t('own.rent.sub', { host: RENT.host })}
-            note={found ? t('own.rent.found', { ip: found.host }) : letter.trim() ? t('own.rent.notFound') : undefined}
-            actions={
-              <FlowPrimary
-                disabled={!found}
-                onPress={() => {
-                  if (!found) return;
-                  setHost(found.host);
-                  setUser(found.user);
-                  setPassword(found.password);
-                  go('server', true);
-                }}
-              >
-                {t('own.next')}
-              </FlowPrimary>
-            }
+            error={error}
+            note={renting ? t(`own.rent.stage.${renting}` as Key) : undefined}
+            actions={<FlowPrimary busy={busy} disabled={!apiLogin.trim() || !apiPassword} onPress={rentServer}>{t('own.rent.create')}</FlowPrimary>}
             below={<TextAction onPress={() => go('server', true)}>{t('own.rent.manual')}</TextAction>}
           >
             <View style={{ gap: 16 }}>
@@ -440,11 +451,12 @@ export default function OwnServer() {
                 <Text style={{ fontSize: 14, color: colors.muted }}>{t('own.rent.topUpSub')}</Text>
               </View>
               <View>
-                <Text style={{ fontSize: 17 }}>{t('own.rent.create')}</Text>
-                <Text style={{ fontSize: 14, color: colors.muted }}>{t('own.rent.createSub', { os: RENT.os })}</Text>
+                <Text style={{ fontSize: 17 }}>{t('own.rent.api')}</Text>
+                <Text style={{ fontSize: 14, color: colors.muted }}>{t('own.rent.apiSub')}</Text>
               </View>
             </View>
-            <LineField label={t('own.rent.letter')} value={letter} onChangeText={setLetter} placeholder={t('own.rent.letterHint')} autoCapitalize="none" autoCorrect={false} />
+            <LineField label={t('own.rent.login')} value={apiLogin} onChangeText={(v) => (setApiLogin(v), setError(''))} placeholder="hostvds-…" autoCapitalize="none" autoCorrect={false} />
+            <LineField label={t('own.rent.password')} value={apiPassword} onChangeText={(v) => (setApiPassword(v), setError(''))} secureTextEntry autoCapitalize="none" autoCorrect={false} returnKeyType="go" onSubmitEditing={() => apiLogin.trim() && apiPassword && rentServer()} />
           </FlowStep>
         );
       case 'address':

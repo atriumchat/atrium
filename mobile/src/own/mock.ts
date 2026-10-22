@@ -39,6 +39,20 @@ export const mock: Backend = {
     if (password === 'wrong') return fail(t('own.ssh.badLogin'));
     return { facts: { ip: host.trim() || '203.0.113.10', os: 'Ubuntu 24.04 LTS · x86_64', root: true, cores: 1, memory: 1.9, disk: 17 }, hostKey: 'ssh-ed25519 MOCK' };
   },
+  rent: async ({ password, onStage }) => {
+    for (const stage of ['login', 'create', 'boot', 'connect'] as const) {
+      onStage?.(stage);
+      await wait(900);
+      if (stage === 'login' && password === 'wrong') return fail(t('own.rent.error.login'));
+    }
+    return {
+      facts: { ip: '203.0.113.24', os: 'Ubuntu 24.04 LTS · x86_64', root: true, cores: 1, memory: 1.9, disk: 19 },
+      hostKey: 'ssh-ed25519 MOCK',
+      host: '203.0.113.24',
+      privateKey: 'MOCK',
+      publicKey: 'ssh-ed25519 MOCK atrium-app',
+    };
+  },
   resume: async () => {
     await wait(800);
     return { ok: true as const };

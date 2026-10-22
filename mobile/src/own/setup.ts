@@ -15,11 +15,14 @@ import {
   progressCommand,
   registerBody,
   registerError,
+  rentServer,
+  fetchHttp,
   sq,
   startCommand,
   type DesecError,
   type Facts,
   type Progress,
+  type RentStage,
 } from '@atrium/setup';
 import { t, type Key } from '../i18n';
 
@@ -154,6 +157,40 @@ export async function connect({ host, user, password }: { host: string; user: st
       return { error: t('own.ssh.needRoot') };
     }
     return { facts, hostKey: opened.hostKey };
+  } catch (error) {
+    close();
+    return sshError(error);
+  }
+}
+
+/**
+ * "No server?": a server made in the person's HostVDS account with a new key of the app's in it, then into it as root
+ * with that key (it takes a little while after it's up for sshd and the key to be there). No root password at all; the
+ * API password is used for this and forgotten.
+ */
+export async function rent({ login, password, onStage }: { login: string; password: string; onStage?: (stage: RentStage | 'connect') => void }): Promise<
+  { facts: Facts; hostKey: string; host: string; privateKey: string; publicKey: string } | { error: string }
+> {
+  close();
+  const { privateKey, publicKey } = ssh.generateKey();
+  const made = await rentServer(fetchHttp, { login, password, publicKey, onStage });
+  if ('error' in made) return { error: t(`own.rent.error.${made.error}` as Key) };
+  onStage?.('connect');
+  const until = Date.now() + 120_000;
+  let opened: { id: string; hostKey: string };
+  for (;;) {
+    try {
+      opened = await open(made.ip, 'root', { key: privateKey }, null);
+      break;
+    } catch (error) {
+      if (changedKey(error) || Date.now() > until) return sshError(error);
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+    }
+  }
+  session = { id: opened.id, host: made.ip, user: 'root', password: null, hostKey: opened.hostKey };
+  try {
+    const facts = parseProbe((await exec(probeCommand(made.ip))).output);
+    return { facts, hostKey: opened.hostKey, host: made.ip, privateKey, publicKey };
   } catch (error) {
     close();
     return sshError(error);

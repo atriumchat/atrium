@@ -19,6 +19,9 @@ const TURN = /^[a-z0-9-]{1,20}$/;
 
 // One setup at a time: the open SSH session and the deSEC account being made.
 let ssh = null; // { conn, host, ip, user, hostKey, facts }
+// The app's own key for the server being set up: made before a rented server exists (it goes in at its creation),
+// otherwise at the install. The installer adds it for root and pins it to the agent once Atrium runs.
+let appKey = null;
 let desec = null; // { email, password, name }
 let mailWait = null; // { stop: boolean }
 
@@ -84,8 +87,28 @@ function exec(conn, command, { onLine, stdin } = {}) {
   });
 }
 
-/** Logs in with the password and looks at the server: system, memory, disk, whether it's root. */
-async function connect({ host, user, password }) {
+/** A new key for the app (OpenSSH public line back): the one a rented server is made with. */
+function newAppKey() {
+  appKey = utils.generateKeyPairSync('ed25519', { comment: 'atrium-app' });
+  return appKey.public.trim();
+}
+
+/**
+ * Into a server just rented with the app's key: it takes a little while after it's up for sshd and the key to be
+ * there, so a refusal is tried again for up to two minutes.
+ */
+async function connectByKey(host) {
+  const until = Date.now() + 120000;
+  for (;;) {
+    const answer = await connect({ host, user: 'root', withKey: true });
+    if (!answer.error || Date.now() > until) return answer;
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
+}
+
+/** Logs in (the password, or the app's key) and looks at the server: system, memory, disk, whether it's root. */
+async function connect({ host, user, password, withKey = false }) {
+  if (withKey && !appKey) return { error: t('ssh.noReply') };
   close();
   host = String(host).trim();
   user = String(user || 'root').trim();
@@ -108,8 +131,7 @@ async function connect({ host, user, password }) {
         host: address,
         port: 22,
         username: user,
-        password,
-        tryKeyboard: true,
+        ...(withKey ? { privateKey: appKey.private } : { password, tryKeyboard: true }),
         readyTimeout: 20000,
         keepaliveInterval: 15000,
         hostVerifier: (key) => {
@@ -340,7 +362,7 @@ async function installSteps({ domain, turn, installer }, report, save) {
   if (!DOMAIN.test(domain) || !TURN.test(turn)) return report({ state: 'fail', why: t('install.badAddress') });
   const { conn } = ssh;
   // The app's own key: the installer adds it for root and switches password login off.
-  const key = utils.generateKeyPairSync('ed25519', { comment: 'atrium-app' });
+  const key = appKey ?? utils.generateKeyPairSync('ed25519', { comment: 'atrium-app' });
   save({ host: ssh.host, ip: ssh.ip, user: ssh.user, hostKey: ssh.hostKey, domain, privateKey: key.private });
 
   const fetchInstaller = installer
@@ -405,4 +427,4 @@ async function install(options, report, save) {
   }
 }
 
-module.exports = { connect, close, register, reuse, waitMail, cancelMail, checkDomain, install };
+module.exports = { connect, connectByKey, newAppKey, close, register, reuse, waitMail, cancelMail, checkDomain, install };

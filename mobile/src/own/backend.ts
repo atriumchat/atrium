@@ -1,6 +1,6 @@
 import { api } from '../api';
 import { enter } from '../store';
-import { cancelMail, checkDomain, close, connect, loadSaved, readProgress, register, resume, reuse, save, startInstall, waitMail } from './setup';
+import { cancelMail, checkDomain, close, connect, loadSaved, readProgress, register, rent, resume, reuse, save, startInstall, waitMail } from './setup';
 
 /**
  * Everything "Your own server" asks of the outside world: the VPS over SSH and deSEC (setup.ts), then the new server's
@@ -10,6 +10,7 @@ export const real = {
   loadSaved,
   save,
   connect,
+  rent,
   resume,
   close,
   register,

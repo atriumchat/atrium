@@ -1,4 +1,4 @@
-import { MOCK_DOMAIN, MOCK_SETUP_CODE, MOCK_TOOK, TASKS } from '@atrium/setup';
+import { MOCK_DOMAIN, MOCK_SETUP_CODE, MOCK_TOOK, RENT, TASKS, type Http } from '@atrium/setup';
 import { t } from '../i18n';
 
 /**
@@ -17,6 +17,11 @@ export type InstallEvent =
 export type Setup = {
   openExternal(url: string): void;
   connect(login: { host: string; user: string; password: string }): Promise<{ facts: { ip: string; os: string; size: string } } | Failure>;
+  /** "No server?": the app's new key (an OpenSSH public line), then into the rented server with it. */
+  appKey(): Promise<string>;
+  connectKey(host: string): Promise<{ facts: { ip: string; os: string; size: string } } | Failure>;
+  /** HostVDS's API, through the main process (rentServer drives it). */
+  hostvds: Http;
   register(form: { name: string; email: string }): Promise<{ ok: true } | Failure>;
   waitMail(where: { ip: string }): Promise<{ ok: true } | Failure>;
   cancelMail(): void;
@@ -44,6 +49,34 @@ const fake: Setup = {
     if (host.startsWith('10.')) return { error: t('ssh.noReply'), field: 'host' };
     return { facts: { ip: host, os: 'Ubuntu 24.04 LTS · x86_64', size: t('ssh.size', { memory: 2, disk: 18 }) } };
   },
+  appKey: async () => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIStandIn atrium-app',
+  async connectKey(host) {
+    await wait(1500);
+    return { facts: { ip: host, os: 'Ubuntu 24.04 LTS · x86_64', size: t('ssh.size', { memory: 2, disk: 20 }) } };
+  },
+  // A made-up HostVDS: the API password "wrong" is refused, anything else gets a server that's up on the second look.
+  hostvds: (() => {
+    let looks = 0;
+    const base = `${RENT.api}/${RENT.region}`;
+    return async ({ method, url, body }) => {
+      await wait(400);
+      if (url.endsWith('/auth/tokens')) {
+        const password = (body as { auth: { identity: { password: { user: { password: string } } } } }).auth.identity.password.user.password;
+        if (password === 'wrong') return { status: 401, json: {} };
+        const catalog = ['compute', 'image', 'network'].map((type) => ({ type, endpoints: [{ interface: 'public', region_id: RENT.region, url: `${base}/${type}` }] }));
+        return { status: 201, token: 'T', json: { token: { catalog } } };
+      }
+      if (url.endsWith('/flavors/detail')) return { status: 200, json: { flavors: [{ name: RENT.flavor, id: 'f' }] } };
+      if (url.includes('/v2/images')) return { status: 200, json: { images: [{ id: 'i' }] } };
+      if (url.includes('/v2.0/networks')) return { status: 200, json: { networks: [{ name: 'Internet-01', id: 'n' }] } };
+      if (url.endsWith('/servers') && method === 'POST') return { status: 202, json: { server: { id: 's' } } };
+      if (url.endsWith('/servers/s') && method === 'GET') {
+        const up = ++looks > 1;
+        return { status: 200, json: { server: { status: up ? 'ACTIVE' : 'BUILD', addresses: up ? { 'Internet-01': [{ addr: '203.0.113.24' }] } : {} } } };
+      }
+      return { status: 202, json: {} };
+    };
+  })(),
   async register({ name }) {
     await wait(900);
     return name === 'taken' ? { error: t('desec.nameTaken') } : { ok: true };

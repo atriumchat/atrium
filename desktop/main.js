@@ -556,6 +556,31 @@ setupCall('open-external', (url) => {
   if (/^https:\/\/[^/]+/.test(url)) shell.openExternal(url);
 });
 setupCall('connect', (login) => serverSetup.connect(login));
+setupCall('app-key', () => serverSetup.newAppKey());
+setupCall('connect-key', (host) => serverSetup.connectByKey(String(host)));
+// "No server?": the setup page drives HostVDS's API (@atrium/setup, rentServer) through here, since a page can't
+// reach it (CORS). Only that API, only these methods; the answer goes back as { status, token, json }.
+setupCall('hostvds', async ({ method, url, body, token }) => {
+  if (!['GET', 'POST', 'DELETE'].includes(method) || !String(url).startsWith('https://os-api.hostvds.com/')) return { status: 400, json: null };
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(token ? { 'X-Auth-Token': String(token) } : {}) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(60000),
+    });
+    const text = await res.text();
+    let json = null;
+    try {
+      json = text ? JSON.parse(text) : null;
+    } catch {
+      json = text;
+    }
+    return { status: res.status, token: res.headers.get('X-Subject-Token') ?? undefined, json };
+  } catch (error) {
+    return { status: 599, json: { error: { message: String(error?.message ?? error) } } };
+  }
+});
 setupCall('register', (form) => serverSetup.register(form));
 setupCall('wait-mail', async (where) => {
   const answer = await serverSetup.waitMail(where);

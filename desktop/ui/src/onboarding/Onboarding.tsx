@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { domainOk, emailOk, freeName, hostOk, jobFill, mailboxOf, MOCK_DOMAIN, nameOk, ownOnDesktop, pickTurn, readServerLetter, RENT, TASKS, type OwnDesktopStep as Step } from '@atrium/setup';
+import { domainOk, emailOk, freeName, hostOk, jobFill, mailboxOf, MOCK_DOMAIN, nameOk, ownOnDesktop, pickTurn, RENT, rentServer, TASKS, type OwnDesktopStep as Step, type RentStage } from '@atrium/setup';
 import { Drum, FlowPrimary, FlowProvider, FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '@atrium/ui-web';
 import type { DrumItem } from '@atrium/ui-common';
 import { t } from '../i18n';
@@ -33,8 +33,10 @@ export function Onboarding() {
   const [showPassword, setShowPassword] = useState(false);
   const [badHost, setBadHost] = useState(false);
   const [facts, setFacts] = useState<Facts | null>(null);
-  // No server yet: the host's letter, pasted, gives the fields above.
-  const [letter, setLetter] = useState('');
+  // No server yet: the login and password of the host's API, and how far the rent has got.
+  const [apiLogin, setApiLogin] = useState('');
+  const [apiPassword, setApiPassword] = useState('');
+  const [renting, setRenting] = useState<RentStage | 'connect' | null>(null);
 
   // 2. The address.
   const [way, setWay] = useState<'free' | 'own'>('free');
@@ -86,15 +88,28 @@ export function Onboarding() {
       go('address');
     });
 
-  const found = readServerLetter(letter);
-  const takeLetter = () => {
-    if (!found) return;
-    setHost(found.host);
-    setUser(found.user);
-    setPassword(found.password);
-    setBadHost(false);
-    go('server', true);
-  };
+  // The server is made in the person's HostVDS account with the app's key in it, then the app goes in with that key:
+  // no root password at all, nothing to look for in the host's panel.
+  const rentReady = !!apiLogin.trim() && !!apiPassword;
+  const rent = () =>
+    rentReady &&
+    void run(async () => {
+      const publicKey = await setup.appKey();
+      const made = await rentServer(setup.hostvds, { login: apiLogin, password: apiPassword, publicKey, onStage: setRenting });
+      if ('error' in made) {
+        setRenting(null);
+        return setError(t(`ob.rent.error.${made.error}`));
+      }
+      setRenting('connect');
+      const answer = await setup.connectKey(made.ip);
+      setRenting(null);
+      if ('error' in answer) return setError(answer.error);
+      setHost(made.ip);
+      setUser('root');
+      setApiPassword('');
+      setFacts(answer.facts);
+      go('address');
+    });
 
   /* ---------- 2. the address ---------- */
 
@@ -296,10 +311,11 @@ export function Onboarding() {
           <FlowStep
             title={t('ob.rent.h')}
             sub={t('ob.rent.sub', { host: RENT.host })}
-            note={found ? t('ob.rent.found', { ip: found.host }) : letter.trim() ? t('ob.rent.notFound') : undefined}
+            error={error}
+            note={renting ? t(`ob.rent.stage.${renting}`) : undefined}
             onBack={back}
-            onSubmit={takeLetter}
-            actions={<FlowPrimary type="submit" disabled={!found}>{t('ob.next')}</FlowPrimary>}
+            onSubmit={rent}
+            actions={<FlowPrimary type="submit" busy={busy} disabled={!rentReady}>{t('ob.rent.create')}</FlowPrimary>}
             below={<TextAction onPress={() => go('server', true)}>{t('ob.rent.manual')}</TextAction>}
           >
             <ol className="rent">
@@ -315,11 +331,12 @@ export function Onboarding() {
                 <small>{t('ob.rent.topUpSub')}</small>
               </li>
               <li>
-                <b>{t('ob.rent.create')}</b>
-                <small>{t('ob.rent.createSub', { os: RENT.os })}</small>
+                <b>{t('ob.rent.api')}</b>
+                <small>{t('ob.rent.apiSub')}</small>
               </li>
             </ol>
-            <LineField label={t('ob.rent.letter')} value={letter} onChange={(e) => setLetter(e.target.value)} placeholder={t('ob.rent.letterHint')} />
+            <LineField label={t('ob.rent.login')} value={apiLogin} onChange={(e) => (setApiLogin(e.target.value), setError(''))} placeholder="hostvds-…" autoCapitalize="off" spellCheck={false} />
+            <LineField label={t('ob.rent.password')} type="password" value={apiPassword} onChange={(e) => (setApiPassword(e.target.value), setError(''))} />
           </FlowStep>
         );
 
