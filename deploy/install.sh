@@ -438,10 +438,25 @@ wait_dns() {
   for i in $(seq 1 60); do
     check_dns
     progress sub "Записей на месте: $DNS_HITS из 3"
-    (( DNS_OK )) && break
+    (( DNS_OK )) && dns_everywhere && break
+    (( DNS_OK )) && progress sub "Адрес расходится по интернету"
     sleep 3
   done
   progress "done" address
+}
+
+# Every name answers from both Cloudflare and Google with this server's address. Let's Encrypt asks from its own
+# resolvers, and a name one big resolver has while another still fails it (dedyn.io's delegation shows up a little
+# later in some) can fail the certificate; Caddy then waits longer and longer before it tries again (step_https).
+dns_everywhere() {
+  local host url out
+  for host in "$DOMAIN" "app.$DOMAIN" "$TURN_HOST.$DOMAIN"; do
+    for url in "https://cloudflare-dns.com/dns-query?name=$host&type=A" "https://dns.google/resolve?name=$host&type=A"; do
+      out=$(curl -fsS --max-time 5 -H 'accept: application/dns-json' "$url" 2>/dev/null) || return 1
+      [[ $out == *'"Status":0'* || $out == *'"Status": 0'* ]] || return 1
+      [[ -z ${SERVER_IP:-} || $out == *"\"$SERVER_IP\""* ]] || return 1
+    done
+  done
 }
 
 print_checks() {
@@ -1076,11 +1091,20 @@ step_up() {
   docker image prune -f
 }
 
+# The certificate. Caddy asks for it as it starts; when that first try fails (the name not seen everywhere yet), it
+# waits a minute, then two, four… before the next. A minute without one, Caddy is started again, which asks at once:
+# the certificate comes within a minute of the name being everywhere instead of after Caddy's next turn. Four minutes
+# in all; past that it's left to Caddy and the install still ends (screen_done says so).
 step_https() {
   local i
+  cd "$ATRIUM_DIR/deploy" || return
   progress sub "Ждём сертификат от Let's Encrypt"
-  for i in $(seq 1 30); do
+  for i in $(seq 1 80); do
     curl -fsS --max-time 5 -o /dev/null --resolve "app.$DOMAIN:443:127.0.0.1" "https://app.$DOMAIN/api/setup" && return 0
+    if (( i % 20 == 0 )); then
+      progress sub "Просим сертификат ещё раз"
+      docker compose restart caddy >/dev/null 2>&1 || true
+    fi
     sleep 3
   done
   return 1
