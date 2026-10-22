@@ -11,10 +11,9 @@ import { Text } from '../text';
 import { colors } from '../theme';
 import { Avatar } from '../components/Avatar';
 import { StatusDot } from '../components/Settings';
-import { Badge, Press, RoundButton } from '../components/ui';
-import { ChevronRightIcon, GearIcon, PencilIcon, XIcon } from '../icons';
+import { Press, RoundButton } from '../components/ui';
+import { GearIcon, PencilIcon, XIcon } from '../icons';
 import { dateOnly, statusUntil } from '../format';
-import { openFriends } from '../nav';
 import { haptic } from '../haptics';
 
 export const statusKey = { online: 'shell.status.online', dnd: 'shell.status.dnd', invisible: 'shell.status.invisible' } as const;
@@ -71,8 +70,6 @@ export function YouTab() {
             <Text style={{ marginTop: 2, fontSize: 17 }}>{dateOnly(me.createdAt, { day: 'numeric', month: 'long', year: 'numeric' })}</Text>
           </View>
         </Card>
-
-        <FriendsRow />
       </View>
     </ScrollView>
   );
@@ -99,29 +96,6 @@ function StatusLine({ status, text, until }: { status: 'online' | 'dnd' | 'invis
       </View>
       {busy ? <ActivityIndicator color="#fff" style={{ width: 36 }} /> : <RoundButton size="sm" tone="ghost" label={t('m.clearStatus')} onPress={() => void clear()}>{(c) => <XIcon size={16} color={c} />}</RoundButton>}
     </View>
-  );
-}
-
-/** Your friends as a row of faces; the red number is requests waiting for you. */
-function FriendsRow() {
-  const { t } = useT();
-  const friends = useStore((s) => s.friends);
-  const users = useStore((s) => s.users);
-  const online = useStore((s) => s.online);
-  const incoming = friends.filter((f) => f.status === 'incoming').length;
-  // Who's around first: those are the faces worth showing.
-  const faces = friends.filter((f) => f.status === 'friend').map((f) => f.userId).sort((a, b) => Number(online.includes(b)) - Number(online.includes(a))).slice(0, 5);
-  return (
-    <Card>
-      <Pressable accessibilityRole="button" onPress={openFriends} style={({ pressed }) => ({ minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, backgroundColor: pressed ? 'rgba(255,255,255,0.05)' : 'transparent' })}>
-        <Text style={{ flex: 1, fontSize: 17, fontWeight: '500' }}>{t('m.yourFriends')}</Text>
-        {incoming > 0 ? <Badge count={incoming} /> : null}
-        <View style={{ flexDirection: 'row' }}>
-          {faces.map((id, i) => <View key={id} style={{ marginLeft: i ? -10 : 0, borderRadius: 16, borderWidth: 2, borderColor: colors.graphite }}><Avatar user={users[id]} size={28} ringBg={colors.graphite} /></View>)}
-        </View>
-        <ChevronRightIcon size={18} color={colors.faint} />
-      </Pressable>
-    </Card>
   );
 }
 
