@@ -21,7 +21,8 @@ body {
 body::before {
   content: "";
   position: fixed;
-  inset: 0 0 auto;
+  /* Stops short of the top-right corner: the language button sits there and a drag strip would swallow its clicks. */
+  inset: 0 120px auto 0;
   z-index: 100;
   height: 36px;
   -webkit-app-region: drag;

@@ -12,6 +12,9 @@ contextBridge.exposeInMainWorld('atriumSetup', {
   connectKey: (host) => call('connect-key', String(host)),
   /** One request to HostVDS's API ({ method, url, body?, token? } → { status, token?, json }). */
   hostvds: (request) => call('hostvds', request),
+  /** The globe: the app's language ('ru' | 'en'); `onLanguage` hears every change (from here or the tray menu). */
+  language: (choice) => call('language', choice),
+  onLanguage: (callback) => ipcRenderer.on('setup:language', (_event, lang) => callback(lang)),
   register: (form) => call('register', form),
   /** Resolves once the link in deSEC's letter is pressed and the name points at the server. */
   waitMail: (where) => call('wait-mail', where),

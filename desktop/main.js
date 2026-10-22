@@ -55,12 +55,14 @@ function writeConfig(next) {
 // A server is the default only in builds made for one: ATRIUM_DEFAULT_URL in release-desktop.sh puts the address into
 // package.json (electron-builder's extraMetadata). Any other build first asks where its server is.
 const DEFAULT_URL = require('./package.json').atriumDefaultUrl || '';
-const APP_URL = devEnv('ATRIUM_URL') || readConfig().url || DEFAULT_URL;
-const ORIGIN = APP_URL ? new URL(APP_URL).origin : '';
+// The server the app opens. Set once at start, or by the first window / "Your own server" when they're done (useServer):
+// the main window then opens in their place, no restart.
+let APP_URL = devEnv('ATRIUM_URL') || readConfig().url || DEFAULT_URL;
+let ORIGIN = APP_URL ? new URL(APP_URL).origin : '';
 // An invite link pasted on first start (address:save): its path and query are opened once, so sign-up comes with
 // the invite in place, then forgotten.
 const PENDING = readConfig().open;
-const START_URL = ORIGIN && typeof PENDING === 'string' && PENDING.startsWith('/') ? ORIGIN + PENDING : APP_URL;
+let START_URL = ORIGIN && typeof PENDING === 'string' && PENDING.startsWith('/') ? ORIGIN + PENDING : APP_URL;
 if (PENDING !== undefined) {
   const { open: _open, ...rest } = readConfig();
   try {
@@ -132,11 +134,13 @@ function showWindow() {
   win.focus();
 }
 
-function createWindow() {
+/** The main window; `bounds` puts it where the window it takes over from stood (useServer), else in the middle. */
+function createWindow(bounds = null) {
   win = new BrowserWindow({
     width: 1280,
     height: 820,
     ...centred(1280, 820),
+    ...(bounds ?? {}),
     minWidth: 380,
     minHeight: 560,
     title: 'Atrium',
@@ -330,12 +334,8 @@ function setLanguage(choice, { fromPage }) {
   addressWindow?.setTitle(firstRunAddress ? 'Atrium' : t('address.windowTitle'));
   setupWindow?.setTitle(t('setup.title'));
   relocalize(addressWindow?.webContents);
-  // The setup window holds a half-made server's answers in the page, so it only reloads while nothing is filled in
-  // yet; from a later step it keeps its language until opened again.
-  setupWindow?.webContents
-    .executeJavaScript(`document.querySelector('.step:not([hidden])')?.dataset.step === 'server' && !document.getElementById('pass').value`)
-    .then((untouched) => untouched && relocalize(setupWindow?.webContents))
-    .catch(() => undefined);
+  // The setup window holds a half-made server's answers: it switches its words in place instead of reloading.
+  setupWindow?.webContents.send('setup:language', i18n.getLang());
   screenPicker.relocalize();
   reachable.relocalize();
   // The page learns of a change made here; one it made itself needs no echo.
@@ -477,10 +477,7 @@ ipcMain.handle('address:save', (event, value, opts) => {
   const rest = url.pathname + url.search;
   const open = rest === '/' ? (opts?.signIn ? '/?signin' : null) : rest;
   const config = open ? { url: url.origin, open } : { url: url.origin };
-  writeConfig(config);
-  quitting = true;
-  app.relaunch();
-  app.exit(0);
+  useServer(url.origin, open, addressWindow);
 });
 
 // The first window's globe: the same choice as the tray's Language menu; the window reloads in it.
@@ -557,6 +554,9 @@ setupCall('open-external', (url) => {
 });
 setupCall('connect', (login) => serverSetup.connect(login));
 setupCall('app-key', () => serverSetup.newAppKey());
+setupCall('language', (choice) => {
+  if (choice === 'ru' || choice === 'en') setLanguage(choice, { fromPage: false });
+});
 setupCall('connect-key', (host) => serverSetup.connectByKey(String(host)));
 // "No server?": the setup page drives HostVDS's API (@atrium/setup, rentServer) through here, since a page can't
 // reach it (CORS). Only that API, only these methods; the answer goes back as { status, token, json }.
@@ -686,11 +686,32 @@ setupCall('open-server', (value) => {
   if (url.protocol !== 'https:') return { error: t('setup.noAddress') };
   const rest = url.pathname + url.search;
   keepSetupLink(url);
-  writeConfig(rest === '/' ? { url: url.origin } : { url: url.origin, open: rest });
-  quitting = true;
-  app.relaunch();
-  app.exit(0);
+  useServer(url.origin, rest === '/' ? null : rest, setupWindow);
 });
+
+/**
+ * The app's server from now on: remembered, and opened in the main window right where `from` (the first window or
+ * "Your own server") stands, which goes once the main window shows. `open` (a path with its query) is where it opens
+ * this time: an invite, sign-in, the server's first-run wizard.
+ */
+function useServer(origin, open, from) {
+  writeConfig({ url: origin });
+  APP_URL = origin;
+  ORIGIN = origin;
+  START_URL = open ? origin + open : origin;
+  // Set up again from the tray while the main window is there: it just goes to the new server.
+  if (win && !win.isDestroyed()) {
+    reachable.open(win, START_URL);
+    showWindow();
+    if (from && !from.isDestroyed()) from.destroy();
+    return;
+  }
+  const bounds = from && !from.isDestroyed() ? from.getBounds() : null;
+  startMain(bounds);
+  win.once('ready-to-show', () => {
+    if (from && !from.isDestroyed()) from.destroy();
+  });
+}
 
 // The link with the setup code (https://app.DOMAIN/?setup=CODE) is kept with the server's other secrets until the
 // server's first-run wizard is done: the address opened without it (or the wizard left half-way) would ask for a code.
@@ -839,7 +860,12 @@ app.whenReady().then(async () => {
     showSplash(addressWindow);
     return;
   }
-  createWindow();
+  startMain();
+});
+
+/** The main window and what goes with it: updates, the tray, the microphone. Once, at start or once a server is set. */
+function startMain(bounds = null) {
+  createWindow(bounds);
   updater.init({
     manifestUrl: devEnv('ATRIUM_UPDATE_URL') || UPDATE_MANIFEST,
     onChange: (state) => {
@@ -852,6 +878,6 @@ app.whenReady().then(async () => {
   powerMonitor.on('resume', () => updater.check());
   // macOS asks for the microphone once, for the app — not per call. Camera is asked on first use.
   if (isMac && app.isPackaged && systemPreferences.getMediaAccessStatus('microphone') === 'not-determined') {
-    await systemPreferences.askForMediaAccess('microphone');
+    void systemPreferences.askForMediaAccess('microphone');
   }
-});
+}

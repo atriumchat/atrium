@@ -22,6 +22,9 @@ export type Setup = {
   connectKey(host: string): Promise<{ facts: { ip: string; os: string; size: string } } | Failure>;
   /** HostVDS's API, through the main process (rentServer drives it). */
   hostvds: Http;
+  /** The globe: the app's language (as the tray's menu does); `onLanguage` hears it, from here or the tray. */
+  language(choice: 'ru' | 'en'): Promise<void>;
+  onLanguage(callback: (lang: 'ru' | 'en') => void): void;
   register(form: { name: string; email: string }): Promise<{ ok: true } | Failure>;
   waitMail(where: { ip: string }): Promise<{ ok: true } | Failure>;
   cancelMail(): void;
@@ -33,6 +36,7 @@ export type Setup = {
 };
 
 const bridge = (window as unknown as { atriumSetup?: Setup }).atriumSetup;
+const languageListeners: ((lang: 'ru' | 'en') => void)[] = [];
 /** Design work in a browser: the made-up answers, and #step=… opening a step (Onboarding). */
 export const standIn = !bridge;
 
@@ -50,6 +54,10 @@ const fake: Setup = {
     return { facts: { ip: host, os: 'Ubuntu 24.04 LTS · x86_64', size: t('ssh.size', { memory: 2, disk: 18 }) } };
   },
   appKey: async () => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIStandIn atrium-app',
+  language: async (choice) => {
+    for (const listen of languageListeners) listen(choice);
+  },
+  onLanguage: (callback) => void languageListeners.push(callback),
   async connectKey(host) {
     await wait(1500);
     return { facts: { ip: host, os: 'Ubuntu 24.04 LTS · x86_64', size: t('ssh.size', { memory: 2, disk: 20 }) } };

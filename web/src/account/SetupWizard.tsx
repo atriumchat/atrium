@@ -7,6 +7,7 @@ import { IconCropper, centred, cropToBlob, cropToUrl, loadImage, type Crop } fro
 import { KeyStep } from './KeyStep';
 import { adminForm, codeFrom, CODE_LENGTH, firstRun, type FirstRunStep } from '@atrium/setup';
 import { FlowPrimary, FlowSecondary, FlowShell, FlowStep, LineField, TextAction } from '@atrium/ui-web';
+import { LangButton } from '../ui/LangButton';
 import './setupWizard.css';
 
 /**
@@ -335,7 +336,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   const parts = { server: t('setup.done.server'), account: t('setup.progress.account'), friends: t('setup.progress.friends') };
   const stage = firstRun.stage(step.id);
   return (
-    <FlowShell fill={firstRun.fill(step.id)} label={stage ? t('setup.stageOf', { stage: parts[stage.part], n: stage.n, total: stage.total }) : undefined}>
+    <FlowShell fill={firstRun.fill(step.id)} label={stage ? t('setup.stageOf', { stage: parts[stage.part], n: stage.n, total: stage.total }) : undefined} corner={<LangButton />}>
       <div key={step.n} className={step.back ? 'flow-swap back-in' : 'flow-swap'}>
         {render(step.id)}
       </div>

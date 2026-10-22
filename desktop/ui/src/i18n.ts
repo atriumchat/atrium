@@ -15,4 +15,9 @@ const asked = new URLSearchParams(location.search).get('lang') ?? location.hash.
 export const lang = i18n.setLang(asked ?? i18n.pick(navigator.language));
 document.documentElement.lang = lang;
 
+/** Switches the words in place (`t` reads the current language), for a window that keeps its state across a switch. */
+export function switchLang(next: 'ru' | 'en') {
+  document.documentElement.lang = i18n.setLang(next);
+}
+
 export const t = i18n.t;

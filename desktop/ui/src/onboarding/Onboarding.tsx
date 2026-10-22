@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { domainOk, emailOk, freeName, hostOk, jobFill, mailboxOf, MOCK_DOMAIN, nameOk, ownOnDesktop, pickTurn, RENT, rentServer, TASKS, type OwnDesktopStep as Step, type RentStage } from '@atrium/setup';
 import { Drum, FlowPrimary, FlowProvider, FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '@atrium/ui-web';
 import type { DrumItem } from '@atrium/ui-common';
-import { t } from '../i18n';
+import { lang as startLang, switchLang, t } from '../i18n';
+import { LangButton } from '../LangButton';
 import { setup, standIn, type InstallEvent } from './bridge';
 import './onboarding.css';
 
@@ -21,6 +22,14 @@ const MAIL_LATE = location.hash.includes('slowmail') ? 5000 : 15 * 60 * 1000;
 const OPEN_ANYWAY = 4 * 60 * 1000;
 
 export function Onboarding() {
+  // The language switches in place: a half-made server's answers stay as they are.
+  const [lang, setLang] = useState(startLang);
+  useEffect(() => {
+    setup.onLanguage((next) => {
+      switchLang(next);
+      setLang(next);
+    });
+  }, []);
   const [step, setStep] = useState<{ id: Step; back: boolean; n: number }>({ id: 'server', back: false, n: 0 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -446,7 +455,11 @@ export function Onboarding() {
 
   return (
     <FlowProvider labels={{ back: t('ob.back') }}>
-      <FlowShell fill={fill} label={stage ? t('ob.stageOf', { stage: t(`ob.stage.${stage.part}`), n: stage.n, total: stage.total }) : undefined}>
+      <FlowShell
+        fill={fill}
+        label={stage ? t('ob.stageOf', { stage: t(`ob.stage.${stage.part}`), n: stage.n, total: stage.total }) : undefined}
+        corner={<LangButton lang={lang} onSwitch={(other) => void setup.language(other)} />}
+      >
         <div ref={box} key={step.n} className={step.back ? 'flow-swap back-in' : 'flow-swap'}>
           {screen()}
         </div>
