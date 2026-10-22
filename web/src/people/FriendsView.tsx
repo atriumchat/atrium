@@ -5,6 +5,7 @@ import { messageUser, showError, useStore } from '../store';
 import type { Friend, User } from '../types';
 import { Avatar } from '../ui/Avatar';
 import { InboxButton } from './Inbox';
+import { desktop } from '../desktop';
 import { BackButton } from '../shell/ChannelHeader';
 import { EmptyState, type ArtName } from '../ui/Illustrations';
 import { FriendButton, UserProfile } from './UserProfile';
@@ -80,7 +81,8 @@ export function FriendsView() {
               <UserPlusIcon size={18} className="@min-[34rem]:hidden" />
               <span className="@max-[34rem]:hidden">{t('people.friends.add')}</span>
             </button>
-            <InboxButton />
+            {/* In the desktop app the bell is in the window's title row (TitleBar). */}
+            {!desktop && <InboxButton />}
           </div>
           <div className="no-scrollbar mt-3 flex items-center gap-1 overflow-x-auto">
             {tabButton('online', t('people.friends.online'))}

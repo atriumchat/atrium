@@ -19,6 +19,7 @@ import { MobileShell } from './MobileShell';
 import { CallRinger, IncomingCall } from '../voice/CallPanel';
 import { GroupPicker } from '../people/GroupPicker';
 import { AtriumMark } from '../ui/Logo';
+import { TitleBar } from './TitleBar';
 import { UpdateBanner } from './UpdateBanner';
 import { InviteBanner, prefetchInvite } from '../people/Invites';
 import { ArtPlayground, Playground } from './Playground';
@@ -100,6 +101,7 @@ function DesktopShell() {
   const panel = 'overflow-hidden rounded-[20px] bg-window';
   return (
     <div className="flex h-full gap-2 bg-background p-2 [html[data-desktop]_&]:pt-0">
+      {desktop && <TitleBar />}
       <ServerRail className={`${panel} w-[72px] shrink-0`} />
       <div className={`${panel} flex w-[320px] shrink-0 flex-col pb-2`}>
         {/* Both lists stay mounted; switching home ↔ server only shows the other, so nothing reloads. */}

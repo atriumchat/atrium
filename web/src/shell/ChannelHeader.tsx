@@ -5,6 +5,7 @@ import { useIsMobile } from '../hooks';
 import { localeOf, useT } from '../i18n';
 import { Avatar } from '../ui/Avatar';
 import { InboxButton } from '../people/Inbox';
+import { desktop } from '../desktop';
 import { UserProfile } from '../people/UserProfile';
 import { RoundButton } from '../ui/ui';
 import { ChevronLeftIcon } from '../ui/icons';
@@ -57,7 +58,8 @@ export function ChannelHeader(props: {
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {actions}
-        <InboxButton />
+        {/* In the desktop app the bell is in the window's title row (TitleBar). */}
+        {!desktop && <InboxButton />}
       </div>
       {showOnline && <OnlinePeople />}
     </header>

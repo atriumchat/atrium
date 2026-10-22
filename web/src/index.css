@@ -67,6 +67,23 @@ html[data-desktop] body::before {
   -webkit-app-region: drag;
   app-region: drag;
 }
+/* Windows and Linux: their window buttons fill the right corner, the strip stops short of the space left of them. */
+html[data-desktop]:not([data-desktop="darwin"]) body::before {
+  right: 200px;
+}
+/* The main window's title row (shell/TitleBar.tsx): drags like the strip; the bell in it stays clickable. */
+.desktop-titlebar {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+.desktop-titlebar-end {
+  right: 12px;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+html[data-desktop]:not([data-desktop="darwin"]) .desktop-titlebar-end {
+  right: 152px;
+}
 
 body {
   background: var(--background);

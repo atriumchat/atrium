@@ -14,7 +14,7 @@ import { AtIcon, BellIcon, ReplyIcon } from '../ui/icons';
  * Notifications: every message that mentions you (or everyone) or answers you, from all channels and your DMs,
  * newest first. A click opens the conversation right at that message.
  */
-export function InboxButton() {
+export function InboxButton({ compact = false }: { compact?: boolean }) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<InboxItem[] | null>(null);
@@ -46,9 +46,9 @@ export function InboxButton() {
     <Popover isOpen={open} onOpenChange={setOpen}>
       <Popover.Trigger
         aria-label={total ? t('people.inbox.titleNew', { n: total }) : t('people.inbox.title')}
-        className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-foreground outline-none transition-colors hover:bg-white/10 data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus"
+        className={`relative flex shrink-0 items-center justify-center rounded-full outline-none transition-colors hover:bg-white/10 data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus ${compact ? 'h-8 w-8 text-foreground' : 'h-10 w-10 text-foreground'}`}
       >
-        <BellIcon size={20} />
+        <BellIcon size={compact ? 18 : 20} />
         {total > 0 && (
           <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-danger px-1 text-center text-[10px] font-medium leading-[18px] text-white ring-2 ring-[var(--app-window)]">
             {total > 99 ? '99+' : total}
