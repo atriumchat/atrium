@@ -460,7 +460,23 @@ function openAddressWindow({ firstRun = false, show = true, bounds = null, step 
   });
 }
 
-ipcMain.handle('address:save', (event, value, opts) => {
+/**
+ * An Atrium server's root domain is only its cover page; the app is on app.DOMAIN. An address typed as the root (what
+ * people mostly know) becomes the app's own, when app.DOMAIN answers as an Atrium server; anything else stays.
+ */
+async function appOrigin(origin) {
+  const { protocol, host } = new URL(origin);
+  if (host.startsWith('app.') || protocol !== 'https:') return origin;
+  try {
+    const res = await net.fetch(`https://app.${host}/api/setup`, { cache: 'no-store', signal: AbortSignal.timeout(6000) });
+    if (res.ok && 'needed' in (await res.json())) return `https://app.${host}`;
+  } catch {
+    // No such app next to it: the address is used as typed.
+  }
+  return origin;
+}
+
+ipcMain.handle('address:save', async (event, value, opts) => {
   // Only the local address window may change where the app points.
   if (!event.senderFrame?.url.startsWith('file://')) return t('address.denied');
   let url;
@@ -479,7 +495,7 @@ ipcMain.handle('address:save', (event, value, opts) => {
   const rest = url.pathname + url.search;
   const open = rest === '/' ? (opts?.signIn ? '/?signin' : null) : rest;
   const config = open ? { url: url.origin, open } : { url: url.origin };
-  useServer(url.origin, open, addressWindow);
+  useServer(await appOrigin(url.origin), open, addressWindow);
 });
 
 // The first window's globe: the same choice as the tray's Language menu; the window reloads in it.
@@ -873,6 +889,14 @@ app.whenReady().then(async () => {
     openAddressWindow({ firstRun: true, show: false });
     showSplash(addressWindow);
     return;
+  }
+  // Saved as a server's root domain (before appOrigin): its app is used from now on.
+  const fixed = await appOrigin(APP_URL).catch(() => APP_URL);
+  if (fixed !== APP_URL) {
+    writeConfig({ ...readConfig(), url: fixed });
+    START_URL = START_URL.replace(ORIGIN, fixed);
+    APP_URL = fixed;
+    ORIGIN = fixed;
   }
   startMain();
 });
