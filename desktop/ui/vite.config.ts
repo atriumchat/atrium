@@ -30,7 +30,7 @@ export default defineConfig({
     emptyOutDir: true,
     // Fonts and the like as files: the pages' CSP allows only 'self'.
     assetsInlineLimit: 0,
-    rolldownOptions: { input: { onboarding: resolve(__dirname, 'onboarding.html') } },
+    rolldownOptions: { input: { onboarding: resolve(__dirname, 'onboarding.html'), start: resolve(__dirname, 'start.html'), splash: resolve(__dirname, 'splash.html') } },
   },
   server: { port: 5320, strictPort: true },
 });

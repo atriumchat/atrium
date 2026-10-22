@@ -1,0 +1,218 @@
+/* The first window: the page itself; the steps are @atrium/ui-web's flow parts. Colours are tokens. */
+
+:root {
+  color-scheme: dark;
+  /* The flow's corner (the globe) on the line of the window's traffic lights (main.js puts them at y 16, 12 high). */
+  --flow-corner-top: 4px;
+}
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--gx-page);
+}
+/* The window has no title bar (desktop/main.js, frameless): its top strip drags it. The flow's column starts below it. */
+body::before {
+  content: "";
+  position: fixed;
+  /* Stops short of the top-right corner: the language button sits there and a drag strip would swallow its clicks. */
+  inset: 0 120px auto 0;
+  z-index: 100;
+  height: 36px;
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+#root {
+  height: 100%;
+}
+
+/*
+ * The welcome (Start.tsx, Welcome): the app's icon as on the site's download page, a white tile inside a ring of
+ * ticks. The dim ticks turn slowly; the bright ones light up round them once, as the app opens. Then the greeting,
+ * the line and the button rise in, one after another.
+ */
+.welcome {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 24px 24px;
+  color: var(--gx-text);
+  font-family: var(--gx-font);
+  text-align: center;
+  -webkit-font-smoothing: antialiased;
+}
+.welcome-icon {
+  position: relative;
+  display: grid;
+  width: 200px;
+  height: 200px;
+  margin-bottom: 24px;
+  place-items: center;
+  animation: welcome-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.welcome-ticks {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from -1deg, var(--gx-tick) 0 1.6deg, transparent 1.6deg 15deg);
+  -webkit-mask: radial-gradient(closest-side, transparent 80%, #000 81%, #000 93%, transparent 94%);
+  mask: radial-gradient(closest-side, transparent 80%, #000 81%, #000 93%, transparent 94%);
+  animation: welcome-turn 90s linear infinite;
+}
+@property --welcome-p {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+.welcome-ticks::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from -1deg, var(--gx-tick-on) 0 1.6deg, transparent 1.6deg 15deg);
+  -webkit-mask: conic-gradient(#000 calc(var(--welcome-p) - 5%), transparent var(--welcome-p));
+  mask: conic-gradient(#000 calc(var(--welcome-p) - 5%), transparent var(--welcome-p));
+  animation: welcome-fill 1.6s cubic-bezier(0.3, 0.6, 0.3, 1) 0.3s forwards;
+}
+.welcome-tile {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  width: 116px;
+  height: 116px;
+  place-items: center;
+  border-radius: 24%;
+  background: linear-gradient(180deg, #ffffff, #e4e4e7);
+  color: var(--gx-button-ink);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+.welcome-title {
+  margin: 0;
+  font-size: 40px;
+  font-weight: 300;
+  line-height: 46px;
+  letter-spacing: -1px;
+}
+.welcome-sub {
+  margin: 10px 0 0;
+  color: var(--gx-muted);
+  font-size: 17px;
+  line-height: 23px;
+}
+.welcome-go {
+  height: 56px;
+  margin-top: 40px;
+  padding: 0 36px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gx-button);
+  color: var(--gx-button-ink);
+  font: 600 17px/1 var(--gx-font);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+.welcome-go:hover {
+  background: var(--gx-button-hover);
+}
+.welcome-go:active {
+  transform: scale(0.98);
+}
+.welcome-go:focus-visible {
+  outline: 2px solid var(--gx-button);
+  outline-offset: 3px;
+}
+.welcome-rise {
+  animation: welcome-rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+/* Leaving for the first step, which slides in from the right (flow.css): the welcome goes a little the other way. */
+.welcome.leaving {
+  opacity: 0;
+  transform: translateX(-28px);
+  transition: opacity 200ms ease-in, transform 200ms ease-in;
+}
+@keyframes welcome-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+@keyframes welcome-turn {
+  to {
+    rotate: 360deg;
+  }
+}
+@keyframes welcome-fill {
+  to {
+    --welcome-p: 105%;
+  }
+}
+@keyframes welcome-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes welcome-rise {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+    filter: blur(6px);
+  }
+}
+/*
+ * Come from the splash (main.js adds .from-splash): the same icon, already lit and still. Once the window has landed
+ * round it, one band of light passes over the tile (the app is on), and the words rise after it.
+ */
+.from-splash .welcome-icon {
+  animation: none;
+}
+.from-splash .welcome-tile::after {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.35) 50%, transparent 62%);
+  transform: translateX(-100%);
+  animation: welcome-sweep 0.75s cubic-bezier(0.45, 0, 0.25, 1) 0.4s forwards;
+}
+.from-splash .welcome-ticks::after {
+  animation: none;
+  --welcome-p: 105%;
+}
+/* Not seen yet (its window still hidden behind the splash): everything waits at its start. */
+.welcome:not(.seen) .welcome-icon,
+.welcome:not(.seen) .welcome-rise,
+.welcome:not(.seen) .welcome-ticks::after,
+.welcome:not(.seen) .welcome-tile::after {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .welcome-icon,
+  .welcome-rise,
+  .welcome-ticks {
+    animation: none;
+  }
+  .welcome-ticks::after {
+    animation: none;
+    --welcome-p: 105%;
+  }
+  .from-splash .welcome-tile::after {
+    display: none;
+  }
+}
+
+/* In a window (not a phone) the step stands in the middle of it, the ruler, title and buttons as one block. */
+.flow .flow-col {
+  justify-content: safe center;
+  padding-top: 56px;
+  padding-bottom: 56px;
+}
+.flow .flow-swap {
+  flex: 0 0 auto;
+}

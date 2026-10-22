@@ -3,6 +3,8 @@
 
 :root {
   color-scheme: dark;
+  /* The flow's corner on the line of the window's traffic lights (main.js puts them at y 16, 12 high). */
+  --flow-corner-top: 4px;
 }
 *,
 *::before,
@@ -14,6 +16,16 @@ body {
   height: 100%;
   margin: 0;
   background: var(--gx-page);
+}
+/* The window has no title bar (desktop/main.js, frameless): its top strip drags it. The flow's column starts below it. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 100;
+  height: 36px;
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 
 .eye {
@@ -142,4 +154,14 @@ body {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* In a window (not a phone) the step stands in the middle of it, the ruler, title and buttons as one block. */
+.flow .flow-col {
+  justify-content: safe center;
+  padding-top: 56px;
+  padding-bottom: 56px;
+}
+.flow .flow-swap {
+  flex: 0 0 auto;
 }

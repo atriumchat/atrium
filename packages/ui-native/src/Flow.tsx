@@ -60,7 +60,7 @@ export function useFlowFrame() {
  * The page under a flow: black, the part it's in (`label`, "Адрес (2/5)") over the step, the ticks drawn last so
  * nothing covers them. `bottom` is laid along the screen's bottom edge to edge, kept inside the ticks (InsideEdge).
  */
-export function FlowShell({ fill, label, bottom, children }: FlowShellProps) {
+export function FlowShell({ fill, label, bottom, corner, children }: FlowShellProps) {
   const frame = useFlowFrame();
   return (
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: color.page.phone }}>
@@ -73,6 +73,7 @@ export function FlowShell({ fill, label, bottom, children }: FlowShellProps) {
           </View>
         ) : null}
       </View>
+      {corner ? <View style={{ position: 'absolute', top: frame.top, right: frame.edge - 12, zIndex: 5 }}>{corner}</View> : null}
       <EdgeTicks fill={fill} island={frame.island} />
       {frame.phone ? <View style={{ position: 'absolute', top: 11, alignSelf: 'center', width: 126, height: 37, borderRadius: 19, backgroundColor: color.page.phone, zIndex: 10 }} /> : null}
     </KeyboardAvoidingView>

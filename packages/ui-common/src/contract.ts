@@ -12,6 +12,8 @@ export type FlowShellProps = {
   label?: string;
   /** Laid along the screen's bottom edge to edge, kept inside the ticks (the install's game). */
   bottom?: ReactNode;
+  /** In the top right corner, quiet: the language switch before you're signed in. */
+  corner?: ReactNode;
   children: ReactNode;
 };
 

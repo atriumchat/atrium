@@ -32,10 +32,11 @@ export function FlowProvider({ labels, children }: FlowProviderProps) {
  * The black page: the part it's in (`label`, "Server (1/3)") over the step, the ticks along the window's edge on a
  * phone, or as a ruler over the column in a bigger window.
  */
-export function FlowShell({ fill, label, bottom, children }: FlowShellProps) {
+export function FlowShell({ fill, label, bottom, corner, children }: FlowShellProps) {
   const narrow = useNarrow();
   return (
     <div className="flow">
+      {corner ? <div className="flow-corner">{corner}</div> : null}
       {narrow ? <EdgeTicks fill={fill} /> : null}
       <div className="flow-col">
         {narrow ? null : <TickRuler fill={fill} />}

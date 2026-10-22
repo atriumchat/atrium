@@ -1,0 +1,209 @@
+/* The splash's window is transparent (desktop/main.js): no page colour, only the icon on whatever is behind it. */
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+}
+body {
+  display: grid;
+  place-items: center;
+  transition: opacity 0.5s ease;
+}
+/* Fading while the welcome window fades in round the same icon (main.js): nothing moves, only the light changes. */
+body.out {
+  opacity: 0;
+}
+/* Waiting to be shown (placed first, hidden): everything at its start. */
+body:not(.go) .splash-ticks,
+body:not(.go) .splash-ticks::after,
+body:not(.go) .splash-tile,
+body:not(.go) .splash-tile::before,
+body:not(.go) .splash-tile::after,
+body:not(.go) .splash-tile svg,
+body:not(.go) .splash-mark,
+body:not(.go) .splash::before {
+  animation-play-state: paused;
+}
+
+/*
+ * One event for each moment of the sound (main.ts): out of the quiet the mark is drawn as a white line, coming into
+ * focus; the ticks light round it as the chord swells; at its peak the tile floods white from the middle and the line
+ * turns to the dark mark on it; while the chord settles nothing moves. The light over the tile comes later, in the
+ * welcome window, once it has landed.
+ */
+.splash {
+  position: relative;
+  display: grid;
+  width: 200px;
+  height: 200px;
+  place-items: center;
+}
+/* A soft dark halo, so the white tile and the ticks read on a light wallpaper too; on a dark one it all but vanishes. */
+.splash::before {
+  content: "";
+  position: absolute;
+  inset: -50px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(12, 12, 14, 0.78), rgba(12, 12, 14, 0.55) 55%, rgba(12, 12, 14, 0.18) 80%, transparent);
+  animation: splash-in 0.6s ease both;
+}
+.splash-ticks {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from -1deg, rgba(255, 255, 255, 0.28) 0 1.6deg, transparent 1.6deg 15deg);
+  -webkit-mask: radial-gradient(closest-side, transparent 80%, #000 81%, #000 93%, transparent 94%);
+  mask: radial-gradient(closest-side, transparent 80%, #000 81%, #000 93%, transparent 94%);
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.6));
+  /* No turning here: the welcome's ring takes over at the same angle and turns from there. */
+  animation: splash-in 0.8s ease both;
+}
+@property --splash-p {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+.splash-ticks::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from -1deg, #ffffff 0 1.6deg, transparent 1.6deg 15deg);
+  -webkit-mask: conic-gradient(#000 calc(var(--splash-p) - 5%), transparent var(--splash-p));
+  mask: conic-gradient(#000 calc(var(--splash-p) - 5%), transparent var(--splash-p));
+  animation: splash-fill 1.25s cubic-bezier(0.3, 0.6, 0.3, 1) 0.5s forwards;
+}
+
+/* The tile: empty at first, the line alone in the middle; its white and its shadow are layers under the mark. */
+.splash-tile {
+  position: relative;
+  display: grid;
+  isolation: isolate;
+  width: 116px;
+  height: 116px;
+  place-items: center;
+  border-radius: 24%;
+  color: #ffffff;
+  animation: splash-ink 0.3s ease 1.72s forwards;
+}
+/* The white, opening from the middle at the peak: a circle that grows until the rounded square holds it. */
+.splash-tile::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, #ffffff, #e4e4e7);
+  clip-path: circle(0% at 50% 50%);
+  animation: splash-flood 0.45s cubic-bezier(0.22, 1, 0.36, 1) 1.72s forwards;
+}
+/* Its shadow (a close sharp one and a far soft one, as the welcome's tile has), coming with the white. */
+.splash-tile::after {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 18px 40px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  animation: splash-show 0.5s ease 1.8s forwards;
+}
+/* The line comes into focus as it is drawn (its own layer: the blur is the compositor's, not a repaint). */
+.splash-tile svg {
+  will-change: opacity, filter;
+  animation: splash-focus 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+/*
+ * The line starts at the top of the A (splash.html's path begins there) and runs down both sides at once, the two ends
+ * meeting at the top of the arch: the first `--draw` of the path from its start and the last `--draw` from its end.
+ */
+@property --draw {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+.splash-mark {
+  fill-opacity: 0;
+  stroke-width: 5.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: var(--draw) calc(1 - 2 * var(--draw)) var(--draw) 1;
+  animation:
+    splash-draw 1.4s cubic-bezier(0.65, 0, 0.35, 1) 0.1s forwards,
+    splash-solid 0.3s ease 1.72s forwards;
+}
+
+@keyframes splash-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes splash-show {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes splash-fill {
+  to {
+    --splash-p: 105%;
+  }
+}
+@keyframes splash-focus {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+  }
+}
+@keyframes splash-draw {
+  to {
+    --draw: 0.5;
+  }
+}
+@keyframes splash-ink {
+  to {
+    color: #0c0c0e;
+  }
+}
+/* The line gives way to the fill, so the mark ends exactly as the welcome's (no stroke on it). */
+@keyframes splash-solid {
+  to {
+    fill-opacity: 1;
+    stroke-opacity: 0;
+  }
+}
+@keyframes splash-flood {
+  to {
+    clip-path: circle(75% at 50% 50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-ticks,
+  .splash-tile,
+  .splash-tile::before,
+  .splash-tile::after,
+  .splash-tile svg,
+  .splash-mark {
+    animation: none;
+  }
+  .splash-ticks::after {
+    animation: none;
+    --splash-p: 105%;
+  }
+  .splash-tile {
+    color: #0c0c0e;
+  }
+  .splash-tile::before {
+    clip-path: none;
+  }
+  .splash-tile::after {
+    opacity: 1;
+  }
+  .splash-mark {
+    fill-opacity: 1;
+    stroke-opacity: 0;
+  }
+}

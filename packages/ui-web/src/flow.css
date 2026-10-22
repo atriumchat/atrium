@@ -17,6 +17,39 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* The corner (FlowShell's `corner`): top right, over the ticks; --flow-corner-top moves it under a window's own strip. */
+.flow-corner {
+  position: fixed;
+  top: var(--flow-corner-top, 16px);
+  right: 16px;
+  z-index: 2;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+/* A quiet button for the corner: an icon and a short label, grey until hovered (the language switch). */
+.flow-corner-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gx-muted);
+  font: 500 14px/1 var(--gx-font);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.flow-corner-button:hover,
+.flow-corner-button:focus-visible {
+  color: var(--gx-text);
+  background: var(--gx-graphite);
+  outline: none;
+}
+
 .flow-ticks {
   position: fixed;
   inset: 0;

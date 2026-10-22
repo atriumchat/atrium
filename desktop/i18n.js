@@ -49,6 +49,17 @@
       'address.haveInviteSub': 'Ссылка от друга',
       'address.own': 'Свой сервер',
       'address.ownSub': 'Для своей компании. Нужен VPS',
+      // The first window (desktop/ui start page)
+      'start.tagline': 'Свои люди, свои звонки.',
+      'start.welcome': 'Добро пожаловать в Atrium',
+      'start.begin': 'Начать',
+      'start.have': 'Есть аккаунт',
+      'start.haveSub': 'Адрес сервера',
+      'start.invited': 'Меня пригласили',
+      'start.next': 'Дальше',
+      'start.back': 'Назад',
+      'start.addressField': 'Адрес',
+      'start.inviteField': 'Ссылка',
 
       // Setup window: main-process answers
       'setup.title': 'Свой сервер',
@@ -242,6 +253,17 @@
       'address.haveInviteSub': 'Link from a friend',
       'address.own': 'Your own server',
       'address.ownSub': 'For your own group. Needs a VPS',
+      // The first window (desktop/ui start page)
+      'start.tagline': 'Your people, your calls.',
+      'start.welcome': 'Welcome to Atrium',
+      'start.begin': 'Get started',
+      'start.have': 'I have an account',
+      'start.haveSub': 'The server address',
+      'start.invited': 'I was invited',
+      'start.next': 'Next',
+      'start.back': 'Back',
+      'start.addressField': 'Address',
+      'start.inviteField': 'Link',
 
       'setup.title': 'Your own server',
       'setup.denied': 'Not allowed',
