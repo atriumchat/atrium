@@ -58,6 +58,8 @@
   max-width: var(--gx-column);
   height: 100%;
   padding: max(44px, calc(env(safe-area-inset-top) + 28px)) var(--flow-edge) max(var(--flow-edge), calc(env(safe-area-inset-bottom) + 12px));
+  /* A step taller than the window (a short desktop window, a long list) scrolls rather than cutting its buttons off. */
+  overflow-y: auto;
 }
 @media (min-width: 821px) {
   .flow-col {
@@ -78,8 +80,8 @@
 .flow-swap {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  /* The window's height at least (on a phone the buttons stand at its bottom), the content's when that's more. */
+  flex: 1 0 auto;
 }
 /* A new step slides in from the right; going back fades in. */
 .flow-swap {
@@ -129,14 +131,18 @@
   flex: 1;
   min-height: 12px;
 }
-/* On a monitor the eye goes down the column, there's no thumb to reach for: the buttons follow the content, one gap
-   under it, instead of standing at the window's bottom. The column stays at the top, so the title doesn't move from
+/* On a monitor the eye goes down the column, there's no thumb to reach for: the buttons follow the content, a part's
+   gap under it, instead of standing at the window's bottom. The column stays at the top, so the title doesn't move from
    step to step. */
 @media (min-width: 821px) {
   .flow-spacer {
     flex: none;
     min-height: 0;
-    height: var(--gx-between);
+    height: var(--gx-section);
+  }
+  /* The heading, the content and the buttons further apart than two fields, so they read as parts. */
+  .flow-body {
+    margin-top: var(--gx-section);
   }
 }
 .flow-foot {

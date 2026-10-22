@@ -80,6 +80,9 @@ export const type = {
 export const space = {
   inBlock: 8,
   between: 32,
+  // Between a step's parts (the heading, the content, the buttons) in a wide window, more than between two fields so
+  // the parts read apart; a phone keeps `between`, its screens mustn't scroll.
+  section: 48,
   // A flow's side margin is the screen's corner radius less the button's (concentric), never under this.
   edgeMin: 32,
   // How far in from the screen's edge the edge ticks reach.

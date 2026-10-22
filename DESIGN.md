@@ -28,8 +28,9 @@ the design system Gomex Flow, one package per platform with one contract (docs/a
 | Top | safe area + 8, never closer to the edge ticks than their width + 22 |
 | Inside a block | 8 |
 | Between blocks | 32 |
+| Between a step's parts (heading, content, buttons) in a window wider than a phone | 48 |
 | Field label → field | 0 (label sits right on it) |
-| The buttons | on a phone at the bottom, in the thumb's reach; in a window wider than a phone right under the content, 32 below it (the column at the top, the title in place from step to step) |
+| The buttons | on a phone at the bottom, in the thumb's reach; in a window wider than a phone right under the content, 48 below it (the column at the top, the title in place from step to step) |
 
 `useFlowFrame()` computes these for the current screen, so nothing is hard-coded per device.
 

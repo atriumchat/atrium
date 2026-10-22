@@ -66,6 +66,7 @@ export function tokenCss() {
     'button-size': `${type.button.size}px`,
     'in-block': `${space.inBlock}px`,
     between: `${space.between}px`,
+    section: `${space.section}px`,
     column: `${space.column}px`,
     'radius-button': `${radius.button}px`,
     'radius-field': `${radius.field}px`,
