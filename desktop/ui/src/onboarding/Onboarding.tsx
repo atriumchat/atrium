@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { domainOk, emailOk, freeName, hostOk, jobFill, mailboxOf, MOCK_DOMAIN, nameOk, ownOnDesktop, pickTurn, TASKS, type OwnDesktopStep as Step } from '@atrium/setup';
+import { domainOk, emailOk, freeName, hostOk, jobFill, mailboxOf, MOCK_DOMAIN, nameOk, ownOnDesktop, pickTurn, readServerLetter, RENT, TASKS, type OwnDesktopStep as Step } from '@atrium/setup';
 import { Drum, FlowPrimary, FlowProvider, FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '@atrium/ui-web';
 import type { DrumItem } from '@atrium/ui-common';
 import { t } from '../i18n';
@@ -33,6 +33,8 @@ export function Onboarding() {
   const [showPassword, setShowPassword] = useState(false);
   const [badHost, setBadHost] = useState(false);
   const [facts, setFacts] = useState<Facts | null>(null);
+  // No server yet: the host's letter, pasted, gives the fields above.
+  const [letter, setLetter] = useState('');
 
   // 2. The address.
   const [way, setWay] = useState<'free' | 'own'>('free');
@@ -45,9 +47,7 @@ export function Onboarding() {
   const [domain, setDomain] = useState('');
   const [address, setAddress] = useState<string | null>(null);
 
-  // 3. Backups.
-
-  // 4. The install.
+  // 3. The install.
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [current, setCurrent] = useState<string | null>(null);
   const [failed, setFailed] = useState('');
@@ -85,6 +85,16 @@ export function Onboarding() {
       setFacts(answer.facts);
       go('address');
     });
+
+  const found = readServerLetter(letter);
+  const takeLetter = () => {
+    if (!found) return;
+    setHost(found.host);
+    setUser(found.user);
+    setPassword(found.password);
+    setBadHost(false);
+    go('server', true);
+  };
 
   /* ---------- 2. the address ---------- */
 
@@ -246,6 +256,7 @@ export function Onboarding() {
             error={error}
             onSubmit={connect}
             actions={<FlowPrimary type="submit" busy={busy} disabled={!serverReady}>{t('ob.connect')}</FlowPrimary>}
+            below={<TextAction onPress={() => go('rent')}>{t('ob.rent.link')}</TextAction>}
           >
             <div className="flow-pair">
               <LineField label={t('ob.ip')} value={host} onChange={(e) => (setHost(e.target.value), setBadHost(false), setError(''))} placeholder="203.0.113.10" bad={badHost} />
@@ -277,6 +288,38 @@ export function Onboarding() {
                 </button>
               }
             />
+          </FlowStep>
+        );
+
+      case 'rent':
+        return (
+          <FlowStep
+            title={t('ob.rent.h')}
+            sub={t('ob.rent.sub', { host: RENT.host })}
+            note={found ? t('ob.rent.found', { ip: found.host }) : letter.trim() ? t('ob.rent.notFound') : undefined}
+            onBack={back}
+            onSubmit={takeLetter}
+            actions={<FlowPrimary type="submit" disabled={!found}>{t('ob.next')}</FlowPrimary>}
+            below={<TextAction onPress={() => go('server', true)}>{t('ob.rent.manual')}</TextAction>}
+          >
+            <ol className="rent">
+              <li>
+                <span className="grow">
+                  <b>{t('ob.rent.signUp')}</b>
+                  <small>{t('ob.rent.signUpSub', { host: RENT.host })}</small>
+                </span>
+                <TextAction onPress={() => setup.openExternal(RENT.url)}>{t('ob.rent.open')}</TextAction>
+              </li>
+              <li>
+                <b>{t('ob.rent.topUp')}</b>
+                <small>{t('ob.rent.topUpSub')}</small>
+              </li>
+              <li>
+                <b>{t('ob.rent.create')}</b>
+                <small>{t('ob.rent.createSub', { os: RENT.os })}</small>
+              </li>
+            </ol>
+            <LineField label={t('ob.rent.letter')} value={letter} onChange={(e) => setLetter(e.target.value)} placeholder={t('ob.rent.letterHint')} />
           </FlowStep>
         );
 

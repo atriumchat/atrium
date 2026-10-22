@@ -15,7 +15,7 @@ import { Drum, FlowPrimary, FlowSecondary, FlowShell, FlowStep, KeptRow, LineFie
 import { RecoveryKeyStep } from '../src/components/RecoveryKeyStep';
 import { real } from '../src/own/backend';
 import { DinoRun } from '../src/own/DinoRun';
-import { adminForm, capacity, doneCount, emailOk as isEmail, jobFill, MOCK_DOMAIN, MOCK_INVITE, MOCK_KEY, MOCK_SETUP_CODE, OWN_READY, ownOnPhone, pickTurn, TASKS, type Facts, type OwnPhoneStep as Step, type Progress } from '@atrium/setup';
+import { adminForm, capacity, doneCount, emailOk as isEmail, jobFill, MOCK_DOMAIN, MOCK_INVITE, MOCK_KEY, MOCK_SETUP_CODE, OWN_READY, ownOnPhone, pickTurn, readServerLetter, RENT, TASKS, type Facts, type OwnPhoneStep as Step, type Progress } from '@atrium/setup';
 import { mock, mockInstall, mockPace } from '../src/own/mock';
 import type { Saved } from '../src/own/setup';
 
@@ -45,6 +45,9 @@ export default function OwnServer() {
   const [host, setHost] = useState('');
   const [user, setUser] = useState('root');
   const [password, setPassword] = useState('');
+  // No server yet: the host's letter, pasted, gives the fields above.
+  const [letter, setLetter] = useState('');
+  const found = readServerLetter(letter);
   const [facts, setFacts] = useState<Facts | null>(null);
   const [saved, setSaved] = useState<Saved | null>(null);
   const [earlier, setEarlier] = useState<Saved | null>(null);
@@ -390,6 +393,7 @@ export default function OwnServer() {
             sub={t('own.server.sub')}
             error={error}
             actions={<FlowPrimary busy={busy} disabled={!host.trim() || !password} onPress={connectServer}>{t('own.connect')}</FlowPrimary>}
+            below={<TextAction onPress={() => go('rent')}>{t('own.rent.link')}</TextAction>}
           >
             {earlier?.started && !earlier.url ? <KeptRow label={t('own.resume', { host: earlier.domain ?? earlier.host })} go={t('own.resumeGo')} onPress={resumeEarlier} /> : null}
             {earlier?.url ? <KeptRow label={t('own.installed', { host: earlier.domain ?? earlier.host })} go={t('own.installedGo')} onPress={openEarlier} /> : null}
@@ -398,6 +402,49 @@ export default function OwnServer() {
               <LineField style={{ flex: 1 }} label={t('own.login')} value={user} onChangeText={setUser} />
             </View>
             <LineField label={t('own.password')} value={password} onChangeText={setPassword} placeholder={t('own.passwordHint')} secureTextEntry textContentType="password" returnKeyType="go" onSubmitEditing={() => host.trim() && password && connectServer()} />
+          </FlowStep>
+        );
+      case 'rent':
+        return (
+          <FlowStep
+            onBack={back}
+            title={t('own.rent.h')}
+            sub={t('own.rent.sub', { host: RENT.host })}
+            note={found ? t('own.rent.found', { ip: found.host }) : letter.trim() ? t('own.rent.notFound') : undefined}
+            actions={
+              <FlowPrimary
+                disabled={!found}
+                onPress={() => {
+                  if (!found) return;
+                  setHost(found.host);
+                  setUser(found.user);
+                  setPassword(found.password);
+                  go('server', true);
+                }}
+              >
+                {t('own.next')}
+              </FlowPrimary>
+            }
+            below={<TextAction onPress={() => go('server', true)}>{t('own.rent.manual')}</TextAction>}
+          >
+            <View style={{ gap: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 17 }}>{t('own.rent.signUp')}</Text>
+                  <Text style={{ fontSize: 14, color: colors.muted }}>{t('own.rent.signUpSub', { host: RENT.host })}</Text>
+                </View>
+                <TextAction onPress={() => void Linking.openURL(RENT.url)}>{t('own.rent.open')}</TextAction>
+              </View>
+              <View>
+                <Text style={{ fontSize: 17 }}>{t('own.rent.topUp')}</Text>
+                <Text style={{ fontSize: 14, color: colors.muted }}>{t('own.rent.topUpSub')}</Text>
+              </View>
+              <View>
+                <Text style={{ fontSize: 17 }}>{t('own.rent.create')}</Text>
+                <Text style={{ fontSize: 14, color: colors.muted }}>{t('own.rent.createSub', { os: RENT.os })}</Text>
+              </View>
+            </View>
+            <LineField label={t('own.rent.letter')} value={letter} onChangeText={setLetter} placeholder={t('own.rent.letterHint')} autoCapitalize="none" autoCorrect={false} />
           </FlowStep>
         );
       case 'address':

@@ -118,6 +118,38 @@ body::before {
   height: 16px;
 }
 
+/* Renting a server: the three things to do at the host, each a name and a line, the first with its link. */
+.rent {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rent li:has(.grow) {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.rent b,
+.rent small {
+  display: block;
+}
+.rent .grow {
+  flex: 1;
+}
+.rent b {
+  font-size: var(--gx-choice-size);
+  line-height: var(--gx-choice-line);
+  font-weight: 400;
+}
+.rent small {
+  margin-top: 2px;
+  font-size: var(--gx-note-size);
+  color: var(--gx-muted);
+}
+
 /*
  * In a window (not a phone) the step stands in the middle of it, the ruler, title and buttons as one block. The
  * margins are just the strip on top and a little air below, so the tallest step (with an error under it) still

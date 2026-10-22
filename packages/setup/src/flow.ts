@@ -55,6 +55,8 @@ export const ownOnPhone = defineFlow({
   parts: ['server', 'address', 'install', 'setup', 'friends'],
   steps: {
     server: { fill: 0.04, part: 'server' },
+    // "No server?": renting one, then the host's letter fills the server's fields.
+    rent: { fill: 0.04, part: 'server', back: 'server' },
     address: { fill: 0.12, part: 'address', back: 'server' },
     free: { fill: 0.2, part: 'address', back: 'address' },
     own: { fill: 0.2, part: 'address', back: 'address' },
@@ -74,10 +76,12 @@ export const OWN_READY = 0.68;
  * "Your own server" in the desktop app: the VPS, its address, the install. The server's first run follows in the web
  * wizard, with its own scale.
  */
-export const ownOnDesktop = defineFlow<'server' | 'address' | 'free-name' | 'free-mail' | 'own' | 'install', 'server' | 'address' | 'install', Way>({
+export const ownOnDesktop = defineFlow<'server' | 'rent' | 'address' | 'free-name' | 'free-mail' | 'own' | 'install', 'server' | 'address' | 'install', Way>({
   parts: ['server', 'address', 'install'],
   steps: {
     server: { fill: 0, part: 'server' },
+    // "No server?": renting one, then the host's letter fills the server's fields.
+    rent: { fill: 0, part: 'server', back: 'server' },
     address: { fill: 0.2, part: 'address', back: 'server' },
     'free-name': { fill: 0.4, part: 'address', back: 'address' },
     'free-mail': { fill: 0.5, part: 'address', back: 'free-name' },
