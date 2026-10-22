@@ -8,6 +8,7 @@ export const setup = {
   'setup.server.defaultIcon': 'Знак Atrium',
   'setup.server.remove': 'Убрать',
   'setup.server.another': 'Другой',
+  'setup.server.anotherPicture': 'Другая картинка',
   'setup.server.nameLabel': 'Название',
   'setup.server.namePlaceholder': 'Подвал',
   'setup.admin.title': 'Аккаунт админа',

@@ -12,6 +12,7 @@ export const setup = {
   'setup.server.defaultIcon': 'Atrium mark',
   'setup.server.remove': 'Remove',
   'setup.server.another': 'Another',
+  'setup.server.anotherPicture': 'Another picture',
   'setup.server.nameLabel': 'Name',
   'setup.server.namePlaceholder': 'Basement',
   'setup.admin.title': 'Admin account',

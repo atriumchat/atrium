@@ -273,12 +273,9 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             sub={draft.name}
             onBack={backFrom('crop')}
             onSubmit={keepCrop}
-            actions={
-              <>
-                <FlowPrimary type="submit">{t('setup.server.cropDone')}</FlowPrimary>
-                <FlowSecondary onPress={() => fileInput.current?.click()}>{t('setup.server.another')}</FlowSecondary>
-              </>
-            }
+            actions={<FlowPrimary type="submit">{t('setup.server.cropDone')}</FlowPrimary>}
+            // Another picture is a link under the button, not a second button next to it (it took the clicks meant for Done).
+            below={<TextAction onPress={() => fileInput.current?.click()}>{t('setup.server.anotherPicture')}</TextAction>}
           >
             <IconCropper image={draft.image} crop={draft.crop} onChange={(crop) => setDraft((d) => d && { ...d, crop })} className="flow-crop" />
             <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => void pick(e.target.files?.[0])} />
