@@ -189,6 +189,7 @@
   border-color: var(--gx-text);
 }
 .flow-secondary {
+  white-space: nowrap;
   flex: none;
   height: 48px;
   padding: 0 20px;
@@ -204,6 +205,7 @@
   border-color: var(--gx-text);
 }
 .flow-primary {
+  white-space: nowrap;
   flex: 1;
   height: 48px;
   border: 0;
@@ -301,6 +303,7 @@
 }
 
 .flow-text-action {
+  white-space: nowrap;
   align-self: center;
   padding: 4px 0;
   border: 0;

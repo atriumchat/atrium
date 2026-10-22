@@ -159,7 +159,7 @@ export function FlowPrimary({ onPress, disabled = false, busy = false, children 
       onPress={onPress}
       style={({ pressed }) => ({ height: 48, borderRadius: radius.button, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20, backgroundColor: busy ? color.button : off ? color.graphite : pressed ? color.buttonHover : color.button })}
     >
-      {busy ? <ActivityIndicator color={color.buttonInk} /> : <Text style={{ fontSize: type.button.size, lineHeight: type.button.line, fontWeight: '500', color: off ? color.faint : color.buttonInk }}>{children}</Text>}
+      {busy ? <ActivityIndicator color={color.buttonInk} /> : <Text numberOfLines={1} style={{ fontSize: type.button.size, lineHeight: type.button.line, fontWeight: '500', color: off ? color.faint : color.buttonInk }}>{children}</Text>}
     </Pressable>
   );
 }
@@ -201,7 +201,7 @@ export function LineField({ label, suffix, trailing, bad = false, error, style, 
 export function FlowSecondary({ onPress, children }: FlowSecondaryProps) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => ({ height: 48, marginLeft: 2, paddingHorizontal: 20, borderRadius: radius.button, borderWidth: 1, borderColor: pressed ? ink : color.outline, alignItems: 'center', justifyContent: 'center' })}>
-      <Text style={{ fontSize: type.button.size }}>{children}</Text>
+      <Text numberOfLines={1} style={{ fontSize: type.button.size }}>{children}</Text>
     </Pressable>
   );
 }
@@ -210,7 +210,7 @@ export function FlowSecondary({ onPress, children }: FlowSecondaryProps) {
 export function TextAction({ onPress, left = false, children }: TextActionProps) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} hitSlop={8} style={({ pressed }) => ({ alignSelf: left ? 'flex-start' : 'center', paddingVertical: 4, opacity: pressed ? 0.5 : 1 })}>
-      <Text style={{ fontSize: type.button.size, textDecorationLine: 'underline' }}>{children}</Text>
+      <Text numberOfLines={1} style={{ fontSize: type.button.size, textDecorationLine: 'underline' }}>{children}</Text>
     </Pressable>
   );
 }

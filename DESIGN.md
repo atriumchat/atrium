@@ -94,6 +94,7 @@ couple of minutes; you can close the app"). Not marketing, not jargon: people se
 
 ## Don't
 
+- A button's label on two lines. It stays on one: shorten the words, or give the button the row.
 - Centred glowing icon discs over centred bold titles (the stock "AI" look).
 - Grey plates and cards around content; several background tones.
 - Green or any accent in flows.
