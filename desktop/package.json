@@ -1,7 +1,7 @@
 {
   "name": "atrium-desktop",
   "productName": "Atrium",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Atrium for desktop: chat and calls that arrive even when the window is closed",
   "main": "main.js",
   "license": "AGPL-3.0-only",
