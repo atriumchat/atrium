@@ -5,7 +5,7 @@ import { useT } from '../i18n';
 import { Text } from '../text';
 import { haptic } from '../haptics';
 import { type } from '../theme';
-import { FlowPrimary, FlowStep, TextAction } from '@gomex/ui-native';
+import { FlowPrimary, FlowStep, TextAction } from '@atrium/ui-native';
 
 /**
  * The recovery key, shown once (DESIGN.md flow look): big, to copy or save through the share sheet; "Next" opens once

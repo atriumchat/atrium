@@ -234,7 +234,7 @@ def dm_messages(dm_id: str, before: int | None = None, limit: int = 50,
     return messages_out(list(reversed(rows)), "dm_messages")
 
 
-# The other gomex modules import this one too: they come last, once everything above is defined.
+# The other atrium modules import this one too: they come last, once everything above is defined.
 from .users import friend_ids, ordered_pair
 from .channels import history_boundary, messages_out
 from .uploads import remove_upload_files

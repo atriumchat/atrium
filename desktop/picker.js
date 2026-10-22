@@ -2,7 +2,7 @@
 // process, which hands it to getDisplayMedia; closing without one is a cancel.
 const REFRESH = 2000;
 const $ = (id) => document.getElementById(id);
-const picker = window.gomexPicker;
+const picker = window.atriumPicker;
 
 const NOTES = { window: t('picker.noWindows'), screen: t('picker.noScreens'), error: t('picker.failed') };
 

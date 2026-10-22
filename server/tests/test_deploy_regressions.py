@@ -27,16 +27,16 @@ def test_installer_propagates_file_step_failures_inside_run(tmp_path, failure):
     with tarfile.open(archive,'w:gz') as tar:
         for name in ['docker-compose.yml','Caddyfile','backup.sh','livekit.yaml.tmpl']:
             content = b'fixture\n'
-            entry = tarfile.TarInfo('gomex-fixture/deploy/'+name)
+            entry = tarfile.TarInfo('atrium-fixture/deploy/'+name)
             entry.size = len(content)
             tar.addfile(entry,io.BytesIO(content))
     script = '''set -Eeuo pipefail
-TTY=0 GOMEX_PROGRESS=0 SECONDS=0 C_DIM='' C_RESET='' RELEASE_VERSION=fixture
+TTY=0 ATRIUM_PROGRESS=0 SECONDS=0 C_DIM='' C_RESET='' RELEASE_VERSION=fixture
 progress(){ :; }; log(){ :; }; line(){ :; }; say(){ :; }
 ok(){ echo REPORTED_SUCCESS; }; bad(){ echo REPORTED_FAILURE; }; die(){ exit 1; }
 sha256_ok(){ return 0; }
 '''
-    for key, value in {'GOMEX_TMP':tmp_path,'GOMEX_DIR':tmp_path/'destination','TARBALL_SRC':archive,'TARBALL_SHA256':'fixture','LOG':tmp_path/'test.log'}.items():
+    for key, value in {'ATRIUM_TMP':tmp_path,'ATRIUM_DIR':tmp_path/'destination','TARBALL_SRC':archive,'TARBALL_SHA256':'fixture','LOG':tmp_path/'test.log'}.items():
         script += f'{key}={str(value)!r}\n'
     script += failure+'(){ return 23; }\n'+function('step_files')+'\n'+function('run')+"\nrun fixture step_files\n"
     result = subprocess.run(['bash','-c',script],capture_output=True,text=True)
@@ -83,7 +83,7 @@ def test_backup_keeps_snapshot_media_and_only_publishes_complete_copies(tmp_path
     executable(bins/'docker',python+'''
 import os, sqlite3, sys
 from pathlib import Path
-from gomex.media import remove_media_files
+from atrium.media import remove_media_files
 data=Path.cwd()/'data'
 # Execute backup.sh's real SQLite program, adapting only the container's data mount.
 exec(sys.argv[-1].replace('/data',str(data)))
@@ -96,7 +96,7 @@ assert remove_media_files([data/'uploads/fixture.bin']) is False
     executable(bins/'date','#!/bin/sh\nif [ "$1" = -Is ]; then exec /bin/date +%Y-%m-%dT%H:%M:%S; fi\nexec /bin/date "$@"\n')
     if copy_fails:
         executable(bins/'rsync','#!/bin/sh\nexit 23\n')
-    source = (ROOT/'deploy/backup.sh').read_text().replace('/root/gomex-backups',str(tmp_path/'backups')).replace('df -Pk /root','df -Pk '+str(tmp_path))
+    source = (ROOT/'deploy/backup.sh').read_text().replace('/root/atrium-backups',str(tmp_path/'backups')).replace('df -Pk /root','df -Pk '+str(tmp_path))
     script = deploy/'backup.sh'
     script.write_text(source)
     env = {**os.environ,'PATH':str(bins)+os.pathsep+os.environ['PATH'],'PYTHONPATH':str(ROOT/'server'),'DATA_DIR':str(data)}

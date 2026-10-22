@@ -15,7 +15,7 @@ const absoluteUrl = (url: string) => new URL(url, window.location.href).href;
 /** Pictures are kept as WebP and saved as they are; the server has no original name for them. */
 function imageName(url: string) {
   const id = /([0-9a-f]{32})/.exec(url)?.[1] ?? '';
-  return `gomex-${id.slice(0, 8) || 'image'}.webp`;
+  return `atrium-${id.slice(0, 8) || 'image'}.webp`;
 }
 
 function save(item: Attachment) {

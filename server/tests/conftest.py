@@ -3,14 +3,14 @@ import sys
 import tempfile
 from pathlib import Path
 
-# The server reads its settings when gomex.config is first imported, so the throwaway data folder is set up before that.
-os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="gomex-test-")
+# The server reads its settings when atrium.config is first imported, so the throwaway data folder is set up before that.
+os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="atrium-test-")
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
 from fastapi.testclient import TestClient
 
-from gomex import auth
+from atrium import auth
 
 
 @pytest.fixture(scope="session")

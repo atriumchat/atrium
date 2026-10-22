@@ -1,11 +1,11 @@
 import { IPV4 } from './validate';
 
 /**
- * The installer as the apps drive it over SSH (install.sh): how it's started detached, how its "::gomex" progress
+ * The installer as the apps drive it over SSH (install.sh): how it's started detached, how its "::atrium" progress
  * lines read, and what the first look at the server asks. Strings in, strings out: the SSH itself is the platform's.
  */
 
-/** The installer's steps, in the order they run ("::gomex run|done STEP"). */
+/** The installer's steps, in the order they run ("::atrium run|done STEP"). */
 export const TASKS = ['check', 'address', 'docker', 'firewall', 'ssh', 'files', 'config', 'backups', 'pull', 'up', 'https'] as const;
 export type Task = (typeof TASKS)[number];
 
@@ -13,22 +13,22 @@ export type Task = (typeof TASKS)[number];
 export const TURN_NAMES = ['media', 'cdn', 'static', 'assets', 'files', 'img'] as const;
 export const pickTurn = (random = Math.random) => TURN_NAMES[Math.floor(random() * TURN_NAMES.length)] ?? 'media';
 
-export const INSTALLER_URL = 'https://github.com/gomex-inc/gomex/releases/latest/download/install.sh';
-export const LOG = '/root/gomex-app-install.log';
+export const INSTALLER_URL = 'https://github.com/atriumchat/atrium/releases/latest/download/install.sh';
+export const LOG = '/root/atrium-app-install.log';
 
 /** Single quotes for sh, safe for anything. */
 export const sq = (value: string) => `'${String(value).replace(/'/g, `'\\''`)}'`;
 
 /** Fetches the installer to the server. */
-export const fetchCommand = (installerUrl = INSTALLER_URL) => `curl -fsSL --retry 3 ${sq(installerUrl)} -o /root/gomex-install.sh`;
+export const fetchCommand = (installerUrl = INSTALLER_URL) => `curl -fsSL --retry 3 ${sq(installerUrl)} -o /root/atrium-install.sh`;
 
 /**
  * Starts the fetched installer detached (setsid, its output into LOG), so it runs on when the phone sleeps or the
  * window closes. The app's key goes in first: the installer adds it for root and switches password login off.
  */
 export function startCommand({ domain, turn, publicKey }: { domain: string; turn: string; publicKey: string }) {
-  const env = ['GOMEX_YES=1', 'GOMEX_PROGRESS=1', 'NO_COLOR=1', `DOMAIN=${sq(domain)}`, `TURN_HOST=${sq(turn)}`, `GOMEX_AUTHORIZED_KEY=${sq(publicKey)}`].join(' ');
-  const job = `${env} sh /root/gomex-install.sh > ${LOG} 2>&1; echo "::exit $?" >> ${LOG}`;
+  const env = ['ATRIUM_YES=1', 'ATRIUM_PROGRESS=1', 'NO_COLOR=1', `DOMAIN=${sq(domain)}`, `TURN_HOST=${sq(turn)}`, `ATRIUM_AUTHORIZED_KEY=${sq(publicKey)}`].join(' ');
+  const job = `${env} sh /root/atrium-install.sh > ${LOG} 2>&1; echo "::exit $?" >> ${LOG}`;
   return `rm -f ${LOG}; nohup setsid sh -c ${sq(job)} > /dev/null 2>&1 < /dev/null & echo started`;
 }
 
@@ -37,7 +37,7 @@ export type Progress = {
   steps: Partial<Record<string, StepState>>;
   /** The step running now. */
   current: string | null;
-  /** What it's doing (::gomex sub), or the installer's last plain line. */
+  /** What it's doing (::atrium sub), or the installer's last plain line. */
   doing: string;
   /** The setup link once the server is up. */
   ready: string | null;
@@ -48,7 +48,7 @@ export type Progress = {
 
 /** Reads back the log's progress lines and its last few plain ones, split by a "::tail" line (parseProgress). */
 export const progressCommand = () =>
-  `grep -a -E '^::(gomex|exit) ' ${LOG} 2>/dev/null; echo '::tail'; tail -c 800 ${LOG} 2>/dev/null | tr '\\r' '\\n' | grep -v '^::' | tail -n 4`;
+  `grep -a -E '^::(atrium|exit) ' ${LOG} 2>/dev/null; echo '::tail'; tail -c 800 ${LOG} 2>/dev/null | tr '\\r' '\\n' | grep -v '^::' | tail -n 4`;
 
 /** The progress out of progressCommand's output. */
 export function parseProgress(output: string): Progress {
@@ -60,12 +60,12 @@ export function parseProgress(output: string): Progress {
       progress.exit = Number(exit[1]);
       continue;
     }
-    const sub = line.match(/^::gomex sub (.+)$/);
+    const sub = line.match(/^::atrium sub (.+)$/);
     if (sub) {
       progress.doing = (sub[1] ?? '').slice(0, 120);
       continue;
     }
-    const m = line.match(/^::gomex (run|done|fail|ready) ?(\S*) ?(.*)$/);
+    const m = line.match(/^::atrium (run|done|fail|ready) ?(\S*) ?(.*)$/);
     if (!m) continue;
     const [, state = '', step = '', rest = ''] = m;
     if (state === 'ready') {

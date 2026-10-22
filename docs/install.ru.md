@@ -4,7 +4,7 @@
 
 ## Свой сервер из приложения
 
-Основной путь: приложение для Mac или Windows ([скачать](https://github.com/gomex-inc/gomex/releases/tag/desktop)),
+Основной путь: приложение для Mac или Windows ([скачать](https://github.com/atriumchat/atrium/releases/tag/desktop)),
 без терминала и своего домена.
 
 1. **VPS-сервер.** Ubuntu или Debian (x86_64 или arm64), 1–2 ГБ ОЗУ, 3 ГБ на диске, доступ root. IP и пароль
@@ -29,13 +29,13 @@ deSEC не пришло за 15 минут, приложение предлаг�
 На сервере:
 
 ```bash
-curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh
+curl -fsSL https://github.com/atriumchat/atrium/releases/latest/download/install.sh | sh
 ```
 
-Если GitHub недоступен, тот же релиз лежит в npm как пакет `@gomex.llc/install` (Node на сервере не нужен):
+Если GitHub недоступен, тот же релиз лежит в npm как пакет `@atriumchat/install` (Node на сервере не нужен):
 
 ```bash
-curl -fsSL https://cdn.jsdelivr.net/npm/@gomex.llc/install@latest/install.sh | sh
+curl -fsSL https://cdn.jsdelivr.net/npm/@atriumchat/install@latest/install.sh | sh
 ```
 
 Архив релиза установщик тоже скачает оттуда, если GitHub не отвечает, и сверит ту же SHA-256.
@@ -48,29 +48,29 @@ curl -fsSL https://cdn.jsdelivr.net/npm/@gomex.llc/install@latest/install.sh | s
 Без вопросов, для скриптов:
 
 ```bash
-curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | DOMAIN=chat.example.com GOMEX_YES=1 sh
+curl -fsSL https://github.com/atriumchat/atrium/releases/latest/download/install.sh | DOMAIN=chat.example.com ATRIUM_YES=1 sh
 ```
 
 Обновление: повторный запуск, или без вопросов:
 
 ```bash
-curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh -s update
+curl -fsSL https://github.com/atriumchat/atrium/releases/latest/download/install.sh | sh -s update
 ```
 
 Ссылка для первой настройки (с кодом установки) ещё раз, пока настройка не закончена:
 
 ```bash
-curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh -s link
+curl -fsSL https://github.com/atriumchat/atrium/releases/latest/download/install.sh | sh -s link
 ```
 
 Вернуть данные из ночной копии (удалили канал по ошибке или сервер сломался; на новом сервере сначала положи копии
-в `/root/gomex-backups/daily`):
+в `/root/atrium-backups/daily`):
 
 ```bash
-curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh -s restore
+curl -fsSL https://github.com/atriumchat/atrium/releases/latest/download/install.sh | sh -s restore
 ```
 
-Установщик покажет копии с датой и размером, спросит, какую вернуть (`GOMEX_YES=1 GOMEX_RESTORE=2026-10-18` — без
+Установщик покажет копии с датой и размером, спросит, какую вернуть (`ATRIUM_YES=1 ATRIUM_RESTORE=2026-10-18` — без
 вопросов), сохранит нынешние данные копией `pre-restore-<время>` в той же папке, остановит приложение, положит данные
 на место, запустит и проверит, что оно отвечает. Ошибочный выбор отменяется тем же `restore` с копией `pre-restore-…`.
 
@@ -79,23 +79,23 @@ curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.s
 Снять Atrium с сервера:
 
 ```bash
-curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh -s uninstall
+curl -fsSL https://github.com/atriumchat/atrium/releases/latest/download/install.sh | sh -s uninstall
 ```
 
-Установщик спросит подтверждение (`GOMEX_YES=1` — без вопроса), остановит контейнеры и удалит их образы, папку
-`/opt/gomex` (`.env`, переписка, файлы), бэкапы в `/root/gomex-backups`, ночной таймер, свой файл и лог в `/root` и
-`/var/log`. Вход по SSH вернётся к тому, что было: уберётся файл `00-gomex-key-only.conf` и ключ приложения (строка с
-комментарием `gomex-app`). Docker и ufw остаются. Вернуть удалённое нельзя, бэкапы тоже.
+Установщик спросит подтверждение (`ATRIUM_YES=1` — без вопроса), остановит контейнеры и удалит их образы, папку
+`/opt/atrium` (`.env`, переписка, файлы), бэкапы в `/root/atrium-backups`, ночной таймер, свой файл и лог в `/root` и
+`/var/log`. Вход по SSH вернётся к тому, что было: уберётся файл `00-atrium-key-only.conf` и ключ приложения (строка с
+комментарием `atrium-app`). Docker и ufw остаются. Вернуть удалённое нельзя, бэкапы тоже.
 
 `.env` и данные при обновлении не трогаются. Дополнительные переменные установщика описаны в шапке
-[`deploy/install.sh`](../deploy/install.sh): `SERVER_NAME`, `TURN_HOST`, `GOMEX_DIR` (по умолчанию `/opt/gomex`),
-`GOMEX_NO_GUM=1`, `GOMEX_FIREWALL=0`, `GOMEX_SSH=0`, свой архив релиза или реестр образов.
+[`deploy/install.sh`](../deploy/install.sh): `SERVER_NAME`, `TURN_HOST`, `ATRIUM_DIR` (по умолчанию `/opt/atrium`),
+`ATRIUM_NO_GUM=1`, `ATRIUM_FIREWALL=0`, `ATRIUM_SSH=0`, свой архив релиза или реестр образов.
 
 Обложку на самом домене установщик пишет заново при каждом обновлении. Свой сайт кладётся в
-`/opt/gomex/landing/site` вместе с пустым файлом `.custom`: тогда установщик его не трогает. Страницы открываются
+`/opt/atrium/landing/site` вместе с пустым файлом `.custom`: тогда установщик его не трогает. Страницы открываются
 без `.html`: `/about` — это `about.html`.
 
-Свои блоки Caddy кладутся файлами `*.caddy` в `/opt/gomex/deploy/sites`, обновления их не трогают. Например,
+Свои блоки Caddy кладутся файлами `*.caddy` в `/opt/atrium/deploy/sites`, обновления их не трогают. Например,
 `www.caddy` для переадресации с `www.` (нужна A-запись `www`):
 
 ```caddy
@@ -104,7 +104,7 @@ www.{$DOMAIN}, http://www.{$DOMAIN} {
 }
 ```
 
-Свои маршруты внутри приложения (`app.DOMAIN`) кладутся файлами `*.caddy` в `/opt/gomex/deploy/routes/app`, раньше
+Свои маршруты внутри приложения (`app.DOMAIN`) кладутся файлами `*.caddy` в `/opt/atrium/deploy/routes/app`, раньше
 маршрутов самого приложения; обновления их не трогают, по умолчанию их нет. Каждая страница приложения загружает
 `/owner.js`, в Atrium он пустой; свой скрипт отдаётся маршрутом оттуда же:
 
@@ -118,4 +118,4 @@ handle /owner.js {
 CSP приложения разрешает только его собственный адрес, поэтому всё, куда ходит такой скрипт, тоже идёт через маршрут.
 
 После правки, без обрыва звонков:
-`cd /opt/gomex/deploy && docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile`.
+`cd /opt/atrium/deploy && docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile`.

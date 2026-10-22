@@ -10,7 +10,7 @@ import { once } from 'node:events';
 import { io } from 'socket.io-client';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const directory = await mkdtemp(resolve(tmpdir(), 'gomex-mobile-contract-'));
+const directory = await mkdtemp(resolve(tmpdir(), 'atrium-mobile-contract-'));
 const reservation = createServer();
 reservation.listen(0, '127.0.0.1');
 await once(reservation, 'listening');

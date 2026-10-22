@@ -13,8 +13,8 @@ import jwt
 import pytest
 from fastapi.testclient import TestClient
 
-from gomex import auth, db, media, realtime, uploads, users
-from gomex.config import INVITE_CODE, LIVEKIT_API_SECRET, MEDIA_COOKIE
+from atrium import auth, db, media, realtime, uploads, users
+from atrium.config import INVITE_CODE, LIVEKIT_API_SECRET, MEDIA_COOKIE
 
 PASSWORD = 'original-password-123'
 

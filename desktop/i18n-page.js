@@ -4,7 +4,7 @@
 //   data-i18n-attr="aria-label:key;..."  attributes
 // and gives the page's scripts t(key, vars).
 (function () {
-  const { pick, setLang, t } = globalThis.gomexI18n;
+  const { pick, setLang, t } = globalThis.atriumI18n;
   const asked = new URLSearchParams(location.search).get('lang') || location.hash.match(/lang=(\w+)/)?.[1];
   const lang = setLang(asked ?? pick(navigator.language));
   document.documentElement.lang = lang;

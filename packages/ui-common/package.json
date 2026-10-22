@@ -1,5 +1,5 @@
 {
-  "name": "@gomex/ui-common",
+  "name": "@atrium/ui-common",
   "version": "0.1.0",
   "private": true,
   "description": "Atrium Flow, the part every platform shares: design tokens, the scale's geometry, the components' props.",

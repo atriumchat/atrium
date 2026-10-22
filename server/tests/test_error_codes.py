@@ -3,9 +3,9 @@ Run: .venv/bin/pytest"""
 
 import pytest
 
-from gomex.channels import message_body
-from gomex.db import execute
-from gomex.errors import Rejected, socket_error, socket_rejected
+from atrium.channels import message_body
+from atrium.db import execute
+from atrium.errors import Rejected, socket_error, socket_rejected
 
 
 def test_http_error_has_code_and_russian_detail(client):

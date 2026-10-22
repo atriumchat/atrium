@@ -2,10 +2,10 @@ import { useEffect, useMemo } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, { Easing, useAnimatedProps, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import Svg, { Line } from 'react-native-svg';
-import { color, cornerRadius, edgeTicks, filled, scale, tickState, useSweep, type Tick } from '@gomex/ui-common';
+import { color, cornerRadius, edgeTicks, filled, scale, tickState, useSweep, type Tick } from '@atrium/ui-common';
 
 /**
- * A flow's progress along the edge of the phone's screen (DESIGN.md), the geometry from @gomex/ui-common: ticks that
+ * A flow's progress along the edge of the phone's screen (DESIGN.md), the geometry from @atrium/ui-common: ticks that
  * follow its rounded corners, one scale for the whole way, not one per step. They fill clockwise from the right of the
  * camera island, the next one breathing; the screen inside stays free for the step.
  */

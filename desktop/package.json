@@ -1,5 +1,5 @@
 {
-  "name": "gomex-desktop",
+  "name": "atrium-desktop",
   "productName": "Atrium",
   "version": "1.6.0",
   "description": "Atrium for desktop: chat and calls that arrive even when the window is closed",
@@ -9,17 +9,17 @@
   "scripts": {
     "start": "electron .",
     "predev": "npm run ui",
-    "dev": "GOMEX_URL=http://localhost:5180 electron .",
+    "dev": "ATRIUM_URL=http://localhost:5180 electron .",
     "check:i18n": "node check-i18n.js",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
-    "ui": "npm --prefix .. run build -w @gomex/desktop-ui",
+    "ui": "npm --prefix .. run build -w @atrium/desktop-ui",
     "predist:mac": "npm run ui",
     "predist:win": "npm run ui",
     "prestart": "npm run ui"
   },
   "build": {
-    "appId": "io.github.gomex-inc.gomex",
+    "appId": "club.atriumchat.desktop",
     "productName": "Atrium",
     "directories": {
       "output": "dist",

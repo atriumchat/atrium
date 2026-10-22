@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const call = (name, ...args) => ipcRenderer.invoke(`setup:${name}`, ...args);
 
-contextBridge.exposeInMainWorld('gomexSetup', {
+contextBridge.exposeInMainWorld('atriumSetup', {
   openExternal: (url) => call('open-external', String(url)),
   /** { host, user, password } → { facts: { ip, os, size } } or { error, field? }. */
   connect: (login) => call('connect', login),

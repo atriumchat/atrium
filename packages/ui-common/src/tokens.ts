@@ -56,7 +56,7 @@ export const color = {
   othersInk: '#1a0a1c',
 } as const;
 
-/** Onest throughout: the variable font on the web, its weight files on a phone (@gomex/ui-native picks them). */
+/** Onest throughout: the variable font on the web, its weight files on a phone (@atrium/ui-native picks them). */
 export const font = {
   web: '"Onest Variable", "Onest", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
 } as const;

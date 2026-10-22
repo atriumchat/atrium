@@ -1,8 +1,8 @@
 {
-  "name": "@gomex/ui-native",
+  "name": "@atrium/ui-native",
   "version": "0.1.0",
   "private": true,
-  "description": "Atrium Flow for React Native: the flow parts on @gomex/ui-common's tokens, geometry and contract.",
+  "description": "Atrium Flow for React Native: the flow parts on @atrium/ui-common's tokens, geometry and contract.",
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@gomex/ui-common": "*"
+    "@atrium/ui-common": "*"
   },
   "peerDependencies": {
     "expo-haptics": "*",

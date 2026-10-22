@@ -421,7 +421,7 @@ async def delete_channel(channel_id: str, user: dict = Depends(current_user)):
     return channels
 
 
-# The other gomex modules import this one too: they come last, once everything above is defined.
+# The other atrium modules import this one too: they come last, once everything above is defined.
 from .dms import dm_for, dm_rooms
 from .uploads import attachment_out, remove_upload_files
 from .realtime import sio, user_room, voice, voice_payload

@@ -18,9 +18,9 @@ WORKDIR /app
 COPY server/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 # Runs as this unprivileged user; deploy/install.sh gives it the data folder.
-RUN useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin gomex
+RUN useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin atrium
 COPY server/app.py ./
-COPY server/gomex ./gomex
+COPY server/atrium ./atrium
 COPY --from=web /src/web/dist ./web
 ENV WEB_DIST=/app/web \
     DATA_DIR=/data \

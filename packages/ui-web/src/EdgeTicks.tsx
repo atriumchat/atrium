@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { edgeTicks, filled, rulerTicks, scale, tickState, useSweep } from '@gomex/ui-common';
+import { edgeTicks, filled, rulerTicks, scale, tickState, useSweep } from '@atrium/ui-common';
 
 /**
- * A flow's progress in ticks (DESIGN.md), the geometry from @gomex/ui-common: one scale for the whole way, the next
+ * A flow's progress in ticks (DESIGN.md), the geometry from @atrium/ui-common: one scale for the whole way, the next
  * tick breathing. On a phone-sized window it runs round the window's edge (EdgeTicks); on a bigger one the edge is far
  * from the reading and would take a thousand ticks, so the same scale is unrolled into a ruler over the column
  * (TickRuler).

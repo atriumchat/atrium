@@ -16,13 +16,13 @@ from urllib.parse import urlencode
 from urllib.request import urlopen
 from unittest.mock import Mock
 
-with tempfile.TemporaryDirectory(prefix='gomex-rtc-proxy-') as tmp:
+with tempfile.TemporaryDirectory(prefix='atrium-rtc-proxy-') as tmp:
     os.environ['DATA_DIR'] = str(Path(tmp)/'data')
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
     from fastapi.testclient import TestClient
     from app import app
-    from gomex import realtime
-    from gomex.config import INVITE_CODE
+    from atrium import realtime
+    from atrium.config import INVITE_CODE
     realtime.livekit_remove = Mock()
     with TestClient(app) as client, ExitStack() as stack:
         session = client.post('/api/setup',json={'code':INVITE_CODE,'name':'Proxy fixture','password':'fixture-password','serverName':'Fixture'}).json()

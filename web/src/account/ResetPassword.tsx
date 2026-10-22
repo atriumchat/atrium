@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { adminForm } from '@gomex/setup';
-import { FlowPrimary, FlowShell, FlowStep, LineField } from '@gomex/ui-web';
+import { adminForm } from '@atrium/setup';
+import { FlowPrimary, FlowShell, FlowStep, LineField } from '@atrium/ui-web';
 import { api, setToken } from '../api';
 import type { Session } from '../types';
 import { clearResetFromUrl } from './resetLink';

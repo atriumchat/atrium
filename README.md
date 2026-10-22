@@ -2,9 +2,9 @@
 
 <p align="center"><b>Private chat and calls for friends, on your own server.</b><br>Voice rooms, screen share, push-to-talk. One cheap VPS, one command, about 120 MB of memory.</p>
 
-<p align="center"><a href="LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/github/license/gomex-inc/gomex"></a> <a href="https://github.com/gomex-inc/gomex/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/gomex-inc/gomex"></a></p>
+<p align="center"><a href="LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/github/license/atriumchat/atrium"></a> <a href="https://github.com/atriumchat/atrium/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/atriumchat/atrium"></a></p>
 
-<p align="center"><b>English</b> · <a href="README.ru.md">Русский</a> · <a href="https://github.com/gomex-inc/gomex/releases/tag/desktop">Download the app</a> · <a href="docs/install.md">Install guide</a></p>
+<p align="center"><b>English</b> · <a href="README.ru.md">Русский</a> · <a href="https://github.com/atriumchat/atrium/releases/tag/desktop">Download the app</a> · <a href="docs/install.md">Install guide</a></p>
 
 <p align="center"><img src="docs/screenshots/en/voice-room.png" alt="A voice room with four people" width="900"></p>
 
@@ -18,7 +18,7 @@ direct connection fails, LiveKit falls back to TURN on port 443 (TLS over TCP, o
 One command on a fresh Ubuntu or Debian VPS (root access, 1 GB of memory is enough):
 
 ```bash
-curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh
+curl -fsSL https://github.com/atriumchat/atrium/releases/latest/download/install.sh | sh
 ```
 
 The wizard asks for a domain, sets everything up and prints a link to create the administrator. Friends join by
@@ -91,11 +91,11 @@ flowchart LR
 
 | Path | What's there |
 |---|---|
-| [`server/`](server) | Backend. `app.py` assembles the app, code in the `gomex/` package: a module per domain (`users`, `channels`, `dms`, `uploads`, `realtime`), settings in `config.py`, schema in `db.py` |
+| [`server/`](server) | Backend. `app.py` assembles the app, code in the `atrium/` package: a module per domain (`users`, `channels`, `dms`, `uploads`, `realtime`), settings in `config.py`, schema in `db.py` |
 | [`web/`](web) | Client: React 19, Vite, HeroUI v3, Tailwind 4, LiveKit. `src/` is split by domain: `account`, `chat`, `voice`, `people`, `shell`, `ui`, `store` |
 | [`desktop/`](desktop) | Electron shell: lives in the tray so calls arrive with the window closed, global push-to-talk, signed updates |
 | [`deploy/`](deploy) | Compose, Caddyfile, installer, release and backup scripts |
-| [`.github/workflows/images.yml`](.github/workflows/images.yml) | Builds the `gomex-app` and `gomex-caddy` images (amd64 and arm64) on a `v*` tag |
+| [`.github/workflows/images.yml`](.github/workflows/images.yml) | Builds the `atrium-app` and `atrium-caddy` images (amd64 and arm64) on a `v*` tag |
 
 ## Security
 
@@ -123,7 +123,7 @@ Report vulnerabilities to the maintainer privately, not in public discussions.
 
 ## Maintenance
 
-[@gomex-inc](https://github.com/gomex-inc).
+[@atriumchat](https://github.com/atriumchat).
 
 ## Contributing
 

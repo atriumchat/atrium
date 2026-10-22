@@ -1,4 +1,4 @@
-"""The Gomex server, a module per domain; app.py (beside this folder) puts them together.
+"""The Atrium server, a module per domain; app.py (beside this folder) puts them together.
 
 config    environment and limits          users      accounts, invites, status, blocks, friends, avatars, setup
 db        SQLite, schema, migrations      channels   channels, messages in general, read marks, inbox

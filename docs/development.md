@@ -32,7 +32,7 @@ npm run dev -w web
 
 On an empty database the first-run wizard opens. The default code is `friends`.
 
-Shared code lives in `packages/` (`@gomex/ui-common`, `@gomex/ui-web`, `@gomex/ui-native`, `@gomex/setup`; see
+Shared code lives in `packages/` (`@atrium/ui-common`, `@atrium/ui-web`, `@atrium/ui-native`, `@atrium/setup`; see
 [ADR-001](adr/001-client-architecture.md)). Node 24.3 or newer with npm 11: npm 10.8 crashes building this tree. After
 adding a package, run `npm install` at the root and restart the dev servers, Metro with `--clear`: they don't pick up
 a new workspace link while running.
@@ -42,14 +42,14 @@ Desktop against the local client. `npm run dev` points at the old port 5180, so 
 ```bash
 cd desktop
 npm ci
-GOMEX_URL=http://localhost:5190 npm start
+ATRIUM_URL=http://localhost:5190 npm start
 ```
 
 The app's own windows that are pages of React (`desktop/ui`, now "Your own server") are built into `desktop/ui-dist`
 before `npm start` and the `dist:*` builds (`npm run ui`); `npm run desktop-ui` at the root serves them for design
 work, on made-up answers without the main process (`onboarding.html#step=install`).
 
-`GOMEX_LANG=ru` or `GOMEX_LANG=en` forces the desktop language; by default it follows the system's.
+`ATRIUM_LANG=ru` or `ATRIUM_LANG=en` forces the desktop language; by default it follows the system's.
 
 Checks before a commit (CI runs the same, .github/workflows/checks.yml):
 
@@ -83,10 +83,10 @@ writes the version, SHA-256 and digests into `deploy/install.sh`, publishes the 
 Release `v1.2.3` (SHA-256 and digests in the release notes), checks them by their public links and commits
 `install.sh`. Install and update take `releases/latest/download/install.sh`, which takes the archive of its own
 release. A version with a suffix (`1.2.3-rc.1`) goes out as a pre-release and doesn't move `latest`.
-The script publishes the same two files to npm as `@gomex.llc/install@1.2.3`, a mirror for when GitHub is
+The script publishes the same two files to npm as `@atriumchat/install@1.2.3`, a mirror for when GitHub is
 unavailable. npm must be logged in (`npm login`) and asks for a two-factor code on publishing.
-`GOMEX_SKIP_NPM=1` releases without the mirror.
-After the very first release, the `gomex-app` and `gomex-caddy` packages on GitHub must be made public once,
+`ATRIUM_SKIP_NPM=1` releases without the mirror.
+After the very first release, the `atrium-app` and `atrium-caddy` packages on GitHub must be made public once,
 otherwise servers can't pull them. The script stops and gives the links.
 
 **Desktop.** Raise `version` in `desktop/package.json`, then:
@@ -99,7 +99,7 @@ Builds go to this repository's GitHub Releases: `desktop-v1.2.3` holds the versi
 the latest version under permanent names plus `update.json`, which installed apps check. Both are pre-releases;
 `latest` stays with the server release. The "Download app" button on any server leads to `desktop`.
 
-Builds are signed with the key `~/.gomex/seed-update-signing-key.pem`, created on the first run. It must be backed up
+Builds are signed with the key `~/.atrium/seed-update-signing-key.pem`, created on the first run. It must be backed up
 at once: without it, installed apps stop updating. The public half, `desktop/update-key.pem`, is committed and pushed
-before the release. The build has no server address; the app asks for it on first start. `GOMEX_DEFAULT_URL=https://…`
+before the release. The build has no server address; the app asks for it on first start. `ATRIUM_DEFAULT_URL=https://…`
 builds one in.

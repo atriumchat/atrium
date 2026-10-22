@@ -6,8 +6,8 @@ Atrium keeps Discord's structure and habits (server rail, channel list, voice ro
 them), so someone switching over finds their way at once. It does not keep Discord's look. This file is the look we
 are moving to. The first screen built in it is "Your own server" on the phone (`mobile/app/own.tsx`). Its parts are
 the design system Atrium Flow, one package per platform with one contract (docs/adr/001-client-architecture.md):
-`@gomex/ui-common` (tokens, the scale's geometry, the parts' props), `@gomex/ui-web` (React DOM, shown in Storybook:
-`npm run storybook -w @gomex/ui-web`) and `@gomex/ui-native` (React Native, shown at `/design` in a development build).
+`@atrium/ui-common` (tokens, the scale's geometry, the parts' props), `@atrium/ui-web` (React DOM, shown in Storybook:
+`npm run storybook -w @atrium/ui-web`) and `@atrium/ui-native` (React Native, shown at `/design` in a development build).
 
 ## Principles
 
@@ -49,7 +49,7 @@ Content is always quieter than the title. Numbers are never put in fixed-width c
 
 ## Colour
 
-All values live in one package, `@gomex/ui-common` (`packages/ui-common/src/tokens.ts`), with the scale's geometry
+All values live in one package, `@atrium/ui-common` (`packages/ui-common/src/tokens.ts`), with the scale's geometry
 next to them (`geometry.ts`): the web turns the tokens into `--gx-` CSS variables at start-up (`applyTokens`, also read
 by the HeroUI theme), the phone app imports them (`mobile/src/theme.ts`). Never write a colour, size or radius by hand
 in a flow; add a token.
@@ -110,7 +110,7 @@ couple of minutes; you can close the app"). Not marketing, not jargon: people se
   `invite`) opens a step, `&fast=1` hurries the install. Sign-in: `localhost:8081/login?mock=1` (add
   `&invite=7F3K9QAB` for the invite branch). The web build stubs LiveKit and the Keychain (`mobile/web-stubs`).
 - Done on these parts: "Your own server", sign-in, invite and the recovery key on the phone (`RecoveryKeyStep`); the
-  server's setup wizard, the sign-in, the recovery key, the reset link and "where to use Atrium" on the web and in the desktop app (`@gomex/ui-web`; `#signin`, `#key`, `#reset`, `#where=ios`, `#step=server`
+  server's setup wizard, the sign-in, the recovery key, the reset link and "where to use Atrium" on the web and in the desktop app (`@atrium/ui-web`; `#signin`, `#key`, `#reset`, `#where=ios`, `#step=server`
   and the like open a step on made-up answers in development); the desktop app's own "Your own server" window
   (`desktop/ui`, `npm run desktop-ui` and `onboarding.html?lang=ru#step=install` on made-up answers). Next: settings. The main screens (rail, channels, chat, call) last,
   drawn in Figma first.

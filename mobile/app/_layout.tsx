@@ -7,7 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useFonts, Onest_400Regular, Onest_500Medium, Onest_600SemiBold, Onest_700Bold } from '@expo-google-fonts/onest';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { startSession, useStore } from '../src/store';
-import { FlowProvider } from '@gomex/ui-native';
+import { FlowProvider } from '@atrium/ui-native';
 import { useT } from '../src/i18n';
 import { Text } from '../src/text';
 import { colors } from '../src/theme';

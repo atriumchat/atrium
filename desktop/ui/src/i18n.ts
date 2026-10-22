@@ -9,7 +9,7 @@ type I18n = {
   setLang: (lang: string) => 'ru' | 'en';
   t: (key: string, vars?: Record<string, string | number>) => string;
 };
-const i18n = (globalThis as unknown as { gomexI18n: I18n }).gomexI18n;
+const i18n = (globalThis as unknown as { atriumI18n: I18n }).atriumI18n;
 
 const asked = new URLSearchParams(location.search).get('lang') ?? location.hash.match(/lang=(\w+)/)?.[1];
 export const lang = i18n.setLang(asked ?? i18n.pick(navigator.language));

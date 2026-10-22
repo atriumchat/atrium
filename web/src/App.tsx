@@ -4,7 +4,7 @@ import { api, ApiError, getToken } from './api';
 import { initStore } from './store';
 import { connectSocket } from './socket';
 import { clearInviteFromUrl } from './people/invite';
-import { FlowProvider } from '@gomex/ui-web';
+import { FlowProvider } from '@atrium/ui-web';
 import { Login } from './account/Login';
 import { DEMO_KEY, DEMO_RESET_TOKEN, demo, demoPlatform } from './account/demo';
 import { Shell } from './shell/Shell';

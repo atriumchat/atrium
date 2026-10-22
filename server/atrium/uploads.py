@@ -279,6 +279,6 @@ def sweep_orphan_media() -> None:
     remove_media_files(paths)
 
 
-# The other gomex modules import this one too: they come last, once everything above is defined.
+# The other atrium modules import this one too: they come last, once everything above is defined.
 from .channels import purge_deleted_channels
 from .dms import dm_for

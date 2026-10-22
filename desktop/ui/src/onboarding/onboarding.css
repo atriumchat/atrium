@@ -1,4 +1,4 @@
-/* "Your own server" in the desktop app: what this window has and the web's flow parts don't (@gomex/ui-web has the
+/* "Your own server" in the desktop app: what this window has and the web's flow parts don't (@atrium/ui-web has the
    rest): the password's eye, the wait for deSEC's letter, the DNS records, the Drive row. Colours and sizes are tokens. */
 
 :root {

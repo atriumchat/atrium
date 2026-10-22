@@ -4,7 +4,7 @@ import { setVoicePrefs } from './voice';
 import { attempt } from './ConnectionCheck';
 import { t } from '../i18n';
 
-const CHECKED = 'gomex_net_checked';
+const CHECKED = 'atrium_net_checked';
 
 /**
  * The first time Atrium runs on a device (right after sign-up, or a new device), quietly try a call: if it

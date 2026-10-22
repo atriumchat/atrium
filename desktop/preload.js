@@ -2,7 +2,7 @@
 // nothing else: no Node, no file system, no Electron internals.
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('gomexDesktop', {
+contextBridge.exposeInMainWorld('atriumDesktop', {
   platform: process.platform,
   /** Someone is calling: bring the window up, bounce/flash, show a system notification. */
   incomingCall: (title, body) => ipcRenderer.send('call:incoming', { title: String(title), body: String(body) }),
@@ -24,7 +24,7 @@ contextBridge.exposeInMainWorld('gomexDesktop', {
       ipcRenderer.on('ptt:state', (_event, down) => callback(Boolean(down)));
     },
   },
-  /** The language choice shared with the desktop's tray menu: 'ru', 'en' or null (follow the system). A change made in the tray reaches the page as a `gomex-language` event on window, detail = the new choice. */
+  /** The language choice shared with the desktop's tray menu: 'ru', 'en' or null (follow the system). A change made in the tray reaches the page as a `atrium-language` event on window, detail = the new choice. */
   language: {
     get: () => ipcRenderer.invoke('language:get'),
     set: (lang) => ipcRenderer.invoke('language:set', lang === 'ru' || lang === 'en' ? lang : null),

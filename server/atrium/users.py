@@ -801,7 +801,7 @@ def bootstrap(request: Request, response: Response, user: dict = Depends(current
     }
 
 
-# The other gomex modules import this one too: they come last, once everything above is defined.
+# The other atrium modules import this one too: they come last, once everything above is defined.
 from .channels import list_channels, muted_channels, unread_counts
 from .uploads import PRIVATE_IMAGE_HEADERS, make_avatar, process_image
 from .realtime import disconnect_user, end_dm_voice, presence_payload, sio, user_room

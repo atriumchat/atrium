@@ -1,9 +1,9 @@
-import { drum, drumAt, interpolate, type DrumProps } from '@gomex/ui-common';
+import { drum, drumAt, interpolate, type DrumProps } from '@atrium/ui-common';
 import { Check, Cross } from './icons';
 
 /**
  * A long job's steps on a drum (the installer's): the running one in the middle, the done ones fading above it, the
- * coming ones below. The motion's numbers are @gomex/ui-common's `drum`, the same as the phone app's.
+ * coming ones below. The motion's numbers are @atrium/ui-common's `drum`, the same as the phone app's.
  */
 export function Drum({ items, current, shown = 5 }: DrumProps) {
   const at = drumAt(items, current);

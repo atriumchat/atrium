@@ -44,8 +44,8 @@ type DesktopBridge = {
 
 declare global {
   interface Window {
-    gomexDesktop?: DesktopBridge;
+    atriumDesktop?: DesktopBridge;
   }
 }
 
-export const desktop: DesktopBridge | undefined = typeof window === 'undefined' ? undefined : window.gomexDesktop;
+export const desktop: DesktopBridge | undefined = typeof window === 'undefined' ? undefined : window.atriumDesktop;

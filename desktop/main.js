@@ -24,17 +24,7 @@ const path = require('node:path');
 const devEnv = (name) => (app.isPackaged ? undefined : process.env[name]);
 
 // A separate settings folder, to run a second copy next to the installed one.
-if (devEnv('GOMEX_USER_DATA')) app.setPath('userData', devEnv('GOMEX_USER_DATA'));
-// Atrium used to be called Gomex. An install from then keeps that name inside: the settings folder and the keychain
-// key that seals the saved servers' SSH keys both come from the app's name, and a new name would lose them.
-const legacyData = path.join(app.getPath('appData'), 'Gomex');
-if (!devEnv('GOMEX_USER_DATA') && fs.existsSync(legacyData)) {
-  app.setName('Gomex');
-  app.setPath('userData', legacyData);
-}
-// Servers released before the rename know the desktop app by "Gomex/<version>" in its user agent (deploy/Caddyfile,
-// `(desktop)`) and give it the app at the root address instead of the cover page; keep saying so to them.
-app.userAgentFallback = app.userAgentFallback.replace(/\bAtrium\//, 'Gomex/');
+if (devEnv('ATRIUM_USER_DATA')) app.setPath('userData', devEnv('ATRIUM_USER_DATA'));
 const updater = require('./updater');
 const ptt = require('./ptt');
 const serverSetup = require('./server-setup');
@@ -61,10 +51,10 @@ function writeConfig(next) {
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(language ? { ...next, language } : next, null, 2));
 }
 
-// A server is the default only in builds made for one: GOMEX_DEFAULT_URL in release-desktop.sh puts the address into
+// A server is the default only in builds made for one: ATRIUM_DEFAULT_URL in release-desktop.sh puts the address into
 // package.json (electron-builder's extraMetadata). Any other build first asks where its server is.
-const DEFAULT_URL = require('./package.json').gomexDefaultUrl || '';
-const APP_URL = devEnv('GOMEX_URL') || readConfig().url || DEFAULT_URL;
+const DEFAULT_URL = require('./package.json').atriumDefaultUrl || '';
+const APP_URL = devEnv('ATRIUM_URL') || readConfig().url || DEFAULT_URL;
 const ORIGIN = APP_URL ? new URL(APP_URL).origin : '';
 // An invite link pasted on first start (address:save): its path and query are opened once, so sign-up comes with
 // the invite in place, then forgotten.
@@ -79,11 +69,11 @@ if (PENDING !== undefined) {
   }
 }
 // Where "Your own server" on the first start leads.
-const SERVER_GUIDE = 'https://gomex.party/server-install';
+const SERVER_GUIDE = 'https://atriumchat.club/server-install';
 // The app's own updates come from the project's GitHub Releases whatever server it talks to, and only signed ones
 // install (updater.js). release-desktop.sh puts the manifest's address into package.json, like the server's; a build
 // without it never updates.
-const UPDATE_MANIFEST = require('./package.json').gomexUpdateUrl || '';
+const UPDATE_MANIFEST = require('./package.json').atriumUpdateUrl || '';
 const isMac = process.platform === 'darwin';
 
 // The ringtone must play the moment a call comes in, without the user having clicked the page first.
@@ -216,9 +206,9 @@ function setUpPermissions() {
   });
 
   // Screen sharing: the system picker where the OS has one (macOS); everywhere else Atrium's own (screen-picker.js),
-  // with the computer's sound as a switch on Windows. Only Atrium itself may ask. GOMEX_PICKER=1 (development)
+  // with the computer's sound as a switch on Windows. Only Atrium itself may ask. ATRIUM_PICKER=1 (development)
   // turns the system picker off to try Atrium's on a Mac.
-  const ownPickerForced = Boolean(devEnv('GOMEX_PICKER'));
+  const ownPickerForced = Boolean(devEnv('ATRIUM_PICKER'));
   session.defaultSession.setDisplayMediaRequestHandler(
     (request, callback) => {
       if (!fromAtrium(request.securityOrigin || request.frame?.url || '')) return callback(null);
@@ -324,7 +314,7 @@ function setLanguage(choice, { fromPage }) {
   // The page learns of a change made here; one it made itself needs no echo.
   if (!fromPage && win && !win.isDestroyed() && fromAtrium(win.webContents.getURL())) {
     win.webContents.executeJavaScript(
-      `window.dispatchEvent(new CustomEvent('gomex-language', { detail: ${JSON.stringify(choice)} }))`,
+      `window.dispatchEvent(new CustomEvent('atrium-language', { detail: ${JSON.stringify(choice)} }))`,
     ).catch(() => undefined);
   }
 }
@@ -535,7 +525,7 @@ async function watchAddress(url) {
 
 setupCall('install', ({ domain, turn }) =>
   serverSetup.install(
-    { domain, turn, installer: devEnv('GOMEX_INSTALLER') },
+    { domain, turn, installer: devEnv('ATRIUM_INSTALLER') },
     (data) => {
       setupWindow?.webContents.send('setup:event', data);
       if (data.state === 'ready') watchAddress(data.url);
@@ -693,9 +683,9 @@ app.on('before-quit', () => {
 app.on('activate', showWindow);
 
 app.whenReady().then(async () => {
-  // The system's language (a developer can force one with GOMEX_LANG=ru|en); the windows below open in it.
-  i18n.setLang(devEnv('GOMEX_LANG') ?? readConfig().language ?? i18n.pick(app.getLocale()));
-  app.setAppUserModelId('io.github.gomex-inc.gomex'); // Windows notifications need it
+  // The system's language (a developer can force one with ATRIUM_LANG=ru|en); the windows below open in it.
+  i18n.setLang(devEnv('ATRIUM_LANG') ?? readConfig().language ?? i18n.pick(app.getLocale()));
+  app.setAppUserModelId('club.atriumchat.desktop'); // Windows notifications need it
   setUpPermissions();
   listenToPage();
   if (!APP_URL) {
@@ -704,7 +694,7 @@ app.whenReady().then(async () => {
   }
   createWindow();
   updater.init({
-    manifestUrl: devEnv('GOMEX_UPDATE_URL') || UPDATE_MANIFEST,
+    manifestUrl: devEnv('ATRIUM_UPDATE_URL') || UPDATE_MANIFEST,
     onChange: (state) => {
       updateTrayMenu();
       win?.webContents.send('update:state', state);

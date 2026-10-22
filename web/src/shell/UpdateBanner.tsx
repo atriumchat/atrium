@@ -6,7 +6,7 @@ import { desktop } from '../desktop';
 import { INSTALLERS } from '../updates';
 import { DownloadIcon, XIcon } from '../ui/icons';
 
-const DISMISSED_KEY = 'gomex.oldAppBannerDismissed';
+const DISMISSED_KEY = 'atrium.oldAppBannerDismissed';
 
 /**
  * One line about an update, above the user panel (a computer) or the tab bar (a phone): the desktop app's new

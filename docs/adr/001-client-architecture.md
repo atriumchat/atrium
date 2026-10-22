@@ -1,4 +1,4 @@
-# ADR-001: Gomex client architecture — a monorepo, the Gomex Flow design system and one "Your own server"
+# ADR-001: Atrium client architecture — a monorepo, the Atrium Flow design system and one "Your own server"
 
 **Status:** Accepted, done (branch `onboarding`, 2026-10-22)
 **Date:** 2026-10-21
@@ -8,7 +8,7 @@
 
 ## Context
 
-Gomex is a self-hosted Discord-like app for a group of friends. The server (FastAPI + SQLite, LiveKit, Caddy) installs
+Atrium is a self-hosted Discord-like app for a group of friends. The server (FastAPI + SQLite, LiveKit, Caddy) installs
 with one command on a 1 GB VPS. The clients:
 - **web:** React, HeroUI v3, Tailwind v4, Vite;
 - **mobile:** Expo SDK 58, React Native;
@@ -50,10 +50,10 @@ screen's edge), and "Your own server" on three platforms. Before this decision:
 
 ```
 package.json            workspaces: packages/*, web, mobile, desktop/ui; shared scripts; ESLint
-packages/ui-common      @gomex/ui-common — tokens (+tokenCss), the scale's geometry, the parts' props contract
-packages/ui-web         @gomex/ui-web — the React DOM implementation + flow.css, Storybook
-packages/ui-native      @gomex/ui-native — the React Native implementation, same names and props, /design catalog
-packages/setup          @gomex/setup — "Your own server" and first run without UI: steps, scale, validations, the
+packages/ui-common      @atrium/ui-common — tokens (+tokenCss), the scale's geometry, the parts' props contract
+packages/ui-web         @atrium/ui-web — the React DOM implementation + flow.css, Storybook
+packages/ui-native      @atrium/ui-native — the React Native implementation, same names and props, /design catalog
+packages/setup          @atrium/setup — "Your own server" and first run without UI: steps, scale, validations, the
                         installer's protocol, deSEC's answers, capacity, a made-up install
 web/ mobile/ desktop/   the apps where they were; desktop/ui — the app's windows in React (Vite) on ui-web and setup
 ```
@@ -144,7 +144,7 @@ HeroUI; regressions in calls and screen sharing.
 ## Consequences
 
 **Easier:**
-- A new screen or window is built from `@gomex/ui-*` with one API.
+- A new screen or window is built from `@atrium/ui-*` with one API.
 - A change to the scale, a token or a validation is made once and reaches every platform.
 - An outside developer finds a standard monorepo, showcases, tests and CI.
 - The desktop's "Your own server" has what the phone's has: mocks, the shared scale.
@@ -159,8 +159,8 @@ HeroUI; regressions in calls and screen sharing.
 **To come back to:**
 - Turborepo or Nx for task caching, once builds get long.
 - Moving the desktop's other windows (address, picker, unreachable) into `desktop/ui`.
-- A `@gomex/protocol` package for the types and dictionaries the phone app still takes from `web/src`.
-- The desktop main process's own deSEC answers (`server-setup.js`) onto `@gomex/setup`, once the main process has a
+- A `@atrium/protocol` package for the types and dictionaries the phone app still takes from `web/src`.
+- The desktop main process's own deSEC answers (`server-setup.js`) onto `@atrium/setup`, once the main process has a
   build step.
 - Publishing Storybook next to DESIGN.md.
 
@@ -175,7 +175,7 @@ All eight action items are done, one commit each. Where it differs from the plan
 - **The parts' own words come through `FlowProvider`.** Packages don't import app code: the back button's label comes
   from the app, `Drum` takes ready rows.
 - **Two rules check the boundaries.** `eslint-plugin-boundaries` catches crossings by path but takes an import by
-  package name for an external one, so `no-restricted-imports` sets the direction by name, and keeps `@gomex/setup`
+  package name for an external one, so `no-restricted-imports` sets the direction by name, and keeps `@atrium/setup`
   free of React.
 - **The desktop main process (`server-setup.js`) is untouched.** It's outside the workspaces; its transport (SSH,
   deSEC) stays its own. The shared step model runs in the window (`desktop/ui`).
@@ -190,17 +190,17 @@ storybook`) and `/design` in a development build of the phone app; the checks in
 1. [x] **Checkpoint:** commit the work in progress (the desktop window in the new look, `tokenCss`, the demo key fix).
 2. [x] **Monorepo:** a root `package.json` with workspaces; mobile per Expo's guide (no manual `watchFolders`); the
    Dockerfile copies `packages/`; `.claude/launch.json`, docs/development.
-3. [x] **`@gomex/ui-common`:** tokens from `web/src/tokens.ts`; geometry from both `EdgeTicks.tsx`, `useFlowFrame` and
+3. [x] **`@atrium/ui-common`:** tokens from `web/src/tokens.ts`; geometry from both `EdgeTicks.tsx`, `useFlowFrame` and
    `desktop/onboarding.js ruler()`; the contract (`onPress`, `secondary`, `onSubmit`, `FlowPrimary`); tests
    (`node --test` + tsx: a `tokenCss` snapshot, the geometry, parity).
-4. [x] **`@gomex/ui-web` and `@gomex/ui-native`:** move the implementations; bring the parts to parity; remove
+4. [x] **`@atrium/ui-web` and `@atrium/ui-native`:** move the implementations; bring the parts to parity; remove
    literals (`Settings.Primary` in the flows to `FlowPrimary`, `DinoRun` to tokens); update `SetupWizard.tsx`,
    `own.tsx`, `login.tsx`, `recovery.tsx`; Storybook and `/design` on the phone.
-5. [x] **`@gomex/setup`:** the model of "Your own server" and first run from `own.tsx`, `onboarding.js`,
+5. [x] **`@atrium/setup`:** the model of "Your own server" and first run from `own.tsx`, `onboarding.js`,
    `mobile/src/own/{setup,capacity,mock}.ts`, `SetupWizard.tsx`; platform differences as step configs; tests of
    transitions, validations and the installer's protocol.
 6. [x] **`desktop/ui`:** Vite pages, the `onboarding` window on `ui-web` and `setup` with an adapter over
-   `window.gomexSetup` (`onboarding-preload.js` and `server-setup.js` unchanged); `main.js` loads `ui-dist`,
+   `window.atriumSetup` (`onboarding-preload.js` and `server-setup.js` unchanged); `main.js` loads `ui-dist`,
    electron-builder's `files` include it; the old `onboarding.*`, the CSS copies and `design.js` removed.
 7. [x] **Gates:** root ESLint (boundaries, hooks, no colour literals in the flow layer); `npm run check` (lint, types,
    tests, builds); `.github/workflows/checks.yml` on push and pull request, with a `pytest` job.

@@ -32,7 +32,7 @@ npm run dev -w web
 
 На пустой базе откроется мастер первого запуска. Код по умолчанию — `friends`.
 
-Общий код лежит в `packages/` (`@gomex/ui-common`, `@gomex/ui-web`, `@gomex/ui-native`, `@gomex/setup`; см.
+Общий код лежит в `packages/` (`@atrium/ui-common`, `@atrium/ui-web`, `@atrium/ui-native`, `@atrium/setup`; см.
 [ADR-001](adr/001-client-architecture.md)). Нужны Node 24.3+ и npm 11: npm 10.8 падает на этом дереве. После добавления
 пакета — `npm install` в корне и перезапуск dev-серверов, Metro с `--clear`: новую ссылку воркспейса на ходу они не видят.
 
@@ -41,14 +41,14 @@ npm run dev -w web
 ```bash
 cd desktop
 npm ci
-GOMEX_URL=http://localhost:5190 npm start
+ATRIUM_URL=http://localhost:5190 npm start
 ```
 
 Окна приложения, сделанные на React (`desktop/ui`, пока «Свой сервер»), собираются в `desktop/ui-dist` перед `npm start`
 и сборками `dist:*` (`npm run ui`); `npm run desktop-ui` в корне отдаёт их для работы над дизайном, на выдуманных
 ответах и без главного процесса (`onboarding.html#step=install`).
 
-`GOMEX_LANG=ru` или `GOMEX_LANG=en` задаёт язык десктопа; по умолчанию — язык системы.
+`ATRIUM_LANG=ru` или `ATRIUM_LANG=en` задаёт язык десктопа; по умолчанию — язык системы.
 
 Проверки перед коммитом (CI гоняет то же, .github/workflows/checks.yml):
 
@@ -74,10 +74,10 @@ deploy/release.sh 1.2.3
 релиза), проверяет их по публичным ссылкам и коммитит `install.sh`. Установка и обновление берут
 `releases/latest/download/install.sh`, а он — архив своего релиза.
 Версия с суффиксом (`1.2.3-rc.1`) выходит пре-релизом и `latest` не двигает.
-Те же два файла скрипт публикует в npm как `@gomex.llc/install@1.2.3` — зеркало на случай, когда GitHub недоступен. Для этого
+Те же два файла скрипт публикует в npm как `@atriumchat/install@1.2.3` — зеркало на случай, когда GitHub недоступен. Для этого
 npm должен быть залогинен (`npm login`), при публикации он спросит код двухфакторной защиты.
-`GOMEX_SKIP_NPM=1` выпускает релиз без зеркала.
-После самого первого релиза пакеты `gomex-app` и `gomex-caddy` в GitHub нужно один раз сделать публичными,
+`ATRIUM_SKIP_NPM=1` выпускает релиз без зеркала.
+После самого первого релиза пакеты `atrium-app` и `atrium-caddy` в GitHub нужно один раз сделать публичными,
 иначе серверы не смогут их скачать. Скрипт остановится и даст ссылки.
 
 **Десктоп.** Поднять `version` в `desktop/package.json`, затем:
@@ -90,7 +90,7 @@ deploy/release-desktop.sh            # Mac (Apple Silicon и Intel) и Windows
 версия под постоянными именами и `update.json`, который проверяют установленные приложения. Оба — пре-релизы,
 `latest` остаётся за серверным релизом. Кнопка «Скачать приложение» на любом сервере ведёт в `desktop`.
 
-Сборки подписываются ключом `~/.gomex/seed-update-signing-key.pem`, он создаётся при первом запуске. Его надо сразу
+Сборки подписываются ключом `~/.atrium/seed-update-signing-key.pem`, он создаётся при первом запуске. Его надо сразу
 сохранить в бэкап: без него установленные приложения больше не обновятся. Открытая половина,
 `desktop/update-key.pem`, коммитится и пушится до выпуска. Адреса сервера в сборке нет, приложение спрашивает его при
-первом запуске; `GOMEX_DEFAULT_URL=https://…` встроит адрес.
+первом запуске; `ATRIUM_DEFAULT_URL=https://…` встроит адрес.

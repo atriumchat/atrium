@@ -11,7 +11,7 @@ import { Row, RowIcon } from '../ui/settings';
 import { CopyButton } from '../ui/CopyButton';
 import { CheckIcon, UserPlusIcon, XIcon } from '../ui/icons';
 
-const BANNER_HIDDEN = 'gomex_invite_banner_hidden';
+const BANNER_HIDDEN = 'atrium_invite_banner_hidden';
 
 // Your invite, kept between screens so the banner and the window show it at once instead of popping in after
 // a request; refetched when someone signs up with it (inviteVersion) or after a reset.

@@ -1,7 +1,7 @@
 // The desktop app updating itself. (The chat is the server's site and changes with every deploy; this is for the
 // shell around it.) The project's GitHub Releases list the current build in update.json (release "desktop"):
 //   { "signed": "{\"version\":\"1.4.0\",\"files\":{\"darwin-arm64\":{\"url\":\"https://github.com/…/releases/download/
-//                desktop-v1.4.0/Gomex-1.4.0-mac-apple-silicon.dmg\",\"sha256\":\"…\",\"size\":126545854},\"win32-x64\":{…}}}",
+//                desktop-v1.4.0/Atrium-1.4.0-mac-apple-silicon.dmg\",\"sha256\":\"…\",\"size\":126545854},\"win32-x64\":{…}}}",
 //     "signature": "<base64 Ed25519 signature over the UTF-8 bytes of `signed`>" }
 // `signed` is the manifest as a string, so the signature covers exact bytes and nothing depends on how JSON
 // gets re-serialised. We trust only that string, and only once it verifies against update-key.pem shipped
@@ -24,7 +24,7 @@ const { t } = require('./i18n');
 const run = promisify(execFile);
 const CHECK_EVERY = 4 * 60 * 60 * 1000;
 const PLATFORM = `${process.platform}-${process.arch}`;
-const DIR = path.join(app.getPath('temp'), 'gomex-update');
+const DIR = path.join(app.getPath('temp'), 'atrium-update');
 const KEY_FILE = path.join(__dirname, 'update-key.pem');
 // The only installer type each platform can run; anything else in a manifest is refused.
 const EXTENSIONS = { darwin: '.dmg', win32: '.exe' };
@@ -231,7 +231,7 @@ async function detach(mount) {
 
 /** Copies the new Atrium.app out of the DMG to a hidden folder next to the running one, ready to swap in. */
 async function stageMac(dmg, version, bundle) {
-  const staged = path.join(path.dirname(bundle), '.Gomex-update.app');
+  const staged = path.join(path.dirname(bundle), '.Atrium-update.app');
   const mount = fs.mkdtempSync(path.join(DIR, 'mnt-'));
   await attach(dmg, mount);
   try {
@@ -291,7 +291,7 @@ async function checkNow() {
   }
   set({ status: 'downloading', version, progress: 0 });
   fs.mkdirSync(DIR, { recursive: true });
-  const dest = path.join(DIR, `Gomex-${version}${update.ext}`);
+  const dest = path.join(DIR, `Atrium-${version}${update.ext}`);
   await download(downloadUrl, dest, { sha256: update.sha256, size: update.size });
   if (bundle) {
     // Staging reuses the one hidden folder, so the older staged update is gone from here on.
@@ -303,7 +303,7 @@ async function checkNow() {
   }
   // Older downloads are no use any more.
   for (const name of fs.readdirSync(DIR)) {
-    if (name.startsWith('Gomex-') && path.join(DIR, name) !== dest) fs.rmSync(path.join(DIR, name), { force: true });
+    if (name.startsWith('Atrium-') && path.join(DIR, name) !== dest) fs.rmSync(path.join(DIR, name), { force: true });
   }
   set(readyState());
 }
@@ -335,7 +335,7 @@ function startInstall(relaunch) {
       'fi',
       '[ "$4" = 1 ] && open "$2"',
     ].join('\n');
-    const args = ['-c', script, 'gomex-update', String(process.pid), ready.bundle, ready.staged, relaunch ? '1' : '0'];
+    const args = ['-c', script, 'atrium-update', String(process.pid), ready.bundle, ready.staged, relaunch ? '1' : '0'];
     spawn('/bin/sh', args, { detached: true, stdio: 'ignore' }).unref();
   } else if (process.platform === 'win32') {
     if (!ready.file || !fs.existsSync(ready.file)) return false;

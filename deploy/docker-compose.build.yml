@@ -4,7 +4,7 @@
 services:
   app:
     build: ..
-    image: gomex-app:local
+    image: atrium-app:local
   caddy:
     build: ./caddy
-    image: gomex-caddy:2.11.7-l4
+    image: atrium-caddy:2.11.7-l4

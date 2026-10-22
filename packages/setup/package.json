@@ -1,5 +1,5 @@
 {
-  "name": "@gomex/setup",
+  "name": "@atrium/setup",
   "version": "0.1.0",
   "private": true,
   "description": "\"Your own server\" and a server's first run without UI: steps, validations, the installer's protocol, deSEC's answers, capacity, a made-up install.",

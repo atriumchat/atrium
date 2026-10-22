@@ -73,17 +73,17 @@ private func openSSHLine(_ key: Curve25519.Signing.PublicKey, comment: String) -
   return "ssh-ed25519 \(Data(blob).base64EncodedString()) \(comment)"
 }
 
-public class GomexSshModule: Module {
+public class AtriumSshModule: Module {
   private let sessions = Sessions()
 
   public func definition() -> ModuleDefinition {
-    Name("GomexSsh")
+    Name("AtriumSsh")
 
     /// A fresh ed25519 key for the app: the public half for authorized_keys, the private one (raw, base64) for the Keychain.
     Function("generateKey") { () -> [String: String] in
       let key = Curve25519.Signing.PrivateKey()
       return [
-        "publicKey": openSSHLine(key.publicKey, comment: "gomex-app"),
+        "publicKey": openSSHLine(key.publicKey, comment: "atrium-app"),
         "privateKey": key.rawRepresentation.base64EncodedString(),
       ]
     }

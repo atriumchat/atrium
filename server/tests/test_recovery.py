@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from gomex.db import execute, now_ms
+from atrium.db import execute, now_ms
 
 KEY_FORMAT = re.compile(r"^([A-Z2-9]{4}-){3}[A-Z2-9]{4}$")
 PASSWORD = "correct horse battery"
@@ -45,8 +45,8 @@ def test_sign_up_returns_a_key_that_recovers(client, server):
 
 
 def test_old_long_keys_still_work(client, server):
-    from gomex.auth import hash_password
-    from gomex.users import normalize_key
+    from atrium.auth import hash_password
+    from atrium.users import normalize_key
 
     long_key = "ABCD-EFGH-JKMN-PQRS-TUVW-XYZ2-3456-789A"
     execute("UPDATE users SET recovery_hash = ? WHERE name = 'Лена'", (hash_password(normalize_key(long_key)),))

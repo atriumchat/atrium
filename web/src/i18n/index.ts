@@ -15,7 +15,7 @@ export const LANGS: { id: Lang; label: string }[] = [
 ];
 
 const dictionaries: Record<Lang, Record<Key, Entry>> = { ru, en };
-const KEY = 'gomex_lang';
+const KEY = 'atrium_lang';
 
 /** Russian for Russian systems, English for everything else. */
 function detect(): Lang {
@@ -70,7 +70,7 @@ export function setLang(next: Lang | null) {
 const fromDesktop = (lang: unknown) => apply(lang === 'ru' || lang === 'en' ? lang : null);
 desktop?.language?.get().then((lang) => lang && fromDesktop(lang), () => undefined);
 desktop?.onLanguage?.(fromDesktop);
-if (typeof window !== 'undefined') window.addEventListener('gomex-language', (e) => fromDesktop((e as CustomEvent).detail));
+if (typeof window !== 'undefined') window.addEventListener('atrium-language', (e) => fromDesktop((e as CustomEvent).detail));
 
 const subscribe = (cb: () => void) => {
   listeners.add(cb);

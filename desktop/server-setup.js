@@ -3,7 +3,7 @@
 //     memory for this window. The installer then switches password login off, and the app keeps its own key.
 //   - The address: a free name on deSEC (name.dedyn.io), registered and pointed here through deSEC's API, or the
 //     person's own domain, checked at its own name servers.
-//   - The installer (install.sh, GOMEX_PROGRESS=1) with its progress read back line by line.
+//   - The installer (install.sh, ATRIUM_PROGRESS=1) with its progress read back line by line.
 // Main process only; the window reaches it through onboarding-preload.js and main.js.
 const { Client, utils } = require('ssh2');
 const crypto = require('node:crypto');
@@ -12,7 +12,7 @@ const fs = require('node:fs');
 const { t } = require('./i18n');
 
 const DESEC = 'https://desec.io/api/v1';
-const INSTALLER_URL = 'https://github.com/gomex-inc/gomex/releases/latest/download/install.sh';
+const INSTALLER_URL = 'https://github.com/atriumchat/atrium/releases/latest/download/install.sh';
 const NAME = /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])$/;
 const DOMAIN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 const TURN = /^[a-z0-9-]{1,20}$/;
@@ -340,27 +340,27 @@ async function installSteps({ domain, turn, installer }, report, save) {
   if (!DOMAIN.test(domain) || !TURN.test(turn)) return report({ state: 'fail', why: t('install.badAddress') });
   const { conn } = ssh;
   // The app's own key: the installer adds it for root and switches password login off.
-  const key = utils.generateKeyPairSync('ed25519', { comment: 'gomex-app' });
+  const key = utils.generateKeyPairSync('ed25519', { comment: 'atrium-app' });
   save({ host: ssh.host, ip: ssh.ip, user: ssh.user, hostKey: ssh.hostKey, domain, privateKey: key.private });
 
   const fetchInstaller = installer
-    ? exec(conn, 'cat > /root/gomex-install.sh', { stdin: fs.readFileSync(installer) })
-    : exec(conn, `curl -fsSL --retry 3 ${sq(INSTALLER_URL)} -o /root/gomex-install.sh`);
+    ? exec(conn, 'cat > /root/atrium-install.sh', { stdin: fs.readFileSync(installer) })
+    : exec(conn, `curl -fsSL --retry 3 ${sq(INSTALLER_URL)} -o /root/atrium-install.sh`);
   const fetched = await fetchInstaller;
   if (fetched.code !== 0) return report({ state: 'fail', why: t('install.noInstaller'), tail: fetched.tail });
 
   const env = [
-    'GOMEX_YES=1',
-    'GOMEX_PROGRESS=1',
+    'ATRIUM_YES=1',
+    'ATRIUM_PROGRESS=1',
     'NO_COLOR=1',
     `DOMAIN=${sq(domain)}`,
     `TURN_HOST=${sq(turn)}`,
-    `GOMEX_AUTHORIZED_KEY=${sq(key.public.trim())}`,
+    `ATRIUM_AUTHORIZED_KEY=${sq(key.public.trim())}`,
   ].join(' ');
   let ready = null;
   let why = null;
   let current = null; // the installer's step that is running
-  // The installer's own output (not its "::gomex" lines): the last line of it, for a step that takes long. Sent
+  // The installer's own output (not its "::atrium" lines): the last line of it, for a step that takes long. Sent
   // once a second at most; a line of an earlier step is not this step's.
   let last = '';
   let sent = '';
@@ -373,11 +373,11 @@ async function installSteps({ domain, turn, installer }, report, save) {
     // The installer's own status lines ("… Docker", "✓ Docker 12 с") say what the list already does.
     if (clean && !/^[…✓✗!•]/.test(clean)) last = clean.slice(0, 160);
   };
-  const { code, tail } = await exec(conn, `${env} sh /root/gomex-install.sh`, {
+  const { code, tail } = await exec(conn, `${env} sh /root/atrium-install.sh`, {
     onLine: (line) => {
-      const sub = line.match(/^::gomex sub (.+)$/);
+      const sub = line.match(/^::atrium sub (.+)$/);
       if (sub) return report({ step: current, state: 'sub', text: sub[1].slice(0, 120) });
-      const m = line.match(/^::gomex (run|done|fail|ready) ?(\S*) ?(.*)$/);
+      const m = line.match(/^::atrium (run|done|fail|ready) ?(\S*) ?(.*)$/);
       if (!m) return plain(line);
       const [, state, step, rest] = m;
       if (state === 'ready') {

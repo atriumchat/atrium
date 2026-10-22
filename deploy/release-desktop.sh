@@ -5,20 +5,20 @@
 # Raise "version" in desktop/package.json first — apps only update to a higher version.
 #   desktop-vX.Y.Z   this version's installers under versioned names; update.json points at them, so a file never
 #                    changes under an app that's downloading it.
-#   desktop          always the newest: the fixed names the app's download buttons use (/download/Gomex-windows.exe
+#   desktop          always the newest: the fixed names the app's download buttons use (/download/Atrium-windows.exe
 #                    on every server goes there) and update.json, which installed apps check every few hours.
 # Both are pre-releases, so GitHub's "latest" stays on the server release that install.sh comes from.
 #
 # Updates are signed (Ed25519). The private key stays on this Mac, outside the repo:
-#   ${GOMEX_UPDATE_KEY:-~/.gomex/seed-update-signing-key.pem}
+#   ${ATRIUM_UPDATE_KEY:-~/.atrium/seed-update-signing-key.pem}
 # Its public half, desktop/update-key.pem, is committed and built into the app, which installs nothing the key
 # didn't sign — so neither a server, a "new server address" nor GitHub can push code to installed apps.
 # Needs node, gh (logged in) and git with "origin" on GitHub.
 set -euo pipefail
-SIGNING_KEY=${GOMEX_UPDATE_KEY:-$HOME/.gomex/seed-update-signing-key.pem}
+SIGNING_KEY=${ATRIUM_UPDATE_KEY:-$HOME/.atrium/seed-update-signing-key.pem}
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # The server a fresh install opens (main.js). Empty by default: the app asks for the address on first start.
-DEFAULT_URL=${GOMEX_DEFAULT_URL-}
+DEFAULT_URL=${ATRIUM_DEFAULT_URL-}
 cd "$ROOT"
 
 say() { printf '== %s\n' "$*"; }
@@ -61,7 +61,7 @@ if [[ ! -f "$SIGNING_KEY" ]]; then
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!  New update signing key: $SIGNING_KEY
 !!  BACK IT UP NOW (password manager / encrypted drive), and never put it in the repo or on a server.
-!!  Lose it and every installed Gomex stops accepting updates — users would have to reinstall by hand.
+!!  Lose it and every installed Atrium stops accepting updates — users would have to reinstall by hand.
 !!  Commit and push desktop/update-key.pem (the public half), then run this again.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -92,18 +92,18 @@ dirty=$(git -C "$ROOT" status --porcelain -- desktop deploy/release-desktop.sh)
 commit=$(git -C "$ROOT" rev-parse HEAD)
 gh api "repos/$repo/commits/$commit" --silent 2>/dev/null || die "$commit isn't on GitHub yet: git push origin HEAD"
 
-say "Building Gomex $version"
+say "Building Atrium $version"
 rm -rf "$dist"
-META=(-c.extraMetadata.gomexDefaultUrl="$DEFAULT_URL" -c.extraMetadata.gomexUpdateUrl="$manifest_url")
+META=(-c.extraMetadata.atriumDefaultUrl="$DEFAULT_URL" -c.extraMetadata.atriumUpdateUrl="$manifest_url")
 npx electron-builder --mac dmg --arm64 "${META[@]}"
 npx electron-builder --mac dmg --x64 "${META[@]}"
 npx electron-builder --win nsis --x64 "${META[@]}"
 
 # platform-arch key | built file | versioned name (desktop-vX.Y.Z) | fixed name (desktop).
 builds=(
-  "darwin-arm64|$dist/Gomex-$version-arm64.dmg|Gomex-$version-mac-apple-silicon.dmg|Gomex-mac-apple-silicon.dmg"
-  "darwin-x64|$dist/Gomex-$version.dmg|Gomex-$version-mac-intel.dmg|Gomex-mac-intel.dmg"
-  "win32-x64|$dist/Gomex Setup $version.exe|Gomex-$version-windows.exe|Gomex-windows.exe"
+  "darwin-arm64|$dist/Atrium-$version-arm64.dmg|Atrium-$version-mac-apple-silicon.dmg|Atrium-mac-apple-silicon.dmg"
+  "darwin-x64|$dist/Atrium-$version.dmg|Atrium-$version-mac-intel.dmg|Atrium-mac-intel.dmg"
+  "win32-x64|$dist/Atrium Setup $version.exe|Atrium-$version-windows.exe|Atrium-windows.exe"
 )
 # The files as GitHub gets them: an asset is named after its file.
 versioned="$dist/release/$vtag"
@@ -141,7 +141,7 @@ node -e '
 
 sums=$(cd "$versioned" && shasum -a 256 ./* | sed 's# \./# #')
 fence='```'
-notes="Gomex для компьютера $version.
+notes="Atrium для компьютера $version.
 
 SHA-256:
 
@@ -153,21 +153,21 @@ ${fence}"
 if gh release view "$vtag" -R "$repo" >/dev/null 2>&1; then
   say "Updating the release $vtag"
   gh release upload "$vtag" -R "$repo" --clobber "$versioned"/*
-  gh release edit "$vtag" -R "$repo" --title "Gomex для компьютера $version" --notes "$notes" \
+  gh release edit "$vtag" -R "$repo" --title "Atrium для компьютера $version" --notes "$notes" \
     --prerelease --latest=false --draft=false >/dev/null
 else
   say "Publishing the release $vtag"
-  gh release create "$vtag" -R "$repo" --target "$commit" --title "Gomex для компьютера $version" --notes "$notes" \
+  gh release create "$vtag" -R "$repo" --target "$commit" --title "Atrium для компьютера $version" --notes "$notes" \
     --prerelease --latest=false "$versioned"/* >/dev/null
 fi
 
 # == The release "desktop": the fixed names and update.json, swapped in one at a time and update.json last, so no
 # app hears about the version before its files are up.
-channel_notes="Gomex для компьютера: последняя версия, сейчас $version ($vtag). Установленные приложения обновляются сами."
+channel_notes="Atrium для компьютера: последняя версия, сейчас $version ($vtag). Установленные приложения обновляются сами."
 if ! gh release view "$channel" -R "$repo" >/dev/null 2>&1; then
   say "Publishing the release $channel"
-  gh release create "$channel" -R "$repo" --target "$commit" --title "Gomex для компьютера" --notes "$channel_notes" \
-    --prerelease --latest=false "$fixed"/Gomex-* "$fixed/update.json" >/dev/null
+  gh release create "$channel" -R "$repo" --target "$commit" --title "Atrium для компьютера" --notes "$channel_notes" \
+    --prerelease --latest=false "$fixed"/Atrium-* "$fixed/update.json" >/dev/null
 else
   say "Updating the release $channel"
   release_id=$(gh api "repos/$repo/releases/tags/$channel" --jq .id)
@@ -189,7 +189,7 @@ else
     if [[ -n $old ]]; then gh api -X DELETE "repos/$repo/releases/assets/$old" --silent; fi
     gh api -X PATCH "repos/$repo/releases/assets/$new" -f name="$name" --silent
   }
-  for file in "$fixed"/Gomex-*; do swap_asset "$file"; done
+  for file in "$fixed"/Atrium-*; do swap_asset "$file"; done
   swap_asset "$fixed/update.json"
   gh release edit "$channel" -R "$repo" --notes "$channel_notes" --prerelease --latest=false --draft=false >/dev/null
 fi
@@ -208,5 +208,5 @@ for build in "${builds[@]}"; do
   done
 done
 
-say "Published Gomex $version"
+say "Published Atrium $version"
 node -e 'const m = require(process.argv[1]); console.log(JSON.stringify(JSON.parse(m.signed), null, 2))' "$fixed/update.json"

@@ -7,12 +7,12 @@ import { Window } from '../ui/Dialog';
 
 /** Installers on the server (deploy/downloads, served by Caddy at /download/). */
 export const DOWNLOADS = [
-  { id: 'mac-arm64', label: 'Mac', detail: 'M1–M4', file: '/download/Gomex-mac-apple-silicon.dmg' },
-  { id: 'mac-intel', label: 'Mac', detail: 'Intel', file: '/download/Gomex-mac-intel.dmg' },
+  { id: 'mac-arm64', label: 'Mac', detail: 'M1–M4', file: '/download/Atrium-mac-apple-silicon.dmg' },
+  { id: 'mac-intel', label: 'Mac', detail: 'Intel', file: '/download/Atrium-mac-intel.dmg' },
   { id: 'windows', label: 'Windows', get detail() {
       return t('settings.downloads.windowsDetail');
     },
-    file: '/download/Gomex-windows.exe' },
+    file: '/download/Atrium-windows.exe' },
 ] as const;
 
 /** At the foot of the server rail, as in Discord: get the app for the computer. Shown only where it makes sense (see whereToUseNeeded): not in the desktop app or from the Home Screen. */

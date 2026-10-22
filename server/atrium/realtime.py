@@ -68,7 +68,7 @@ def livekit_remove(room: str, identity: str) -> None:
     when they aren't in it or LiveKit can't be reached."""
     now = int(time.time())
     token = jwt.encode(
-        {"iss": LIVEKIT_API_KEY, "sub": "gomex-server", "nbf": now - 10, "exp": now + 60, "video": {"room": room, "roomAdmin": True}},
+        {"iss": LIVEKIT_API_KEY, "sub": "atrium-server", "nbf": now - 10, "exp": now + 60, "video": {"room": room, "roomAdmin": True}},
         LIVEKIT_API_SECRET,
         algorithm="HS256",
     )
@@ -590,7 +590,7 @@ def call_quality(body: CallQualityIn, user: dict = Depends(current_user)):
     return {"ok": True}
 
 
-# The other gomex modules import this one too: they come last, once everything above is defined.
+# The other atrium modules import this one too: they come last, once everything above is defined.
 from .users import blocked_between
 from .channels import (
     can_read_message,

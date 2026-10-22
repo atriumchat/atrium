@@ -7,7 +7,7 @@ import react from '@vitejs/plugin-react';
  * (base './') because they're opened from file://, where `crossorigin` on a module script fails the load.
  */
 const noCrossorigin: Plugin = {
-  name: 'gomex-no-crossorigin',
+  name: 'atrium-no-crossorigin',
   transformIndexHtml: (html) => html.replaceAll(' crossorigin', ''),
 };
 
@@ -17,7 +17,7 @@ const noCrossorigin: Plugin = {
  */
 const CSP = "default-src 'none'; style-src 'self'; font-src 'self'; script-src 'self'; img-src 'self' data:";
 const csp: Plugin = {
-  name: 'gomex-csp',
+  name: 'atrium-csp',
   apply: 'build',
   transformIndexHtml: () => [{ tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: CSP }, injectTo: 'head' }],
 };

@@ -47,4 +47,4 @@ export function showError(message: string) {
 useStore.subscribe(trimLeftConversation);
 
 // Local development only: lets the browser console poke the state (e.g. fake who is talking).
-if (import.meta.env.DEV) (window as unknown as { __gomex: typeof useStore }).__gomex = useStore;
+if (import.meta.env.DEV) (window as unknown as { __atrium: typeof useStore }).__atrium = useStore;

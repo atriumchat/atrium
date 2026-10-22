@@ -106,7 +106,7 @@ async def rename_server(body: ServerIn, user: dict = Depends(current_user)):
     return server_info()
 
 
-# The installed app's manifest: the built one, with the server's icon in place of Gomex's once there is one. Only
+# The installed app's manifest: the built one, with the server's icon in place of Atrium's once there is one. Only
 # where the server serves the built client; in development Vite serves web/public's copy as it is.
 if WEB_DIST:
 
@@ -120,7 +120,7 @@ if WEB_DIST:
         return JSONResponse(built, media_type="application/manifest+json", headers={"Cache-Control": "no-cache"})
 
 
-# The other gomex modules import this one too: they come last, once everything above is defined.
+# The other atrium modules import this one too: they come last, once everything above is defined.
 from .users import remove_avatar_file, server_name
 from .uploads import make_avatar, process_image
 from .realtime import sio

@@ -9,7 +9,7 @@
 2. Позовите друзей: у каждого своя ссылка-приглашение, по ней можно зарегистрировать 5 человек
    (`INVITE_LIMIT`), приглашённый сразу попадает в друзья. У администраторов лимита нет.
 3. Десктоп для Mac (Apple Silicon и Intel) и Windows — кнопка «Скачать приложение» в приложении или релиз
-   [desktop](https://github.com/gomex-inc/gomex/releases/tag/desktop). При первом запуске он спрашивает
+   [desktop](https://github.com/atriumchat/atrium/releases/tag/desktop). При первом запуске он спрашивает
    адрес сервера: вставьте `app.ДОМЕН`. Сменить его потом можно из трея, «Адрес сервера…».
 
 Публичного API нет: HTTP и Socket.IO — внутренний протокол клиента, без версий и обещаний совместимости.
@@ -29,7 +29,7 @@
 | `INVITE_LIMIT` | `5` | Сколько человек можно зарегистрировать по одной личной ссылке |
 | `UPLOAD_MB_PER_DAY` | `500` | Сколько мегабайт файлов в день можно загрузить одному человеку |
 | `RELAY_ONLY` | выключено | `1` — все звонки только через TURN на 443, без прямых и UDP-путей |
-| `GOMEX_REGISTRY`, `GOMEX_VERSION`, `GOMEX_APP_DIGEST`, `GOMEX_CADDY_DIGEST` | из релиза | Какие образы запускать; пишет установщик |
+| `ATRIUM_REGISTRY`, `ATRIUM_VERSION`, `ATRIUM_APP_DIGEST`, `ATRIUM_CADDY_DIGEST` | из релиза | Какие образы запускать; пишет установщик |
 
 `livekit.yaml` не правьте руками: его перезаписывает каждая установка и обновление из
 [`deploy/livekit.yaml.tmpl`](../deploy/livekit.yaml.tmpl).
@@ -52,16 +52,16 @@
 
 ## Обслуживание сервера
 
-Установка живёт в `/opt/gomex`. Всё ниже — из `deploy/`.
+Установка живёт в `/opt/atrium`. Всё ниже — из `deploy/`.
 
 ```bash
-cd /opt/gomex/deploy
+cd /opt/atrium/deploy
 docker compose ps                  # что запущено
 docker compose logs -f app         # логи приложения; так же livekit, caddy
-journalctl -u gomex-backup         # журнал ночных бэкапов
+journalctl -u atrium-backup         # журнал ночных бэкапов
 ```
 
 - **Данные:** `data/` (база `hangout.db`, аватары, загрузки), секреты в `.env`, сертификаты в `caddy-data/`.
-- **Бэкапы:** systemd-таймер в 04:30 по времени сервера, копии в `/root/gomex-backups/daily`, хранятся 14 дней.
+- **Бэкапы:** systemd-таймер в 04:30 по времени сервера, копии в `/root/atrium-backups/daily`, хранятся 14 дней.
   Картинки между днями связаны жёсткими ссылками, поэтому 14 копий занимают примерно одну.
   Если на диске меньше 1 ГБ, бэкап пропускается и пишет об этом в журнал.

@@ -1,7 +1,7 @@
-import { color, radius, space, type } from '@gomex/ui-common';
+import { color, radius, space, type } from '@atrium/ui-common';
 
 /**
- * The app's colours, from the design tokens shared with the web (@gomex/ui-common, DESIGN.md). `window` is the
+ * The app's colours, from the design tokens shared with the web (@atrium/ui-common, DESIGN.md). `window` is the
  * near-black of the main screens, `page` the true black of the flows (sign-in, "Your own server") on an OLED screen.
  */
 export const colors = {
@@ -31,4 +31,4 @@ export const colors = {
 
 export { color, radius, space, type };
 
-export { fonts } from '@gomex/ui-native';
+export { fonts } from '@atrium/ui-native';

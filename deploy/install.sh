@@ -1,47 +1,47 @@
 #!/bin/sh
-# Gomex installer, for a fresh VPS (Ubuntu or Debian), as root:
-#   curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh   # the wizard
+# Atrium installer, for a fresh VPS (Ubuntu or Debian), as root:
+#   curl -fsSL https://github.com/atriumchat/atrium/releases/latest/download/install.sh | sh   # the wizard
 #   curl -fsSL …/install.sh | sh -s update                                 # update, no questions
-#   curl -fsSL …/install.sh | sh -s uninstall                              # take Gomex off the server again
+#   curl -fsSL …/install.sh | sh -s uninstall                              # take Atrium off the server again
 #   curl -fsSL …/install.sh | sh -s restore                               # put data back from a nightly backup
 #   curl -fsSL …/install.sh | sh -s link                                   # the setup link again, while setup is not done
-#   curl -fsSL …/install.sh | DOMAIN=chat.example.com GOMEX_YES=1 sh       # no questions at all
+#   curl -fsSL …/install.sh | DOMAIN=chat.example.com ATRIUM_YES=1 sh       # no questions at all
 # Each installer takes its own release's tarball from that GitHub Release, checked against the SHA-256 pinned
-# below. The npm package @gomex.llc/install mirrors both files, so the same works without GitHub:
-#   curl -fsSL https://cdn.jsdelivr.net/npm/@gomex.llc/install/install.sh | sh
-# Where Node is already installed, the same package runs with npx (its bin is gomex-install):
-#   npx @gomex.llc/install            # update: npx @gomex.llc/install update
+# below. The npm package @atriumchat/install mirrors both files, so the same works without GitHub:
+#   curl -fsSL https://cdn.jsdelivr.net/npm/@atriumchat/install/install.sh | sh
+# Where Node is already installed, the same package runs with npx (its bin is atrium-install):
+#   npx @atriumchat/install            # update: npx @atriumchat/install update
 # Re-running is an update: .env (all the secrets) and the data stay.
 # link prints the link with the setup code (https://app.DOMAIN/?setup=CODE) again, or says that setup is already done.
-# restore lists the nightly backups in /root/gomex-backups/daily with their date and size and asks which one to put
-# back (GOMEX_YES=1 GOMEX_RESTORE=<folder name, e.g. 2026-10-18> asks nothing). It first saves the current data as one
+# restore lists the nightly backups in /root/atrium-backups/daily with their date and size and asks which one to put
+# back (ATRIUM_YES=1 ATRIUM_RESTORE=<folder name, e.g. 2026-10-18> asks nothing). It first saves the current data as one
 # more backup, pre-restore-<time>, in the same folder, then stops the app, puts the chosen database and files back,
 # starts the app and checks that it answers. Works on the same server and on a new one with the backups copied to
-# /root/gomex-backups/daily after a normal install.
-# uninstall asks first (GOMEX_YES=1 skips the question), then removes: the containers and their images, GOMEX_DIR
-# (/opt/gomex: .env, the data, the files), /root/gomex-backups, the nightly backup service and timer, this installer's
-# copy (/root/gomex-install.sh) and log (/var/log/gomex-install.log), and what it changed for SSH: its key-only
-# drop-in (password login is back as it was) and the desktop app's key (the line with the comment gomex-app).
+# /root/atrium-backups/daily after a normal install.
+# uninstall asks first (ATRIUM_YES=1 skips the question), then removes: the containers and their images, ATRIUM_DIR
+# (/opt/atrium: .env, the data, the files), /root/atrium-backups, the nightly backup service and timer, this installer's
+# copy (/root/atrium-install.sh) and log (/var/log/atrium-install.log), and what it changed for SSH: its key-only
+# drop-in (password login is back as it was) and the desktop app's key (the line with the comment atrium-app).
 # Docker and ufw stay. Nothing of it can be brought back, backups included.
-# More knobs, all optional: SERVER_NAME, TURN_HOST, GOMEX_DIR (/opt/gomex), GOMEX_NO_GUM=1 (plain prompts),
-# GOMEX_FIREWALL=0 and GOMEX_SSH=0 (leave ufw / sshd alone), GOMEX_TARBALL + GOMEX_TARBALL_SHA256 (a local or
-# mirrored release), GOMEX_REGISTRY + GOMEX_APP_DIGEST + GOMEX_CADDY_DIGEST (another image registry).
-# For the desktop app, which installs over SSH: GOMEX_AUTHORIZED_KEY (its public key, added for root, so password
-# login can go) and GOMEX_PROGRESS=1 (machine-readable "::gomex …" lines next to the usual output).
+# More knobs, all optional: SERVER_NAME, TURN_HOST, ATRIUM_DIR (/opt/atrium), ATRIUM_NO_GUM=1 (plain prompts),
+# ATRIUM_FIREWALL=0 and ATRIUM_SSH=0 (leave ufw / sshd alone), ATRIUM_TARBALL + ATRIUM_TARBALL_SHA256 (a local or
+# mirrored release), ATRIUM_REGISTRY + ATRIUM_APP_DIGEST + ATRIUM_CADDY_DIGEST (another image registry).
+# For the desktop app, which installs over SSH: ATRIUM_AUTHORIZED_KEY (its public key, added for root, so password
+# login can go) and ATRIUM_PROGRESS=1 (machine-readable "::atrium …" lines next to the usual output).
 #
 # This POSIX part only gets the program below onto bash with the terminal on stdin. Under `curl | sh` stdin is the
 # script itself, so no prompt could ever read an answer: the bash program is saved to a temporary file and run
 # from there. (It sits in a heredoc so sh never parses it; `deploy/release.sh lint` checks it with shellcheck.)
 set -eu
 umask 077
-GOMEX_TMP=$(mktemp -d "${TMPDIR:-/tmp}/gomex.XXXXXX")
-export GOMEX_TMP
-trap 'rm -rf "$GOMEX_TMP"' EXIT
+ATRIUM_TMP=$(mktemp -d "${TMPDIR:-/tmp}/atrium.XXXXXX")
+export ATRIUM_TMP
+trap 'rm -rf "$ATRIUM_TMP"' EXIT
 # Ctrl+C reaches the bash program too; wait for it to clean up and only then remove the folder.
 trap ':' INT TERM HUP
-cat > "$GOMEX_TMP/install.bash" <<'GOMEX_INSTALLER'
+cat > "$ATRIUM_TMP/install.bash" <<'ATRIUM_INSTALLER'
 #!/usr/bin/env bash
-# The Gomex installer itself; the POSIX wrapper above starts it. Screens: welcome → server check → domain →
+# The Atrium installer itself; the POSIX wrapper above starts it. Screens: welcome → server check → domain →
 # summary → install → link (the server's name is given in the browser setup). Pretty prompts with gum
 # (charmbracelet), fetched for this run only and checked against a pinned SHA-256; without gum or without a
 # terminal the same steps run on plain `read` prompts.
@@ -54,10 +54,10 @@ umask 022
 # == The release this installer puts on the server. deploy/release.sh rewrites these lines.
 RELEASE_VERSION=0.6.1-rc.2
 RELEASE_SHA256=52d0914ae63da6a6444e883685a3f55c39deb7f15b89ff2b963267404b4b02e6
-RELEASE_REPO=gomex-inc/gomex
+RELEASE_REPO=atriumchat/atrium
 # The npm package that mirrors each release's install.sh and tarball (deploy/release.sh publishes it).
-RELEASE_NPM=@gomex.llc/install
-RELEASE_REGISTRY=ghcr.io/gomex-inc
+RELEASE_NPM=@atriumchat/install
+RELEASE_REGISTRY=ghcr.io/atriumchat
 RELEASE_APP_DIGEST=sha256:68ad87c75d2b6bafced71423f0d3ffc00370690c5bb5492c98611399fed96691
 RELEASE_CADDY_DIGEST=sha256:000dec7938cd326dfe290cd91c34cf950260245e01b7e0f6a7e02453affc934b
 
@@ -66,14 +66,14 @@ GUM_VERSION=0.17.0
 GUM_SHA256_x86_64=69ee169bd6387331928864e94d47ed01ef649fbfe875baed1bbf27b5377a6fdb
 GUM_SHA256_arm64=b0b9ed95cbf7c8b7073f17b9591811f5c001e33c7cfd066ca83ce8a07c576f9c
 
-ACCENT_HEX='#ff3b3b'
+ACCENT_HEX='#ffffff'
 # Neutral names for the TURN relay's subdomain: "turn." is an easy thing to find and block, and a random pick
 # keeps installs from sharing that fingerprint.
 TURN_NAMES=(media static cdn files assets img edge content res storage dl s3)
 
-GOMEX_TMP=${GOMEX_TMP:-$(mktemp -d "${TMPDIR:-/tmp}/gomex.XXXXXX")}
-LOG=/var/log/gomex-install.log
-LOCK=/run/gomex-install.lock
+ATRIUM_TMP=${ATRIUM_TMP:-$(mktemp -d "${TMPDIR:-/tmp}/atrium.XXXXXX")}
+LOG=/var/log/atrium-install.log
+LOCK=/run/atrium-install.lock
 GUM=
 BG_PID=
 
@@ -84,9 +84,9 @@ TTY=0
 C_ACCENT='' C_BOLD='' C_DIM='' C_GREEN='' C_YELLOW='' C_RED='' C_RESET=''
 if (( TTY )) && [[ -z ${NO_COLOR:-} && ${TERM:-dumb} != dumb ]]; then
   if [[ ${COLORTERM:-} == *truecolor* || ${COLORTERM:-} == *24bit* ]]; then
-    C_ACCENT=$'\e[38;2;255;59;59m'
+    C_ACCENT=$'\e[38;2;255;255;255m'
   else
-    C_ACCENT=$'\e[38;5;203m'
+    C_ACCENT=$'\e[97m'
   fi
   C_BOLD=$'\e[1m' C_DIM=$'\e[2m' C_GREEN=$'\e[32m' C_YELLOW=$'\e[33m' C_RED=$'\e[31m' C_RESET=$'\e[0m'
 fi
@@ -118,15 +118,15 @@ bad() { line "${C_RED}✗${C_RESET} $*"; }
 bullet() { line "• $*"; }
 dim() { line "${C_DIM}$*${C_RESET}"; }
 log() { printf '%s %s\n' "$(date '+%F %T')" "$*" >>"$LOG" 2>/dev/null || true; }
-# For the desktop app (GOMEX_PROGRESS=1): "::gomex run|done|fail STEP [seconds|why]", "::gomex sub TEXT" (what the
-# running step is doing now), "::gomex ready URL".
-progress() { if [[ ${GOMEX_PROGRESS:-} == 1 ]]; then printf '::gomex %s\n' "$*"; fi; }
+# For the desktop app (ATRIUM_PROGRESS=1): "::atrium run|done|fail STEP [seconds|why]", "::atrium sub TEXT" (what the
+# running step is doing now), "::atrium ready URL".
+progress() { if [[ ${ATRIUM_PROGRESS:-} == 1 ]]; then printf '::atrium %s\n' "$*"; fi; }
 # What a step prints, into the log and on to the desktop app a line at a time (indented, so it is plain output next to
-# the "::gomex" lines, which go through as they are): the app shows the last one when a step takes long.
+# the "::atrium" lines, which go through as they are): the app shows the last one when a step takes long.
 relay_output() {
   local text
   while IFS= read -r text || [[ -n $text ]]; do
-    if [[ $text == '::gomex '* ]]; then
+    if [[ $text == '::atrium '* ]]; then
       printf '%s\n' "$text"
     else
       printf '%s\n' "$text" >>"$LOG"
@@ -163,7 +163,7 @@ cleanup() {
     bad "Установка прервалась на неожиданной ошибке."
     dim "Лог: $LOG"
   fi
-  [[ $GOMEX_TMP == */gomex.* ]] && rm -rf -- "$GOMEX_TMP"
+  [[ $ATRIUM_TMP == */atrium.* ]] && rm -rf -- "$ATRIUM_TMP"
   return "$rc"
 }
 interrupted() {
@@ -236,20 +236,20 @@ valid_name() {
 # ---------------------------------------------------------------------------------------------- the server
 
 detect_install() {
-  GOMEX_DIR=${GOMEX_DIR:-/opt/gomex}
-  ENV_FILE=$GOMEX_DIR/deploy/.env
+  ATRIUM_DIR=${ATRIUM_DIR:-/opt/atrium}
+  ENV_FILE=$ATRIUM_DIR/deploy/.env
   EXISTING=0
   if [[ -f $ENV_FILE ]]; then
     EXISTING=1
     OLD_DOMAIN=$(env_get "$ENV_FILE" DOMAIN)
-    OLD_VERSION=$(env_get "$ENV_FILE" GOMEX_VERSION)
+    OLD_VERSION=$(env_get "$ENV_FILE" ATRIUM_VERSION)
     DOMAIN=${DOMAIN:-$OLD_DOMAIN}
     SERVER_NAME=${SERVER_NAME:-$(env_get "$ENV_FILE" SERVER_NAME)}
     TURN_HOST=${TURN_HOST:-$(env_get "$ENV_FILE" TURN_HOST)}
     # Installs from before TURN_HOST existed keep their turn.DOMAIN: its DNS record is already there.
     TURN_HOST=${TURN_HOST:-turn}
   fi
-  SERVER_NAME=${SERVER_NAME:-Gomex}
+  SERVER_NAME=${SERVER_NAME:-Atrium}
   TURN_HOST=${TURN_HOST:-${TURN_NAMES[RANDOM % ${#TURN_NAMES[@]}]}}
 }
 
@@ -335,7 +335,7 @@ run_checks() {
   if (( ${#busy[@]} == 0 )); then
     check_add ok "Порты 80 и 443 свободны"
   elif (( EXISTING )); then
-    check_add ok "Порты 80 и 443: уже Gomex"
+    check_add ok "Порты 80 и 443: уже Atrium"
   else
     check_add bad "Порты заняты: ${busy[*]}"
   fi
@@ -363,7 +363,7 @@ run_checks() {
   fi
 
   SSH_PLAN=keys
-  if [[ ${GOMEX_SSH:-1} == 0 ]]; then
+  if [[ ${ATRIUM_SSH:-1} == 0 ]]; then
     SSH_PLAN=off
   elif ! command -v sshd >/dev/null; then
     SSH_PLAN=none
@@ -400,12 +400,12 @@ first_bad_check() {
   done
 }
 
-# GOMEX_AUTHORIZED_KEY: the desktop app's own SSH key, for root. With a key in place the install switches password
+# ATRIUM_AUTHORIZED_KEY: the desktop app's own SSH key, for root. With a key in place the install switches password
 # login off (step_ssh), and the app keeps coming in with its key for updates.
 add_app_key() {
-  local key=${GOMEX_AUTHORIZED_KEY:-}
+  local key=${ATRIUM_AUTHORIZED_KEY:-}
   [[ -n $key ]] || return 0
-  [[ $key =~ ^ssh-ed25519\ [A-Za-z0-9+/]+=*(\ [A-Za-z0-9@._-]+)?$ ]] || die "GOMEX_AUTHORIZED_KEY: это не ключ ssh-ed25519"
+  [[ $key =~ ^ssh-ed25519\ [A-Za-z0-9+/]+=*(\ [A-Za-z0-9@._-]+)?$ ]] || die "ATRIUM_AUTHORIZED_KEY: это не ключ ssh-ed25519"
   progress sub "Ключ приложения для входа"
   mkdir -p /root/.ssh
   chmod 700 /root/.ssh
@@ -418,7 +418,7 @@ add_app_key() {
 # The desktop app sets the address up just before it installs (a free name on dedyn.io, or the person's own
 # records), so the installer waits for the names to answer here: the certificates can then come at once.
 wait_dns() {
-  [[ ${GOMEX_PROGRESS:-} == 1 ]] || return 0
+  [[ ${ATRIUM_PROGRESS:-} == 1 ]] || return 0
   local i
   progress run address
   for i in $(seq 1 60); do
@@ -483,7 +483,7 @@ print_dns() {
 # ---------------------------------------------------------------------------------------------- prompts
 
 get_gum() {
-  (( TTY )) && [[ ${GOMEX_NO_GUM:-} != 1 && ${TERM:-dumb} != dumb ]] || return 1
+  (( TTY )) && [[ ${ATRIUM_NO_GUM:-} != 1 && ${TERM:-dumb} != dumb ]] || return 1
   local arch sum name
   case $(uname -m) in
     x86_64 | amd64) arch=x86_64 sum=$GUM_SHA256_x86_64 ;;
@@ -491,11 +491,11 @@ get_gum() {
     *) return 1 ;;
   esac
   name=gum_${GUM_VERSION}_Linux_$arch
-  fetch "https://github.com/charmbracelet/gum/releases/download/v$GUM_VERSION/$name.tar.gz" "$GOMEX_TMP/gum.tgz" 30 || return 1
-  sha256_ok "$GOMEX_TMP/gum.tgz" "$sum" || { log "gum: SHA-256 mismatch"; return 1; }
-  tar -xzf "$GOMEX_TMP/gum.tgz" -C "$GOMEX_TMP" "$name/gum" 2>/dev/null || return 1
-  "$GOMEX_TMP/$name/gum" --version >/dev/null 2>&1 || return 1
-  GUM=$GOMEX_TMP/$name/gum
+  fetch "https://github.com/charmbracelet/gum/releases/download/v$GUM_VERSION/$name.tar.gz" "$ATRIUM_TMP/gum.tgz" 30 || return 1
+  sha256_ok "$ATRIUM_TMP/gum.tgz" "$sum" || { log "gum: SHA-256 mismatch"; return 1; }
+  tar -xzf "$ATRIUM_TMP/gum.tgz" -C "$ATRIUM_TMP" "$name/gum" 2>/dev/null || return 1
+  "$ATRIUM_TMP/$name/gum" --version >/dev/null 2>&1 || return 1
+  GUM=$ATRIUM_TMP/$name/gum
   log "gum $GUM_VERSION ($arch) ready"
 }
 
@@ -570,41 +570,25 @@ spin() {
 
 # ---------------------------------------------------------------------------------------------- screens
 
-# The ANSI-art logo, 58 columns, in the basic 16 colours (red and bright red, a light background at the top for
-# the highlight, red below), so it looks the same in every colour terminal. Printed with printf %b, which turns
-# each \033 into an escape.
-LOGO_ANSI=$(cat <<'EOF'
-    \033[0;37m▄▄\033[0;91;47m░░░░\033[0;37m▄▄▄\033[0m     \033[0;37m▄▄▄▄▄\033[0m  \033[0;91;47m░░\033[0;37m▄▄\033[0m     \033[0;37m▐\033[0;91;47m░\033[0;37m▄\033[0m   \033[0;91;47m░░░░\033[0;37m▄▄▄\033[0;91;47m░░\033[0;37m▄\033[0m    \033[0;37m▄\033[0;91;47m░░\033[0;37m▀
-  \033[0;37m▄\033[0;91;47m▒▒▒▒▒▒▒▒▒▒\033[0;37m▀\033[0m  \033[0;37m▄\033[0;91;47m▒▒▒▒▒▒▒\033[0;91m▄\033[0;37m▐\033[0;91;47m▒▒▒▒\033[0m    \033[0;91;47m▒▒▒▒\033[0m  \033[0;91;47m▒▒▒▒▒▒▒\033[0m \033[0;91;47m▒▒\033[0;37m▌\033[0m  \033[0;37m▐\033[0;91;47m▒▒\033[0;37m▌\033[0m
- \033[0;91m▐\033[0;91;47m▓▓▓▓\033[0;91m▀\033[0m  \033[0;91m▀\033[0;91;47m▓\033[0;91m▀\033[0m   \033[0;91;47m▓▓▓\033[0;91m▀\033[0m   \033[0;91m▀\033[0;91;47m▓▓\033[0m \033[0;91;47m▓▓▓▓▓\033[0m  \033[0;91m▐\033[0;91;47m▓▓▓▓\033[0;91m▌\033[0m \033[0;91;47m▓▓\033[0m \033[0;91m▀▀\033[0;91;47m▓▓\033[0m \033[0;91m▐\033[0;91;47m▓▓\033[0m \033[0;91m▄\033[0;91;47m▓▓\033[0;91m▀\033[0m
- \033[0;91m████\033[0m         \033[0;91m▐█\033[0;91;41m█\033[0m      \033[0;91m▐\033[0;91;41m█\033[0m \033[0;91m▐\033[0;91;41m████\033[0;91m▌▄██▌█\033[0;91;41m██\033[0;91m▐\033[0;91;41m███\033[0;91m▄\033[0m  \033[0;91m▄\033[0m  \033[0;91m▀\033[0;91;41m█\033[0;91m███▀\033[0m
-\033[0;91m▐\033[0;91;41m▓▓▓\033[0;91m▌\033[0m \033[0;91m▄\033[0;91;41m▓▓▓▓▓\033[0;91m▄\033[0m \033[0;91m▐\033[0;91;41m▓\033[0;91m▌\033[0m      \033[0;91;41m▓▓\033[0m \033[0;91;41m▓▓▓\033[0;91m▀\033[0;91;41m▓▓▓▓\033[0;91m▀\033[0m \033[0;91;41m▓▓\033[0;91m▌\033[0m \033[0;91;41m▓▓\033[0;91m▀\033[0m \033[0;91m▄\033[0;91;41m▓▓\033[0m  \033[0;91;41m▓▓▓\033[0;91m▀\033[0;91;41m▓▓\033[0;91m▄\033[0m
-\033[0;91m▐\033[0;91;41m▒▒▒▒\033[0;31m▄▀▀▀▀\033[0;91;41m▒▒▒\033[0;31m▌\033[0m \033[0;91;41m▒▒\033[0;31m▄\033[0m   \033[0;31m▄\033[0;91;41m▒▒\033[0m \033[0;31m▐\033[0;91;41m▒▒▒\033[0m \033[0;31m▐\033[0;91;41m▒\033[0;31m▀\033[0m  \033[0;31m▐\033[0;91;41m▒▒\033[0m  \033[0;91;41m▒▒\033[0;31m▄\033[0;91;41m▒▒\033[0;31m▀\033[0m  \033[0;31m▐\033[0;91;41m▒▒\033[0;31m▌\033[0m \033[0;91;41m▒▒▒\033[0;31m▌\033[0m
- \033[0;91;41m░░░░░░░░░░░░\033[0m   \033[0;31m▀\033[0;91;41m░░░░░\033[0;31m▀\033[0m   \033[0;31m▀\033[0;91;41m░░\033[0m     \033[0;31m▐\033[0;91;41m░░\033[0;31m▌\033[0m  \033[0;91;41m░░░\033[0;31m▀\033[0m    \033[0;31m█\033[0;91;41m░░\033[0m  \033[0;31m▐\033[0;91;41m░░\033[0;31m█\033[0m
-  \033[0;31m▀\033[0;91;41m        \033[0;31m▀\033[0m                \033[0;31m▀\033[0m     \033[0;31m▀█▀\033[0m   \033[0;31m█▀\033[0m      \033[0;31m▀\033[0;91;41m \033[0;31m▀\033[0m   \033[0;31m▀\033[0;91;41m  \033[0;31m▀
-EOF
-)
-
-# One colour, for NO_COLOR: the ANSI one is shading and backgrounds, a smudge without colour.
+# The logo, 70 columns of half blocks traced from the mark and wordmark (logo-atrium/atrium-logo-short.svg): white
+# on the terminal's own background, black and white like the brand.
 LOGO=$(cat <<'EOF'
-   ▄██████▄
- ▄██▀    ▀██▄                                                 ™
- ██▀       ▀   ▄██▀▀▀██▄  ████████▄████▄   ▄██▀▀█▄   ██▄  ██▀
- ██    ██████  ██     ██  ███   ██▀   ██  ██▀    ██   ▀████▀
- ██▄      ███  ██     ██  ███   ██    ██  ███▀▀▀▀▀▀    ███▄
- ▀██▄▄   ▄███  ██▄   ▄██  ███   ██    ██  ▀██   ▄██  ▄██▀▀██
-   ▀▀████▀ ▀▀   ▀▀████▀   ▀█▀   ██    ██   ▀▀████▀  ██▀   ▀██
+      ████▄                    ▄▄          ██
+     ██████▄                   ██▄
+    ████████         ▄██████  █████ ██████ ██  ██    ██  ████████████
+   ███    ▀██        ▀▀   ███  ██   ███▀   ██  ██    ██  ██   ██▀  ███
+  ▄██      ███       ▄███▀███  ██   ███    ██  ██    ██  ██   ██   ███
+ ▄███      ████      ██   ▄██  ██▄  ███    ██  ██▄  ▄██  ██   ██   ███
+ ████      █████     ▀████▀██   ▀██ ███    ██  ▀▀████▀   ██   ██   ███
 EOF
 )
 
 print_logo() {
   say
-  if [[ -n $C_RESET ]] && (( COLS >= 60 )); then
-    while IFS= read -r l; do printf ' %b\e[0m\n' "$l"; done <<<"$LOGO_ANSI"
-  elif (( COLS >= 66 )); then
+  if (( COLS >= 72 )); then
     while IFS= read -r l; do say " ${C_ACCENT}${l}${C_RESET}"; done <<<"$LOGO"
   else
-    line "${C_ACCENT}${C_BOLD}G O M E X${C_RESET}"
+    line "${C_ACCENT}${C_BOLD}A T R I U M${C_RESET}"
   fi
   say
 }
@@ -615,7 +599,7 @@ header() {
   local i out=''
   clear_screen
   say
-  line "${C_ACCENT}${C_BOLD}Gomex${C_RESET} ${C_DIM}$RELEASE_VERSION${C_RESET}"
+  line "${C_ACCENT}${C_BOLD}Atrium${C_RESET} ${C_DIM}$RELEASE_VERSION${C_RESET}"
   for i in "${!STEPS[@]}"; do
     (( i > 0 )) && out+="${C_DIM} › ${C_RESET}"
     if (( i + 1 == $1 )); then
@@ -639,7 +623,7 @@ screen_welcome() {
   clear_screen
   print_logo
   line "${C_BOLD}Чат и звонки для своих${C_RESET}"
-  dim "Gomex $RELEASE_VERSION · установка на этот сервер"
+  dim "Atrium $RELEASE_VERSION · установка на этот сервер"
   say
   if (( EXISTING )); then
     line "Уже стоит: ${C_BOLD}${OLD_DOMAIN:-?}${C_RESET} ${C_DIM}${OLD_VERSION:+· $OLD_VERSION}${C_RESET}"
@@ -662,7 +646,7 @@ screen_checks() {
   title "Проверка сервера"
   if [[ -z ${SERVER_IP:-} ]]; then
     spin "Проверяем сервер" detect_ip_to_file || true
-    SERVER_IP=$(cat "$GOMEX_TMP/ip" 2>/dev/null || true)
+    SERVER_IP=$(cat "$ATRIUM_TMP/ip" 2>/dev/null || true)
   fi
   run_checks
   print_checks
@@ -676,14 +660,14 @@ screen_checks() {
   choose "Дальше" "Проверить снова" || return 1
   (( CHOICE == 0 )) || return 3
 }
-detect_ip_to_file() { detect_ip >"$GOMEX_TMP/ip"; }
+detect_ip_to_file() { detect_ip >"$ATRIUM_TMP/ip"; }
 
 screen_domain() {
   local err=''
   while :; do
     header 2
     title "Домен"
-    dim "Адрес, по которому друзья откроют Gomex. Например: chat.example.com"
+    dim "Адрес, по которому друзья откроют Atrium. Например: chat.example.com"
     say
     [[ -n $err ]] && { bad "$err"; say; }
     ask "Домен" "${DOMAIN:-}" "chat.example.com" || return 1
@@ -705,7 +689,7 @@ screen_dns() {
     title "DNS · $DOMAIN"
     spin "Проверяем DNS" check_dns_to_file || true
     # shellcheck source=/dev/null
-    . "$GOMEX_TMP/dns"
+    . "$ATRIUM_TMP/dns"
     if (( DNS_OK )); then
       ok "Все три имени ведут на этот сервер"
       sleep 1
@@ -722,17 +706,17 @@ screen_dns() {
   done
 }
 # Sourced inside a function: -g, or the results would be that function's locals.
-check_dns_to_file() { check_dns; declare -p DNS_ROWS DNS_OK | sed 's/^declare /declare -g /' >"$GOMEX_TMP/dns"; }
+check_dns_to_file() { check_dns; declare -p DNS_ROWS DNS_OK | sed 's/^declare /declare -g /' >"$ATRIUM_TMP/dns"; }
 
 plan_lines() {
   if (( DOCKER_OK )); then ok "Docker уже есть"; else bullet "Docker"; fi
-  if [[ ${GOMEX_FIREWALL:-1} != 0 ]]; then bullet "Файрвол: 22, 80, 443, 7881, 50000–60000"; fi
+  if [[ ${ATRIUM_FIREWALL:-1} != 0 ]]; then bullet "Файрвол: 22, 80, 443, 7881, 50000–60000"; fi
   case $SSH_PLAN in
     keys) bullet "SSH только по ключу" ;;
     nokey) warn "SSH: пароль остаётся, ключа нет" ;;
   esac
   [[ -d /run/systemd/system ]] && bullet "Ночные бэкапы"
-  bullet "Gomex $RELEASE_VERSION в $GOMEX_DIR"
+  bullet "Atrium $RELEASE_VERSION в $ATRIUM_DIR"
 }
 
 screen_summary() {
@@ -758,10 +742,10 @@ step_docker() {
   command -v curl >/dev/null || apt_install curl ca-certificates || return
   if ! command -v docker >/dev/null; then
     progress sub "Скачиваем установщик Docker"
-    fetch https://get.docker.com "$GOMEX_TMP/get-docker.sh" 60 || return
+    fetch https://get.docker.com "$ATRIUM_TMP/get-docker.sh" 60 || return
     progress sub "Ставим пакеты Docker"
     # Without systemd it starts dockerd itself, which must not inherit the lock (main) and hold it for good.
-    sh "$GOMEX_TMP/get-docker.sh" 9>&- || return
+    sh "$ATRIUM_TMP/get-docker.sh" 9>&- || return
   fi
   progress sub "Запускаем Docker"
   systemctl enable --now docker 2>/dev/null || true
@@ -794,10 +778,10 @@ step_firewall() {
 # Key-only login. Only reached when authorized_keys holds a key (run_checks), so nobody gets locked out.
 # Its own file in sshd_config.d: no other file's settings get overwritten.
 step_ssh() {
-  local conf=/etc/ssh/sshd_config.d/00-gomex-key-only.conf
+  local conf=/etc/ssh/sshd_config.d/00-atrium-key-only.conf
   progress sub "Выключаем вход по паролю"
   mkdir -p /run/sshd || return
-  printf '%s\n' '# Written by the Gomex installer: log in with an SSH key only.' \
+  printf '%s\n' '# Written by the Atrium installer: log in with an SSH key only.' \
     'PasswordAuthentication no' 'KbdInteractiveAuthentication no' 'PermitRootLogin prohibit-password' >"$conf" || return
   progress sub "Проверяем настройки sshd"
   if ! sshd -t; then
@@ -809,14 +793,14 @@ step_ssh() {
 }
 
 step_files() {
-  local tgz=$GOMEX_TMP/gomex.tar.gz stage=$GOMEX_TMP/release f src got=0
+  local tgz=$ATRIUM_TMP/atrium.tar.gz stage=$ATRIUM_TMP/release f src got=0
   if [[ -f $TARBALL_SRC ]]; then
     cp "$TARBALL_SRC" "$tgz" || return
     sha256_ok "$tgz" "$TARBALL_SHA256" && got=1
   else
     # The first source that gives the pinned bytes; a mirror can't slip anything else in.
     for src in "$TARBALL_SRC" ${TARBALL_MIRRORS[@]+"${TARBALL_MIRRORS[@]}"}; do
-      progress sub "Скачиваем Gomex $RELEASE_VERSION"
+      progress sub "Скачиваем Atrium $RELEASE_VERSION"
       echo "Tarball from $src"
       if fetch "$src" "$tgz" 300 && sha256_ok "$tgz" "$TARBALL_SHA256"; then got=1; break; fi
       echo "Not usable: $src"
@@ -829,13 +813,13 @@ step_files() {
   for f in deploy/docker-compose.yml deploy/Caddyfile deploy/backup.sh deploy/livekit.yaml.tmpl; do
     [[ -f $stage/$f ]] || { echo "Release has no $f"; return 1; }
   done
-  mkdir -p "$GOMEX_DIR/deploy" "$GOMEX_DIR/landing" || return
+  mkdir -p "$ATRIUM_DIR/deploy" "$ATRIUM_DIR/landing" || return
   # Caddy reads the Caddyfile once: an update that changes it needs Caddy recreated (step_up).
-  if [[ -f $GOMEX_DIR/deploy/Caddyfile ]] && ! cmp -s "$stage/deploy/Caddyfile" "$GOMEX_DIR/deploy/Caddyfile"; then
-    touch "$GOMEX_TMP/caddyfile-changed" || return
+  if [[ -f $ATRIUM_DIR/deploy/Caddyfile ]] && ! cmp -s "$stage/deploy/Caddyfile" "$ATRIUM_DIR/deploy/Caddyfile"; then
+    touch "$ATRIUM_TMP/caddyfile-changed" || return
   fi
-  install -m 644 "$stage/deploy/docker-compose.yml" "$stage/deploy/Caddyfile" "$stage/deploy/livekit.yaml.tmpl" "$GOMEX_DIR/deploy/" || return
-  install -m 755 "$stage/deploy/backup.sh" "$GOMEX_DIR/deploy/" || return
+  install -m 644 "$stage/deploy/docker-compose.yml" "$stage/deploy/Caddyfile" "$stage/deploy/livekit.yaml.tmpl" "$ATRIUM_DIR/deploy/" || return
+  install -m 755 "$stage/deploy/backup.sh" "$ATRIUM_DIR/deploy/" || return
   return 0
 }
 
@@ -888,11 +872,11 @@ app_server_name() {
 }
 
 # write_landing SEED: a seed install's cover page, the server's name and a way into the app. It shares nothing with
-# other installs (no Gomex brand, no common files, no scripts): one HTML file whose colours, layout, type, wording
+# other installs (no Atrium brand, no common files, no scripts): one HTML file whose colours, layout, type, wording
 # and icon come from SEED (LANDING_SEED in .env, so an update keeps the look) and class names that are random.
 write_landing() {
   local n=$1 hue dark layout font weight track radius label shape name
-  local bg fg line accent ink icon w t b layout_css dir=$GOMEX_TMP/landing
+  local bg fg line accent ink icon w t b layout_css dir=$ATRIUM_TMP/landing
   hue=$((n % 360)) n=$((n / 360))
   dark=$((n % 2)) n=$((n / 2))
   layout=$((n % 3)) n=$((n / 3))
@@ -920,7 +904,7 @@ write_landing() {
 
   # The name people gave the server in the browser setup; the domain while it's still the default one.
   name=$(app_server_name)
-  [[ -n $name && ${name,,} != gomex ]] || name=$DOMAIN
+  [[ -n $name && ${name,,} != atrium ]] || name=$DOMAIN
   name=${name//&/&amp;} name=${name//</&lt;} name=${name//>/&gt;} name=${name//\"/&quot;} name=${name//\'/&#39;}
 
   w=$(css_name) t=$(css_name) b=$(css_name)
@@ -969,11 +953,11 @@ $layout_css
 </body>
 </html>
 EOF
-  replace_dir "$dir" "$GOMEX_DIR/landing/site"
+  replace_dir "$dir" "$ATRIUM_DIR/landing/site"
 }
 
 step_config() {
-  cd "$GOMEX_DIR/deploy" || return
+  cd "$ATRIUM_DIR/deploy" || return
   progress sub "Секреты и настройки"
   if [[ ! -f .env ]]; then
     (umask 077 && cat >.env <<EOF
@@ -993,10 +977,10 @@ EOF
   env_set .env TURN_HOST "$TURN_HOST" || return
   if [[ ${NAME_SET:-0} == 1 ]]; then env_set .env SERVER_NAME "'$SERVER_NAME'" || return; fi
   # Which images run: this release's, pinned by digest.
-  env_set .env GOMEX_REGISTRY "$REGISTRY" || return
-  env_set .env GOMEX_VERSION "$RELEASE_VERSION" || return
-  env_set .env GOMEX_APP_DIGEST "$APP_DIGEST" || return
-  env_set .env GOMEX_CADDY_DIGEST "$CADDY_DIGEST" || return
+  env_set .env ATRIUM_REGISTRY "$REGISTRY" || return
+  env_set .env ATRIUM_VERSION "$RELEASE_VERSION" || return
+  env_set .env ATRIUM_APP_DIGEST "$APP_DIGEST" || return
+  env_set .env ATRIUM_CADDY_DIGEST "$CADDY_DIGEST" || return
 
   # LiveKit's config comes from .env, so its keys always match the app's.
   local s key
@@ -1006,7 +990,7 @@ EOF
     s=${s//"{{$key}}"/$(env_get .env "$key")}
   done
   [[ $s != *'{{'* ]] || { echo "livekit.yaml.tmpl: unknown placeholder"; return 1; }
-  if [[ -f livekit.yaml ]] && [[ $(<livekit.yaml) != "$s" ]]; then touch "$GOMEX_TMP/livekit-changed" || return; fi
+  if [[ -f livekit.yaml ]] && [[ $(<livekit.yaml) != "$s" ]]; then touch "$ATRIUM_TMP/livekit-changed" || return; fi
   (umask 077 && printf '%s\n' "$s" >livekit.yaml) || return
 
   mkdir -p data caddy-data caddy-config sites routes/app || return
@@ -1020,22 +1004,22 @@ EOF
   fi
 }
 
-# Nightly backup at 04:30 server time, a systemd timer (a fresh server may have no cron). Log: journalctl -u gomex-backup
+# Nightly backup at 04:30 server time, a systemd timer (a fresh server may have no cron). Log: journalctl -u atrium-backup
 step_backups() {
   command -v rsync >/dev/null || apt_install rsync || return
   command -v flock >/dev/null || apt_install util-linux || return
   progress sub "Служба и таймер на 04:30"
-  cat >/etc/systemd/system/gomex-backup.service <<EOF || return
+  cat >/etc/systemd/system/atrium-backup.service <<EOF || return
 [Unit]
-Description=Gomex nightly backup
+Description=Atrium nightly backup
 
 [Service]
 Type=oneshot
-ExecStart=$GOMEX_DIR/deploy/backup.sh
+ExecStart=$ATRIUM_DIR/deploy/backup.sh
 EOF
-  cat >/etc/systemd/system/gomex-backup.timer <<'EOF' || return
+  cat >/etc/systemd/system/atrium-backup.timer <<'EOF' || return
 [Unit]
-Description=Gomex nightly backup at 04:30
+Description=Atrium nightly backup at 04:30
 
 [Timer]
 OnCalendar=*-*-* 04:30:00
@@ -1045,24 +1029,24 @@ Persistent=true
 WantedBy=timers.target
 EOF
   systemctl daemon-reload || return
-  systemctl enable --now gomex-backup.timer
+  systemctl enable --now atrium-backup.timer
 }
 
 step_pull() {
-  cd "$GOMEX_DIR/deploy" || return
+  cd "$ATRIUM_DIR/deploy" || return
   progress sub "Образы приложения, звонков и веб-сервера"
   # The desktop app shows the last line of this; the plain installer keeps it quiet.
-  if [[ ${GOMEX_PROGRESS:-} == 1 ]]; then docker compose pull; else docker compose pull --quiet; fi
+  if [[ ${ATRIUM_PROGRESS:-} == 1 ]]; then docker compose pull; else docker compose pull --quiet; fi
 }
 
 step_up() {
-  cd "$GOMEX_DIR/deploy" || return
+  cd "$ATRIUM_DIR/deploy" || return
   progress sub "Запускаем контейнеры"
   docker compose up -d --remove-orphans || return
   # Bind-mounted single files: an update swaps in new files the running containers never see.
-  if [[ -f $GOMEX_TMP/caddyfile-changed ]]; then docker compose up -d --force-recreate --no-deps caddy || return; fi
+  if [[ -f $ATRIUM_TMP/caddyfile-changed ]]; then docker compose up -d --force-recreate --no-deps caddy || return; fi
   # Restarting LiveKit drops calls in progress, so only when its config changed.
-  if [[ -f $GOMEX_TMP/livekit-changed ]]; then docker compose up -d --force-recreate --no-deps livekit || return; fi
+  if [[ -f $ATRIUM_TMP/livekit-changed ]]; then docker compose up -d --force-recreate --no-deps livekit || return; fi
   local i
   progress sub "Ждём ответ приложения"
   for i in $(seq 1 90); do
@@ -1073,7 +1057,7 @@ step_up() {
   # Once the app answers: the cover page carries the name it has. A site of one's own in landing/site, marked by a
   # file named .custom there, stays as it is.
   progress sub "Пишем обложку сайта"
-  [[ -e $GOMEX_DIR/landing/site/.custom ]] || write_landing "$(env_get .env LANDING_SEED)" || return
+  [[ -e $ATRIUM_DIR/landing/site/.custom ]] || write_landing "$(env_get .env LANDING_SEED)" || return
   # Images of earlier releases.
   docker image prune -f
 }
@@ -1096,7 +1080,7 @@ run() {
   start=$SECONDS
   if (( TTY )); then
     spin "$title" "$fn" || rc=$?
-  elif [[ ${GOMEX_PROGRESS:-} == 1 ]]; then
+  elif [[ ${ATRIUM_PROGRESS:-} == 1 ]]; then
     # The log as always, and the output on to the desktop app, which shows its last line when a step takes long.
     line "… $title"
     "$fn" 2>&1 | relay_output || rc=$?
@@ -1125,14 +1109,14 @@ run() {
 install_all() {
   [[ -n ${WIZARD:-} ]] || say
   if (( DOCKER_OK )); then ok "Docker уже есть"; progress "done" docker 0; else run "Docker" step_docker; fi
-  if [[ ${GOMEX_FIREWALL:-1} != 0 ]]; then run "Файрвол" step_firewall; fi
+  if [[ ${ATRIUM_FIREWALL:-1} != 0 ]]; then run "Файрвол" step_firewall; fi
   case $SSH_PLAN in
     keys) run "SSH только по ключу" step_ssh ;;
     nokey) warn "SSH: пароль остаётся, ключа нет"; progress "done" ssh 0 ;;
     noinclude) warn "SSH: не трогаем, старый sshd без sshd_config.d"; progress "done" ssh 0 ;;
     *) progress "done" ssh 0 ;;
   esac
-  run "Файлы Gomex $RELEASE_VERSION" step_files
+  run "Файлы Atrium $RELEASE_VERSION" step_files
   run "Настройки и ключи" step_config
   if [[ -d /run/systemd/system ]]; then run "Ночные бэкапы" step_backups; fi
   run "Скачиваем образы" step_pull
@@ -1153,7 +1137,7 @@ screen_done() {
     next="Открой ссылку: создашь админа и позовёшь друзей."
   else
     url="https://app.$DOMAIN"
-    next="Gomex $RELEASE_VERSION работает."
+    next="Atrium $RELEASE_VERSION работает."
   fi
   say
   if [[ -n $GUM ]]; then
@@ -1180,7 +1164,7 @@ screen_done() {
 
 # `link`: the setup link again, for an owner who lost it or opened the address without it.
 show_link() {
-  (( EXISTING )) || die "Gomex здесь ещё не стоит"
+  (( EXISTING )) || die "Atrium здесь ещё не стоит"
   [[ -n $DOMAIN ]] || die "В $ENV_FILE нет DOMAIN"
   local needed code
   needed=$(curl -fsS --max-time 5 http://127.0.0.1:8000/api/setup 2>/dev/null) || die "Сервер не отвечает"
@@ -1195,14 +1179,14 @@ show_link() {
 
 # ---------------------------------------------------------------------------------------------- restore
 
-BACKUPS=/root/gomex-backups/daily
+BACKUPS=/root/atrium-backups/daily
 
 # `restore`: the data of a nightly backup back in place (a channel's history lost, a server that broke). What was there
 # is kept first as pre-restore-<time>, so a wrong choice can be undone with the same command.
 restore_all() {
   (( EUID == 0 )) || die "Нужен root: sudo sh install.sh restore"
-  (( EXISTING )) || die "Gomex здесь ещё не стоит: сначала установи, потом restore"
-  local data=$GOMEX_DIR/deploy/data names=() name pick="${GOMEX_RESTORE:-}" size
+  (( EXISTING )) || die "Atrium здесь ещё не стоит: сначала установи, потом restore"
+  local data=$ATRIUM_DIR/deploy/data names=() name pick="${ATRIUM_RESTORE:-}" size
   [[ -d $BACKUPS ]] || die "Бэкапов нет: $BACKUPS"
   # Newest first; only folders that hold a database count.
   while IFS= read -r name; do
@@ -1210,10 +1194,10 @@ restore_all() {
   done < <(find "$BACKUPS" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -r)
   (( ${#names[@]} )) || die "В $BACKUPS нет ни одной копии"
 
-  if [[ ${GOMEX_YES:-} == 1 ]]; then
-    [[ -n $pick ]] || die "Без вопросов: GOMEX_YES=1 GOMEX_RESTORE=<копия> sh install.sh restore. Копии: ${names[*]}"
+  if [[ ${ATRIUM_YES:-} == 1 ]]; then
+    [[ -n $pick ]] || die "Без вопросов: ATRIUM_YES=1 ATRIUM_RESTORE=<копия> sh install.sh restore. Копии: ${names[*]}"
   else
-    (( TTY )) || die "Нет терминала. Без вопросов: GOMEX_YES=1 GOMEX_RESTORE=<копия> sh install.sh restore"
+    (( TTY )) || die "Нет терминала. Без вопросов: ATRIUM_YES=1 ATRIUM_RESTORE=<копия> sh install.sh restore"
   fi
   if [[ -z $pick ]]; then
     say
@@ -1236,7 +1220,7 @@ restore_all() {
   # A name from the list only: no paths.
   [[ $pick != */* && $pick != .* && -f $BACKUPS/$pick/hangout.db ]] || die "Нет такой копии: $pick"
 
-  cd "$GOMEX_DIR/deploy"
+  cd "$ATRIUM_DIR/deploy"
   local saved
   saved=pre-restore-$(date +%F_%H%M%S)
   docker compose stop app >>"$LOG" 2>&1 || die "Не остановить приложение. Смотри лог."
@@ -1281,69 +1265,69 @@ restore_all() {
 
 # ---------------------------------------------------------------------------------------------- uninstall
 
-# `uninstall`: Gomex off this server, back to what it was before the installer (Docker and ufw stay).
+# `uninstall`: Atrium off this server, back to what it was before the installer (Docker and ufw stay).
 uninstall_all() {
   (( EUID == 0 )) || die "Нужен root: sudo sh install.sh uninstall"
-  [[ $GOMEX_DIR == /?* && $GOMEX_DIR != *..* ]] || die "GOMEX_DIR: нужен полный путь, например /opt/gomex"
-  case ${GOMEX_DIR%/} in
+  [[ $ATRIUM_DIR == /?* && $ATRIUM_DIR != *..* ]] || die "ATRIUM_DIR: нужен полный путь, например /opt/atrium"
+  case ${ATRIUM_DIR%/} in
     /bin | /boot | /dev | /etc | /home | /lib | /lib64 | /mnt | /opt | /proc | /root | /run | /sbin | /srv | /sys | /tmp | /usr | /var)
-      die "GOMEX_DIR: $GOMEX_DIR — системная папка, не Gomex" ;;
+      die "ATRIUM_DIR: $ATRIUM_DIR — системная папка, не Atrium" ;;
   esac
-  # The folder is deleted whole, so it must be Gomex's: it has the compose file the installer puts there.
-  [[ ! -e $GOMEX_DIR || -f $GOMEX_DIR/deploy/docker-compose.yml ]] || die "В $GOMEX_DIR нет Gomex: ничего не трогаю"
+  # The folder is deleted whole, so it must be Atrium's: it has the compose file the installer puts there.
+  [[ ! -e $ATRIUM_DIR || -f $ATRIUM_DIR/deploy/docker-compose.yml ]] || die "В $ATRIUM_DIR нет Atrium: ничего не трогаю"
 
-  [[ ${GOMEX_YES:-} == 1 ]] || (( TTY )) || die "Нет терминала. Без вопросов: GOMEX_YES=1 sh install.sh uninstall"
+  [[ ${ATRIUM_YES:-} == 1 ]] || (( TTY )) || die "Нет терминала. Без вопросов: ATRIUM_YES=1 sh install.sh uninstall"
 
   say
-  title "Удалить Gomex с этого сервера?"
-  bullet "Контейнеры и образы Gomex"
-  bullet "Папка $GOMEX_DIR: настройки, переписка, файлы"
-  bullet "Бэкапы в /root/gomex-backups и ночной таймер"
+  title "Удалить Atrium с этого сервера?"
+  bullet "Контейнеры и образы Atrium"
+  bullet "Папка $ATRIUM_DIR: настройки, переписка, файлы"
+  bullet "Бэкапы в /root/atrium-backups и ночной таймер"
   bullet "Установщик в /root и его лог"
   bullet "Вход по паролю: как было до установки"
   say
   dim "Docker и файрвол останутся. Вернуть удалённое нельзя, бэкапы тоже."
   say
-  if [[ ${GOMEX_YES:-} != 1 ]]; then
+  if [[ ${ATRIUM_YES:-} != 1 ]]; then
     ESC_MEANS=выход
-    choose "Отмена" "Удалить Gomex" || exit 0
+    choose "Отмена" "Удалить Atrium" || exit 0
     if (( CHOICE != 1 )); then dim "Ничего не удалено."; exit 0; fi
     say
   fi
 
   # The stack first, while its folder and .env are still there.
-  if [[ -f $GOMEX_DIR/deploy/docker-compose.yml ]] && command -v docker >/dev/null; then
-    (cd "$GOMEX_DIR/deploy" && docker compose down --rmi all --volumes --remove-orphans) >>"$LOG" 2>&1 ||
+  if [[ -f $ATRIUM_DIR/deploy/docker-compose.yml ]] && command -v docker >/dev/null; then
+    (cd "$ATRIUM_DIR/deploy" && docker compose down --rmi all --volumes --remove-orphans) >>"$LOG" 2>&1 ||
       die "Не остановить контейнеры. Смотри лог и запусти снова."
     ok "Контейнеры и образы"
   fi
   if [[ -d /run/systemd/system ]]; then
-    systemctl disable --now gomex-backup.timer >/dev/null 2>&1 || true
-    systemctl stop gomex-backup.service >/dev/null 2>&1 || true
+    systemctl disable --now atrium-backup.timer >/dev/null 2>&1 || true
+    systemctl stop atrium-backup.service >/dev/null 2>&1 || true
   fi
-  rm -f /etc/systemd/system/gomex-backup.service /etc/systemd/system/gomex-backup.timer
+  rm -f /etc/systemd/system/atrium-backup.service /etc/systemd/system/atrium-backup.timer
   if [[ -d /run/systemd/system ]]; then
     systemctl daemon-reload >/dev/null 2>&1 || true
-    systemctl reset-failed gomex-backup.service >/dev/null 2>&1 || true
+    systemctl reset-failed atrium-backup.service >/dev/null 2>&1 || true
   fi
   ok "Ночной бэкап"
 
   # The log goes with the rest: from here nothing may write it again.
   local log_file=$LOG
   LOG=/dev/null
-  rm -rf -- "$GOMEX_DIR" /root/gomex-backups
-  rm -f -- /root/gomex-install.sh "$log_file"
+  rm -rf -- "$ATRIUM_DIR" /root/atrium-backups
+  rm -f -- /root/atrium-install.sh "$log_file"
   ok "Файлы и бэкапы"
 
   # SSH as before: our key-only file goes, and the desktop app's key with it.
-  rm -f /etc/ssh/sshd_config.d/00-gomex-key-only.conf
-  if [[ -f /root/.ssh/authorized_keys ]]; then sed -i '/[[:space:]]gomex-app[[:space:]]*$/d' /root/.ssh/authorized_keys; fi
+  rm -f /etc/ssh/sshd_config.d/00-atrium-key-only.conf
+  if [[ -f /root/.ssh/authorized_keys ]]; then sed -i '/[[:space:]]atrium-app[[:space:]]*$/d' /root/.ssh/authorized_keys; fi
   if command -v sshd >/dev/null && sshd -t 2>/dev/null; then
     systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true
   fi
   ok "Вход по SSH"
   say
-  line "Gomex удалён."
+  line "Atrium удалён."
   say
 }
 
@@ -1351,47 +1335,47 @@ uninstall_all() {
 
 usage() {
   cat <<EOF
-Gomex $RELEASE_VERSION — установка на этот сервер.
+Atrium $RELEASE_VERSION — установка на этот сервер.
   sh install.sh            мастер установки (повторный запуск — обновление)
   sh install.sh update     обновить без вопросов
   sh install.sh link       ссылка для первой настройки ещё раз (если настройка не закончена)
-  sh install.sh restore    вернуть данные из ночной копии (GOMEX_YES=1 GOMEX_RESTORE=<копия> — без вопросов)
-  sh install.sh uninstall  снять Gomex с сервера: контейнеры, данные, бэкапы (GOMEX_YES=1 — без вопроса)
-  DOMAIN=chat.example.com GOMEX_YES=1 sh install.sh   без вопросов
+  sh install.sh restore    вернуть данные из ночной копии (ATRIUM_YES=1 ATRIUM_RESTORE=<копия> — без вопросов)
+  sh install.sh uninstall  снять Atrium с сервера: контейнеры, данные, бэкапы (ATRIUM_YES=1 — без вопроса)
+  DOMAIN=chat.example.com ATRIUM_YES=1 sh install.sh   без вопросов
 EOF
 }
 
 # The release to install: this installer's own, or a local/mirrored one given with its checksum.
 pick_release() {
-  REGISTRY=${GOMEX_REGISTRY:-$RELEASE_REGISTRY}
-  APP_DIGEST=${GOMEX_APP_DIGEST-$RELEASE_APP_DIGEST}
-  CADDY_DIGEST=${GOMEX_CADDY_DIGEST-$RELEASE_CADDY_DIGEST}
+  REGISTRY=${ATRIUM_REGISTRY:-$RELEASE_REGISTRY}
+  APP_DIGEST=${ATRIUM_APP_DIGEST-$RELEASE_APP_DIGEST}
+  CADDY_DIGEST=${ATRIUM_CADDY_DIGEST-$RELEASE_CADDY_DIGEST}
   TARBALL_MIRRORS=()
-  if [[ -n ${GOMEX_TARBALL:-} ]]; then
-    [[ -n ${GOMEX_TARBALL_SHA256:-} ]] || die "GOMEX_TARBALL без GOMEX_TARBALL_SHA256"
-    TARBALL_SRC=$GOMEX_TARBALL TARBALL_SHA256=$GOMEX_TARBALL_SHA256
-    RELEASE_VERSION=${GOMEX_VERSION:-$RELEASE_VERSION}
+  if [[ -n ${ATRIUM_TARBALL:-} ]]; then
+    [[ -n ${ATRIUM_TARBALL_SHA256:-} ]] || die "ATRIUM_TARBALL без ATRIUM_TARBALL_SHA256"
+    TARBALL_SRC=$ATRIUM_TARBALL TARBALL_SHA256=$ATRIUM_TARBALL_SHA256
+    RELEASE_VERSION=${ATRIUM_VERSION:-$RELEASE_VERSION}
   else
     [[ -n $RELEASE_SHA256 ]] ||
       die "Это не релизная сборка установщика: возьми его с https://github.com/$RELEASE_REPO/releases/latest/download/install.sh"
-    TARBALL_SRC=https://github.com/$RELEASE_REPO/releases/download/v$RELEASE_VERSION/gomex-$RELEASE_VERSION.tar.gz
+    TARBALL_SRC=https://github.com/$RELEASE_REPO/releases/download/v$RELEASE_VERSION/atrium-$RELEASE_VERSION.tar.gz
     TARBALL_SHA256=$RELEASE_SHA256
     # When GitHub can't be reached: the same file from the npm mirror, through two CDNs.
     TARBALL_MIRRORS=(
-      "https://cdn.jsdelivr.net/npm/$RELEASE_NPM@$RELEASE_VERSION/gomex-$RELEASE_VERSION.tar.gz"
-      "https://unpkg.com/$RELEASE_NPM@$RELEASE_VERSION/gomex-$RELEASE_VERSION.tar.gz"
+      "https://cdn.jsdelivr.net/npm/$RELEASE_NPM@$RELEASE_VERSION/atrium-$RELEASE_VERSION.tar.gz"
+      "https://unpkg.com/$RELEASE_NPM@$RELEASE_VERSION/atrium-$RELEASE_VERSION.tar.gz"
     )
   fi
 }
 
-# No questions: GOMEX_YES=1, or `update`.
+# No questions: ATRIUM_YES=1, or `update`.
 run_quiet() {
-  if (( TTY )); then print_logo; else say "Gomex $RELEASE_VERSION"; fi
-  [[ -n ${DOMAIN:-} ]] || die "Нужен домен: DOMAIN=chat.example.com GOMEX_YES=1 sh install.sh"
+  if (( TTY )); then print_logo; else say "Atrium $RELEASE_VERSION"; fi
+  [[ -n ${DOMAIN:-} ]] || die "Нужен домен: DOMAIN=chat.example.com ATRIUM_YES=1 sh install.sh"
   DOMAIN=$(normalize_domain "$DOMAIN")
   valid_domain "$DOMAIN" || die "Не похоже на домен: $DOMAIN"
   valid_name "$SERVER_NAME" || die "Имя сервера: до 40 символов, без кавычек, \\, \$ и \`"
-  [[ -n ${GOMEX_SERVER_NAME_SET:-} ]] && NAME_SET=1
+  [[ -n ${ATRIUM_SERVER_NAME_SET:-} ]] && NAME_SET=1
   progress run check
   progress sub "Определяем внешний IP"
   SERVER_IP=$(detect_ip)
@@ -1427,12 +1411,12 @@ wizard() {
           header 1
           title "Проверка сервера"
           spin "Проверяем сервер" detect_ip_to_file || true
-          SERVER_IP=$(cat "$GOMEX_TMP/ip" 2>/dev/null || true)
+          SERVER_IP=$(cat "$ATRIUM_TMP/ip" 2>/dev/null || true)
           run_checks
           (( CHECK_FATAL )) && { print_checks; die "Сервер не готов."; }
           spin "Проверяем DNS" check_dns_to_file || true
           # shellcheck source=/dev/null
-          . "$GOMEX_TMP/dns"
+          . "$ATRIUM_TMP/dns"
           step=install
         else
           step=checks
@@ -1465,7 +1449,7 @@ main() {
     -h | --help | help) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;
   esac
-  [[ -n ${SERVER_NAME:-} ]] && GOMEX_SERVER_NAME_SET=1
+  [[ -n ${SERVER_NAME:-} ]] && ATRIUM_SERVER_NAME_SET=1
   # One installer at a time: two would share the log and both run docker compose. The lock goes with this process
   # (fd 9). No /run to write to means no root, which the server check reports anyway.
   if command -v flock >/dev/null && { exec 9>>"$LOCK"; } 2>/dev/null && ! flock -n 9; then
@@ -1474,9 +1458,9 @@ main() {
     bad "Установщик уже запущен на этом сервере"
     exit 1
   fi
-  if ! { : >>"$LOG"; } 2>/dev/null; then LOG=$GOMEX_TMP/install.log; fi
+  if ! { : >>"$LOG"; } 2>/dev/null; then LOG=$ATRIUM_TMP/install.log; fi
   chmod 600 "$LOG" 2>/dev/null || true
-  log "Gomex installer $RELEASE_VERSION, mode $MODE"
+  log "Atrium installer $RELEASE_VERSION, mode $MODE"
   if [[ $MODE == link ]]; then
     detect_install
     show_link
@@ -1497,13 +1481,13 @@ main() {
   DNS_OK=0 DOCKER_OK=0 SSH_PLAN=none NAME_SET=0
 
   if [[ $MODE == update ]]; then
-    (( EXISTING )) || die "Gomex здесь ещё не стоит: запусти без update"
+    (( EXISTING )) || die "Atrium здесь ещё не стоит: запусти без update"
     DNS_OK=1
     run_quiet
-  elif [[ ${GOMEX_YES:-} == 1 ]]; then
+  elif [[ ${ATRIUM_YES:-} == 1 ]]; then
     run_quiet
   elif (( ! TTY )); then
-    die "Нет терминала. Без вопросов: DOMAIN=chat.example.com GOMEX_YES=1 sh install.sh"
+    die "Нет терминала. Без вопросов: DOMAIN=chat.example.com ATRIUM_YES=1 sh install.sh"
   else
     (( TTY )) && printf '  %sГотовим установщик…%s' "$C_DIM" "$C_RESET"
     get_gum || GUM=''
@@ -1513,14 +1497,14 @@ main() {
 }
 
 main "$@"
-GOMEX_INSTALLER
+ATRIUM_INSTALLER
 
-command -v bash >/dev/null 2>&1 || { echo "Gomex: нужен bash" >&2; exit 1; }
+command -v bash >/dev/null 2>&1 || { echo "Atrium: нужен bash" >&2; exit 1; }
 # The terminal, if there is one: under `curl | sh` our stdin is the script, not the person.
 status=0
 if (: </dev/tty) 2>/dev/null; then
-  bash "$GOMEX_TMP/install.bash" "$@" </dev/tty || status=$?
+  bash "$ATRIUM_TMP/install.bash" "$@" </dev/tty || status=$?
 else
-  bash "$GOMEX_TMP/install.bash" "$@" </dev/null || status=$?
+  bash "$ATRIUM_TMP/install.bash" "$@" </dev/null || status=$?
 fi
 exit "$status"

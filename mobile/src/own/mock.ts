@@ -2,7 +2,7 @@ import { t } from '../i18n';
 import { color } from '../theme';
 import type { MyInvite, Session } from '../protocol';
 import type { Backend } from './backend';
-import { MOCK_DOMAIN, MOCK_INVITE, MOCK_KEY, mockProgress, type Progress } from '@gomex/setup';
+import { MOCK_DOMAIN, MOCK_INVITE, MOCK_KEY, mockProgress, type Progress } from '@atrium/setup';
 
 /**
  * "Your own server" with nothing real behind it, for design work in development: /own?mock=1 walks the whole way with

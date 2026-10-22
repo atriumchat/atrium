@@ -7,9 +7,9 @@ import { normalizeServer } from '../src/protocol';
 import { signIn } from '../src/store';
 import { useT } from '../src/i18n';
 import { Text } from '../src/text';
-import { FlowPrimary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '@gomex/ui-native';
+import { FlowPrimary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '@atrium/ui-native';
 import { RecoveryKeyStep } from '../src/components/RecoveryKeyStep';
-import { MIN_PASSWORD, MOCK_KEY, signInFlow, type SignInStep } from '@gomex/setup';
+import { MIN_PASSWORD, MOCK_KEY, signInFlow, type SignInStep } from '@atrium/setup';
 
 /**
  * Signing in, in the flow look (DESIGN.md), a short step at a time so nothing scrolls: what you're here for, then the
@@ -17,7 +17,7 @@ import { MIN_PASSWORD, MOCK_KEY, signInFlow, type SignInStep } from '@gomex/setu
  * The server is remembered and shown as a line to change, not a field to fill every time.
  */
 
-// The steps, their scale and the way back are @gomex/setup's signInFlow; 'key' is the mocks' end of a sign-up.
+// The steps, their scale and the way back are @atrium/setup's signInFlow; 'key' is the mocks' end of a sign-up.
 type Step = SignInStep | 'key';
 type Way = 'login' | 'invite' | 'own';
 

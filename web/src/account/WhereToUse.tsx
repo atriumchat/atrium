@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { FlowPrimary, FlowShell, FlowStep, TextAction } from '@gomex/ui-web';
+import { FlowPrimary, FlowShell, FlowStep, TextAction } from '@atrium/ui-web';
 import { desktop } from '../desktop';
 import { DOWNLOADS } from '../shell/Downloads';
 import { DotsIcon, PlusSquareIcon, ShareIcon } from '../ui/icons';

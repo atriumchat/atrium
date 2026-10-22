@@ -11,11 +11,11 @@ import { Text } from '../src/text';
 import { colors } from '../src/theme';
 import { haptic } from '../src/haptics';
 import { AtriumMark } from '../src/components/Logo';
-import { Drum, FlowPrimary, FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, RING, TextAction, useFlowFrame } from '@gomex/ui-native';
+import { Drum, FlowPrimary, FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, RING, TextAction, useFlowFrame } from '@atrium/ui-native';
 import { RecoveryKeyStep } from '../src/components/RecoveryKeyStep';
 import { real } from '../src/own/backend';
 import { DinoRun } from '../src/own/DinoRun';
-import { adminForm, capacity, doneCount, emailOk as isEmail, jobFill, MOCK_DOMAIN, MOCK_INVITE, MOCK_KEY, MOCK_SETUP_CODE, OWN_READY, ownOnPhone, pickTurn, TASKS, type Facts, type OwnPhoneStep as Step, type Progress } from '@gomex/setup';
+import { adminForm, capacity, doneCount, emailOk as isEmail, jobFill, MOCK_DOMAIN, MOCK_INVITE, MOCK_KEY, MOCK_SETUP_CODE, OWN_READY, ownOnPhone, pickTurn, TASKS, type Facts, type OwnPhoneStep as Step, type Progress } from '@atrium/setup';
 import { mock, mockInstall, mockPace } from '../src/own/mock';
 import type { Saved } from '../src/own/setup';
 

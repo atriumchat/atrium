@@ -2,9 +2,9 @@
 
 <p align="center"><b>Приватный чат и звонки для своих, на своём сервере.</b><br>Голосовые комнаты, показ экрана, разговор по кнопке. Один недорогой VPS, одна команда, около 120 МБ памяти.</p>
 
-<p align="center"><a href="LICENSE"><img alt="Лицензия: AGPL-3.0" src="https://img.shields.io/github/license/gomex-inc/gomex"></a> <a href="https://github.com/gomex-inc/gomex/releases/latest"><img alt="Последний релиз" src="https://img.shields.io/github/v/release/gomex-inc/gomex"></a></p>
+<p align="center"><a href="LICENSE"><img alt="Лицензия: AGPL-3.0" src="https://img.shields.io/github/license/atriumchat/atrium"></a> <a href="https://github.com/atriumchat/atrium/releases/latest"><img alt="Последний релиз" src="https://img.shields.io/github/v/release/atriumchat/atrium"></a></p>
 
-<p align="center"><a href="README.md">English</a> · <b>Русский</b> · <a href="https://github.com/gomex-inc/gomex/releases/tag/desktop">Скачать приложение</a> · <a href="docs/install.ru.md">Установка</a></p>
+<p align="center"><a href="README.md">English</a> · <b>Русский</b> · <a href="https://github.com/atriumchat/atrium/releases/tag/desktop">Скачать приложение</a> · <a href="docs/install.ru.md">Установка</a></p>
 
 <p align="center"><img src="docs/screenshots/ru/voice-room.png" alt="Голосовая комната на четверых" width="900"></p>
 
@@ -19,7 +19,7 @@ Atrium — закрытый Discord для небольшой компании: 
 Одна команда на чистом VPS с Ubuntu или Debian (доступ root, хватит 1 ГБ памяти):
 
 ```bash
-curl -fsSL https://github.com/gomex-inc/gomex/releases/latest/download/install.sh | sh
+curl -fsSL https://github.com/atriumchat/atrium/releases/latest/download/install.sh | sh
 ```
 
 Мастер спросит домен, всё настроит и покажет ссылку, по которой создаётся администратор. Друзья заходят по личным
@@ -92,11 +92,11 @@ flowchart LR
 
 | Путь | Что там |
 |---|---|
-| [`server/`](server) | Бэкенд. `app.py` собирает приложение, код в пакете `gomex/`: модуль на домен (`users`, `channels`, `dms`, `uploads`, `realtime`), настройки в `config.py`, схема в `db.py` |
+| [`server/`](server) | Бэкенд. `app.py` собирает приложение, код в пакете `atrium/`: модуль на домен (`users`, `channels`, `dms`, `uploads`, `realtime`), настройки в `config.py`, схема в `db.py` |
 | [`web/`](web) | Клиент: React 19, Vite, HeroUI v3, Tailwind 4, LiveKit. `src/` разложен по доменам: `account`, `chat`, `voice`, `people`, `shell`, `ui`, `store` |
 | [`desktop/`](desktop) | Electron-оболочка: живёт в трее, чтобы звонки доходили при закрытом окне, глобальный push-to-talk, подписанные обновления |
 | [`deploy/`](deploy) | Compose, Caddyfile, установщик, скрипты релиза и бэкапа |
-| [`.github/workflows/images.yml`](.github/workflows/images.yml) | Сборка образов `gomex-app` и `gomex-caddy` (amd64 и arm64) на тег `v*` |
+| [`.github/workflows/images.yml`](.github/workflows/images.yml) | Сборка образов `atrium-app` и `atrium-caddy` (amd64 и arm64) на тег `v*` |
 
 ## Безопасность
 
@@ -122,7 +122,7 @@ flowchart LR
 
 ## Сопровождение
 
-[@gomex-inc](https://github.com/gomex-inc).
+[@atriumchat](https://github.com/atriumchat).
 
 ## Участие
 

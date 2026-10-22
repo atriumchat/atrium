@@ -17,7 +17,7 @@ LIVEKIT_URL = os.environ.get("LIVEKIT_URL", "ws://localhost:7880")
 # Where this server reaches LiveKit's own API (same machine, host networking).
 LIVEKIT_API = os.environ.get("LIVEKIT_API", "http://127.0.0.1:7880")
 WEB_DIST = os.environ.get("WEB_DIST")
-SERVER_NAME = os.environ.get("SERVER_NAME", "Gomex")
+SERVER_NAME = os.environ.get("SERVER_NAME", "Atrium")
 # Calls only through the TURN relay on 443 (no direct or plain-UDP paths): for networks where everything else
 # gets cut. Each person can also turn it on for themselves.
 RELAY_ONLY = os.environ.get("RELAY_ONLY", "") in ("1", "true", "yes")

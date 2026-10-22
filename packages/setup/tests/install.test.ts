@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { capacity, doneCount, loginError, mailboxOf, mockProgress, parseProbe, parseProgress, pickTurn, pointError, probeCommand, registerError, sq, startCommand, TASKS, TURN_NAMES } from '../src/index';
 
 test('the install log reads as progress', () => {
-  const log = ['::gomex run check', '::gomex done check 2', '::gomex run docker', '::gomex sub pulling layers', '::tail', 'some line', '\u001b[32m✓ ok\u001b[0m', ''].join('\n');
+  const log = ['::atrium run check', '::atrium done check 2', '::atrium run docker', '::atrium sub pulling layers', '::tail', 'some line', '\u001b[32m✓ ok\u001b[0m', ''].join('\n');
   const p = parseProgress(log);
   assert.deepEqual(p.steps.check, { state: 'done', took: 2 });
   assert.equal(p.current, 'docker');
@@ -13,10 +13,10 @@ test('the install log reads as progress', () => {
 });
 
 test('a failed, a finished and a quiet install', () => {
-  const failed = parseProgress('::gomex run pull\n::gomex fail pull no space left\n::exit 1\n::tail\n');
+  const failed = parseProgress('::atrium run pull\n::atrium fail pull no space left\n::exit 1\n::tail\n');
   assert.equal(failed.failed, 'no space left');
   assert.equal(failed.exit, 1);
-  const ready = parseProgress('::gomex ready https://app.x.dedyn.io/?setup=A\n::exit 0\n::tail\n');
+  const ready = parseProgress('::atrium ready https://app.x.dedyn.io/?setup=A\n::exit 0\n::tail\n');
   assert.equal(ready.ready, 'https://app.x.dedyn.io/?setup=A');
   assert.equal(parseProgress('::tail\nDownloading…\nStill here\n').doing, 'Still here');
 });

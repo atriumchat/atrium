@@ -5,8 +5,8 @@ import { inviteLink } from '../people/invite';
 import { AtriumMark } from '../ui/Logo';
 import { IconCropper, centred, cropToBlob, cropToUrl, loadImage, type Crop } from '../ui/IconCropper';
 import { KeyStep } from './KeyStep';
-import { adminForm, codeFrom, CODE_LENGTH, firstRun, type FirstRunStep } from '@gomex/setup';
-import { FlowPrimary, FlowSecondary, FlowShell, FlowStep, LineField, TextAction } from '@gomex/ui-web';
+import { adminForm, codeFrom, CODE_LENGTH, firstRun, type FirstRunStep } from '@atrium/setup';
+import { FlowPrimary, FlowSecondary, FlowShell, FlowStep, LineField, TextAction } from '@atrium/ui-web';
 import './setupWizard.css';
 
 /**

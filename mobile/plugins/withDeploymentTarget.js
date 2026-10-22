@@ -3,9 +3,9 @@ const { withPodfile } = require('expo/config-plugins');
 // Xcode 27 rejects old minimum versions even on privacy/resource bundle targets.
 module.exports = function withDeploymentTarget(config) {
   return withPodfile(config, (result) => {
-    const marker = '# Gomex: align dependency resource bundles with the RN minimum';
+    const marker = '# Atrium: align dependency resource bundles with the RN minimum';
     // Remove an earlier generated block when rerunning prebuild after an update.
-    result.modResults.contents = result.modResults.contents.replace(/ {4}# Gomex: align dependency resource bundles with the RN minimum[\s\S]*?\n {4}end\n/g, '');
+    result.modResults.contents = result.modResults.contents.replace(/ {4}# Atrium: align dependency resource bundles with the RN minimum[\s\S]*?\n {4}end\n/g, '');
     const hook = 'post_install do |installer|';
     if (!result.modResults.contents.includes(hook)) throw new Error('Missing CocoaPods post_install hook');
     result.modResults.contents = result.modResults.contents.replace(hook, `${hook}

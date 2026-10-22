@@ -4,13 +4,13 @@
 #                               then the tarball install.sh unpacks and install.sh pinned to it and to the image
 #                               digests, both published as the assets of the GitHub Release v1.0.0. Installs take
 #                               releases/latest/download/install.sh.
-#                               The same two files go to npm as @gomex.llc/install@1.0.0 (the name is RELEASE_NPM in
+#                               The same two files go to npm as @atriumchat/install@1.0.0 (the name is RELEASE_NPM in
 #                               install.sh), a mirror for when GitHub can't be reached: jsDelivr and unpkg serve it, no
 #                               server runs Node.
 #   deploy/release.sh lint      bash -n and shellcheck on every deploy script, install.sh's bash part included
 # Re-running a version that's already tagged picks up where it stopped. A version with a suffix (1.0.0-rc.1) is a
 # pre-release: "latest" stays on the last full release. Needs git with "origin" on GitHub, gh and npm (both logged
-# in; GOMEX_SKIP_NPM=1 releases without the npm mirror), curl and either shellcheck or Docker to run it.
+# in; ATRIUM_SKIP_NPM=1 releases without the npm mirror), curl and either shellcheck or Docker to run it.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 INSTALLER=deploy/install.sh
@@ -33,7 +33,7 @@ shellcheck_() {
 }
 # install.sh's bash program sits in a heredoc, which shellcheck can't see into: check it on its own.
 installer_body() {
-  awk '/^cat > "\$GOMEX_TMP\/install.bash" <<.GOMEX_INSTALLER.$/ { f = 1; next } /^GOMEX_INSTALLER$/ { f = 0 } f' "$INSTALLER"
+  awk '/^cat > "\$ATRIUM_TMP\/install.bash" <<.ATRIUM_INSTALLER.$/ { f = 1; next } /^ATRIUM_INSTALLER$/ { f = 0 } f' "$INSTALLER"
 }
 lint_installer() {
   sh -n "$INSTALLER"
@@ -66,8 +66,8 @@ tag=v$version
 # is tagged, so a release never stops half-way for it.
 npm_package=$(sed -n 's/^RELEASE_NPM=//p' "$INSTALLER")
 [[ -n $npm_package ]] || die "$INSTALLER: no RELEASE_NPM= line"
-if [[ ${GOMEX_SKIP_NPM:-} != 1 ]]; then
-  npm whoami >/dev/null 2>&1 || die "npm isn't logged in: npm login (or GOMEX_SKIP_NPM=1 to release without the npm mirror)."
+if [[ ${ATRIUM_SKIP_NPM:-} != 1 ]]; then
+  npm whoami >/dev/null 2>&1 || die "npm isn't logged in: npm login (or ATRIUM_SKIP_NPM=1 to release without the npm mirror)."
 fi
 
 # == The GitHub repository (origin) gets the release; the images live in ghcr.io/<its owner>, lower case like the
@@ -87,7 +87,7 @@ else
   [[ -z $dirty ]] || die "Uncommitted changes that would miss the release:"$'\n'"$dirty"
   lint_installer || die "install.sh doesn't pass the checks above."
   say "Tagging $tag on $(git rev-parse --short HEAD)"
-  git tag -a "$tag" -m "Gomex $version"
+  git tag -a "$tag" -m "Atrium $version"
 fi
 git push origin "refs/tags/$tag"
 
@@ -114,26 +114,26 @@ digest_of() {
     "https://ghcr.io/v2/$owner/$image/manifests/$version" 2>/dev/null |
     tr -d '\r' | sed -n 's/^[Dd]ocker-[Cc]ontent-[Dd]igest: //p' || true
 }
-app_digest=$(digest_of gomex-app)
-caddy_digest=$(digest_of gomex-caddy)
+app_digest=$(digest_of atrium-app)
+caddy_digest=$(digest_of atrium-caddy)
 if [[ ! $app_digest =~ ^sha256:[0-9a-f]{64}$ || ! $caddy_digest =~ ^sha256:[0-9a-f]{64}$ ]]; then
   # Package settings live under /orgs/ for an organization, /users/ for a person.
   kind=users
   [[ $(gh api "users/$owner" --jq .type 2>/dev/null) == Organization ]] && kind=orgs
   die "Servers can't pull the images anonymously. Make both packages public, once:
-  https://github.com/$kind/$owner/packages/container/gomex-app/settings
-  https://github.com/$kind/$owner/packages/container/gomex-caddy/settings
+  https://github.com/$kind/$owner/packages/container/atrium-app/settings
+  https://github.com/$kind/$owner/packages/container/atrium-caddy/settings
 then run deploy/release.sh $version again."
 fi
-say "gomex-app@$app_digest"
-say "gomex-caddy@$caddy_digest"
+say "atrium-app@$app_digest"
+say "atrium-caddy@$caddy_digest"
 
 # == The tarball, straight from the tag (git archive: no stray local files, same bytes every time). deploy/downloads
 # is only where the release's two files are put together (git ignores it).
 out=$ROOT/deploy/downloads
 mkdir -p "$out"
-tarball=gomex-$version.tar.gz
-git archive --format=tar.gz --prefix="gomex-$version/" -o "$out/$tarball" "$tag" -- "${FILES[@]}"
+tarball=atrium-$version.tar.gz
+git archive --format=tar.gz --prefix="atrium-$version/" -o "$out/$tarball" "$tag" -- "${FILES[@]}"
 sha=$(shasum -a 256 "$out/$tarball" | awk '{print $1}')
 say "$tarball $sha"
 
@@ -189,19 +189,19 @@ ${fence}
 Образы:
 
 ${fence}
-$registry/gomex-app@$app_digest
-$registry/gomex-caddy@$caddy_digest
+$registry/atrium-app@$app_digest
+$registry/atrium-caddy@$caddy_digest
 ${fence}
 EOF
 )
 if gh release view "$tag" -R "$repo" >/dev/null 2>&1; then
   say "Updating the GitHub Release $tag"
   gh release upload "$tag" -R "$repo" --clobber "$out/$tarball" "$out/install.sh"
-  gh release edit "$tag" -R "$repo" --title "Gomex $version" --notes "$notes" --prerelease="$prerelease" --draft=false >/dev/null
+  gh release edit "$tag" -R "$repo" --title "Atrium $version" --notes "$notes" --prerelease="$prerelease" --draft=false >/dev/null
 else
   say "Publishing the GitHub Release $tag"
   # gh keeps it a draft until both files are up: install.sh never points at a tarball that isn't there yet.
-  gh release create "$tag" -R "$repo" --verify-tag --title "Gomex $version" --notes "$notes" \
+  gh release create "$tag" -R "$repo" --verify-tag --title "Atrium $version" --notes "$notes" \
     --prerelease="$prerelease" "$out/$tarball" "$out/install.sh" >/dev/null
 fi
 
@@ -219,11 +219,11 @@ fi
 
 # == The npm mirror: the same two files as the npm package RELEASE_NPM names, at this version, which jsDelivr and
 # unpkg serve. install.sh falls back to it when GitHub can't be reached, and checks the same SHA-256 there.
-# The package also has a bin, so `npx @gomex.llc/install` runs the installer where Node is already installed. The bin is
-# named gomex-install, never "install": a global `npm i -g` would otherwise put a second `install` in front of coreutils'.
+# The package also has a bin, so `npx @atriumchat/install` runs the installer where Node is already installed. The bin is
+# named atrium-install, never "install": a global `npm i -g` would otherwise put a second `install` in front of coreutils'.
 npm_cdn=https://cdn.jsdelivr.net/npm/$npm_package@$version
-if [[ ${GOMEX_SKIP_NPM:-} == 1 ]]; then
-  say "Skipping the npm mirror (GOMEX_SKIP_NPM=1)"
+if [[ ${ATRIUM_SKIP_NPM:-} == 1 ]]; then
+  say "Skipping the npm mirror (ATRIUM_SKIP_NPM=1)"
 else
   if npm view "$npm_package@$version" version >/dev/null 2>&1; then
     say "npm already has $npm_package@$version"
@@ -234,18 +234,18 @@ else
 {
   "name": "$npm_package",
   "version": "$version",
-  "description": "Gomex installer and release files: npx $npm_package, or curl -fsSL https://cdn.jsdelivr.net/npm/$npm_package/install.sh | sh",
+  "description": "Atrium installer and release files: npx $npm_package, or curl -fsSL https://cdn.jsdelivr.net/npm/$npm_package/install.sh | sh",
   "homepage": "https://github.com/$repo",
   "repository": { "type": "git", "url": "git+https://github.com/$repo.git" },
   "license": "AGPL-3.0-only",
-  "bin": { "gomex-install": "install.sh" },
+  "bin": { "atrium-install": "install.sh" },
   "files": ["install.sh", "$tarball", "LICENSE"]
 }
 EOF
     cat >"$pkg/README.md" <<EOF
-# Gomex $version
+# Atrium $version
 
-Установщик Gomex и архив релиза, который он распаковывает.
+Установщик Atrium и архив релиза, который он распаковывает.
 
 Установка на свежий VPS (Ubuntu или Debian, root).
 
@@ -291,7 +291,7 @@ EOF
 fi
 
 # The repo's install.sh is what's published.
-git diff --quiet -- "$INSTALLER" || git commit -q -m "install.sh: Gomex $version" -- "$INSTALLER"
-say "Published Gomex $version: curl -fsSL $install_url | sh"
-[[ ${GOMEX_SKIP_NPM:-} == 1 ]] || say "Mirror: curl -fsSL $npm_cdn/install.sh | sh"
+git diff --quiet -- "$INSTALLER" || git commit -q -m "install.sh: Atrium $version" -- "$INSTALLER"
+say "Published Atrium $version: curl -fsSL $install_url | sh"
+[[ ${ATRIUM_SKIP_NPM:-} == 1 ]] || say "Mirror: curl -fsSL $npm_cdn/install.sh | sh"
 say "Push the commit when ready: git push origin HEAD"

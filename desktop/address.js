@@ -35,7 +35,7 @@ $('invite').addEventListener('click', () => {
 });
 
 // One's own server is set up right from the app, in its own window.
-$('own').addEventListener('click', () => window.gomexAddress.setup());
+$('own').addEventListener('click', () => window.atriumAddress.setup());
 
 $('back').addEventListener('click', () => {
   $('enter').hidden = true;
@@ -46,6 +46,6 @@ $('back').addEventListener('click', () => {
 $('form').addEventListener('submit', async (event) => {
   event.preventDefault();
   error.textContent = '';
-  const problem = await window.gomexAddress.save(input.value.trim());
+  const problem = await window.atriumAddress.save(input.value.trim());
   if (problem) error.textContent = problem;
 });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { MIN_PASSWORD, signInFlow, type SignInStep as Step } from '@gomex/setup';
-import { FlowPrimary, FlowShell, FlowStep, LineField, RadioRow, TextAction } from '@gomex/ui-web';
+import { MIN_PASSWORD, signInFlow, type SignInStep as Step } from '@atrium/setup';
+import { FlowPrimary, FlowShell, FlowStep, LineField, RadioRow, TextAction } from '@atrium/ui-web';
 import { api, setToken } from '../api';
 import { clearInviteFromUrl, inviteFromUrl, parseInvite } from '../people/invite';
 import type { Session } from '../types';
@@ -10,7 +10,7 @@ import { demo } from './demo';
 /**
  * Getting in, in the flow look (DESIGN.md), as the phone app does it (mobile/app/login.tsx): what you're here for,
  * then the nickname and password; by invite, the link first (whose it is shows as soon as it's typed), then the
- * account; or the recovery key. The steps, their scale and the way back are @gomex/setup's signInFlow. The server is
+ * account; or the recovery key. The steps, their scale and the way back are @atrium/setup's signInFlow. The server is
  * the page's own, so there's nothing to choose.
  */
 

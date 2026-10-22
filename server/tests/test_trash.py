@@ -2,8 +2,8 @@
 
 import pytest
 
-from gomex.channels import TRASH_TTL_MS, purge_deleted_channels
-from gomex.db import execute, now_ms, query
+from atrium.channels import TRASH_TTL_MS, purge_deleted_channels
+from atrium.db import execute, now_ms, query
 
 PASSWORD = "correct horse battery"
 

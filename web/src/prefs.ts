@@ -12,7 +12,7 @@ export type VoicePrefs = {
   relayOnly: boolean;
 };
 
-const KEY = 'gomex_voice_prefs';
+const KEY = 'atrium_voice_prefs';
 export const DEFAULT_PREFS: VoicePrefs = { noise: 'browser', ptt: false, pttKey: 'Backquote', relayOnly: false };
 
 export function loadPrefs(): VoicePrefs {

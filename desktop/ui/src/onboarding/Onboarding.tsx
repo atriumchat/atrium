@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { domainOk, emailOk, freeName, hostOk, jobFill, mailboxOf, MOCK_DOMAIN, nameOk, ownOnDesktop, pickTurn, TASKS, type OwnDesktopStep as Step } from '@gomex/setup';
-import { Drum, FlowPrimary, FlowProvider, FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '@gomex/ui-web';
-import type { DrumItem } from '@gomex/ui-common';
+import { domainOk, emailOk, freeName, hostOk, jobFill, mailboxOf, MOCK_DOMAIN, nameOk, ownOnDesktop, pickTurn, TASKS, type OwnDesktopStep as Step } from '@atrium/setup';
+import { Drum, FlowPrimary, FlowProvider, FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '@atrium/ui-web';
+import type { DrumItem } from '@atrium/ui-common';
 import { t } from '../i18n';
 import { setup, standIn, type InstallEvent } from './bridge';
 import './onboarding.css';
 
 /**
  * "Your own server" in the desktop app: a fresh VPS becomes an Atrium server, then the app opens its first-run wizard.
- * The steps, their scale and the way back are @gomex/setup's ownOnDesktop; the parts are Atrium Flow's (DESIGN.md);
+ * The steps, their scale and the way back are @atrium/setup's ownOnDesktop; the parts are Atrium Flow's (DESIGN.md);
  * the SSH, deSEC and the install run in the main process (server-setup.js) through the bridge.
  */
 

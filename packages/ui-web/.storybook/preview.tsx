@@ -1,6 +1,6 @@
 import type { Preview } from '@storybook/react-vite';
 import '@fontsource-variable/onest';
-import { tokenCss } from '@gomex/ui-common';
+import { tokenCss } from '@atrium/ui-common';
 
 // The tokens as the web app sets them at start-up (applyTokens), so the parts look here as they do there.
 const style = document.createElement('style');

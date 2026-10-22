@@ -1,6 +1,6 @@
 """Hangout backend: invite-only auth, channels, chat, voice presence, LiveKit tokens.
 
-The code lives in the gomex package, a module per domain; this file only puts the app together.
+The code lives in the atrium package, a module per domain; this file only puts the app together.
 
 Run locally:  .venv/bin/uvicorn app:app --port 8000 --reload
 """
@@ -12,13 +12,13 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from gomex import channels, dms, realtime, server, uploads, users
-from gomex.config import WEB_DIST
-from gomex.db import init_db
-from gomex.errors import ApiError
-from gomex.realtime import sio
-from gomex.uploads import housekeeping
-from gomex.users import expire_statuses
+from atrium import channels, dms, realtime, server, uploads, users
+from atrium.config import WEB_DIST
+from atrium.db import init_db
+from atrium.errors import ApiError
+from atrium.realtime import sio
+from atrium.uploads import housekeeping
+from atrium.users import expire_statuses
 
 init_db()
 

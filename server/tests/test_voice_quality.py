@@ -2,7 +2,7 @@
 
 import pytest
 
-from gomex import realtime
+from atrium import realtime
 
 PASSWORD = "correct horse battery"
 
@@ -13,7 +13,7 @@ def bearer(token: str) -> dict:
 
 @pytest.fixture(autouse=True)
 def fresh_limit():
-    # The shared fixture only resets the limits in gomex.auth; this one lives in gomex.realtime.
+    # The shared fixture only resets the limits in atrium.auth; this one lives in atrium.realtime.
     realtime.CALL_QUALITY_BY_USER.hits.clear()
 
 

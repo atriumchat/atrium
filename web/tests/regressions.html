@@ -2,7 +2,7 @@
 <style>body{font:15px system-ui;padding:24px;max-width:960px}pre{white-space:pre-wrap;line-height:1.6;padding:20px;background:#f3f5f7}button,textarea{padding:8px}</style>
 <h1>Atrium regression checks</h1><p>Actual source modules; controlled network, room and desktop IPC. No real microphone or SSH connection.</p>
 <button id="run">Run checks</button> <textarea id="editor" aria-label="PTT typing test"></textarea><pre id="output">Ready</pre>
-<script>window.gomexDesktop={ptt:{watch(){},onChange(fn){window.pttEvent=fn;}}};</script>
+<script>window.atriumDesktop={ptt:{watch(){},onChange(fn){window.pttEvent=fn;}}};</script>
 <script type="module">
 import {useStore,initStore,resetStore,mergeMessages,refreshFriends,refreshDms} from '/src/store/index.ts';
 import {api} from '/src/api.ts';

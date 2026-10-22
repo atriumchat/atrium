@@ -1,5 +1,5 @@
 import Svg, { Path } from 'react-native-svg';
-import { color } from '@gomex/ui-common';
+import { color } from '@atrium/ui-common';
 
 /** The few icons the parts draw: 24-unit strokes, as in the app's own icon set. */
 

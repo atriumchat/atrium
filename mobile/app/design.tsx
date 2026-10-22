@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { Redirect } from 'expo-router';
-import { Drum, FlowPrimary, FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '@gomex/ui-native';
+import { Drum, FlowPrimary, FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '@atrium/ui-native';
 
 /**
- * Atrium Flow's native parts on one screen, every state a tap away (the web's are in Storybook, @gomex/ui-web).
+ * Atrium Flow's native parts on one screen, every state a tap away (the web's are in Storybook, @atrium/ui-web).
  * Development builds only: /design.
  */
 

@@ -261,7 +261,7 @@ const plurals = {
   ru: { select: (n: number): Intl.LDMLPluralRule => { const a = Math.abs(n); const m10 = a % 10, m100 = a % 100; return Number.isInteger(a) ? (m10 === 1 && m100 !== 11 ? 'one' : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? 'few' : 'many') : 'other'; } },
   en: { select: (n: number): Intl.LDMLPluralRule => (n === 1 ? 'one' : 'other') },
 };
-const KEY = 'gomex.lang';
+const KEY = 'atrium.lang';
 
 const system = (): Lang => (getLocales()[0]?.languageCode === 'ru' ? 'ru' : 'en');
 /** `choice` is what the person picked (null = follow the device). */

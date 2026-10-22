@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import { ssh } from '../../modules/gomex-ssh';
+import { ssh } from '../../modules/atrium-ssh';
 import {
   DESEC,
   DOMAIN,
@@ -20,7 +20,7 @@ import {
   type DesecError,
   type Facts,
   type Progress,
-} from '@gomex/setup';
+} from '@atrium/setup';
 import { t, type Key } from '../i18n';
 
 /**
@@ -34,7 +34,7 @@ import { t, type Key } from '../i18n';
 
 // A test build can install a pre-release instead (.env.local: EXPO_PUBLIC_INSTALLER_URL=…/download/v0.6.1-rc.2/install.sh).
 const INSTALLER = process.env.EXPO_PUBLIC_INSTALLER_URL || INSTALLER_URL;
-const SAVED = 'gomex.own';
+const SAVED = 'atrium.own';
 
 /** What the app keeps for the server being set up (and for one set up before), in the Keychain. */
 export type Saved = {
@@ -315,7 +315,7 @@ export async function startInstall(saved: Saved): Promise<{ ok: true } | { error
 
 export type { Progress };
 
-/** Reads the install's log on the server (its "::gomex" lines). */
+/** Reads the install's log on the server (its "::atrium" lines). */
 export async function readProgress(): Promise<Progress> {
   return parseProgress((await exec(progressCommand())).output);
 }

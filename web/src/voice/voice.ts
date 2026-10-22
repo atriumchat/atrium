@@ -110,7 +110,7 @@ function resetVoice() {
   });
 }
 
-const LAST_ROOM = 'gomex_last_room';
+const LAST_ROOM = 'atrium_last_room';
 
 /** The server voice room you were in last: the home screen offers it back when everyone's quiet. */
 export function lastRoomId(): string | null {

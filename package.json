@@ -1,5 +1,5 @@
 {
-  "name": "gomex",
+  "name": "atrium",
   "private": true,
   "description": "Atrium clients and their shared packages (docs/adr/001-client-architecture.md). The server, deploy and the Electron shell are outside the workspaces.",
   "packageManager": "npm@11.3.0",
@@ -16,12 +16,12 @@
   "scripts": {
     "web": "npm run dev -w web",
     "mobile": "npm run start -w mobile",
-    "desktop-ui": "npm run dev -w @gomex/desktop-ui",
-    "storybook": "npm run storybook -w @gomex/ui-web",
+    "desktop-ui": "npm run dev -w @atrium/desktop-ui",
+    "storybook": "npm run storybook -w @atrium/ui-web",
     "lint": "eslint .",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm test --workspaces --if-present && node --test desktop/tests/*.test.cjs && node desktop/check-i18n.js",
-    "build": "npm run build -w web && npm run build -w @gomex/desktop-ui && npm run build-storybook -w @gomex/ui-web",
+    "build": "npm run build -w web && npm run build -w @atrium/desktop-ui && npm run build-storybook -w @atrium/ui-web",
     "check": "npm run lint && npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {

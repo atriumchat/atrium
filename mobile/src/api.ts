@@ -8,16 +8,16 @@ let mediaCookie: { server: string; token: string; value: string } | null = null;
 export class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
 export const getCredentials = () => credentials;
 export async function loadCredentials() {
-  const raw = await SecureStore.getItemAsync('gomex.session');
+  const raw = await SecureStore.getItemAsync('atrium.session');
   if (raw) {
     try { const saved = JSON.parse(raw); credentials = { server: normalizeServer(saved.server), token: String(saved.token) }; }
-    catch { await SecureStore.deleteItemAsync('gomex.session'); }
+    catch { await SecureStore.deleteItemAsync('atrium.session'); }
   }
   return credentials;
 }
 export async function saveCredentials(value: Credentials | null) {
-  if (value) await SecureStore.setItemAsync('gomex.session', JSON.stringify(value), { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY });
-  else await SecureStore.deleteItemAsync('gomex.session');
+  if (value) await SecureStore.setItemAsync('atrium.session', JSON.stringify(value), { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY });
+  else await SecureStore.deleteItemAsync('atrium.session');
   credentials = value;
   if (!value || mediaCookie?.server !== value.server || mediaCookie?.token !== value.token) mediaCookie = null;
 }

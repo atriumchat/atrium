@@ -1,14 +1,14 @@
 {
   "expo": {
     "name": "Atrium",
-    "slug": "gomex-mobile",
-    "scheme": "gomex",
+    "slug": "atrium-mobile",
+    "scheme": "atrium",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
     "ios": {
-      "bundleIdentifier": "com.gomex.mobile",
+      "bundleIdentifier": "club.atriumchat.app",
       "supportsTablet": true,
       "infoPlist": {
         "UIBackgroundModes": [
@@ -20,7 +20,7 @@
       }
     },
     "android": {
-      "package": "com.gomex.mobile",
+      "package": "club.atriumchat.app",
       "permissions": [
         "RECORD_AUDIO",
         "CAMERA",

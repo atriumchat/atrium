@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fontsource-variable/onest';
-import { tokenCss } from '@gomex/ui-common';
+import { tokenCss } from '@atrium/ui-common';
 import { t } from '../i18n';
 import { Onboarding } from './Onboarding';
 

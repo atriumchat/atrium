@@ -1,13 +1,13 @@
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import Animated, { Easing, Extrapolation, interpolate, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
-import { color, drum, drumAt, type, type DrumItem, type DrumProps } from '@gomex/ui-common';
+import { color, drum, drumAt, type, type DrumItem, type DrumProps } from '@atrium/ui-common';
 import { Check, Cross } from './icons';
 import { Text } from './Text';
 
 /**
  * A long job's steps on a drum (the installer's): the running one in the middle, the done ones fading above it, the
- * coming ones below. The motion's numbers are @gomex/ui-common's `drum`, the same as the web's.
+ * coming ones below. The motion's numbers are @atrium/ui-common's `drum`, the same as the web's.
  */
 
 function Row({ i, at, item }: { i: number; at: SharedValue<number>; item: DrumItem }) {

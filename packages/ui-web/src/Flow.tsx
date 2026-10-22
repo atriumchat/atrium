@@ -10,13 +10,13 @@ import type {
   LineFieldProps,
   RadioRowProps,
   TextActionProps,
-} from '@gomex/ui-common';
+} from '@atrium/ui-common';
 import { EdgeTicks, TickRuler, useNarrow } from './EdgeTicks';
 import { ChevronLeft } from './icons';
 import './flow.css';
 
 /**
- * Atrium Flow on the web (DESIGN.md), the props from @gomex/ui-common's contract, the same parts as @gomex/ui-native: a
+ * Atrium Flow on the web (DESIGN.md), the props from @atrium/ui-common's contract, the same parts as @atrium/ui-native: a
  * step at a time in type alone on black, one scale of ticks along the window's edge, the main button white at the
  * bottom with back as an outlined icon beside it.
  */

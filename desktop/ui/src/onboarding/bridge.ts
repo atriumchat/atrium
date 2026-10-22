@@ -1,4 +1,4 @@
-import { MOCK_DOMAIN, MOCK_SETUP_CODE, MOCK_TOOK, TASKS } from '@gomex/setup';
+import { MOCK_DOMAIN, MOCK_SETUP_CODE, MOCK_TOOK, TASKS } from '@atrium/setup';
 import { t } from '../i18n';
 
 /**
@@ -28,7 +28,7 @@ export type Setup = {
   openServer(url: string): void;
 };
 
-const bridge = (window as unknown as { gomexSetup?: Setup }).gomexSetup;
+const bridge = (window as unknown as { atriumSetup?: Setup }).atriumSetup;
 /** Design work in a browser: the made-up answers, and #step=… opening a step (Onboarding). */
 export const standIn = !bridge;
 

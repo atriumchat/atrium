@@ -1,10 +1,10 @@
 # SSH for "Your own server" on the phone: Citadel (SwiftNIO SSH), pulled in through Swift Package Manager.
 Pod::Spec.new do |s|
-  s.name           = 'GomexSsh'
+  s.name           = 'AtriumSsh'
   s.version        = '0.1.0'
-  s.summary        = 'SSH client for Gomex setup'
-  s.author         = 'Gomex'
-  s.homepage       = 'https://github.com/gomex-inc/gomex'
+  s.summary        = 'SSH client for Atrium setup'
+  s.author         = 'Atrium'
+  s.homepage       = 'https://github.com/atriumchat/atrium'
   s.license        = 'AGPL-3.0-only'
   s.platforms      = { :ios => '16.4' }
   s.source         = { :git => '' }

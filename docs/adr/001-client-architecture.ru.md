@@ -1,4 +1,4 @@
-# ADR-001: Архитектура клиентов Gomex — монорепа, дизайн-система Gomex Flow и общий «Свой сервер»
+# ADR-001: Архитектура клиентов Atrium — монорепа, дизайн-система Atrium Flow и общий «Свой сервер»
 
 **Статус:** Принято, выполнено (ветка `onboarding`, 2026-10-22)
 **Дата:** 2026-10-21
@@ -8,7 +8,7 @@
 
 ## Контекст
 
-Gomex — self-hosted аналог Discord для своей компании. Сервер (FastAPI + SQLite, LiveKit, Caddy) ставится одной командой
+Atrium — self-hosted аналог Discord для своей компании. Сервер (FastAPI + SQLite, LiveKit, Caddy) ставится одной командой
 на VPS с 1 ГБ памяти. Клиенты:
 - **web:** React, HeroUI v3, Tailwind v4, Vite;
 - **mobile:** Expo SDK 58, React Native;
@@ -46,10 +46,10 @@ Gomex — self-hosted аналог Discord для своей компании. �
 
 ```
 package.json            workspaces: packages/*, web, mobile, desktop; общие скрипты; ESLint
-packages/ui-common      @gomex/ui-common — токены (+tokenCss), геометрия шкалы/углов/отступов, контракт пропсов
-packages/ui-web         @gomex/ui-web — React DOM-реализация Flow + flow.css, Storybook
-packages/ui-native      @gomex/ui-native — React Native-реализация, те же имена и пропсы, экран-каталог
-packages/setup          @gomex/setup — «Свой сервер» и первый запуск без UI: шаги, шкала, валидации, задачи,
+packages/ui-common      @atrium/ui-common — токены (+tokenCss), геометрия шкалы/углов/отступов, контракт пропсов
+packages/ui-web         @atrium/ui-web — React DOM-реализация Flow + flow.css, Storybook
+packages/ui-native      @atrium/ui-native — React Native-реализация, те же имена и пропсы, экран-каталог
+packages/setup          @atrium/setup — «Свой сервер» и первый запуск без UI: шаги, шкала, валидации, задачи,
                         вместимость, интерфейс Backend, единый мок
 web/ mobile/ desktop/   приложения на прежних местах; desktop/ui — окна на React (Vite) поверх ui-web и setup
 ```
@@ -149,7 +149,7 @@ web/ mobile/ desktop/   приложения на прежних местах; d
 ## Последствия
 
 **Становится проще:**
-- Новый экран или окно собирается из `@gomex/ui-*` с одинаковым API.
+- Новый экран или окно собирается из `@atrium/ui-*` с одинаковым API.
 - Правка шкалы, токена или валидации делается в одном месте и попадает на все платформы.
 - Внешний разработчик видит стандартную монорепу, витрины, тесты и CI.
 - Десктопный «Свой сервер» получает те же возможности, что мобильный: моки, ускорение, общая шкала.
@@ -163,7 +163,7 @@ web/ mobile/ desktop/   приложения на прежних местах; d
 **Вернуться позже:**
 - Turborepo или Nx для кеша задач, когда сборки станут долгими.
 - Перенос остальных десктопных окон (address, picker, unreachable) на `desktop/ui`.
-- Общий пакет `@gomex/protocol` для типов и словарей, которые мобилка сейчас берёт из `web/src`.
+- Общий пакет `@atrium/protocol` для типов и словарей, которые мобилка сейчас берёт из `web/src`.
 - Публикация Storybook вместе с DESIGN.md.
 
 ## Как вышло
@@ -176,7 +176,7 @@ web/ mobile/ desktop/   приложения на прежних местах; d
 - **Строки частей идут через `FlowProvider`.** Пакеты не импортируют код приложений: подпись «Назад» приходит из
   приложения, `Drum` получает готовые строки.
 - **Границы проверяют два правила.** `eslint-plugin-boundaries` ловит переходы по путям, а импорт по имени пакета он
-  считает внешним, поэтому направление по именам задаёт `no-restricted-imports`. Он же держит `@gomex/setup` без React.
+  считает внешним, поэтому направление по именам задаёт `no-restricted-imports`. Он же держит `@atrium/setup` без React.
 - **Главный процесс десктопа (`server-setup.js`) не тронут.** Он вне воркспейсов, его транспорт (SSH, deSEC) остаётся
   своим. Общая модель шагов работает в окне (`desktop/ui`).
 - **Контракт пополнился** `KeptRow`, `Drum`, `FlowProvider` и слотом `trailing` у `LineField` (глаз пароля).
@@ -194,23 +194,23 @@ web/ mobile/ desktop/   приложения на прежних местах; d
    - mobile по гайду Expo (убрать ручной `watchFolders`);
    - Dockerfile копирует `packages/`;
    - `.claude/launch.json`, docs/development.
-3. [x] **`@gomex/ui-common`:**
+3. [x] **`@atrium/ui-common`:**
    - токены из `web/src/tokens.ts`;
    - геометрия из обоих `EdgeTicks.tsx`, `useFlowFrame` и `desktop/onboarding.js ruler()`;
    - контракт: `onPress`, `secondary`, `onSubmit`, `FlowPrimary`;
    - тесты `node --test` + tsx: снимок `tokenCss`, геометрия, паритет.
-4. [x] **`@gomex/ui-web` и `@gomex/ui-native`:**
+4. [x] **`@atrium/ui-web` и `@atrium/ui-native`:**
    - перенести реализации (`web/src/ui/flow/*`, `mobile/src/components/{Flow,EdgeTicks,RecoveryKeyStep}.tsx`, `mobile/src/own/Drum.tsx`);
    - довести паритет компонентов;
    - убрать литералы (`Settings.Primary` в сценариях заменить на `FlowPrimary`, `DinoRun` на токены);
    - обновить `SetupWizard.tsx`, `own.tsx`, `login.tsx`, `recovery.tsx`;
    - Storybook и `/design` в мобилке.
-5. [x] **`@gomex/setup`:**
+5. [x] **`@atrium/setup`:**
    - модель «Своего сервера» и первого запуска из `own.tsx`, `onboarding.js`, `mobile/src/own/{setup,capacity,mock}.ts`, `SetupWizard.tsx`;
    - различия платформ — конфигом шагов;
    - тесты переходов, валидаций, повторно-безопасной последовательности.
 6. [x] **`desktop/ui`:**
-   - Vite multi-page, окно `onboarding` на `ui-web` и `setup` с адаптером над `window.gomexSetup` (мосты `onboarding-preload.js` и `server-setup.js` не меняются);
+   - Vite multi-page, окно `onboarding` на `ui-web` и `setup` с адаптером над `window.atriumSetup` (мосты `onboarding-preload.js` и `server-setup.js` не меняются);
    - `main.js` грузит `ui-dist`, `electron-builder files` дополняется;
    - удалить старые `onboarding.*`, копии CSS и `design.js`.
 7. [x] **Ворота:**

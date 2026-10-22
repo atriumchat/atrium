@@ -1,7 +1,7 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
 
-/** SSH for "Your own server" (ios/GomexSshModule.swift, on Citadel). Errors carry a reason code in `message`. */
-type GomexSsh = {
+/** SSH for "Your own server" (ios/AtriumSshModule.swift, on Citadel). Errors carry a reason code in `message`. */
+type AtriumSsh = {
   generateKey(): { publicKey: string; privateKey: string };
   randomToken(bytes: number): string;
   /** `hostKey`: the server's key seen before (an OpenSSH line); a different one fails with the code "hostKey". */
@@ -11,4 +11,4 @@ type GomexSsh = {
 };
 
 // Not there on the web, where "Your own server" only runs on mocks (src/own/mock.ts).
-export const ssh = requireOptionalNativeModule<GomexSsh>('GomexSsh')!;
+export const ssh = requireOptionalNativeModule<AtriumSsh>('AtriumSsh')!;

@@ -94,11 +94,11 @@ http://app.{$DOMAIN} {
 	}
 }
 
-# The app's download buttons (/download/Gomex-windows.exe, …): the desktop builds are in this project's GitHub
+# The app's download buttons (/download/Atrium-windows.exe, …): the desktop builds are in this project's GitHub
 # Releases (deploy/release-desktop.sh keeps the fixed names in the release "desktop"), not on any server.
 (downloads) {
 	handle_path /download/* {
-		redir https://github.com/gomex-inc/gomex/releases/download/desktop{path} 302
+		redir https://github.com/atriumchat/atrium/releases/download/desktop{path} 302
 	}
 }
 
@@ -114,10 +114,9 @@ http://app.{$DOMAIN} {
 	reverse_proxy 127.0.0.1:8000
 }
 
-# The desktop app opens whatever address it was given, often the root domain: it gets the app itself there. Its
-# user agent says Gomex/<version> (desktop/main.js keeps the old name for servers before this), Atrium/ later.
+# The desktop app opens whatever address it was given, often the root domain: it gets the app itself there.
 (desktop) {
-	@desktop header_regexp User-Agent \b(Atrium|Gomex)/[0-9]\S*\s.*\bElectron/
+	@desktop header_regexp User-Agent \bAtrium/[0-9]\S*\s.*\bElectron/
 }
 
 # The cover page as a plain static site (its own few headers, a 404 for any other path): the root domain
@@ -185,5 +184,5 @@ http://:8081 {
 	import cover
 }
 
-# Sites of one's own beside Gomex, such as www.DOMAIN sent on to DOMAIN: deploy/sites/*.caddy, which updates keep.
+# Sites of one's own beside Atrium, such as www.DOMAIN sent on to DOMAIN: deploy/sites/*.caddy, which updates keep.
 import /etc/caddy/sites/*.caddy

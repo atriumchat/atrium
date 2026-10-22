@@ -1,6 +1,6 @@
 import { createContext, useContext, type ComponentRef, type Ref } from 'react';
 import { StyleSheet, Text as RNText, TextInput as RNTextInput, type TextInputProps, type TextProps, type TextStyle } from 'react-native';
-import { color } from '@gomex/ui-common';
+import { color } from '@atrium/ui-common';
 
 /** Onest's weight files, as the app loads them (@expo-google-fonts/onest). */
 export const fonts = { 400: 'Onest_400Regular', 500: 'Onest_500Medium', 600: 'Onest_600SemiBold', 700: 'Onest_700Bold' } as const;

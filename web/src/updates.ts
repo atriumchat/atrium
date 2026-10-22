@@ -66,6 +66,6 @@ export function startUpdateChecks() {
 
 /** Installers for apps from before self-updating (1.1.x), by platform. */
 export const INSTALLERS: Record<string, string> = {
-  darwin: '/download/Gomex-mac-apple-silicon.dmg',
-  win32: '/download/Gomex-windows.exe',
+  darwin: '/download/Atrium-mac-apple-silicon.dmg',
+  win32: '/download/Atrium-windows.exe',
 };

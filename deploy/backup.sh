@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Nightly backup, run by the gomex-backup systemd timer that install.sh installs: a consistent copy of the
-# database plus avatars and chat files (media/), kept for 14 days in /root/gomex-backups/daily.
+# Nightly backup, run by the atrium-backup systemd timer that install.sh installs: a consistent copy of the
+# database plus avatars and chat files (media/), kept for 14 days in /root/atrium-backups/daily.
 set -euo pipefail
 umask 077
 cd "$(dirname "$0")"
 
-root=/root/gomex-backups/daily
+root=/root/atrium-backups/daily
 dest=$root/$(date +%Y-%m-%d)
 # The newest earlier backup: its pictures are hard-linked rather than copied again (below).
 # shellcheck disable=SC2012  # our own dated folder names, nothing odd in them
@@ -19,7 +19,7 @@ if (( free_kb < 1024 * 1024 )); then
   exit 1
 fi
 mkdir -p "$root"
-# Same inode as gomex.media: uploads have unique names, and deletions wait until this snapshot is copied.
+# Same inode as atrium.media: uploads have unique names, and deletions wait until this snapshot is copied.
 exec 9< data/.media.lock
 flock -x 9
 stage=$(mktemp -d "$root/.backup.XXXXXX")
@@ -53,6 +53,6 @@ if [[ -d "$dest" ]]; then mv "$dest" "$old"; fi
 mv "$stage" "$dest"
 rm -rf -- "$old"
 
-chmod -R go-rwx /root/gomex-backups
-find /root/gomex-backups/daily -mindepth 1 -maxdepth 1 -type d -mtime +14 -exec rm -rf {} +
+chmod -R go-rwx /root/atrium-backups
+find /root/atrium-backups/daily -mindepth 1 -maxdepth 1 -type d -mtime +14 -exec rm -rf {} +
 echo "$(date -Is) backup ok: $dest"

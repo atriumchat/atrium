@@ -7,18 +7,18 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-const DEEP = { group: ['@gomex/*/*'], message: 'Import the package by its name: everything public is in its index.ts.' };
+const DEEP = { group: ['@atrium/*/*'], message: 'Import the package by its name: everything public is in its index.ts.' };
 
 /** Workspace packages a part of the repo may not import by name (the boundaries plugin sees those as external). */
 const NOT_BY_NAME = {
-  'packages/ui-common/**': ['@gomex/ui-web', '@gomex/ui-native', '@gomex/setup'],
-  'packages/ui-web/**': ['@gomex/ui-native', '@gomex/setup'],
-  'packages/ui-native/**': ['@gomex/ui-web', '@gomex/setup'],
+  'packages/ui-common/**': ['@atrium/ui-web', '@atrium/ui-native', '@atrium/setup'],
+  'packages/ui-web/**': ['@atrium/ui-native', '@atrium/setup'],
+  'packages/ui-native/**': ['@atrium/ui-web', '@atrium/setup'],
   // The domain model runs anywhere: no UI, no platform.
-  'packages/setup/**': ['@gomex/ui-common', '@gomex/ui-web', '@gomex/ui-native', 'react', 'react-dom', 'react-native'],
-  'web/**': ['@gomex/ui-native'],
-  'desktop/ui/**': ['@gomex/ui-native'],
-  'mobile/**': ['@gomex/ui-web'],
+  'packages/setup/**': ['@atrium/ui-common', '@atrium/ui-web', '@atrium/ui-native', 'react', 'react-dom', 'react-native'],
+  'web/**': ['@atrium/ui-native'],
+  'desktop/ui/**': ['@atrium/ui-native'],
+  'mobile/**': ['@atrium/ui-web'],
 };
 const byName = Object.entries(NOT_BY_NAME).map(([files, names]) => ({
   files: [files],
@@ -101,7 +101,7 @@ export default tseslint.config(
             { from: { element: { type: 'setup' } }, disallow: { to: { element: { types: { anyOf: ['ui-common', 'ui-web', 'ui-native', 'web', 'mobile', 'desktop'] } } } } },
             { from: { element: { type: 'web' } }, disallow: { to: { element: { types: { anyOf: ['ui-native', 'mobile', 'desktop'] } } } } },
             { from: { element: { type: 'desktop' } }, disallow: { to: { element: { types: { anyOf: ['ui-native', 'web', 'mobile'] } } } } },
-            // The phone app still takes the web's dictionaries and protocol types (a @gomex/protocol package later).
+            // The phone app still takes the web's dictionaries and protocol types (a @atrium/protocol package later).
             { from: { element: { type: 'mobile' } }, disallow: { to: { element: { types: { anyOf: ['ui-web', 'desktop'] } } } } },
           ],
         },
@@ -124,9 +124,9 @@ export default tseslint.config(
         'error',
         {
           selector: 'Literal[value=/^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/]',
-          message: 'A colour in Atrium Flow is a token (@gomex/ui-common color).',
+          message: 'A colour in Atrium Flow is a token (@atrium/ui-common color).',
         },
-        { selector: 'Literal[value=/^rgba?\\(/]', message: 'A colour in Atrium Flow is a token (@gomex/ui-common color).' },
+        { selector: 'Literal[value=/^rgba?\\(/]', message: 'A colour in Atrium Flow is a token (@atrium/ui-common color).' },
       ],
     },
   },

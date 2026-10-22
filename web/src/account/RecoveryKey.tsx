@@ -1,4 +1,4 @@
-import { FlowShell } from '@gomex/ui-web';
+import { FlowShell } from '@atrium/ui-web';
 import { t, useT } from '../i18n';
 import { KeyStep } from './KeyStep';
 
@@ -7,7 +7,7 @@ import { KeyStep } from './KeyStep';
 export type NewKey = { key: string; name: string; serverName: string; newcomer?: boolean };
 
 // The key is shown once, so a reload on its screen mustn't lose it: it waits in this tab until "Next".
-const PENDING = 'gomex_new_key';
+const PENDING = 'atrium_new_key';
 
 export function loadNewKey(): NewKey | null {
   try {

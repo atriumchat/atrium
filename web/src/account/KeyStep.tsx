@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FlowPrimary, FlowStep, TextAction } from '@gomex/ui-web';
+import { FlowPrimary, FlowStep, TextAction } from '@atrium/ui-web';
 import { downloadKey, type NewKey } from './RecoveryKey';
 import { useT } from '../i18n';
 
