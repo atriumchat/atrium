@@ -5,6 +5,7 @@ import { api, setToken } from '../api';
 import { clearInviteFromUrl, inviteFromUrl, parseInvite } from '../people/invite';
 import type { Session } from '../types';
 import { useT } from '../i18n';
+import { LangButton } from '../ui/LangButton';
 import { demo } from './demo';
 
 /**
@@ -23,7 +24,12 @@ export function Login({ onLoggedIn }: { onLoggedIn: (session: Session, signedUp:
   const { t } = useT();
   // Opened from an invite link: the link is in, whose it is shows, Next goes on to the account.
   const [linkCode] = useState(inviteFromUrl);
-  const [step, setStep] = useState<{ id: Step; back: boolean; n: number }>({ id: linkCode ? 'invite' : 'start', back: false, n: 0 });
+  // The desktop app's "I have an account" (…/?signin): straight to the nickname and password, the question already asked.
+  const [signIn] = useState(() => new URLSearchParams(window.location.search).has('signin'));
+  const [step, setStep] = useState<{ id: Step; back: boolean; n: number }>({ id: linkCode ? 'invite' : signIn ? 'login' : 'start', back: false, n: 0 });
+  useEffect(() => {
+    if (signIn) window.history.replaceState(null, '', window.location.pathname);
+  }, [signIn]);
   const [way, setWay] = useState<Way>('login');
   const [invite, setInvite] = useState(linkCode ?? '');
   const [inviter, setInviter] = useState<string | null>(null);
@@ -184,7 +190,7 @@ export function Login({ onLoggedIn }: { onLoggedIn: (session: Session, signedUp:
   const stage = signInFlow.stage(step.id);
   const parts = { invite: t('account.login.inviteLabel'), account: t('account.account') };
   return (
-    <FlowShell fill={signInFlow.fill(step.id)} label={stage ? t('setup.stageOf', { stage: parts[stage.part], n: stage.n, total: stage.total }) : undefined}>
+    <FlowShell fill={signInFlow.fill(step.id)} label={stage ? t('setup.stageOf', { stage: parts[stage.part], n: stage.n, total: stage.total }) : undefined} corner={<LangButton />}>
       <div key={step.n} className={step.back ? 'flow-swap back-in' : 'flow-swap'}>
         {screen()}
       </div>

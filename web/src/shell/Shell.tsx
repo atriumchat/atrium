@@ -99,7 +99,7 @@ function DesktopShell() {
   // Modest 20px corners, no edge line; everything inside is concentric to them.
   const panel = 'overflow-hidden rounded-[20px] bg-window';
   return (
-    <div className="flex h-full gap-2 bg-background p-2">
+    <div className="flex h-full gap-2 bg-background p-2 [html[data-desktop]_&]:pt-0">
       <ServerRail className={`${panel} w-[72px] shrink-0`} />
       <div className={`${panel} flex w-[320px] shrink-0 flex-col pb-2`}>
         {/* Both lists stay mounted; switching home ↔ server only shows the other, so nothing reloads. */}

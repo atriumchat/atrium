@@ -49,3 +49,7 @@ declare global {
 }
 
 export const desktop: DesktopBridge | undefined = typeof window === 'undefined' ? undefined : window.atriumDesktop;
+
+// In the desktop app the window has no title bar (desktop/main.js, frameless): the page marks itself so its top strip
+// stays clear of the traffic lights (or Windows' buttons) and drags the window (index.css, html[data-desktop]).
+if (desktop) document.documentElement.dataset.desktop = desktop.platform;

@@ -49,6 +49,25 @@ body,
   margin: 0;
 }
 
+/*
+ * The desktop app's window has no title bar (desktop/main.js, frameless): a 36px strip on top stays clear of the
+ * traffic lights or Windows' buttons and drags the window; the app starts under it.
+ */
+html[data-desktop] #root {
+  height: calc(100% - 36px);
+  margin-top: 36px;
+}
+html[data-desktop] body::before {
+  content: "";
+  position: fixed;
+  /* Stops short of the top-right corner: the language button sits there and a drag strip would swallow its clicks. */
+  inset: 0 120px auto 0;
+  z-index: 100;
+  height: 36px;
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
