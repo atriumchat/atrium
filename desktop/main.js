@@ -69,7 +69,7 @@ if (PENDING !== undefined) {
   }
 }
 // Where "Your own server" on the first start leads.
-const SERVER_GUIDE = 'https://atriumchat.club/server-install';
+const SERVER_GUIDE = 'https://gomex.party/server-install';
 // The app's own updates come from the project's GitHub Releases whatever server it talks to, and only signed ones
 // install (updater.js). release-desktop.sh puts the manifest's address into package.json, like the server's; a build
 // without it never updates.
