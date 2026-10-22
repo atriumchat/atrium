@@ -129,6 +129,16 @@
   flex: 1;
   min-height: 12px;
 }
+/* On a monitor the eye goes down the column, there's no thumb to reach for: the buttons follow the content, one gap
+   under it, instead of standing at the window's bottom. The column stays at the top, so the title doesn't move from
+   step to step. */
+@media (min-width: 821px) {
+  .flow-spacer {
+    flex: none;
+    min-height: 0;
+    height: var(--gx-between);
+  }
+}
 .flow-foot {
   display: flex;
   flex-direction: column;

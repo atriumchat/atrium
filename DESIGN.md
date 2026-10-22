@@ -29,6 +29,7 @@ the design system Gomex Flow, one package per platform with one contract (docs/a
 | Inside a block | 8 |
 | Between blocks | 32 |
 | Field label → field | 0 (label sits right on it) |
+| The buttons | on a phone at the bottom, in the thumb's reach; in a window wider than a phone right under the content, 32 below it (the column at the top, the title in place from step to step) |
 
 `useFlowFrame()` computes these for the current screen, so nothing is hard-coded per device.
 
@@ -66,8 +67,8 @@ in a flow; add a token.
   clockwise. One scale for the whole flow; it continues from step to step, never restarts. In a window wider than a
   phone (the web, the desktop app) the same scale is unrolled into a ruler over the column (`TickRuler`): the edge of a
   monitor is too far from the reading and would take a thousand ticks.
-- **FlowStep**: title, line, content, and at the bottom (thumb reach) back as an outlined 48 circle 2 points from the
-  main button. General errors and notes stand over the buttons; a field's own error goes under the field.
+- **FlowStep**: title, line, content, then back as an outlined 48 circle 2 points from the main button: at the bottom on
+  a phone (thumb reach), right under the content in a wider window. General errors and notes stand over the buttons; a field's own error goes under the field.
 - **LineField**: label, big text on a hairline (white while typing, red when wrong), placeholder always, error under it.
 - **RadioRow**: a choice between hairlines, radio on the right (as iOS marks a choice). One option preselected.
 - **FlowPrimary**: the main button, the white pill; `busy` shows a spinner on it, disabled it turns graphite.
