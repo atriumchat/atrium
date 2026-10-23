@@ -7,6 +7,11 @@
 #     PROXY protocol so the app still sees each visitor's real IP (needed for the login rate limits).
 # UDP 443 belongs to LiveKit's TURN, so HTTP/3 is off.
 {
+	# The admin API on a unix socket in Caddy's own /config, not on 127.0.0.1:2019: every container shares the host's
+	# network, so a TCP port would be open to the app's container too, and with it the whole proxy config. `caddy
+	# reload` inside this container still finds it (docs/install.md, "own Caddy blocks").
+	admin unix//config/caddy-admin.sock
+
 	layer4 {
 		:443 {
 			@turn tls sni {$TURN_HOST}.{$DOMAIN}

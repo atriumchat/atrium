@@ -3,11 +3,13 @@
 import asyncio
 import hashlib
 import hmac
+import re
 import secrets
 import sqlite3
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -35,6 +37,7 @@ from .auth import (
     INVITE_RESETS_BY_USER,
     LOGIN_BY_IP,
     LOGIN_BY_NAME,
+    LOGIN_BY_NICK,
     REGISTER_BY_IP,
     RESET_BY_IP,
     RESET_LINKS_BY_USER,
@@ -44,6 +47,7 @@ from .auth import (
     hash_password,
     is_account_admin,
     is_admin,
+    log_event,
     issue_token,
     media_user,
     password_outdated,
@@ -133,7 +137,7 @@ def friend_ids(user_id: str) -> set[str]:
 
 
 class RegisterIn(BaseModel):
-    # A personal invite code (or, for the very first account, INVITE_CODE).
+    # Someone's personal invite code; the first account comes from the setup instead.
     invite: str = Field(max_length=200)
     name: str = Field(min_length=1, max_length=32)
     password: str = Field(min_length=MIN_PASSWORD_LEN, max_length=128)
@@ -193,15 +197,16 @@ def new_invite_code(user_id: str) -> str:
 @router.post("/api/register")
 async def register(body: RegisterIn, request: Request, response: Response):
     REGISTER_BY_IP.check(client_ip(request))
-    inviter = None
-    first_account = not query("SELECT 1 FROM users LIMIT 1")
-    if not (first_account and hmac.compare_digest(body.invite.strip().encode(), INVITE_CODE.encode())):
-        code = normalize_invite(body.invite)
-        rows = query("SELECT * FROM users WHERE invite_code = ?", (code,)) if code else []
-        inviter = rows[0] if rows else None
-        limit = inviter and invite_limit(inviter)
-        if not inviter or (limit is not None and invited_count(inviter["id"]) >= limit):
-            raise ApiError(403, "inviteGone", INVITE_GONE)
+    if not query("SELECT 1 FROM users LIMIT 1"):
+        # The first account comes from the setup (/api/setup), which makes it the admin. Signing up with the setup
+        # code instead would leave the server with no admin at all.
+        raise ApiError(409, "setupNeeded", "Сначала настройте сервер по ссылке от установщика")
+    code = normalize_invite(body.invite)
+    rows = query("SELECT * FROM users WHERE invite_code = ?", (code,)) if code else []
+    inviter = rows[0] if rows else None
+    limit = inviter and invite_limit(inviter)
+    if not inviter or (limit is not None and invited_count(inviter["id"]) >= limit):
+        raise ApiError(403, "inviteGone", INVITE_GONE)
     name = " ".join(body.name.split())
     check_nick(name)
     if find_user_by_name(name):
@@ -246,14 +251,23 @@ async def register(body: RegisterIn, request: Request, response: Response):
     return {"token": issue_token(user_id), "user": user, "recoveryKey": recovery_key, "serverName": server_name()}
 
 
+def check_login_limits(request: Request, name: str) -> None:
+    nick = " ".join(name.split()).casefold()
+    LOGIN_BY_IP.check(client_ip(request))
+    LOGIN_BY_NAME.check(f"{client_ip(request)}|{nick}")
+    LOGIN_BY_NICK.check(nick)
+
+
 @router.post("/api/login")
 async def login(body: LoginIn, request: Request, response: Response):
-    LOGIN_BY_IP.check(client_ip(request))
-    LOGIN_BY_NAME.check(" ".join(body.name.split()).casefold())
+    check_login_limits(request, body.name)
     row = find_user_by_name(body.name)
     valid = await password_work(verify_password, body.password, row["password_hash"] if row else DUMMY_HASH)
     if not row or not valid:
+        log_event("login_failed", nick=" ".join(body.name.split())[:32], ip=client_ip(request))
         raise ApiError(401, "badCredentials", "Неверный ник или пароль")
+    if row.get("removed"):
+        log_event("login_removed", user=row["id"], ip=client_ip(request))
     refuse_removed(row)
     if password_outdated(row["password_hash"]):
         password_hash = await password_work(hash_password, body.password)
@@ -418,6 +432,7 @@ async def change_password(body: PasswordChangeIn, request: Request, response: Re
     await disconnect_user(user["id"])
     version = row["token_version"] + 1
     set_media_cookie(request, response, user["id"], version=version)
+    log_event("password_changed", user=user["id"])
     return {"token": issue_token(user["id"], version=version)}
 
 
@@ -468,12 +483,12 @@ class RecoverIn(BaseModel):
 async def recover(body: RecoverIn, request: Request, response: Response):
     """Forgot the password: nick + recovery key + a new password. The key works once, so the next one comes back
     with the sign-in; old sessions end."""
-    LOGIN_BY_IP.check(client_ip(request))
-    LOGIN_BY_NAME.check(" ".join(body.name.split()).casefold())
+    check_login_limits(request, body.name)
     row = find_user_by_name(body.name)
     stored = row["recovery_hash"] if row and row["recovery_hash"] else DUMMY_HASH
     valid = await password_work(verify_password, normalize_key(body.key), stored)
     if not row or not row["recovery_hash"] or not valid:
+        log_event("recover_failed", nick=" ".join(body.name.split())[:32], ip=client_ip(request))
         raise ApiError(401, "badRecovery", "Неверный ник или ключ восстановления")
     refuse_removed(row)
     password_hash = await password_work(hash_password, body.password)
@@ -521,6 +536,7 @@ def make_reset_link(user_id: str, user: dict = Depends(current_user)):
         raise ApiError(403, "noAdminReset", "Для другого админа ссылку сделать нельзя")
     token = secrets.token_urlsafe(32)
     expires_at = now_ms() + RESET_TTL_MS
+    log_event("reset_link", admin=user["id"], user=user_id)
     execute(
         "INSERT OR REPLACE INTO password_resets (user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)",
         (user_id, token_digest(token), expires_at, now_ms()),
@@ -611,6 +627,7 @@ async def remove_user(user_id: str, user: dict = Depends(current_user)):
         conn.execute("UPDATE users SET removed = 1, token_version = token_version + 1, invite_code = NULL WHERE id = ?", (user_id,))
         conn.execute("DELETE FROM password_resets WHERE user_id = ?", (user_id,))
     await disconnect_user(user_id)
+    log_event("user_removed", admin=user["id"], user=user_id)
     gone = public_user(query("SELECT * FROM users WHERE id = ?", (user_id,))[0])
     await sio.emit("user:updated", gone)
     return gone
@@ -621,6 +638,7 @@ async def let_back(user_id: str, user: dict = Depends(current_user)):
     """The admin changed their mind: they can sign in again with their password."""
     moderation_target(user_id, user)
     execute("UPDATE users SET removed = 0 WHERE id = ?", (user_id,))
+    log_event("user_let_back", admin=user["id"], user=user_id)
     back = public_user(query("SELECT * FROM users WHERE id = ?", (user_id,))[0])
     await sio.emit("user:updated", back)
     return back
@@ -666,7 +684,7 @@ async def upload_avatar(request: Request, user: dict = Depends(current_user)):
     webp = await process_image(make_avatar, data)
     # A fresh random name per upload so browsers never show a cached old picture.
     name = f"{user['id']}-{secrets.token_hex(8)}.webp"
-    (AVATAR_DIR / name).write_bytes(webp)
+    await run_in_threadpool((AVATAR_DIR / name).write_bytes, webp)
     old = query("SELECT avatar FROM users WHERE id = ?", (user["id"],))[0]["avatar"]
     execute("UPDATE users SET avatar = ? WHERE id = ?", (name, user["id"]))
     remove_avatar_file(old)
@@ -688,7 +706,7 @@ async def delete_avatar(user: dict = Depends(current_user)):
 @router.get("/api/avatars/{name}")
 def avatar_file(name: str, user: dict = Depends(media_user)):
     # Names are generated server-side; reject anything that could walk out of the folder.
-    if "/" in name or "\\" in name or not name.endswith(".webp"):
+    if not re.fullmatch(r"[\w.-]+\.webp", name):
         raise HTTPException(status_code=404)
     path = AVATAR_DIR / name
     if not path.is_file():
@@ -809,6 +827,7 @@ async def setup(body: SetupIn, request: Request, response: Response):
     except sqlite3.IntegrityError:
         raise ApiError(409, "alreadySetup", "Сервер уже настроен")
     user = public_user(query("SELECT * FROM users WHERE id = ?", (user_id,))[0])
+    log_event("setup", admin=user_id, ip=client_ip(request))
     set_media_cookie(request, response, user_id)
     await sio.emit("user:new", user)
     return {"token": issue_token(user_id), "user": user}

@@ -58,6 +58,11 @@ def livekit_token(user: dict, room: str) -> str:
     return jwt.encode(claims, LIVEKIT_API_SECRET, algorithm="HS256")
 
 
+def event_data(data) -> dict:
+    """A socket event's data as a dict: clients send one, but a list or a string mustn't crash the handler."""
+    return data if isinstance(data, dict) else {}
+
+
 def livekit_room(kind: str, target: str) -> str:
     """Separate LiveKit room names: only a DM's members ever get a token for its room."""
     return f"voice-{target}" if kind == "channel" else f"dm-{target}"
@@ -190,13 +195,13 @@ async def disconnect(sid, reason=None):
 @sio.on("message:send")
 async def message_send(sid, data):
     user = (await sio.get_session(sid))["user"]
-    channel_id = str((data or {}).get("channelId", ""))
-    if MESSAGES_BY_USER.wait(user["id"]):
-        return socket_error("tooFast", "Слишком часто, пауза пару секунд")
+    channel_id = str(event_data(data).get("channelId", ""))
     try:
-        content, attachments, upload_ids = message_body(user["id"], data)
+        content, attachments, upload_ids = message_body(user["id"], event_data(data))
     except Rejected as e:
         return socket_rejected(e)
+    if MESSAGES_BY_USER.wait(user["id"]):
+        return socket_error("tooFast", "Слишком часто, пауза пару секунд")
     # Text channels, and voice rooms' own chat (the messages beside the call).
     if not query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NULL", (channel_id,)):
         return {"ok": False, "error": "Нет такого канала"}
@@ -226,7 +231,7 @@ async def message_send(sid, data):
 @sio.on("dm:send")
 async def dm_send(sid, data):
     user = (await sio.get_session(sid))["user"]
-    dm = dm_for(user["id"], str((data or {}).get("dmId", "")))
+    dm = dm_for(user["id"], str(event_data(data).get("dmId", "")))
     if not dm:
         return {"ok": False, "error": "Нет такой переписки"}
     if dm["kind"] == "dm" and any(blocked_between(user["id"], m) for m in dm_member_ids(dm["id"]) if m != user["id"]):
@@ -234,7 +239,7 @@ async def dm_send(sid, data):
     if MESSAGES_BY_USER.wait(user["id"]):
         return socket_error("tooFast", "Слишком часто, пауза пару секунд")
     try:
-        content, attachments, upload_ids = message_body(user["id"], data)
+        content, attachments, upload_ids = message_body(user["id"], event_data(data))
     except Rejected as e:
         return socket_rejected(e)
     try:
@@ -266,7 +271,7 @@ async def typing(sid, data):
     user = (await sio.get_session(sid))["user"]
     if TYPING_BY_USER.wait(user["id"]):
         return
-    channel_id = str((data or {}).get("channelId", ""))
+    channel_id = str(event_data(data).get("channelId", ""))
     payload = {"channelId": channel_id, "userId": user["id"]}
     if dm_for(user["id"], channel_id):
         await sio.emit("typing", payload, to=[r for r in dm_rooms(channel_id) if r != user_room(user["id"])])
@@ -278,14 +283,14 @@ async def typing(sid, data):
 async def message_edit(sid, data):
     """Change the text of your own message; pictures and files stay as they were."""
     user = (await sio.get_session(sid))["user"]
-    found = find_message(str((data or {}).get("id", "")))
+    found = find_message(str(event_data(data).get("id", "")))
     # Readable as well as yours: someone who left a group mustn't keep rewriting what they said there.
     if not found or not can_read_message(user["id"], *found):
         return socket_error("noMessage", "Нет такого сообщения")
     table, row = found
     if row["user_id"] != user["id"]:
         return socket_error("ownEditOnly", "Можно менять только свои сообщения")
-    content = str((data or {}).get("content", "")).strip()
+    content = str(event_data(data).get("content", "")).strip()
     if len(content) > MAX_MESSAGE_LEN or (not content and row["attachments"] == "[]"):
         return socket_error("badMessage", "Пустое или слишком длинное сообщение")
     if MESSAGES_BY_USER.wait(user["id"]):
@@ -301,7 +306,7 @@ async def message_edit(sid, data):
 async def message_delete(sid, data):
     """Your own message, or anyone's in a server channel if you're an admin. Its pictures and files go with it."""
     user = (await sio.get_session(sid))["user"]
-    found = find_message(str((data or {}).get("id", "")))
+    found = find_message(str(event_data(data).get("id", "")))
     if not found or not can_read_message(user["id"], *found):
         return socket_error("noMessage", "Нет такого сообщения")
     table, row = found
@@ -333,12 +338,13 @@ CALL_QUALITY_BY_USER = RateLimit(10, 60)
 async def reaction_toggle(sid, data):
     """Add your reaction with this emoji, or take it back if it's already there."""
     user = (await sio.get_session(sid))["user"]
-    emoji = str((data or {}).get("emoji", "")).strip()
-    found = find_message(str((data or {}).get("messageId", "")))
+    emoji = str(event_data(data).get("emoji", "")).strip()
+    found = find_message(str(event_data(data).get("messageId", "")))
     if not found or not can_read_message(user["id"], *found):
         return socket_error("noMessage", "Нет такого сообщения")
     # One emoji (with skin tone / ZWJ joins), never arbitrary text.
-    if not emoji or len(emoji) > MAX_EMOJI_LEN or not re.search(r"[\u2190-\u2bff\U0001f000-\U0001faff]", emoji) or re.search(r"[\w\s]", emoji):
+    keycap = re.fullmatch(r"[0-9#*]\ufe0f?\u20e3", emoji)
+    if not keycap and (not emoji or len(emoji) > MAX_EMOJI_LEN or not re.search(r"[\u2190-\u2bff\U0001f000-\U0001faff]", emoji) or re.search(r"[\w\s]", emoji)):
         return socket_error("notEmoji", "Это не эмодзи")
     if REACTIONS_BY_USER.wait(user["id"]):
         return socket_error("slowDown", "Не так быстро")
@@ -402,20 +408,16 @@ async def voice_join(sid, data):
     user = (await sio.get_session(sid))["user"]
     if VOICE_EVENTS_BY_USER.wait(user["id"]):
         return
-    target = str((data or {}).get("channelId", ""))
+    target = str(event_data(data).get("channelId", ""))
     kind = voice_target(user["id"], target)
     if not kind:
         return
-    if kind == "dm":
-        dm = dm_for(user["id"], target)
-        if dm and dm["kind"] == "dm" and any(blocked_between(user["id"], m) for m in dm_member_ids(target) if m != user["id"]):
-            return
     previous = voice.get(sid)
     voice[sid] = {
         "channelId": target,
         "userId": user["id"],
-        "muted": bool((data or {}).get("muted", False)),
-        "deafened": bool((data or {}).get("deafened", False)),
+        "muted": bool(event_data(data).get("muted", False)),
+        "deafened": bool(event_data(data).get("deafened", False)),
         "video": False,
         "screen": False,
         "kind": kind,
@@ -457,7 +459,7 @@ async def voice_update(sid, data):
         return
     changed = False
     for key in ("muted", "deafened", "video", "screen"):
-        if key in (data or {}) and entry[key] != bool(data[key]):
+        if key in event_data(data) and entry[key] != bool(data[key]):
             entry[key] = bool(data[key])
             changed = True
     # Clients repeat their state (every push-to-talk press, every track change): only a change goes out.
@@ -479,17 +481,17 @@ async def voice_update(sid, data):
 @sio.on("call:decline")
 async def call_decline(sid, data):
     user = (await sio.get_session(sid))["user"]
-    call = calls.get(str((data or {}).get("dmId", "")))
+    call = calls.get(str(event_data(data).get("dmId", "")))
     if call and user["id"] in call["ringing"]:
         call["ringing"].discard(user["id"])
-        await sio.emit("call:state", call_payload(data["dmId"]), to=dm_rooms(data["dmId"]))
+        await sio.emit("call:state", call_payload(event_data(data)["dmId"]), to=dm_rooms(event_data(data)["dmId"]))
 
 
 @sio.on("call:ring")
 async def call_ring(sid, data):
     """Someone in the call rings the members who aren't in it (again)."""
     entry = voice.get(sid)
-    dm_id = str((data or {}).get("dmId", ""))
+    dm_id = str(event_data(data).get("dmId", ""))
     if not entry or entry["channelId"] != dm_id or dm_id not in calls or RINGS_BY_USER.wait(entry["userId"]):
         return
     present = {e["userId"] for e in voice.values() if e["channelId"] == dm_id}
@@ -534,7 +536,7 @@ async def read_socket(sid, data):
     if READS_BY_USER.wait(user["id"]):
         return socket_error("slowDown", "Не так быстро")
     try:
-        conversation_id, at = str((data or {})["conversationId"])[:64], int(data["at"])
+        conversation_id, at = str(event_data(data)["conversationId"])[:64], int(event_data(data)["at"])
     except (KeyError, TypeError, ValueError):
         return {"ok": False, "error": "Нет такого разговора"}
     if not await save_read(user, conversation_id, at):

@@ -60,6 +60,7 @@ cd /opt/atrium/deploy
 docker compose ps                  # what's running
 docker compose logs -f app         # app logs; likewise livekit, caddy
 journalctl -u atrium-backup         # nightly backup log
+docker compose logs app | grep '"event"'   # sign-ins that failed, reset links, people removed, imports
 ```
 
 - **Data:** `data/` (the `hangout.db` database, avatars, uploads), secrets in `.env`, certificates in `caddy-data/`.

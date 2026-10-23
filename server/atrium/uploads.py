@@ -193,9 +193,10 @@ async def upload_file_or_image(request: Request, name: str = "", user: dict = De
                 raise
         else:
             image_id = f"{uuid.uuid4().hex}.webp"
-            (UPLOAD_DIR / image_id).write_bytes(webp)
+            # Writing to disk off the event loop too: a slow disk mustn't hold up chat and calls.
+            await run_in_threadpool((UPLOAD_DIR / image_id).write_bytes, webp)
             if preview:
-                (UPLOAD_DIR / preview_name(image_id)).write_bytes(preview)
+                await run_in_threadpool((UPLOAD_DIR / preview_name(image_id)).write_bytes, preview)
             # file_size here is only what the picture takes on disk, for the daily allowance.
             execute(
                 "INSERT INTO uploads (id, user_id, width, height, created_at, file_size) VALUES (?, ?, ?, ?, ?, ?)",
@@ -209,7 +210,7 @@ async def upload_file_or_image(request: Request, name: str = "", user: dict = De
     if not all(ch.isprintable() for ch in file_name):
         file_name = "файл"
     file_id = f"{uuid.uuid4().hex}.bin"
-    (UPLOAD_DIR / file_id).write_bytes(data)
+    await run_in_threadpool((UPLOAD_DIR / file_id).write_bytes, data)
     execute(
         "INSERT INTO uploads (id, user_id, width, height, created_at, file_name, file_size, file_type) VALUES (?, ?, 0, 0, ?, ?, ?, ?)",
         (file_id, user["id"], now_ms(), file_name, len(data), content_type[:100]),

@@ -77,3 +77,6 @@ AVATAR_DIR = DATA_DIR / "avatars"
 AVATAR_DIR.mkdir(exist_ok=True)
 UPLOAD_DIR = DATA_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
+
+# Times from clients are milliseconds; anything past 2^53 isn't one, and SQLite can't hold numbers past 2^63 anyway.
+MAX_TIME = 2**53

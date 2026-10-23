@@ -4,9 +4,10 @@ import json
 import uuid
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
-from .config import MAX_ATTACHMENTS, MAX_MESSAGE_LEN, MENTION
+from .config import MAX_ATTACHMENTS, MAX_MESSAGE_LEN, MAX_TIME, MENTION
 from .errors import ApiError, Rejected
 from .db import connect_db, execute, now_ms, query
 from .auth import current_user, is_admin
@@ -219,7 +220,7 @@ def unread_counts(user: dict) -> tuple[dict[str, int], dict[str, int]]:
 
 class ReadIn(BaseModel):
     conversationId: str = Field(max_length=64)
-    at: int
+    at: int = Field(ge=0, le=MAX_TIME)
 
 
 async def save_read(user: dict, conversation_id: str, at: int) -> bool:
@@ -227,7 +228,7 @@ async def save_read(user: dict, conversation_id: str, at: int) -> bool:
     readable = query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NULL", (conversation_id,)) or dm_for(user["id"], conversation_id)
     if not readable:
         return False
-    at = min(at, now_ms())
+    at = max(0, min(at, now_ms()))
     execute(
         """INSERT INTO read_states (user_id, conversation_id, read_at) VALUES (?, ?, ?)
            ON CONFLICT (user_id, conversation_id) DO UPDATE SET read_at = MAX(read_at, excluded.read_at)""",
@@ -253,7 +254,7 @@ def history_boundary(before: int | None, before_id: str, prefix: str = "") -> tu
 
 
 @router.get("/api/inbox")
-def inbox(before: int | None = None, before_id: str = Query("", alias="beforeId", max_length=64), user: dict = Depends(current_user)):
+def inbox(before: int | None = Query(None, ge=0, le=MAX_TIME), before_id: str = Query("", alias="beforeId", max_length=64), user: dict = Depends(current_user)):
     """Messages that mention you (or everyone) or answer you, from every channel and your DMs, newest first."""
     marks = read_marks(user)
     mention = f"%<@{user['id']}>%"
@@ -282,7 +283,7 @@ def inbox(before: int | None = None, before_id: str = Query("", alias="beforeId"
 
 
 @router.get("/api/channels/{channel_id}/messages")
-def channel_messages(channel_id: str, before: int | None = None, limit: int = 50,
+def channel_messages(channel_id: str, before: int | None = Query(None, ge=0, le=MAX_TIME), limit: int = 50,
                      before_id: str = Query("", alias="beforeId", max_length=64), user: dict = Depends(current_user)):
     limit = max(1, min(limit, 100))
     if not query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NULL", (channel_id,)):
@@ -389,6 +390,7 @@ def purge_channel(channel_id: str) -> None:
         # No foreign key reaches reactions or read marks (see leave_group), so they go by hand, before the messages.
         conn.execute("DELETE FROM reactions WHERE message_id IN (SELECT id FROM messages WHERE channel_id = ?)", (channel_id,))
         conn.execute("DELETE FROM read_states WHERE conversation_id = ?", (channel_id,))
+        conn.execute("DELETE FROM voice_grants WHERE room = ?", (f"voice-{channel_id}",))
         conn.execute("DELETE FROM messages WHERE channel_id = ?", (channel_id,))
         conn.execute("DELETE FROM channels WHERE id = ?", (channel_id,))
     remove_upload_files(upload_ids)
@@ -432,7 +434,8 @@ async def delete_channel(channel_id: str, user: dict = Depends(current_user)):
     if channel_or_404(channel_id)["kind"] == "text" and query("SELECT COUNT(*) AS n FROM channels WHERE kind = 'text' AND deleted_at IS NULL")[0]["n"] <= 1:
         raise ApiError(400, "lastTextChannel", "Последний текстовый канал удалить нельзя")
     execute("UPDATE channels SET deleted_at = ? WHERE id = ?", (now_ms(), channel_id))
-    purge_deleted_channels()
+    # Clearing out week-old trash removes messages and files: off the event loop.
+    await run_in_threadpool(purge_deleted_channels)
     channels = await send_layout()
     # Whoever was in the room is hung up; their apps leave the LiveKit room once the channel is gone.
     in_room = [sid for sid, e in voice.items() if e["kind"] == "channel" and e["channelId"] == channel_id]

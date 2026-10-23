@@ -3,7 +3,10 @@
 import asyncio
 import hashlib
 import hmac
+import json
+import logging
 import secrets
+import sys
 import time
 from collections import deque
 
@@ -88,7 +91,10 @@ class RateLimit:
 
 
 LOGIN_BY_IP = RateLimit(20, 600)
+# Wrong passwords for one nick from one address; and, much higher, for one nick from anywhere: a stranger guessing
+# can't lock the owner out of their own account by failing eight times.
 LOGIN_BY_NAME = RateLimit(8, 600)
+LOGIN_BY_NICK = RateLimit(40, 600)
 REGISTER_BY_IP = RateLimit(6, 3600)
 UPLOADS_BY_USER = RateLimit(60, 600)
 AVATARS_BY_USER = RateLimit(10, 600)
@@ -99,6 +105,22 @@ INVITE_RESETS_BY_USER = RateLimit(10, 86400)
 INVITE_CHECKS_BY_IP = RateLimit(30, 600)
 RESET_LINKS_BY_USER = RateLimit(20, 3600)
 RESET_BY_IP = RateLimit(30, 600)
+
+
+# Who got in, who didn't and what the admin did, one JSON line each, for working out what happened after the fact.
+# Into the app's own output (docker compose logs app): Caddy keeps no access log, so this is the only trace. Never a
+# password, key or token.
+security_log = logging.getLogger("atrium.security")
+if not security_log.handlers:
+    _handler = logging.StreamHandler(sys.stdout)
+    _handler.setFormatter(logging.Formatter("%(message)s"))
+    security_log.addHandler(_handler)
+    security_log.setLevel(logging.INFO)
+    security_log.propagate = False
+
+
+def log_event(event: str, **fields) -> None:
+    security_log.info(json.dumps({"event": event, "at": int(time.time()), **fields}, ensure_ascii=False))
 
 
 def client_ip(request: Request) -> str:

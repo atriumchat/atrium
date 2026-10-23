@@ -80,5 +80,6 @@ export const errors = {
   'err.removed': 'You can\'t sign in to this server',
   'err.noAdminRemove': 'An admin can\'t be removed',
   'err.removedUser': 'Let them back on the server first',
+  'err.setupNeeded': 'Set the server up first, with the link from the installer',
   'err.tooManyTries': 'Too many attempts, retry in {minutes} min',
 } satisfies Record<keyof typeof source, Entry>;

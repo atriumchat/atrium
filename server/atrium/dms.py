@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
-from .config import MAX_GROUP_MEMBERS
+from .config import MAX_GROUP_MEMBERS, MAX_TIME
 from .errors import ApiError
 from .db import connect_db, execute, now_ms, query
 from .auth import GROUPS_BY_USER, current_user
@@ -206,6 +206,7 @@ async def leave_group(group_id: str, user: dict = Depends(current_user)):
             # along; without this they'd outlive the group. Before the dms row, while its messages still exist.
             conn.execute("DELETE FROM reactions WHERE message_id IN (SELECT id FROM dm_messages WHERE dm_id = ?)", (group_id,))
             conn.execute("DELETE FROM read_states WHERE conversation_id = ?", (group_id,))
+            conn.execute("DELETE FROM voice_grants WHERE room = ?", (f"dm-{group_id}",))
             conn.execute("DELETE FROM dms WHERE id = ?", (group_id,))
     elif group["owner_id"] == user["id"]:
         execute("UPDATE dms SET owner_id = ? WHERE id = ?", (remaining[0], group_id))
@@ -213,6 +214,7 @@ async def leave_group(group_id: str, user: dict = Depends(current_user)):
     for sid in [s for s, e in voice.items() if e["channelId"] == group_id and e["userId"] == user["id"]]:
         del voice[sid]
     await run_in_threadpool(livekit_remove, f"dm-{group_id}", user["id"])
+    execute("DELETE FROM voice_grants WHERE user_id = ? AND room = ?", (user["id"], f"dm-{group_id}"))
     if group_id in calls:
         calls[group_id]["ringing"].discard(user["id"])
         await sync_call(group_id)
@@ -221,7 +223,7 @@ async def leave_group(group_id: str, user: dict = Depends(current_user)):
 
 
 @router.get("/api/dms/{dm_id}/messages")
-def dm_messages(dm_id: str, before: int | None = None, limit: int = 50,
+def dm_messages(dm_id: str, before: int | None = Query(None, ge=0, le=MAX_TIME), limit: int = 50,
                 before_id: str = Query("", alias="beforeId", max_length=64), user: dict = Depends(current_user)):
     if not dm_for(user["id"], dm_id):
         raise ApiError(404, "noDm", "Нет такой переписки")

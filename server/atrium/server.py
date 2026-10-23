@@ -7,6 +7,7 @@ import secrets
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
@@ -73,7 +74,7 @@ async def upload_server_icon(request: Request, user: dict = Depends(current_user
     AVATARS_BY_USER.check(user["id"])
     webp = await process_image(make_avatar, data, SERVER_ICON_SIZE)
     name = f"server-{secrets.token_hex(8)}.webp"
-    (AVATAR_DIR / name).write_bytes(webp)
+    await run_in_threadpool((AVATAR_DIR / name).write_bytes, webp)
     old = icon_file()
     execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('server_icon', ?)", (name,))
     remove_avatar_file(old)
@@ -110,9 +111,13 @@ async def rename_server(body: ServerIn, user: dict = Depends(current_user)):
 # where the server serves the built client; in development Vite serves web/public's copy as it is.
 if WEB_DIST:
 
+    # Read once: the built file only changes with a new image, and a new image is a new process.
+    _manifest = Path(WEB_DIST) / "manifest.webmanifest"
+    BUILT_MANIFEST = _manifest.read_text(encoding="utf-8") if _manifest.is_file() else "{}"
+
     @router.get("/manifest.webmanifest")
     def manifest():
-        built = json.loads((Path(WEB_DIST) / "manifest.webmanifest").read_text(encoding="utf-8"))
+        built = json.loads(BUILT_MANIFEST)
         url = icon_url()
         if url:
             size = f"{SERVER_ICON_SIZE}x{SERVER_ICON_SIZE}"

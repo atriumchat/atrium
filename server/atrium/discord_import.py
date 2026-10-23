@@ -13,9 +13,10 @@ import urllib.request
 import uuid
 
 from fastapi import APIRouter, Depends
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
-from .auth import current_user, is_admin
+from .auth import current_user, is_admin, log_event
 from .channels import channel_name, list_categories, list_channels, send_layout
 from .db import connect_db, now_ms, query
 from .errors import ApiError
@@ -93,7 +94,8 @@ async def import_template(body: ImportIn, user: dict = Depends(current_user)):
     """Creates the template's categories and channels after the ones there are, without those in `skip`."""
     if not is_admin(user):
         raise ApiError(403, "adminImport", "Переносит сервер только админ")
-    found = structure(fetch_template(template_code(body.link)))
+    # Discord answers in up to 10 s: wait for it off the event loop that runs chat and calls.
+    found = structure(await run_in_threadpool(fetch_template, template_code(body.link)))
     skip = set(body.skip)
     plan = [(None, c) for c in found["loose"] if c["key"] not in skip]
     for category in found["categories"]:
@@ -143,4 +145,5 @@ async def import_template(body: ImportIn, user: dict = Depends(current_user)):
             position += 1
             added += 1
     await send_layout()
+    log_event("discord_import", admin=user["id"], added=added, removed=len(empty))
     return {"channels": list_channels(), "categories": list_categories(), "added": added, "removed": len(empty)}
