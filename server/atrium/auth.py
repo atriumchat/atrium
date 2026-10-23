@@ -119,7 +119,7 @@ def public_user(row: dict) -> dict:
         "status": "dnd" if row.get("status") == "dnd" else "online",
         "statusText": row.get("status_text") or "",
         **({"admin": True} if row.get("is_admin") else {}),
-        **({"removed": row["removed"]} if row.get("removed") else {}),
+        **({"removed": True} if row.get("removed") else {}),
     }
 
 

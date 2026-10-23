@@ -204,10 +204,7 @@ async def register(body: RegisterIn, request: Request, response: Response):
             raise ApiError(403, "inviteGone", INVITE_GONE)
     name = " ".join(body.name.split())
     check_nick(name)
-    taken = find_user_by_name(name)
-    if taken:
-        if taken["removed"] == "kicked" and await password_work(verify_password, body.password, taken["password_hash"]):
-            return await come_back(taken, inviter, request, response)
+    if find_user_by_name(name):
         raise ApiError(409, "nickTaken", "Этот ник уже занят")
 
     created_at = now_ms()
@@ -587,37 +584,13 @@ async def reset_password(body: ResetIn, request: Request, response: Response):
     return {"token": issue_token(user_id, version=version), "user": user, "recoveryKey": recovery_key, "serverName": server_name()}
 
 
-# --- admin: kick and ban. Both end every session at once and take the person's invite link away; messages stay. ---
-
-KICKED = "Вас выгнали с сервера. Вернуться можно по новой ссылке-приглашению"
-BANNED = "Вход на этот сервер для вас закрыт"
+# --- admin: taking someone off the server. Out of every device at once, their invite link gone, and no way back in
+# (password, recovery key, reset link, a new invite) until the admin lets them back. Their messages stay. ---
 
 
 def refuse_removed(row: dict) -> None:
-    if row.get("removed") == "kicked":
-        raise ApiError(403, "kicked", KICKED)
     if row.get("removed"):
-        raise ApiError(403, "banned", BANNED)
-
-
-async def come_back(row: dict, inviter: dict | None, request: Request, response: Response) -> dict:
-    """A kicked person signs up again with a new invite, under their own nick and password: the same account comes
-    back, friends with whoever invited them this time."""
-    with connect_db() as conn:
-        conn.execute("UPDATE users SET removed = NULL WHERE id = ? AND removed = 'kicked'", (row["id"],))
-        if inviter:
-            a, b = ordered_pair(inviter["id"], row["id"])
-            conn.execute(
-                "INSERT OR REPLACE INTO friendships (user_a, user_b, requested_by, status, created_at) VALUES (?, ?, ?, 'accepted', ?)",
-                (a, b, inviter["id"], now_ms()),
-            )
-    fresh = query("SELECT * FROM users WHERE id = ?", (row["id"],))[0]
-    user = public_user(fresh)
-    await sio.emit("user:updated", user)
-    if inviter:
-        await notify_friends_changed(inviter["id"], row["id"])
-    set_media_cookie(request, response, row["id"], version=fresh["token_version"])
-    return {"token": issue_token(row["id"], version=fresh["token_version"]), "user": user, "serverName": server_name()}
+        raise ApiError(403, "removed", "Вход на этот сервер для вас закрыт")
 
 
 def moderation_target(user_id: str, admin: dict) -> dict:
@@ -627,41 +600,27 @@ def moderation_target(user_id: str, admin: dict) -> dict:
     if not rows:
         raise ApiError(404, "noUser", "Нет такого пользователя")
     if rows[0]["is_admin"]:
-        raise ApiError(403, "noAdminRemove", "Админа выгнать нельзя")
+        raise ApiError(403, "noAdminRemove", "Админа убрать нельзя")
     return rows[0]
 
 
-async def remove_user(user_id: str, admin: dict, how: str) -> dict:
-    moderation_target(user_id, admin)
+@router.post("/api/users/{user_id}/remove")
+async def remove_user(user_id: str, user: dict = Depends(current_user)):
+    moderation_target(user_id, user)
     with connect_db() as conn:
-        conn.execute(
-            "UPDATE users SET removed = ?, token_version = token_version + 1, invite_code = NULL WHERE id = ?",
-            (how, user_id),
-        )
+        conn.execute("UPDATE users SET removed = 1, token_version = token_version + 1, invite_code = NULL WHERE id = ?", (user_id,))
         conn.execute("DELETE FROM password_resets WHERE user_id = ?", (user_id,))
     await disconnect_user(user_id)
-    user = public_user(query("SELECT * FROM users WHERE id = ?", (user_id,))[0])
-    await sio.emit("user:updated", user)
-    return user
-
-
-@router.post("/api/users/{user_id}/kick")
-async def kick(user_id: str, user: dict = Depends(current_user)):
-    """Out of every device; back only by a new invite (as themselves, with their own password)."""
-    return await remove_user(user_id, user, "kicked")
-
-
-@router.post("/api/users/{user_id}/ban")
-async def ban(user_id: str, user: dict = Depends(current_user)):
-    """Out of every device and not back in, not even by an invite, until the admin lets them."""
-    return await remove_user(user_id, user, "banned")
+    gone = public_user(query("SELECT * FROM users WHERE id = ?", (user_id,))[0])
+    await sio.emit("user:updated", gone)
+    return gone
 
 
 @router.delete("/api/users/{user_id}/removed")
 async def let_back(user_id: str, user: dict = Depends(current_user)):
     """The admin changed their mind: they can sign in again with their password."""
     moderation_target(user_id, user)
-    execute("UPDATE users SET removed = NULL WHERE id = ?", (user_id,))
+    execute("UPDATE users SET removed = 0 WHERE id = ?", (user_id,))
     back = public_user(query("SELECT * FROM users WHERE id = ?", (user_id,))[0])
     await sio.emit("user:updated", back)
     return back

@@ -77,9 +77,8 @@ export const errors = {
   'err.templateUnavailable': 'Discord didn\'t answer, try again',
   'err.importNothing': 'Nothing to move',
   'err.adminImport': 'Only the admin moves the server',
-  'err.kicked': 'You were kicked from this server. A new invite link brings you back',
-  'err.banned': 'You are banned from this server',
-  'err.noAdminRemove': 'An admin can\'t be kicked',
+  'err.removed': 'You can\'t sign in to this server',
+  'err.noAdminRemove': 'An admin can\'t be removed',
   'err.removedUser': 'Let them back on the server first',
   'err.tooManyTries': 'Too many attempts, retry in {minutes} min',
 } satisfies Record<keyof typeof source, Entry>;

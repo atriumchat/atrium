@@ -135,8 +135,7 @@ export const api = {
   recover: (name: string, key: string, password: string) => request<Session>('/api/recover', post({ name, key, password })),
   /** Admin only: a one-time token for a new password for this person. A newer one replaces it. */
   makeResetLink: (userId: string) => request<{ token: string; expiresAt: number }>(`/api/users/${userId}/reset-link`, post()),
-  kickUser: (userId: string) => request<User>(`/api/users/${userId}/kick`, post()),
-  banUser: (userId: string) => request<User>(`/api/users/${userId}/ban`, post()),
+  removeUser: (userId: string) => request<User>(`/api/users/${userId}/remove`, post()),
   letBack: (userId: string) => request<User>(`/api/users/${userId}/removed`, { method: 'DELETE' }),
   checkReset: (token: string) => request<{ name: string }>('/api/reset/check', post({ token })),
   reset: (token: string, password: string) => request<Session>('/api/reset', post({ token, password })),

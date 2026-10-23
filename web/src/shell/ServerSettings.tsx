@@ -330,7 +330,7 @@ function TrashRow() {
   );
 }
 
-/** Only while someone is off the server: who the admin kicked or banned, each with "Let back". */
+/** Only while someone is off the server: who the admin removed, each with "Let back". */
 function RemovedRow() {
   const { t } = useT();
   const users = useStore((s) => s.users);
@@ -355,7 +355,6 @@ function RemovedRow() {
               key={u.id}
               icon={<Avatar user={u} size={32} ringBg="var(--default)" />}
               title={u.name}
-              value={t(u.removed === 'banned' ? 'people.admin.banned' : 'people.admin.kicked')}
             >
               <Secondary onPress={() => api.letBack(u.id).then(addUser, (e) => showError(e instanceof Error ? e.message : t('settings.server.failed')))}>
                 {t('people.admin.letBack')}

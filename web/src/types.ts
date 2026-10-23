@@ -12,8 +12,8 @@ export type User = {
   statusText?: string;
   /** Holds the server's admin flag. */
   admin?: true;
-  /** The admin took them off the server; their messages stay. */
-  removed?: 'kicked' | 'banned';
+  /** The admin took them off the server until they let them back; their messages stay. */
+  removed?: true;
 };
 
 export type MyStatus = 'online' | 'dnd' | 'invisible';

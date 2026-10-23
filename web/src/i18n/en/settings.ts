@@ -46,7 +46,7 @@ export const settings = {
   'settings.server.importRoles': 'Roles in the template: {n}, not moved yet',
   'settings.server.importDone': 'Channels moved: {n}',
   'settings.server.importLoose': 'No category',
-  'settings.server.removed': 'Kicked and banned',
+  'settings.server.removed': 'Removed from the server',
   'settings.server.restore': 'Restore',
   'settings.server.trashMessages': { one: '{n} message', other: '{n} messages' },
   'settings.playground.bubbles': 'Bubbles',
