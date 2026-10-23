@@ -26,7 +26,10 @@ export function accountSlice(): AccountSlice {
 }
 
 export function initStore(data: Bootstrap) {
-  if (get().me?.id !== data.me.id) resetStore();
+  const fresh = get().me?.id !== data.me.id;
+  if (fresh) resetStore();
+  // A demo's guest starts on the server, in its first channel, not on an empty Chats page.
+  if (fresh && data.isGuest) set({ mode: 'server', mobileTab: 'server' });
   const firstText = data.channels.find((c) => c.kind === 'text');
   set({
     serverName: data.serverName,
