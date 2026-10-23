@@ -51,11 +51,17 @@ body,
 
 /*
  * The desktop app's window has no title bar (desktop/main.js, frameless): a 36px strip on top stays clear of the
- * traffic lights or Windows' buttons and drags the window; the app starts under it.
+ * traffic lights or Windows' buttons and drags the window; the app starts under it. The strip is the body's padding:
+ * as #root's margin it went through the body, the page came out 36px taller than the window, and a scroll moved the
+ * whole app up under the traffic lights. The page itself never scrolls; only the panes inside it do.
  */
-html[data-desktop] #root {
-  height: calc(100% - 36px);
-  margin-top: 36px;
+html[data-desktop],
+html[data-desktop] body {
+  overflow: hidden;
+}
+html[data-desktop] body {
+  box-sizing: border-box;
+  padding-top: 36px;
 }
 html[data-desktop] body::before {
   content: "";
