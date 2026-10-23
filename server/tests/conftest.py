@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import pytest
 from fastapi.testclient import TestClient
 
-from atrium import auth
+from atrium import auth, realtime, users
 
 
 @pytest.fixture(scope="session")
@@ -22,7 +22,9 @@ def client():
 
 @pytest.fixture(autouse=True)
 def fresh_rate_limits():
-    """Every limit counts per process; one test's tries mustn't lock the next one out."""
-    for value in vars(auth).values():
-        if isinstance(value, auth.RateLimit):
-            value.hits.clear()
+    """Every limit counts per process; one test's tries mustn't lock the next one out. Limits live in several modules
+    (the setup one in users, the socket ones in realtime)."""
+    for module in (auth, users, realtime):
+        for value in vars(module).values():
+            if isinstance(value, auth.RateLimit):
+                value.hits.clear()

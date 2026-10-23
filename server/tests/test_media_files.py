@@ -1,10 +1,14 @@
 """Video and audio in the chat play inline; anything else stays a download. Run: .venv/bin/pytest"""
 
+import pytest
 from fastapi.testclient import TestClient
+
+from atrium import auth
 
 PASSWORD = "correct horse battery"
 
 
+@pytest.fixture(scope="module")
 def signed_in():
     from app import app
 
@@ -14,7 +18,10 @@ def signed_in():
     if r.status_code == 409:  # another test file set the server up first, with the same admin
         r = client.post("/api/login", json={"name": "Админ", "password": PASSWORD})
     assert r.status_code == 200, r.text
-    return client, {"Authorization": f"Bearer {r.json()['token']}"}
+    yield client, {"Authorization": f"Bearer {r.json()['token']}"}
+    # The next file's module fixture signs in before the per-test reset runs.
+    for limit in (auth.LOGIN_BY_IP, auth.LOGIN_BY_NAME, auth.LOGIN_BY_NICK):
+        limit.hits.clear()
 
 
 def upload(client, headers, name: str, data: bytes) -> str:
@@ -23,8 +30,8 @@ def upload(client, headers, name: str, data: bytes) -> str:
     return r.json()["url"]
 
 
-def test_video_and_audio_go_out_as_media_with_ranges():
-    client, headers = signed_in()
+def test_video_and_audio_go_out_as_media_with_ranges(signed_in):
+    client, headers = signed_in
     video = upload(client, headers, "clip.MP4", b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 200)
     r = client.get(video)
     assert r.status_code == 200
@@ -38,8 +45,8 @@ def test_video_and_audio_go_out_as_media_with_ranges():
     assert client.get(upload(client, headers, "voice.ogg", b"OggS" + b"\x00" * 50)).headers["content-type"] == "audio/ogg"
 
 
-def test_other_files_stay_downloads_whatever_type_was_claimed():
-    client, headers = signed_in()
+def test_other_files_stay_downloads_whatever_type_was_claimed(signed_in):
+    client, headers = signed_in
     page = client.get(upload(client, headers, "page.html", b"<script>alert(1)</script>"))
     assert page.headers["content-type"] == "application/octet-stream"
     assert page.headers["content-disposition"].startswith("attachment;")
