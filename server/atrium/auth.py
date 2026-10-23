@@ -118,6 +118,8 @@ def public_user(row: dict) -> dict:
         # Invisible people look like everyone else here; they're simply left out of who's online.
         "status": "dnd" if row.get("status") == "dnd" else "online",
         "statusText": row.get("status_text") or "",
+        **({"admin": True} if row.get("is_admin") else {}),
+        **({"removed": row["removed"]} if row.get("removed") else {}),
     }
 
 
@@ -141,7 +143,7 @@ def user_from_token(token: str | None, scope: str = "api") -> dict | None:
         return None
     rows = query("SELECT * FROM users WHERE id = ?", (payload.get("sub"),))
     # A token from before the last password change or recovery no longer counts.
-    if not rows or rows[0]["token_version"] != payload.get("v", 0):
+    if not rows or rows[0]["token_version"] != payload.get("v", 0) or rows[0].get("removed"):
         return None
     return {**public_user(rows[0]), "_authVersion": rows[0]["token_version"]}
 

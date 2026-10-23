@@ -42,6 +42,7 @@ export const settings = {
   'settings.server.importRoles': 'Ролей в шаблоне: {n}, пока не переносятся',
   'settings.server.importDone': 'Перенесено каналов: {n}',
   'settings.server.importLoose': 'Без категории',
+  'settings.server.removed': 'Выгнанные и забаненные',
   'settings.server.restore': 'Вернуть',
   'settings.server.trashMessages': {
     one: '{n} сообщение',

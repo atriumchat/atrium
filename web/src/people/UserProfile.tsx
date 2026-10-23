@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { Button, Dropdown, Label, Popover } from '@heroui/react';
 import { api } from '../api';
-import { messageUser, showError, useStore } from '../store';
+import { addUser, messageUser, showError, useStore } from '../store';
 import type { MyStatus, User } from '../types';
 import { Avatar } from '../ui/Avatar';
 import { ConfirmDialog } from '../ui/Dialog';
@@ -69,7 +69,9 @@ export function ProfileCard({ userId, onClose }: { userId: string; onClose: () =
     );
   }
 
-  const presence = room ? t('people.profile.inRoom', { room }) : online ? (user.status === 'dnd' ? t('people.profile.dnd') : t('people.profile.online')) : t('people.profile.offline');
+  const presence = user.removed
+    ? t(user.removed === 'banned' ? 'people.admin.banned' : 'people.admin.kicked')
+    : room ? t('people.profile.inRoom', { room }) : online ? (user.status === 'dnd' ? t('people.profile.dnd') : t('people.profile.online')) : t('people.profile.offline');
   const dot = room || (online && user.status !== 'dnd') ? 'bg-success' : online ? 'bg-danger' : 'bg-faint';
   // Someone else's card, top to bottom (as in the native app): who they are and where they are now; what you can
   // do as three equal tiles; what there is to know about them in one group; blocking apart at the foot.
@@ -123,7 +125,8 @@ export function ProfileCard({ userId, onClose }: { userId: string; onClose: () =
         <div className="overflow-hidden rounded-[18px] bg-default">
           <BlockButton userId={userId} name={user.name} />
         </div>
-        {isAdmin && <ResetLinkButton userId={userId} name={user.name} />}
+        {isAdmin && !user.admin && <ServerActions user={user} />}
+        {isAdmin && !user.removed && <ResetLinkButton userId={userId} name={user.name} />}
       </div>
     </div>
   );
@@ -290,6 +293,53 @@ function BlockButton({ userId, name }: { userId: string; name: string }) {
         />
       )}
     </>
+  );
+}
+
+/**
+ * The admin's say over someone on the server: kick (out everywhere, back only by a new invite) or ban (not back at
+ * all); once done, letting them back. Apart from the personal block above, which only concerns the two of you.
+ */
+function ServerActions({ user }: { user: User }) {
+  const { t } = useT();
+  const [asking, setAsking] = useState<'kick' | 'ban' | null>(null);
+
+  async function run(action: () => Promise<User>) {
+    try {
+      addUser(await action());
+    } catch (e) {
+      showError(e instanceof Error ? e.message : t('people.failed'));
+    }
+  }
+
+  const row = 'w-full px-4 py-3 text-left text-[15px] transition-colors hover:bg-white/[0.06]';
+  return (
+    <div className="overflow-hidden rounded-[18px] bg-default">
+      {user.removed ? (
+        <button onClick={() => void run(() => api.letBack(user.id))} className={row}>
+          {t('people.admin.letBack')}
+        </button>
+      ) : (
+        <>
+          <button onClick={() => setAsking('kick')} className={`${row} text-danger`}>
+            {t('people.admin.kick')}
+          </button>
+          <div className="ml-4 h-px bg-white/[0.08]" />
+          <button onClick={() => setAsking('ban')} className={`${row} text-danger`}>
+            {t('people.admin.ban')}
+          </button>
+        </>
+      )}
+      {asking && (
+        <ConfirmDialog
+          title={t(asking === 'kick' ? 'people.admin.kickTitle' : 'people.admin.banTitle', { name: user.name })}
+          text={t(asking === 'kick' ? 'people.admin.kickText' : 'people.admin.banText')}
+          confirmLabel={t(asking === 'kick' ? 'people.admin.kick' : 'people.admin.ban')}
+          onConfirm={() => run(() => (asking === 'kick' ? api.kickUser(user.id) : api.banUser(user.id)))}
+          onClose={() => setAsking(null)}
+        />
+      )}
+    </div>
   );
 }
 

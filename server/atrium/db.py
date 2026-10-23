@@ -276,6 +276,10 @@ def init_db() -> None:
         if "status_until" not in user_columns:
             # When a timed "do not disturb" / "invisible" runs out and you're back online (ms); NULL = until changed.
             conn.execute("ALTER TABLE users ADD COLUMN status_until INTEGER")
+        if "removed" not in user_columns:
+            # The admin took them off the server: 'kicked' (back only by a new invite) or 'banned' (not back at all).
+            # Their messages stay, under their name.
+            conn.execute("ALTER TABLE users ADD COLUMN removed TEXT")
         conn.executescript(
             """
             -- user_id doesn't want to hear from blocked_id: no DMs or calls between them, no friend requests,

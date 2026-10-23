@@ -10,6 +10,7 @@ import discordClip from './discord-template.mp4';
 import { adminForm, codeFrom, CODE_LENGTH, firstRun, type FirstRunStep } from '@atrium/setup';
 import { FlowPrimary, FlowSecondary, FlowShell, FlowStep, LineField, TextAction } from '@atrium/ui-web';
 import { LangButton } from '../ui/LangButton';
+import { MovePostDialog } from '../people/MovePost';
 import './setupWizard.css';
 
 /**
@@ -59,6 +60,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   const [found, setFound] = useState<DiscordPreview | null>(null);
   const [link, setLink] = useState(account ? `${window.location.origin}/?invite=7F3K9QAB` : '');
   const [linkSent, setLinkSent] = useState<'copied' | 'shared' | null>(null);
+  const [posting, setPosting] = useState(false);
 
   const name = serverName.trim() || defaultName;
 
@@ -393,6 +395,8 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
           >
             <p className="flow-big" style={{ fontSize: 22, lineHeight: '28px', letterSpacing: 0 }}>{link.replace(/^https?:\/\//, '') || t('setup.invite.loading')}</p>
             {canShare ? <TextAction left onPress={() => void copyLink()}>{linkSent === 'copied' ? t('common.copy.done') : t('common.copy.label')}</TextAction> : null}
+            {link ? <TextAction left onPress={() => setPosting(true)}>{t('people.move.button')}</TextAction> : null}
+            {posting ? <MovePostDialog serverName={name} serverIcon={preview} link={link} onClose={() => setPosting(false)} /> : null}
           </FlowStep>
         );
     }

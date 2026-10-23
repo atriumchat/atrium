@@ -2,8 +2,9 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { toast } from '@heroui/react';
 import { api } from '../api';
 import { useT } from '../i18n';
-import { setChannels, showError, useStore } from '../store';
+import { addUser, setChannels, showError, useStore } from '../store';
 import { ServerMark } from '../ui/Logo';
+import { Avatar } from '../ui/Avatar';
 import { IconCropper, centred, cropToBlob, loadImage, type Crop } from '../ui/IconCropper';
 import { shortStamp } from '../chat/format';
 import type { DeletedChannel, DiscordChannel, DiscordPreview } from '../types';
@@ -23,6 +24,7 @@ export function ServerSettings() {
         <NameRow />
         <ImportRow />
         <TrashRow />
+        <RemovedRow />
       </Rows>
     );
   }
@@ -35,6 +37,7 @@ export function ServerSettings() {
       <Rows className="mt-6">
         <ImportRow />
         <TrashRow />
+        <RemovedRow />
       </Rows>
     </>
   );
@@ -318,6 +321,44 @@ function TrashRow() {
                 onPress={() => api.restoreChannel(c.id).then(setChannels, (e) => showError(e instanceof Error ? e.message : t('settings.server.failed')))}
               >
                 {t('settings.server.restore')}
+              </Secondary>
+            </Row>
+          ))}
+        </Rows>
+      </SubPage>
+    </>
+  );
+}
+
+/** Only while someone is off the server: who the admin kicked or banned, each with "Let back". */
+function RemovedRow() {
+  const { t } = useT();
+  const users = useStore((s) => s.users);
+  const removed = Object.values(users).filter((u) => u.removed).sort((a, b) => a.name.localeCompare(b.name));
+  const sub = useSub();
+  const { open, hide } = sub;
+  useEffect(() => {
+    if (open && removed.length === 0) hide();
+  }, [open, removed.length, hide]);
+
+  return (
+    <>
+      {removed.length > 0 && (
+        <Row title={t('settings.server.removed')} onPress={sub.show}>
+          <RowValue>{removed.length}</RowValue>
+        </Row>
+      )}
+      <SubPage open={open} title={t('settings.server.removed')} onClose={hide}>
+        <Rows className="max-md:mt-2">
+          {removed.map((u) => (
+            <Row
+              key={u.id}
+              icon={<Avatar user={u} size={32} ringBg="var(--default)" />}
+              title={u.name}
+              value={t(u.removed === 'banned' ? 'people.admin.banned' : 'people.admin.kicked')}
+            >
+              <Secondary onPress={() => api.letBack(u.id).then(addUser, (e) => showError(e instanceof Error ? e.message : t('settings.server.failed')))}>
+                {t('people.admin.letBack')}
               </Secondary>
             </Row>
           ))}

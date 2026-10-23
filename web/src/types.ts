@@ -10,6 +10,10 @@ export type User = {
   /** "dnd" shows a red "do not disturb" mark; invisible people look offline and appear as "online" here. */
   status?: 'online' | 'dnd';
   statusText?: string;
+  /** Holds the server's admin flag. */
+  admin?: true;
+  /** The admin took them off the server; their messages stay. */
+  removed?: 'kicked' | 'banned';
 };
 
 export type MyStatus = 'online' | 'dnd' | 'invisible';

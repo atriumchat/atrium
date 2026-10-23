@@ -204,7 +204,10 @@ async def register(body: RegisterIn, request: Request, response: Response):
             raise ApiError(403, "inviteGone", INVITE_GONE)
     name = " ".join(body.name.split())
     check_nick(name)
-    if find_user_by_name(name):
+    taken = find_user_by_name(name)
+    if taken:
+        if taken["removed"] == "kicked" and await password_work(verify_password, body.password, taken["password_hash"]):
+            return await come_back(taken, inviter, request, response)
         raise ApiError(409, "nickTaken", "Этот ник уже занят")
 
     created_at = now_ms()
@@ -254,6 +257,7 @@ async def login(body: LoginIn, request: Request, response: Response):
     valid = await password_work(verify_password, body.password, row["password_hash"] if row else DUMMY_HASH)
     if not row or not valid:
         raise ApiError(401, "badCredentials", "Неверный ник или пароль")
+    refuse_removed(row)
     if password_outdated(row["password_hash"]):
         password_hash = await password_work(hash_password, body.password)
         with connect_db() as conn:
@@ -474,6 +478,7 @@ async def recover(body: RecoverIn, request: Request, response: Response):
     valid = await password_work(verify_password, normalize_key(body.key), stored)
     if not row or not row["recovery_hash"] or not valid:
         raise ApiError(401, "badRecovery", "Неверный ник или ключ восстановления")
+    refuse_removed(row)
     password_hash = await password_work(hash_password, body.password)
     recovery_key, recovery_hash = await fresh_recovery_key()
     with connect_db() as conn:
@@ -509,9 +514,11 @@ def make_reset_link(user_id: str, user: dict = Depends(current_user)):
     if not is_account_admin(user["id"]):
         raise ApiError(403, "adminOnly", "Это может только админ")
     RESET_LINKS_BY_USER.check(user["id"])
-    rows = query("SELECT id, is_admin FROM users WHERE id = ?", (user_id,))
+    rows = query("SELECT id, is_admin, removed FROM users WHERE id = ?", (user_id,))
     if not rows:
         raise ApiError(404, "noUser", "Нет такого пользователя")
+    if rows[0]["removed"]:
+        raise ApiError(409, "removedUser", "Сначала верните человека на сервер")
     if rows[0]["is_admin"] and user_id != user["id"]:
         # Servers have one admin; with several (ADMINS), one must not be able to take another's account.
         raise ApiError(403, "noAdminReset", "Для другого админа ссылку сделать нельзя")
@@ -578,6 +585,86 @@ async def reset_password(body: ResetIn, request: Request, response: Response):
     set_media_cookie(request, response, user_id, version=version)
     user = public_user(query("SELECT * FROM users WHERE id = ?", (user_id,))[0])
     return {"token": issue_token(user_id, version=version), "user": user, "recoveryKey": recovery_key, "serverName": server_name()}
+
+
+# --- admin: kick and ban. Both end every session at once and take the person's invite link away; messages stay. ---
+
+KICKED = "Вас выгнали с сервера. Вернуться можно по новой ссылке-приглашению"
+BANNED = "Вход на этот сервер для вас закрыт"
+
+
+def refuse_removed(row: dict) -> None:
+    if row.get("removed") == "kicked":
+        raise ApiError(403, "kicked", KICKED)
+    if row.get("removed"):
+        raise ApiError(403, "banned", BANNED)
+
+
+async def come_back(row: dict, inviter: dict | None, request: Request, response: Response) -> dict:
+    """A kicked person signs up again with a new invite, under their own nick and password: the same account comes
+    back, friends with whoever invited them this time."""
+    with connect_db() as conn:
+        conn.execute("UPDATE users SET removed = NULL WHERE id = ? AND removed = 'kicked'", (row["id"],))
+        if inviter:
+            a, b = ordered_pair(inviter["id"], row["id"])
+            conn.execute(
+                "INSERT OR REPLACE INTO friendships (user_a, user_b, requested_by, status, created_at) VALUES (?, ?, ?, 'accepted', ?)",
+                (a, b, inviter["id"], now_ms()),
+            )
+    fresh = query("SELECT * FROM users WHERE id = ?", (row["id"],))[0]
+    user = public_user(fresh)
+    await sio.emit("user:updated", user)
+    if inviter:
+        await notify_friends_changed(inviter["id"], row["id"])
+    set_media_cookie(request, response, row["id"], version=fresh["token_version"])
+    return {"token": issue_token(row["id"], version=fresh["token_version"]), "user": user, "serverName": server_name()}
+
+
+def moderation_target(user_id: str, admin: dict) -> dict:
+    if not is_account_admin(admin["id"]):
+        raise ApiError(403, "adminOnly", "Это может только админ")
+    rows = query("SELECT * FROM users WHERE id = ?", (user_id,))
+    if not rows:
+        raise ApiError(404, "noUser", "Нет такого пользователя")
+    if rows[0]["is_admin"]:
+        raise ApiError(403, "noAdminRemove", "Админа выгнать нельзя")
+    return rows[0]
+
+
+async def remove_user(user_id: str, admin: dict, how: str) -> dict:
+    moderation_target(user_id, admin)
+    with connect_db() as conn:
+        conn.execute(
+            "UPDATE users SET removed = ?, token_version = token_version + 1, invite_code = NULL WHERE id = ?",
+            (how, user_id),
+        )
+        conn.execute("DELETE FROM password_resets WHERE user_id = ?", (user_id,))
+    await disconnect_user(user_id)
+    user = public_user(query("SELECT * FROM users WHERE id = ?", (user_id,))[0])
+    await sio.emit("user:updated", user)
+    return user
+
+
+@router.post("/api/users/{user_id}/kick")
+async def kick(user_id: str, user: dict = Depends(current_user)):
+    """Out of every device; back only by a new invite (as themselves, with their own password)."""
+    return await remove_user(user_id, user, "kicked")
+
+
+@router.post("/api/users/{user_id}/ban")
+async def ban(user_id: str, user: dict = Depends(current_user)):
+    """Out of every device and not back in, not even by an invite, until the admin lets them."""
+    return await remove_user(user_id, user, "banned")
+
+
+@router.delete("/api/users/{user_id}/removed")
+async def let_back(user_id: str, user: dict = Depends(current_user)):
+    """The admin changed their mind: they can sign in again with their password."""
+    moderation_target(user_id, user)
+    execute("UPDATE users SET removed = NULL WHERE id = ?", (user_id,))
+    back = public_user(query("SELECT * FROM users WHERE id = ?", (user_id,))[0])
+    await sio.emit("user:updated", back)
+    return back
 
 
 def blocked_ids(user_id: str) -> list[str]:

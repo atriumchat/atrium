@@ -10,6 +10,7 @@ import { ConfirmDialog, Window } from '../ui/Dialog';
 import { Row, RowIcon } from '../ui/settings';
 import { CopyButton } from '../ui/CopyButton';
 import { CheckIcon, UserPlusIcon, XIcon } from '../ui/icons';
+import { MovePostDialog } from './MovePost';
 
 const BANNER_HIDDEN = 'atrium_invite_banner_hidden';
 
@@ -165,7 +166,9 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
   const [invite, setInvite] = useMyInvite();
   const [copied, setCopied] = useState(false);
   const [resetting, setResetting] = useState(false);
-
+  const [posting, setPosting] = useState(false);
+  const serverName = useStore((s) => s.serverName);
+  const serverIcon = useStore((s) => s.serverIcon);
 
   const link = invite ? inviteLink(invite.code) : '';
   const used = invite?.invited.length ?? 0;
@@ -238,6 +241,11 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
         <p className="mt-1 text-[14px] leading-snug text-muted">
           {limit === null ? t('people.invite.descNoLimit') : t('people.invite.desc', { n: limit })}
         </p>
+        {invite && limit === null && (
+          <button onClick={() => setPosting(true)} className="mt-2 text-[14px] text-foreground underline-offset-4 hover:underline">
+            {t('people.move.button')}
+          </button>
+        )}
       </div>
 
       <div className="px-6 pt-5">
@@ -269,6 +277,7 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
           </ul>
         )}
       </div>
+      {posting && <MovePostDialog serverName={serverName} serverIcon={serverIcon} link={link} onClose={() => setPosting(false)} />}
       {resetting && (
         <ConfirmDialog
           title={t('people.invite.resetTitle')}

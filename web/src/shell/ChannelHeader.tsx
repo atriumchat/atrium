@@ -73,7 +73,8 @@ function OnlinePeople() {
   const voiceState = useStore((s) => s.voiceState);
   const channels = useStore((s) => s.channels);
   const onlineSet = new Set(online);
-  const sorted = Object.values(users).sort((a, b) => a.name.localeCompare(b.name, localeOf(lang)));
+  // Whoever the admin took off the server isn't on it any more.
+  const sorted = Object.values(users).filter((u) => !u.removed).sort((a, b) => a.name.localeCompare(b.name, localeOf(lang)));
   const onlineUsers = sorted.filter((u) => onlineSet.has(u.id));
   const offlineUsers = sorted.filter((u) => !onlineSet.has(u.id));
   const roomOf = (id: string) => {
