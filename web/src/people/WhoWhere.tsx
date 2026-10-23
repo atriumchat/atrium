@@ -22,8 +22,9 @@ const CARD_GUTTER = 12;
 
 /**
  * The phone's "who is in voice right now", as cards (the native app's): the people first, the room under them.
- * Green is the room you're in, pink the others; only rooms with someone in them. With everyone out, one quiet
- * line with the way into the room you used last. A tap opens the room (with its Join button), never joins.
+ * Green is the room you're in, pink the others; only rooms with someone in them. With everyone out, the phone gets
+ * one quiet line with the way into the room you used last; the computer's Friends page shows nothing, its own
+ * empty state is right below. A tap opens the room (with its Join button), never joins.
  */
 export function RoomCards({ grid = false }: { grid?: boolean }) {
   const { t } = useT();
@@ -39,9 +40,10 @@ export function RoomCards({ grid = false }: { grid?: boolean }) {
     .sort((a, b) => Number(b.room.id === myRoomId) - Number(a.room.id === myRoomId) || b.people.length - a.people.length || a.room.position - b.room.position);
 
   if (live.length === 0) {
+    if (grid) return null;
     const last = rooms.find((r) => r.id === lastRoomId()) ?? [...rooms].sort((a, b) => a.position - b.position)[0]!;
     return (
-      <div style={{ paddingInline: grid ? 0 : CARD_GUTTER }} className={grid ? 'max-w-[572px]' : ''}>
+      <div style={{ paddingInline: CARD_GUTTER }}>
         <button
           onClick={() => (isMobile ? selectChannel(last.id) : joinVoice(last.id))}
           aria-label={t('people.who.joinRoom', { name: last.name })}
@@ -60,7 +62,7 @@ export function RoomCards({ grid = false }: { grid?: boolean }) {
   const single = live.length === 1;
   if (grid) {
     return (
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 px-1 pb-4">
         {live.map((r) => <RoomCard key={r.room.id} room={r.room} people={r.people} mine={r.room.id === myRoomId} single={false} onPress={() => (r.room.id === myRoomId ? selectChannel(r.room.id) : joinVoice(r.room.id))} />)}
       </div>
     );

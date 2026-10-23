@@ -90,29 +90,34 @@ export function InviteBanner() {
     }
   }
 
+  // Who came by your link, as faces and a count; the places left only when the link has a limit.
+  const joined = invite.invited.length;
+  const status = [joined > 0 ? t('people.invite.bannerJoined', { n: joined }) : t('people.invite.bannerNobody'), left === null ? null : t('people.invite.bannerLeft', { n: left })]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
-    <div className="relative mb-2 rounded-[24px] bg-default p-4">
-      <button
-        onClick={close}
-        aria-label={t('people.invite.hide')}
-        className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full text-muted hover:bg-white/10 hover:text-foreground"
-      >
-        <XIcon size={14} />
-      </button>
-      <div className="pr-6 text-[15px] font-medium">{t('people.invite.title')}</div>
-      <p className="mt-0.5 text-[13px] leading-snug text-muted">
-        {left === null ? t('people.invite.bannerNoLimit') : t('people.invite.bannerLeft', { n: left })}
-      </p>
-      <div className="mt-3 flex items-center gap-2">
-        <span className="flex min-w-0 flex-1 gap-1 overflow-hidden">
-          {invite.invited.slice(0, 5).map((id) => (
-            <Avatar key={id} user={users[id]} size={28} ringBg="var(--default)" />
-          ))}
-          {Array.from({ length: Math.min(left ?? 3, Math.max(0, 5 - invite.invited.length)) }, (_, i) => (
-            <span key={i} className="h-7 w-7 shrink-0 rounded-full border border-dashed border-white/25" />
-          ))}
-        </span>
-        <Button onPress={() => setOpen(true)} className="h-9 shrink-0 rounded-full px-4 text-[14px] [--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]">
+    <div className="mb-2 rounded-[24px] bg-default p-4">
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-[15px] font-medium">{t('people.invite.title')}</span>
+        <button
+          onClick={close}
+          aria-label={t('people.invite.hide')}
+          className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted hover:bg-white/10 hover:text-foreground"
+        >
+          <XIcon size={14} />
+        </button>
+      </div>
+      <div className="mt-3 flex items-center gap-2.5">
+        {joined > 0 && (
+          <span className="flex shrink-0 -space-x-2">
+            {invite.invited.slice(0, 3).map((id) => (
+              <Avatar key={id} user={users[id]} size={28} ringBg="var(--default)" />
+            ))}
+          </span>
+        )}
+        <span className="min-w-0 flex-1 truncate text-[13px] text-muted">{status}</span>
+        <Button onPress={() => setOpen(true)} className="h-9 shrink-0 whitespace-nowrap rounded-full px-4 text-[14px] [--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]">
           {t('people.invite.button')}
         </Button>
       </div>

@@ -94,11 +94,7 @@ export function FriendsView() {
 
       <div className="flex flex-1 flex-col overflow-y-auto px-5 pb-4 pt-2 max-md:px-1 max-md:pt-3">
         {/* The rooms first: where people are talking right now, a tap away. On the phone they're on the home tab. */}
-        {tab !== 'add' && !isMobile && (
-          <div className="px-1 pb-4">
-            <RoomCards grid />
-          </div>
-        )}
+        {tab !== 'add' && !isMobile && <RoomCards grid />}
         {tab === 'add' ? (
           <AddFriend />
         ) : tab === 'pending' ? (

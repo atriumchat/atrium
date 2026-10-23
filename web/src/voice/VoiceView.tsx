@@ -132,6 +132,15 @@ function JoinPrompt({ channel, connecting }: { channel: Channel; connecting: boo
           )}
           <h2 className="mt-4 line-clamp-2 text-[26px] font-bold leading-8">{channel.name}</h2>
           <p className="mt-1 text-[16px] text-muted">{members.length ? who : t('voice.room.nobody')}</p>
+          {/* On a computer Join sits right under the room; the mic is in the panel at the bottom left. */}
+          <button
+            type="button"
+            onClick={() => joinVoice(channel.id)}
+            disabled={connecting}
+            className="mt-6 flex h-11 min-w-40 items-center justify-center whitespace-nowrap rounded-full bg-[#f2f2f4] px-6 text-[15px] font-semibold text-[#0c0c0e] transition-[background-color,transform] duration-150 hover:bg-white active:scale-[0.98] disabled:opacity-80 max-md:hidden"
+          >
+            {connecting ? <Spinner size="sm" color="current" /> : t('voice.room.joinVoice')}
+          </button>
         </div>
         {sharing && (
           <div className="mx-auto mt-5 flex w-full max-w-md items-center gap-2.5 rounded-2xl bg-default p-3.5">
@@ -156,8 +165,8 @@ function JoinPrompt({ channel, connecting }: { channel: Channel; connecting: boo
           </div>
         )}
       </div>
-      {/* The dock: the mic you'll come in with (white is on), and Join under the thumb. */}
-      <div className="shrink-0 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2">
+      {/* The phone's dock: the mic you'll come in with (white is on), and Join under the thumb. */}
+      <div className="shrink-0 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2 md:hidden">
         <div className="mx-auto flex max-w-md items-center gap-2.5 rounded-[38px] border-[0.5px] border-white/10 bg-default p-3">
           <button
             type="button"
