@@ -24,12 +24,14 @@ const OPEN_ANYWAY = 4 * 60 * 1000;
 export function Onboarding() {
   // The language switches in place: a half-made server's answers stay as they are.
   const [lang, setLang] = useState(startLang);
-  useEffect(() => {
-    setup.onLanguage((next) => {
-      switchLang(next);
-      setLang(next);
-    });
-  }, []);
+  useEffect(
+    () =>
+      setup.onLanguage((next) => {
+        switchLang(next);
+        setLang(next);
+      }),
+    [],
+  );
   const [step, setStep] = useState<{ id: Step; back: boolean; n: number }>({ id: 'server', back: false, n: 0 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -41,6 +43,8 @@ export function Onboarding() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [badHost, setBadHost] = useState(false);
+  // The server shows another SSH key than when this computer last connected to it: "It's a new server" forgets it.
+  const [changedHost, setChangedHost] = useState(false);
   const [facts, setFacts] = useState<Facts | null>(null);
   // No server yet: the login and password of the host's API, and how far the rent has got.
   const [apiLogin, setApiLogin] = useState('');
@@ -78,6 +82,9 @@ export function Onboarding() {
     setError('');
     try {
       await action();
+    } catch (e) {
+      // A call to the main process that failed outright: said, not swallowed.
+      setError(e instanceof Error && e.message ? e.message : t('ssh.noReply'));
     } finally {
       setBusy(false);
     }
@@ -93,10 +100,19 @@ export function Onboarding() {
       if ('error' in answer) {
         setError(answer.error);
         setBadHost('field' in answer && answer.field === 'host');
+        setChangedHost('hostChanged' in answer && !!answer.hostChanged);
         return;
       }
+      // In: the root password isn't needed any more (the app has the session, then its own key).
+      setPassword('');
       setFacts(answer.facts);
       go('address');
+    });
+  const newServer = () =>
+    void run(async () => {
+      await setup.forgetHost(host.trim());
+      setChangedHost(false);
+      setError('');
     });
 
   // The server is made in the person's HostVDS account with the app's key in it, then the app goes in with that key:
@@ -112,7 +128,7 @@ export function Onboarding() {
         return setError(t(`ob.rent.error.${made.error}`));
       }
       setRenting('connect');
-      const answer = await setup.connectKey(made.ip);
+      const answer = await setup.connectKey(made.ip, made.fingerprints);
       setRenting(null);
       if ('error' in answer) return setError(answer.error);
       setHost(made.ip);
@@ -244,9 +260,9 @@ export function Onboarding() {
   useEffect(() => {
     const jump = standIn && (location.hash.match(/step=([\w-]+)/)?.[1] as Step | 'done' | undefined);
     if (!jump || jump === 'server') return;
-    setHost('2.27.52.78');
+    setHost('203.0.113.42');
     setPassword('secret');
-    setFacts({ ip: '2.27.52.78', os: 'Ubuntu 24.04 LTS · x86_64', size: t('ssh.size', { memory: 2, disk: 18 }) });
+    setFacts({ ip: '203.0.113.42', os: 'Ubuntu 24.04 LTS · x86_64', size: t('ssh.size', { memory: 2, disk: 18 }) });
     setName('podval');
     setEmail('you@gmail.com');
     setAddress(MOCK_DOMAIN);
@@ -284,10 +300,10 @@ export function Onboarding() {
             onBack={back}
             onSubmit={connect}
             actions={<FlowPrimary type="submit" busy={busy} disabled={!serverReady}>{t('ob.connect')}</FlowPrimary>}
-            below={<TextAction onPress={() => go('rent')}>{t('ob.rent.link')}</TextAction>}
+            below={changedHost ? <TextAction onPress={newServer}>{t('ob.newServer')}</TextAction> : <TextAction onPress={() => go('rent')}>{t('ob.rent.link')}</TextAction>}
           >
             <div className="flow-pair">
-              <LineField label={t('ob.ip')} value={host} onChange={(e) => (setHost(e.target.value), setBadHost(false), setError(''))} placeholder="203.0.113.10" bad={badHost} />
+              <LineField label={t('ob.ip')} value={host} onChange={(e) => (setHost(e.target.value), setBadHost(false), setChangedHost(false), setError(''))} placeholder="203.0.113.10" bad={badHost} />
               {/* The login is almost always root, so it's filled in, in plain sight next to the address. */}
               <LineField label={t('ob.login')} value={user} onChange={(e) => (setUser(e.target.value), setError(''))} />
             </div>
@@ -477,7 +493,7 @@ const DONE = 'M5 12.5l4.5 4.5L19 7.5';
 function Records({ names, ip }: { names: string[]; ip: string }) {
   const [copied, setCopied] = useState<string | null>(null);
   async function copy(name: string) {
-    await navigator.clipboard.writeText(name).catch(() => undefined);
+    if (!(await setup.copy(name))) return;
     setCopied(name);
     setTimeout(() => setCopied((c) => (c === name ? null : c)), 1200);
   }

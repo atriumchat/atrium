@@ -87,6 +87,15 @@ export function rootKeyUserData(publicKey: string) {
   ].join('\n');
 }
 
+/**
+ * The host key fingerprints a server printed to its console on first boot (cloud-init's "SSH HOST KEY FINGERPRINTS"
+ * block, "256 SHA256:… root@atrium (ED25519)"), in OpenSSH's SHA256: form.
+ */
+export function hostFingerprints(log: string): string[] {
+  const block = log.match(/-----BEGIN SSH HOST KEY FINGERPRINTS-----([\s\S]*?)-----END SSH HOST KEY FINGERPRINTS-----/);
+  return block ? [...block[1]!.matchAll(/SHA256:[A-Za-z0-9+/]{43}/g)].map((m) => m[0]) : [];
+}
+
 // Plain ASCII in, so btoa (in browsers, React Native's Hermes and Node alike) takes it as is.
 const toBase64 = (text: string) => btoa(text);
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -95,11 +104,13 @@ const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * Makes a server in the person's HostVDS account and waits for its public IP. The app's own key goes in at creation
  * (`publicKey`, an OpenSSH line), so the install connects as root with it. A network that leaves the server without
  * an address is passed for the next one. Nothing is kept: the API password is used for this and forgotten.
+ * `fingerprints`: the server's SSH host keys from its own boot log, read through the API, so the app connects only to
+ * that very server (empty when the log didn't show them in time: then the first connection pins the key).
  */
 export async function rentServer(
   http: Http,
   { login, password, publicKey, onStage }: { login: string; password: string; publicKey: string; onStage?: (stage: RentStage) => void },
-): Promise<{ ip: string; id: string } | RentError> {
+): Promise<{ ip: string; id: string; fingerprints: string[] } | RentError> {
   let token = '';
   let catalog: Catalog;
   try {
@@ -167,7 +178,7 @@ export async function rentServer(
             .flat()
             .map((a) => String(a.addr))
             .find((addr) => /^\d+\.\d+\.\d+\.\d+$/.test(addr));
-          if (ip) return { ip, id };
+          if (ip) return { ip, id, fingerprints: await bootFingerprints(http, `${compute}/servers/${id}/action`, token) };
           break;
         }
         if (server.status === 'ERROR') break;
@@ -185,4 +196,19 @@ export async function rentServer(
     // The key is in the server by now; the account doesn't need to keep it.
     await call(http, { method: 'DELETE', url: `${compute}/os-keypairs/${keyName}`, token }).catch(() => undefined);
   }
+}
+
+/** Reads the server's console until cloud-init has printed its host keys: up to two minutes, nothing on any error. */
+async function bootFingerprints(http: Http, action: string, token: string): Promise<string[]> {
+  for (let i = 0; i < 24; i++) {
+    try {
+      const log = (await call(http, { method: 'POST', url: action, token, body: { 'os-getConsoleOutput': { length: 400 } } })).json.output;
+      const found = hostFingerprints(String(log ?? ''));
+      if (found.length) return found;
+    } catch {
+      return [];
+    }
+    await pause(5000);
+  }
+  return [];
 }

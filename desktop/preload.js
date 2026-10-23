@@ -15,13 +15,17 @@ contextBridge.exposeInMainWorld('atriumDesktop', {
     ipcRenderer.send('notify', { title: String(title), body: String(body), conversationId: String(conversationId) }),
   /** Called with a conversation id when a message notification is clicked. */
   onOpenConversation: (callback) => {
-    ipcRenderer.on('open-conversation', (_event, id) => callback(String(id)));
+    const listener = (_event, id) => callback(String(id));
+    ipcRenderer.on('open-conversation', listener);
+    return () => ipcRenderer.removeListener('open-conversation', listener);
   },
   /** Push-to-talk held anywhere (since 1.3.0): watch a key, hear it go down and up. */
   ptt: {
     watch: (code) => ipcRenderer.send('ptt:watch', code === null ? null : String(code)),
     onChange: (callback) => {
-      ipcRenderer.on('ptt:state', (_event, down) => callback(Boolean(down)));
+      const listener = (_event, down) => callback(Boolean(down));
+      ipcRenderer.on('ptt:state', listener);
+      return () => ipcRenderer.removeListener('ptt:state', listener);
     },
   },
   /** The language choice shared with the desktop's tray menu: 'ru', 'en' or null (follow the system). A change made in the tray reaches the page as a `atrium-language` event on window, detail = the new choice. */
@@ -35,7 +39,9 @@ contextBridge.exposeInMainWorld('atriumDesktop', {
     check: () => ipcRenderer.invoke('update:check'),
     install: () => ipcRenderer.invoke('update:install'),
     onChange: (callback) => {
-      ipcRenderer.on('update:state', (_event, state) => callback(state));
+      const listener = (_event, state) => callback(state);
+      ipcRenderer.on('update:state', listener);
+      return () => ipcRenderer.removeListener('update:state', listener);
     },
   },
 });

@@ -18,9 +18,9 @@ const DOMAIN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 const TURN = /^[a-z0-9-]{1,20}$/;
 
 // One setup at a time: the open SSH session and the deSEC account being made.
-let ssh = null; // { conn, host, ip, user, hostKey, facts }
-// The app's own key for the server being set up: made before a rented server exists (it goes in at its creation),
-// otherwise at the install. The installer adds it for root and pins it to the agent once Atrium runs.
+let ssh = null; // { conn, host, ip, user, hostKey, viaKey }
+// The app's own key for a server rented with it (it goes in at the server's creation). Used for that server only:
+// a server set up with its root password gets a key of its own at the install.
 let appKey = null;
 let desec = null; // { email, password, name }
 let mailWait = null; // { stop: boolean }
@@ -30,6 +30,32 @@ const sq = (value) => `'${String(value).replace(/'/g, `'\\''`)}'`;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /* ---------- SSH ---------- */
+
+// Every server's SSH host key, pinned at the first connection (trust on first use): a later connection to the same
+// address that shows another key is refused, because someone in between (the network, a forged DNS answer) would get
+// the root password or run the install on their machine. A rented server's key is known before the first connection,
+// from the server's own boot log (@atrium/setup, rentServer). { host: "SHA256:…" } in the app's settings folder.
+let pinsFile = null;
+function pins() {
+  try {
+    return pinsFile ? JSON.parse(fs.readFileSync(pinsFile, 'utf8')) : {};
+  } catch {
+    return {};
+  }
+}
+function savePin(host, fingerprint) {
+  if (!pinsFile) return;
+  fs.writeFileSync(pinsFile, JSON.stringify({ ...pins(), [host]: fingerprint }, null, 2), { mode: 0o600 });
+}
+/** "That's a new server" (reinstalled at the hosting company, same address): its old key is forgotten. */
+function forgetHost(host) {
+  if (!pinsFile) return;
+  const { [String(host).trim()]: _gone, ...rest } = pins();
+  fs.writeFileSync(pinsFile, JSON.stringify(rest, null, 2), { mode: 0o600 });
+}
+function init({ dataDir }) {
+  pinsFile = `${dataDir}/known-hosts.json`;
+}
 
 function sshError(error) {
   if (error?.level === 'client-authentication') return { error: t('ssh.badLogin') };
@@ -97,17 +123,20 @@ function newAppKey() {
  * Into a server just rented with the app's key: it takes a little while after it's up for sshd and the key to be
  * there, so a refusal is tried again for up to two minutes.
  */
-async function connectByKey(host) {
+async function connectByKey(host, expect = []) {
   const until = Date.now() + 120000;
   for (;;) {
-    const answer = await connect({ host, user: 'root', withKey: true });
-    if (!answer.error || Date.now() > until) return answer;
+    const answer = await connect({ host, user: 'root', withKey: true, expect });
+    if (!answer.error || answer.hostChanged || Date.now() > until) return answer;
     await new Promise((resolve) => setTimeout(resolve, 5000));
   }
 }
 
-/** Logs in (the password, or the app's key) and looks at the server: system, memory, disk, whether it's root. */
-async function connect({ host, user, password, withKey = false }) {
+/**
+ * Logs in (the password, or the app's key) and looks at the server: system, memory, disk, whether it's root. `expect`:
+ * the host key fingerprints the server is known to have (a rented one); otherwise the one pinned for `host`, if any.
+ */
+async function connect({ host, user, password, withKey = false, expect = [] }) {
   if (withKey && !appKey) return { error: t('ssh.noReply') };
   close();
   host = String(host).trim();
@@ -120,6 +149,9 @@ async function connect({ host, user, password, withKey = false }) {
   }
   const conn = new Client();
   let hostKey = null;
+  let refused = false;
+  const pinned = pins()[host];
+  const known = expect.length ? expect : pinned ? [pinned] : [];
   try {
     const ready = await new Promise((resolve) => {
       conn.on('ready', () => resolve(null));
@@ -135,11 +167,17 @@ async function connect({ host, user, password, withKey = false }) {
         readyTimeout: 20000,
         keepaliveInterval: 15000,
         hostVerifier: (key) => {
-          hostKey = crypto.createHash('sha256').update(key).digest('base64');
-          return true;
+          // OpenSSH's form: SHA256: and base64 without the padding.
+          hostKey = `SHA256:${crypto.createHash('sha256').update(key).digest('base64').replace(/=+$/, '')}`;
+          refused = known.length > 0 && !known.includes(hostKey);
+          return !refused;
         },
       });
     });
+    if (refused) {
+      conn.end();
+      return { error: t('ssh.hostChanged'), hostChanged: true, fingerprint: hostKey };
+    }
     if (ready) {
       conn.end();
       return ready;
@@ -159,10 +197,12 @@ async function connect({ host, user, password, withKey = false }) {
     }
     const memory = Number(facts.MEM) / 1024;
     const disk = Number(facts.DISK) / 1024;
-    ssh = { conn, host, ip: address, user, hostKey };
+    ssh = { conn, host, ip: address, user, hostKey, viaKey: withKey };
+    if (hostKey) savePin(host, hostKey);
     return {
       facts: {
         ip: address,
+        key: hostKey,
         os: [facts.OS, facts.ARCH].filter(Boolean).join(' · '),
         size: t('ssh.size', { memory: memory.toFixed(memory < 10 ? 1 : 0), disk: Math.round(disk) }),
       },
@@ -239,7 +279,6 @@ async function register({ name, email }) {
   const json = answer.json ?? {};
   // deSEC's own words for the field it refused ({"domain": ["…"]}), so the person sees the real reason.
   const said = (field) => [json[field]].flat(2).filter((x) => typeof x === 'string').join(' ');
-  console.log('deSEC sign-up refused:', answer.status, answer.text.slice(0, 400));
   if (answer.status === 429) return { error: t('desec.tooOften') };
   if (json.email) return { error: t('desec.badEmail', { said: said('email') }) };
   // 400 {"domain": ["This domain name conflicts with an existing domain, or is disallowed by policy."]}
@@ -261,6 +300,9 @@ async function waitMail({ ip }) {
   const me = mailWait;
   const deadline = Date.now() + 12 * 60 * 60 * 1000;
   let token = null;
+  // Every 10 s at first, then less and less often (a minute at most): until the link is pressed every login fails,
+  // and thousands of failures could get the account or this address blocked at deSEC.
+  let pause = 10000;
   while (!me.stop && Date.now() < deadline) {
     try {
       const login = await api('/auth/login/', { method: 'POST', body: { email: desec.email, password: desec.password } });
@@ -268,10 +310,12 @@ async function waitMail({ ip }) {
         token = login.json.token;
         break;
       }
+      if (login.status === 429) pause = 60000;
     } catch {
       // Offline for a moment: try again.
     }
-    await wait(5000);
+    await wait(pause);
+    pause = Math.min(pause * 1.5, 60000);
   }
   if (!token) return { error: me.stop ? t('desec.cancelled') : t('desec.linkExpired') };
   const domain = `${desec.name}.dedyn.io`;
@@ -298,7 +342,6 @@ async function pointAt({ domain, token, ip }) {
     return { error: t('desec.down') };
   }
   if (set.status === 200) return null;
-  console.log('deSEC rrsets refused:', set.status, set.text.slice(0, 400));
   if (set.status === 404) return { error: t('desec.gone') };
   if (set.status === 401 || set.status === 403) return { error: t('desec.noAccess') };
   if (set.status === 429) return { error: t('desec.tooOften') };
@@ -317,7 +360,6 @@ async function reuse({ email, password, name, ip }) {
     return { error: t('desec.down') };
   }
   if (login.status !== 200) {
-    console.log('deSEC login refused:', login.status, login.text.slice(0, 400));
     if (login.status === 429) return { error: t('desec.tooOften') };
     if (login.status === 400 || login.status === 401) return { error: t('desec.savedRejected') };
     if (login.status === 403) return { error: t('desec.accountDenied') };
@@ -361,8 +403,9 @@ async function installSteps({ domain, turn, installer }, report, save) {
   domain = String(domain).toLowerCase();
   if (!DOMAIN.test(domain) || !TURN.test(turn)) return report({ state: 'fail', why: t('install.badAddress') });
   const { conn } = ssh;
-  // The app's own key: the installer adds it for root and switches password login off.
-  const key = appKey ?? utils.generateKeyPairSync('ed25519', { comment: 'atrium-app' });
+  // The app's own key: the installer adds it for root and switches password login off. The rented server's key only
+  // for the rented server; one set up with a password gets its own, so no one key opens two servers.
+  const key = ssh.viaKey && appKey ? appKey : utils.generateKeyPairSync('ed25519', { comment: 'atrium-app' });
   save({ host: ssh.host, ip: ssh.ip, user: ssh.user, hostKey: ssh.hostKey, domain, privateKey: key.private });
 
   const fetchInstaller = installer
@@ -427,4 +470,4 @@ async function install(options, report, save) {
   }
 }
 
-module.exports = { connect, connectByKey, newAppKey, close, register, reuse, waitMail, cancelMail, checkDomain, install };
+module.exports = { init, connect, connectByKey, forgetHost, newAppKey, close, register, reuse, waitMail, cancelMail, checkDomain, install };

@@ -9,14 +9,22 @@ contextBridge.exposeInMainWorld('atriumSetup', {
   connect: (login) => call('connect', login),
   /** "No server?": a new key for the app (its public line), the server rented with it, then into it as root. */
   appKey: () => call('app-key'),
-  connectKey: (host) => call('connect-key', String(host)),
+  connectKey: (host, expect) => call('connect-key', String(host), Array.isArray(expect) ? expect.map(String) : []),
+  /** "It's a new server": forget the SSH key pinned for this address. */
+  forgetHost: (host) => call('forget-host', String(host)),
+  /** Text to the clipboard (the page itself may not write it). */
+  copy: (text) => call('copy', String(text)),
   /** One request to HostVDS's API ({ method, url, body?, token? } → { status, token?, json }). */
   hostvds: (request) => call('hostvds', request),
   /** Back from the first step: to the first window's choice (or the setup just closes). */
   leave: () => call('leave'),
   /** The globe: the app's language ('ru' | 'en'); `onLanguage` hears every change (from here or the tray menu). */
   language: (choice) => call('language', choice),
-  onLanguage: (callback) => ipcRenderer.on('setup:language', (_event, lang) => callback(lang)),
+  onLanguage: (callback) => {
+    const listener = (_event, lang) => callback(lang);
+    ipcRenderer.on('setup:language', listener);
+    return () => ipcRenderer.removeListener('setup:language', listener);
+  },
   register: (form) => call('register', form),
   /** Resolves once the link in deSEC's letter is pressed and the name points at the server. */
   waitMail: (where) => call('wait-mail', where),

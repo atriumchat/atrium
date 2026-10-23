@@ -14,7 +14,7 @@
 // - Windows: the installer runs silently and starts the new version.
 const { app, net, shell } = require('electron');
 const { createHash, createPublicKey, verify } = require('node:crypto');
-const { execFile, spawn } = require('node:child_process');
+const { execFile, execFileSync, spawn } = require('node:child_process');
 const { once } = require('node:events');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -299,7 +299,7 @@ async function checkNow() {
     const staged = await stageMac(dest, version, bundle);
     ready = { version, file: dest, downloadUrl, bundle, staged };
   } else {
-    ready = { version, file: dest, downloadUrl };
+    ready = { version, file: dest, downloadUrl, sha256: update.sha256 };
   }
   // Older downloads are no use any more.
   for (const name of fs.readdirSync(DIR)) {
@@ -320,11 +320,26 @@ function check() {
   return running.then(() => state);
 }
 
-/** Starts the swap / installer; with `relaunch`, the new version opens when it's done. */
+/** The file's SHA-256 right now, read in one go (at install time, when nothing else is running). */
+function sha256Now(file) {
+  return createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+
+/**
+ * Starts the swap / installer; with `relaunch`, the new version opens when it's done. What runs is checked once more
+ * right before (hours may have passed since the download): the installer's SHA-256, the staged app's signature.
+ */
 function startInstall(relaunch) {
   if (!ready || ready.manual || installing) return false;
   if (process.platform === 'darwin') {
     if (!ready.staged || !fs.existsSync(ready.staged)) return false;
+    try {
+      execFileSync('codesign', ['--verify', '--deep', ready.staged], { stdio: 'ignore' });
+    } catch {
+      fs.rmSync(ready.staged, { recursive: true, force: true });
+      ready = null;
+      return false;
+    }
     // Waits for this process to exit, swaps the bundles (putting the old one back if the second move fails).
     const script = [
       'while kill -0 "$1" 2>/dev/null; do sleep 0.2; done',
@@ -339,6 +354,11 @@ function startInstall(relaunch) {
     spawn('/bin/sh', args, { detached: true, stdio: 'ignore' }).unref();
   } else if (process.platform === 'win32') {
     if (!ready.file || !fs.existsSync(ready.file)) return false;
+    if (sha256Now(ready.file) !== ready.sha256) {
+      fs.rmSync(ready.file, { force: true });
+      ready = null;
+      return false;
+    }
     // The NSIS installer: --updated marks it as an update, /S keeps it silent, --force-run starts Atrium after.
     const args = relaunch ? ['--updated', '/S', '--force-run'] : ['--updated', '/S'];
     spawn(ready.file, args, { detached: true, stdio: 'ignore' }).unref();

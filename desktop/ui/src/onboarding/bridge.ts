@@ -6,7 +6,7 @@ import { t } from '../i18n';
  * already in the app's words. Opened in a browser there's no bridge: `stand-in` answers with made-up ones.
  */
 
-type Failure = { error: string; field?: 'host' };
+type Failure = { error: string; field?: 'host'; hostChanged?: true };
 export type InstallEvent =
   | { step: string; state: 'run' | 'done' | 'fail' | 'sub'; text?: string }
   | { state: 'out'; text: string; step?: undefined }
@@ -19,14 +19,20 @@ export type Setup = {
   connect(login: { host: string; user: string; password: string }): Promise<{ facts: { ip: string; os: string; size: string } } | Failure>;
   /** "No server?": the app's new key (an OpenSSH public line), then into the rented server with it. */
   appKey(): Promise<string>;
-  connectKey(host: string): Promise<{ facts: { ip: string; os: string; size: string } } | Failure>;
+  /** `expect`: the rented server's host key fingerprints, from its boot log (rentServer). */
+  connectKey(host: string, expect: string[]): Promise<{ facts: { ip: string; os: string; size: string } } | Failure>;
+  /** "It's a new server": the key pinned for `host` at an earlier connection is forgotten. */
+  forgetHost(host: string): Promise<void>;
+  /** Text to the clipboard, through the main process (a local page may not write it itself). */
+  copy(text: string): Promise<boolean>;
   /** HostVDS's API, through the main process (rentServer drives it). */
   hostvds: Http;
   /** Back from the first step: to the first window's choice. */
   leave(): void;
   /** The globe: the app's language (as the tray's menu does); `onLanguage` hears it, from here or the tray. */
   language(choice: 'ru' | 'en'): Promise<void>;
-  onLanguage(callback: (lang: 'ru' | 'en') => void): void;
+  /** Returns the way to stop listening. */
+  onLanguage(callback: (lang: 'ru' | 'en') => void): () => void;
   register(form: { name: string; email: string }): Promise<{ ok: true } | Failure>;
   waitMail(where: { ip: string }): Promise<{ ok: true } | Failure>;
   cancelMail(): void;
@@ -53,6 +59,7 @@ const fake: Setup = {
     await wait(1100);
     if (password === 'wrong') return { error: t('ssh.badLogin') };
     if (host.startsWith('10.')) return { error: t('ssh.noReply'), field: 'host' };
+    if (host === '203.0.113.66') return { error: t('ssh.hostChanged'), hostChanged: true };
     return { facts: { ip: host, os: 'Ubuntu 24.04 LTS · x86_64', size: t('ssh.size', { memory: 2, disk: 18 }) } };
   },
   appKey: async () => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIStandIn atrium-app',
@@ -60,7 +67,12 @@ const fake: Setup = {
   language: async (choice) => {
     for (const listen of languageListeners) listen(choice);
   },
-  onLanguage: (callback) => void languageListeners.push(callback),
+  onLanguage: (callback) => {
+    languageListeners.push(callback);
+    return () => void languageListeners.splice(languageListeners.indexOf(callback), 1);
+  },
+  forgetHost: async () => undefined,
+  copy: (text) => navigator.clipboard.writeText(text).then(() => true, () => false),
   async connectKey(host) {
     await wait(1500);
     return { facts: { ip: host, os: 'Ubuntu 24.04 LTS · x86_64', size: t('ssh.size', { memory: 2, disk: 20 }) } };

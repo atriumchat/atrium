@@ -5,6 +5,7 @@ const {
   app,
   BrowserWindow,
   Menu,
+  clipboard,
   Notification,
   Tray,
   ipcMain,
@@ -19,6 +20,7 @@ const {
 } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 
 // Developer overrides, for `npm start` only: an installed app ignores them, so nothing in the environment can
 // point it at another server, another update feed or another settings folder.
@@ -58,19 +60,14 @@ const DEFAULT_URL = require('./package.json').atriumDefaultUrl || '';
 // The server the app opens. Set once at start, or by the first window / "Your own server" when they're done (useServer):
 // the main window then opens in their place, no restart.
 let APP_URL = devEnv('ATRIUM_URL') || readConfig().url || DEFAULT_URL;
-let ORIGIN = APP_URL ? new URL(APP_URL).origin : '';
-// An invite link pasted on first start (address:save): its path and query are opened once, so sign-up comes with
-// the invite in place, then forgotten.
-const PENDING = readConfig().open;
-let START_URL = ORIGIN && typeof PENDING === 'string' && PENDING.startsWith('/') ? ORIGIN + PENDING : APP_URL;
-if (PENDING !== undefined) {
-  const { open: _open, ...rest } = readConfig();
-  try {
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(rest, null, 2));
-  } catch {
-    // Not fatal: the invite would just open again next time.
-  }
+let ORIGIN = '';
+try {
+  ORIGIN = APP_URL ? new URL(APP_URL).origin : '';
+} catch {
+  // A config.json that isn't an address any more: as if there were no server yet, so the first window asks again.
+  APP_URL = '';
 }
+let START_URL = APP_URL;
 // Where "Your own server" on the first start leads.
 const SERVER_GUIDE = 'https://gomex.party/server-install';
 // The app's own updates come from the project's GitHub Releases whatever server it talks to, and only signed ones
@@ -107,7 +104,7 @@ function centred(width, height) {
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 if (!app.requestSingleInstanceLock()) {
-  app.quit();
+  app.exit(0);
 }
 
 /** @type {BrowserWindow | null} */
@@ -476,9 +473,17 @@ async function appOrigin(origin) {
   return origin;
 }
 
+/** From the app's own page `page` (in ui-dist), its top frame: the first window's calls are made only from there. */
+function fromPage(event, page) {
+  const frame = event.senderFrame;
+  if (!frame || frame !== event.sender.mainFrame) return false;
+  const own = pathToFileURL(path.join(__dirname, 'ui-dist', page)).href;
+  return frame.url === own || frame.url.startsWith(`${own}?`) || frame.url.startsWith(`${own}#`);
+}
+
 ipcMain.handle('address:save', async (event, value, opts) => {
   // Only the local address window may change where the app points.
-  if (!event.senderFrame?.url.startsWith('file://')) return t('address.denied');
+  if (!fromPage(event, 'start.html')) return t('address.denied');
   let url;
   // "chat.example.com" is what people paste most; it means https.
   const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? value : `https://${value}`;
@@ -494,18 +499,17 @@ ipcMain.handle('address:save', async (event, value, opts) => {
   // "I have an account" opens on sign-in (the web's ?signin), not on the question it was just asked.
   const rest = url.pathname + url.search;
   const open = rest === '/' ? (opts?.signIn ? '/?signin' : null) : rest;
-  const config = open ? { url: url.origin, open } : { url: url.origin };
   useServer(await appOrigin(url.origin), open, addressWindow);
 });
 
 // The first window's globe: the same choice as the tray's Language menu; the window reloads in it.
 ipcMain.handle('address:language', (event, choice) => {
-  if (!event.senderFrame?.url.startsWith('file://')) return;
+  if (!fromPage(event, 'start.html')) return;
   if (choice === 'ru' || choice === 'en') setLanguage(choice, { fromPage: false });
 });
 
 ipcMain.handle('address:guide', (event) => {
-  if (!event.senderFrame?.url.startsWith('file://')) return;
+  if (!fromPage(event, 'start.html')) return;
   shell.openExternal(SERVER_GUIDE);
 });
 
@@ -539,16 +543,17 @@ function openSetupWindow(bounds) {
 
 // "Your own server" on the first start: the setup window takes the place of the small one.
 ipcMain.handle('address:setup', (event) => {
-  if (!event.senderFrame?.url.startsWith('file://')) return;
+  if (!fromPage(event, 'start.html')) return;
   openSetupWindow(addressWindow?.getBounds());
   addressWindow?.close();
 });
 
 // What the app keeps for each server it set up: its SSH key (so it can update the server later) and the deSEC
-// account behind a free name. Encrypted with the system's keychain where there is one.
+// account behind a free name. Encrypted with the system's keychain; where it can't be (no keychain, or access to it
+// refused), a secret isn't kept at all rather than kept readable: undefined, which JSON leaves out. Files from before
+// may still hold `plain` ones, which are read.
 const SERVERS_FILE = path.join(app.getPath('userData'), 'servers.json');
-const seal = (text) =>
-  safeStorage.isEncryptionAvailable() ? { sealed: safeStorage.encryptString(text).toString('base64') } : { plain: text };
+const seal = (text) => (safeStorage.isEncryptionAvailable() ? { sealed: safeStorage.encryptString(text).toString('base64') } : undefined);
 function remember(domain, fields) {
   let all = {};
   try {
@@ -561,8 +566,9 @@ function remember(domain, fields) {
   fs.writeFileSync(SERVERS_FILE, JSON.stringify(all, null, 2), { mode: 0o600 });
 }
 
-/** The setup window's calls; nothing else may make them. */
-const fromSetup = (event) => setupWindow && event.sender === setupWindow.webContents;
+/** The setup window's calls; nothing else may make them, not even a frame inside that window. */
+const fromSetup = (event) =>
+  setupWindow && event.sender === setupWindow.webContents && event.senderFrame === setupWindow.webContents.mainFrame && fromPage(event, 'onboarding.html');
 const setupCall = (name, fn) =>
   ipcMain.handle(`setup:${name}`, (event, ...args) => (fromSetup(event) ? fn(...args) : { error: t('setup.denied') }));
 
@@ -587,7 +593,13 @@ setupCall('leave', () => {
 setupCall('language', (choice) => {
   if (choice === 'ru' || choice === 'en') setLanguage(choice, { fromPage: false });
 });
-setupCall('connect-key', (host) => serverSetup.connectByKey(String(host)));
+setupCall('connect-key', (host, expect) => serverSetup.connectByKey(String(host), Array.isArray(expect) ? expect.map(String).slice(0, 8) : []));
+setupCall('forget-host', (host) => serverSetup.forgetHost(String(host)));
+// A local page may not write the clipboard itself (only the server's origin is granted it): the main process does.
+setupCall('copy', (text) => {
+  clipboard.writeText(String(text).slice(0, 2000));
+  return true;
+});
 // "No server?": the setup page drives HostVDS's API (@atrium/setup, rentServer) through here, since a page can't
 // reach it (CORS). Only that API, only these methods; the answer goes back as { status, token, json }.
 setupCall('hostvds', async ({ method, url, body, token }) => {
@@ -871,6 +883,12 @@ app.on('before-quit', () => {
 // macOS: clicking the Dock icon brings the hidden window back.
 app.on('activate', showWindow);
 
+/** The installed app's menu: on a Mac the app, Edit (copy and paste) and Window menus; elsewhere none at all. */
+function setMenu() {
+  if (!app.isPackaged) return;
+  Menu.setApplicationMenu(isMac ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }]) : null);
+}
+
 app.whenReady().then(async () => {
   // The system's language (a developer can force one with ATRIUM_LANG=ru|en); the windows below open in it.
   i18n.setLang(devEnv('ATRIUM_LANG') ?? readConfig().language ?? i18n.pick(app.getLocale()));
@@ -883,6 +901,8 @@ app.whenReady().then(async () => {
     secureDnsServers: ['https://cloudflare-dns.com/dns-query', 'https://dns.google/dns-query'],
   });
   setUpPermissions();
+  setMenu();
+  serverSetup.init({ dataDir: app.getPath('userData') });
   listenToPage();
   if (!APP_URL) {
     // The very first start: the splash, then the welcome window, made hidden meanwhile so it's there at once.

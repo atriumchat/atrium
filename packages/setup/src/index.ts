@@ -23,4 +23,4 @@ export { DESEC, registerBody, registerError, loginError, pointRecords, pointErro
 export { mailboxOf, type Mailbox } from './mailbox';
 export { capacity } from './capacity';
 export { MOCK_TOOK, MOCK_KEY, MOCK_INVITE, MOCK_DOMAIN, MOCK_SETUP_CODE, mockProgress } from './mock';
-export { RENT, rentServer, rootKeyUserData, fetchHttp, type Http, type HttpRequest, type HttpAnswer, type RentStage, type RentError } from './rent';
+export { RENT, hostFingerprints, rentServer, rootKeyUserData, fetchHttp, type Http, type HttpRequest, type HttpAnswer, type RentStage, type RentError } from './rent';

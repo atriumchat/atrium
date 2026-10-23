@@ -1,8 +1,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { rentServer, rootKeyUserData, type Http, type HttpRequest } from '../src/index';
+import { hostFingerprints, rentServer, rootKeyUserData, type Http, type HttpRequest } from '../src/index';
 
 const KEY = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ0 atrium-app';
+const ED25519 = 'SHA256:1u2fBNqRS6g7hUHaL8eTU4GvYcdKcZFsDtQ6Zyy7mQs';
+const BOOT_LOG = [
+  'ci-info: no authorized SSH keys fingerprints found for user ubuntu.',
+  '-----BEGIN SSH HOST KEY FINGERPRINTS-----',
+  '256 SHA256:AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdefg root@atrium (ECDSA)',
+  `256 ${ED25519} root@atrium (ED25519)`,
+  '-----END SSH HOST KEY FINGERPRINTS-----',
+].join('\n');
 const base = 'https://os-api.hostvds.com/eu-north3';
 const catalog = ['compute', 'image', 'network'].map((type) => ({ type, endpoints: [{ interface: 'public', region_id: 'eu-north3', url: `${base}/${type}` }] }));
 
@@ -19,6 +27,7 @@ function host(states: string[][], { login = true } = {}) {
     if (url.includes('/v2/images')) return { status: 200, json: { images: [{ id: 'img' }] } };
     if (url.includes('/v2.0/networks')) return { status: 200, json: { networks: [{ name: 'Internet-02', id: 'n2' }, { name: 'Internet-01', id: 'n1' }, { name: 'Internet-IPv6-only', id: 'v6' }] } };
     if (url.endsWith('/os-keypairs') || url.includes('/os-keypairs/')) return { status: method === 'POST' ? 200 : 202, json: {} };
+    if (url.endsWith('/action')) return { status: 200, json: { output: BOOT_LOG } };
     if (url.endsWith('/servers') && method === 'POST') {
       const id = `s${made}`;
       left[id] = [...(states[made++] ?? ['ERROR'])];
@@ -36,7 +45,7 @@ test('the server comes up: its IP, plan 2, the key in, the key pair gone after',
   const { http, calls } = host([['BUILD', 'ACTIVE']]);
   const stages: string[] = [];
   const got = await rentServer(http, { login: 'L', password: 'P', publicKey: KEY, onStage: (s) => stages.push(s) });
-  assert.deepEqual(got, { ip: '13.140.80.233', id: 's0' });
+  assert.deepEqual(got, { ip: '13.140.80.233', id: 's0', fingerprints: ['SHA256:AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdefg', ED25519] });
   assert.deepEqual(stages, ['login', 'create', 'boot']);
   const create = calls.find((c) => c.url.endsWith('/servers') && c.method === 'POST')!.body as { server: Record<string, unknown> };
   assert.equal(create.server.flavorRef, 'f2');
@@ -61,4 +70,9 @@ test("root's key goes in on first boot", () => {
   const data = rootKeyUserData(KEY);
   assert.match(data, /^#cloud-config/);
   assert.ok(data.includes(`echo '${KEY}' >> /root/.ssh/authorized_keys`));
+});
+
+test("the host keys come from the server's boot log, nothing else", () => {
+  assert.deepEqual(hostFingerprints(BOOT_LOG), ['SHA256:AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdefg', ED25519]);
+  assert.deepEqual(hostFingerprints(`random SHA256:${'x'.repeat(43)} line`), []);
 });
