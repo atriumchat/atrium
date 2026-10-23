@@ -8,16 +8,16 @@
    server name, creates the administrator and checks that calls get through.
 2. Invite friends: everyone has a personal invite link that can register 5 people (`INVITE_LIMIT`), and the invitee
    becomes a friend right away. Administrators have no limit.
-3. The desktop app for Mac (Apple Silicon and Intel) and Windows: the "Download app" button in the app, or the
-   [desktop](https://github.com/atriumchat/atrium/releases/tag/desktop) release. On first start it asks for the server
-   address: paste `app.DOMAIN`. It can be changed later from the tray, "Server address…".
+3. The desktop app for Mac (Apple Silicon and Intel) and Windows: use the "Download app" button in the app, or get it
+   from the [desktop](https://github.com/atriumchat/atrium/releases/tag/desktop) release. On first start it asks for the server
+   address: paste `app.DOMAIN`. You can change it later from the tray menu: "Server address…".
 
 There is no public API: HTTP and Socket.IO are the client's internal protocol, with no versioning and no
 compatibility promises.
 
 ## Settings
 
-Everything is in `deploy/.env`. The installer writes it; after a manual edit, `docker compose up -d` in `deploy/`.
+Everything is in `deploy/.env`. The installer writes it; after editing it by hand, run `docker compose up -d` in `deploy/`.
 
 | Variable | Default | What it does |
 |---|---|---|
@@ -40,7 +40,7 @@ Don't edit `livekit.yaml` by hand: every install and update rewrites it from
 | Port | Outside | Listener | Purpose |
 |---|---|---|---|
 | 22/tcp | yes, rate-limited | sshd | Access, key only |
-| 80/tcp | yes | Caddy | Certificate issuing, redirect to HTTPS |
+| 80/tcp | yes | Caddy | Certificate issuance, redirect to HTTPS |
 | 443/tcp | yes | Caddy layer4 | Sites and TURN over TLS, SNI routing |
 | 443/udp | yes | LiveKit | TURN over UDP (HTTP/3 is off for it) |
 | 7881/tcp | yes | LiveKit | Media over TCP |
@@ -64,5 +64,5 @@ journalctl -u atrium-backup         # nightly backup log
 
 - **Data:** `data/` (the `hangout.db` database, avatars, uploads), secrets in `.env`, certificates in `caddy-data/`.
 - **Backups:** a systemd timer at 04:30 server time, copies in `/root/atrium-backups/daily`, kept 14 days. Images are
-  hard-linked between days, so 14 copies take about the space of one. With under 1 GB free on disk the backup is
-  skipped and says so in the log.
+  hard-linked between days, so 14 copies take about the space of one. With less than 1 GB of free disk, the backup is
+  skipped and the log says so.

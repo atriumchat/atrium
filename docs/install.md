@@ -4,27 +4,29 @@
 
 ## Your own server from the app
 
-The main path: the app for Mac or Windows ([download](https://github.com/atriumchat/atrium/releases/tag/desktop)),
-no terminal and no domain of one's own needed.
+The easiest way is the Mac or Windows app ([download](https://github.com/atriumchat/atrium/releases/tag/desktop)).
+You don't need a terminal or a domain of your own.
 
-1. **VPS server.** Ubuntu or Debian (x86_64 or arm64), 1–2 GB RAM, 3 GB disk, root access. The IP and password come
-   from the hosting company.
-2. **"Your own server" in the app.** IP and root password. Address: a free `name.dedyn.io` on
-   [deSEC](https://desec.io) (name and email, confirmed by letter) or an own domain with three A records.
+1. **A VPS.** Ubuntu or Debian (x86_64 or arm64), 1–2 GB RAM, 3 GB disk, root access. Your hosting provider gives
+   you the IP and root password.
+2. **"Your own server" in the app.** Enter the IP and root password. For the address, take a free
+   `name.dedyn.io` from [deSEC](https://desec.io) (a name and an email you confirm) or use your own domain with three
+   A records.
 3. **Install.** About five minutes, steps shown on screen. The app runs the same installer over SSH, then opens the
    server setup: name, icon, administrator, invite link.
 
 Password login is switched off after the install, and the app keeps its own key (in the system keychain). If the
-deSEC letter doesn't arrive within 15 minutes, the app offers another email or an own domain.
+deSEC email doesn't arrive within 15 minutes, the app lets you try another email or your own domain.
 
 ## Install by command
 
-For an own domain, and for anyone installing from a terminal. Needed:
+For your own domain, or if you prefer a terminal. You need:
 
-- A VPS on Ubuntu or Debian (x86_64 or arm64), root access. Memory from 1 GB (2 is better), 3 GB or more free disk,
+- A VPS on Ubuntu or Debian (x86_64 or arm64), root access. At least 1 GB of memory (2 is better), 3 GB of free disk,
   ports 80 and 443 free.
 - A domain with three A records pointing at the server IP: the domain itself, `app.` and a subdomain for calls. The
-  installer picks its name and shows a table. On Cloudflare: grey cloud, DNS only; calls don't pass through the proxy.
+  installer picks that name and shows the records to add. On Cloudflare, use the grey cloud (DNS only): calls can't go
+  through its proxy.
 
 On the server:
 
@@ -42,63 +44,63 @@ curl -fsSL https://cdn.jsdelivr.net/npm/@atriumchat/install@latest/install.sh | 
 The installer fetches the release archive from there too when GitHub doesn't answer, and checks the same SHA-256.
 
 The wizard checks the server, asks for the domain, shows a summary and sets everything up: Docker (get.docker.com),
-ufw, SSH key login, `.env` with secrets, nightly backups, the release images. At the end: the link
-`https://app.DOMAIN/?setup=CODE`. Arrows and Enter choose, Esc goes a step back. Without a terminal or without gum the
-same steps run as plain questions.
+ufw, SSH key login, `.env` with secrets, nightly backups, the release images. At the end it prints the link
+`https://app.DOMAIN/?setup=CODE`. Arrows and Enter choose, Esc goes back a step. Without a terminal or without gum, the
+same steps run as plain prompts.
 
-Without questions, for scripts:
+Non-interactive, for scripts:
 
 ```bash
 curl -fsSL https://github.com/atriumchat/atrium/releases/latest/download/install.sh | DOMAIN=chat.example.com ATRIUM_YES=1 sh
 ```
 
-Update: run it again, or without questions:
+To update, run it again, or non-interactively:
 
 ```bash
 curl -fsSL https://github.com/atriumchat/atrium/releases/latest/download/install.sh | sh -s update
 ```
 
-The first-setup link (with the install code) once more, while the setup isn't finished:
+To print the first-setup link (with the setup code) again, while setup isn't finished:
 
 ```bash
 curl -fsSL https://github.com/atriumchat/atrium/releases/latest/download/install.sh | sh -s link
 ```
 
-Restore data from a nightly copy (a channel deleted by mistake, or a broken server; on a new server, first put the
-copies into `/root/atrium-backups/daily`):
+To restore data from a nightly backup (after a mistake or a broken server; on a new server, first copy the backups
+into `/root/atrium-backups/daily`):
 
 ```bash
 curl -fsSL https://github.com/atriumchat/atrium/releases/latest/download/install.sh | sh -s restore
 ```
 
-The installer lists the copies with date and size, asks which one to restore (`ATRIUM_YES=1 ATRIUM_RESTORE=2026-10-18`
-skips the question), saves the current data as a `pre-restore-<time>` copy in the same folder, stops the app, puts the
-data back, starts it and checks that it answers. A wrong choice is undone by the same `restore` with the
-`pre-restore-…` copy.
+The installer lists the backups with their date and size and asks which one to restore
+(`ATRIUM_YES=1 ATRIUM_RESTORE=2026-10-18` skips the question). It saves the current data as a `pre-restore-<time>`
+backup in the same folder, stops the app, puts the data back, starts the app and checks that it responds. To undo a
+wrong pick, run `restore` again and choose the `pre-restore-…` backup.
 
-A deleted channel doesn't need this: it sits for a week in "Server → Deleted channels", and an admin restores it
-from there.
+A deleted channel doesn't need this: it stays in "Server → Deleted channels" for a week, and an admin can restore
+it from there.
 
-Remove Atrium from the server:
+To remove Atrium from the server:
 
 ```bash
 curl -fsSL https://github.com/atriumchat/atrium/releases/latest/download/install.sh | sh -s uninstall
 ```
 
 The installer asks for confirmation (`ATRIUM_YES=1` skips it), stops the containers and removes their images, the
-`/opt/atrium` folder (`.env`, chats, files), the backups in `/root/atrium-backups`, the nightly timer, its own file and
-log in `/root` and `/var/log`. SSH login goes back to what it was: the `00-atrium-key-only.conf` file and the app's key
-(the line commented `atrium-app`) are removed. Docker and ufw stay. What's removed can't be restored, backups included.
+`/opt/atrium` folder (`.env`, chats, files), the backups in `/root/atrium-backups`, the nightly timer, and its own copy and
+log in `/root` and `/var/log`. SSH login goes back to how it was: the `00-atrium-key-only.conf` file and the app's key
+(the line commented `atrium-app`) are removed. Docker and ufw stay. Nothing removed can be recovered, backups included.
 
-`.env` and the data are left alone on update. Extra installer variables are described in the header of
+Updates leave `.env` and the data alone. More installer variables are described at the top of
 [`deploy/install.sh`](../deploy/install.sh): `SERVER_NAME`, `TURN_HOST`, `ATRIUM_DIR` (default `/opt/atrium`),
-`ATRIUM_NO_GUM=1`, `ATRIUM_FIREWALL=0`, `ATRIUM_SSH=0`, an own release archive or image registry.
+`ATRIUM_NO_GUM=1`, `ATRIUM_FIREWALL=0`, `ATRIUM_SSH=0`, and options for your own release archive or image registry.
 
-The cover page on the domain itself is rewritten by the installer on every update. An own site goes into
-`/opt/atrium/landing/site` together with an empty `.custom` file: then the installer leaves it alone. Pages open without
-`.html`: `/about` is `about.html`.
+The installer rewrites the cover page on the root domain on every update. To serve your own site, put it in
+`/opt/atrium/landing/site` along with an empty `.custom` file, and the installer will leave it alone. Pages open without
+`.html`: `/about` serves `about.html`.
 
-Own Caddy blocks go in `*.caddy` files in `/opt/atrium/deploy/sites`; updates leave them alone. For example,
+Your own Caddy blocks go in `*.caddy` files in `/opt/atrium/deploy/sites`; updates leave them alone. For example,
 `www.caddy` to redirect from `www.` (needs a `www` A record):
 
 ```caddy
@@ -107,9 +109,9 @@ www.{$DOMAIN}, http://www.{$DOMAIN} {
 }
 ```
 
-Own routes inside the app (`app.DOMAIN`) go in `*.caddy` files in `/opt/atrium/deploy/routes/app`, ahead of the
-app's own; updates leave them alone, and there are none by default. Every page of the app loads `/owner.js`, empty in
-Atrium; to run a script of one's own, serve it from a route there:
+Your own routes inside the app (`app.DOMAIN`) go in `*.caddy` files in `/opt/atrium/deploy/routes/app` and take
+priority over the app's routes; updates leave them alone, and there are none by default. Every page of the app loads
+`/owner.js`, which is empty by default; to run your own script, serve it from a route there:
 
 ```caddy
 handle /owner.js {
@@ -118,7 +120,7 @@ handle /owner.js {
 }
 ```
 
-The app's CSP allows only its own address, so whatever that script talks to goes through a route of the same kind.
+The app's CSP allows only its own origin, so anything that script talks to has to go through a route like this too.
 
-After editing, without dropping calls:
+To apply changes without dropping calls:
 `cd /opt/atrium/deploy && docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile`.

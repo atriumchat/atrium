@@ -8,8 +8,8 @@
 
 <p align="center"><img src="docs/screenshots/en/voice-room.png" alt="A voice room with four people" width="900"></p>
 
-Atrium is a closed Discord for a small group: text and voice channels, DMs and group chats, video, screen share,
-files, reactions, mentions. One server, one group, invite-only sign-up. Calls hold up on difficult networks: when a
+Atrium is a private Discord for a small group: text and voice channels, DMs and group chats, video, screen share,
+files, reactions, mentions. One server, one group, invite-only sign-up. Calls hold up on poor networks: when a
 direct connection fails, LiveKit falls back to TURN on port 443 (TLS over TCP, or UDP). The whole stack takes about
 120 MB of memory: one Python app with SQLite, LiveKit and Caddy. The interface is in English and Russian.
 
@@ -25,8 +25,8 @@ The wizard asks for a domain, sets everything up and prints a link to create the
 personal invite link.
 
 No terminal, no domain of your own? Use the [desktop app](docs/install.md#your-own-server-from-the-app): it needs only the server's
-IP and root password. The password isn't stored; once installed, the app's key can only check the status, update,
-back up and read logs ([`deploy/atrium-agent`](deploy/atrium-agent)), nothing else as root.
+IP and root password. The password isn't stored; after the install, the app's key can only check status, update,
+back up and read logs ([`deploy/atrium-agent`](deploy/atrium-agent)). It can't do anything else as root.
 
 ## Features
 
@@ -35,7 +35,7 @@ back up and read logs ([`deploy/atrium-agent`](deploy/atrium-agent)), nothing el
 - Push-to-talk on any key or mouse button, also while the window is minimized.
 - Noise suppression with three levels: off, the browser's own, and strong (RNNoise, a small neural network that runs
   in the client).
-- Calls fall back to TURN on port 443 when UDP is blocked; the Anti-lag mode sends calls through the server for
+- Calls fall back to TURN on port 443 when UDP is blocked; Anti-lag mode routes calls through the server on
   weak connections.
 - Invite-only sign-up with personal links; a newcomer becomes a friend of the person who invited them.
 - Nightly backups kept for 14 days, one-command restore.
@@ -88,7 +88,7 @@ flowchart LR
 
 - `DOMAIN` is the cover page, `app.DOMAIN` the app, `<turn>.DOMAIN` the call relay with a neutral name (`media`,
   `cdn`, `static`…) that the installer picks at random.
-- Constraints kept: SQLite, one Python process, no new services. Files live on disk.
+- Deliberate limits: SQLite, one Python process, no extra services. Files live on disk.
 
 | Path | What's there |
 |---|---|
@@ -110,19 +110,19 @@ flowchart LR
   rate-limited. The installer switches password login off only when `authorized_keys` already holds a key, so the
   owner can't be locked out.
 - **Supply chain:** the installer verifies the SHA-256 of the release archive and of the gum binary, and pulls images
-  by digest. Desktop updates are signed with Ed25519 and come from the project's GitHub Releases, whichever server is
-  selected.
+  by digest. Desktop updates are signed with Ed25519 and come from the project's GitHub Releases, whichever server the
+  app is connected to.
 
-Report vulnerabilities to the maintainer privately, not in public discussions.
+Please report vulnerabilities to the maintainer privately, not in public issues.
 
 ## Documentation
 
 - [Installation](docs/install.md): from the app or by command, update, restore, remove, installer options.
 - [Operation](docs/operations.md): first run and invites, settings, ports, maintenance and backups.
 - [Development](docs/development.md): local setup, checks, releases.
-- [Client architecture](docs/adr/001-client-architecture.md) and [design](DESIGN.md): the packages, Atrium Flow, why so.
+- [Client architecture](docs/adr/001-client-architecture.md) and [design](DESIGN.md): the packages, Atrium Flow and the reasoning behind them.
 
-## Maintenance
+## Maintainer
 
 [@atriumchat](https://github.com/atriumchat).
 
@@ -136,12 +136,12 @@ House rules:
 - No new services: SQLite, one Python process, LiveKit, Caddy. A new feature builds on what's there.
 - Code comments are short, in English, and explain why. Interface text is short, in English and Russian (the desktop's
   strings are in `desktop/i18n.js`), with no explanations.
-- The model for behavior is [Fluxer](https://github.com/fluxerapp/fluxer): we look at what's done, but don't copy or
-  retell their code (AGPL).
+- The model for behavior is [Fluxer](https://github.com/fluxerapp/fluxer): we study what it does, but don't copy or
+  paraphrase its code (AGPL).
 - Before a commit: `npm run build` in `web/` and `deploy/release.sh lint`.
 
 ## License
 
-[GNU AGPL-3.0](LICENSE), this version only (`AGPL-3.0-only`). Atrium can be installed, changed and distributed, for
-money too. If a modified Atrium is available to people over a network, its source must be opened to them on the same
-terms.
+[GNU AGPL-3.0](LICENSE), this version only (`AGPL-3.0-only`). You can install, modify and distribute Atrium, including
+for money. If you let people use a modified Atrium over a network, you must offer them its source under the same
+license.
