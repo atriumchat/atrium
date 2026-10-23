@@ -7,6 +7,8 @@ import { showError } from '../store';
 // The phone's sheet: from the bottom almost to the top, the status bar plus a little left above it. A share of its
 // frame, not of the screen, so it shrinks with the keyboard and the buttons at its foot stay in view.
 const SHEET = 'h-[calc(100%_-_max(12px,_env(safe-area-inset-top)_+_8px))] max-h-none rounded-t-[32px] p-0 pb-[env(safe-area-inset-bottom)]';
+// A window on the computer is the app's own window surface with its edge, as Settings is, not HeroUI's lighter overlay.
+const WINDOW = 'border border-edge [--overlay:var(--app-window)]';
 // HeroUI's Drawer leaves in 200ms.
 const SHEET_EXIT_MS = 220;
 
@@ -95,7 +97,7 @@ export function Dialog({
   return (
     <Modal.Backdrop isOpen onOpenChange={(open) => !open && onClose()}>
       <Modal.Container size="md" placement="auto">
-        <Modal.Dialog className={sheet ? 'max-h-[80vh]' : ''}>
+        <Modal.Dialog className={`${WINDOW} ${sheet ? 'max-h-[80vh]' : ''}`}>
           <Modal.CloseTrigger />
           <Modal.Header className="gap-1 pr-8">
             <Modal.Heading className="text-[18px] font-medium">{title}</Modal.Heading>
@@ -137,7 +139,7 @@ export function Window({
   return (
     <Modal.Backdrop isOpen onOpenChange={(open) => !open && onClose()}>
       <Modal.Container size="sm" placement="center">
-        <Modal.Dialog aria-label={label} className={className}>
+        <Modal.Dialog aria-label={label} className={`${WINDOW} ${className}`}>
           <Modal.CloseTrigger className="z-10" />
           {children}
           {footer}
