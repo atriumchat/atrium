@@ -32,8 +32,9 @@ export function BackButton() {
 }
 
 /**
- * Content header: leading icon/avatar and title on the left, actions and people online on the right. On a computer the
- * name is big and light on the panel itself (the Metro part of the look); on a phone it's a graphite pill.
+ * Content header: leading icon/avatar and title on the left; on the right, in this order, people online, the actions,
+ * the bell and last the "…" menu (an overflow menu always ends the row). On a computer the name is big and light on
+ * the panel itself (the Metro part of the look); on a phone it's a graphite pill.
  */
 export function ChannelHeader(props: {
   leading: ReactNode;
@@ -42,8 +43,9 @@ export function ChannelHeader(props: {
   bare?: boolean;
   showOnline?: boolean;
   actions?: ReactNode;
+  menu?: ReactNode;
 }) {
-  const { leading, title, subtitle, showOnline = true, actions } = props;
+  const { leading, title, subtitle, showOnline = true, actions, menu } = props;
   return (
     <header
       className="mx-2 mt-2 flex h-14 shrink-0 items-center gap-3 rounded-full bg-default pl-2 pr-2 max-md:gap-2 md:mx-0 md:mt-0 md:h-auto md:rounded-none md:bg-transparent md:px-6 md:pb-3 md:pt-5"
@@ -56,12 +58,13 @@ export function ChannelHeader(props: {
         </h1>
         {subtitle && <div className="truncate text-[12px] leading-4 text-muted md:text-[14px] md:leading-5">{subtitle}</div>}
       </div>
+      {showOnline && <OnlinePeople />}
       <div className="flex shrink-0 items-center gap-1">
         {actions}
         {/* In the desktop app the bell is in the window's title row (TitleBar). */}
         {!desktop && <InboxButton />}
+        {menu}
       </div>
-      {showOnline && <OnlinePeople />}
     </header>
   );
 }

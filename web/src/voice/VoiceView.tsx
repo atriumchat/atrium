@@ -54,16 +54,14 @@ export function VoiceView({ channel }: { channel: Channel }) {
         }
         title={channel.name}
         actions={
-          <>
-            <span className="relative">
-              <RoundButton label={chatOpen ? t('voice.chat.close') : t('voice.chat.open')} tone={chatOpen ? 'on' : 'plain'} onPress={() => setVoiceChat(!chatOpen)}>
-                <BubbleIcon />
-              </RoundButton>
-              {unread && !chatOpen && <span aria-hidden className="pointer-events-none absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-[var(--app-window)]" />}
-            </span>
-            <ChannelMenu channelId={channel.id} />
-          </>
+          <span className="relative">
+            <RoundButton label={chatOpen ? t('voice.chat.close') : t('voice.chat.open')} tone={chatOpen ? 'on' : 'plain'} onPress={() => setVoiceChat(!chatOpen)}>
+              <BubbleIcon />
+            </RoundButton>
+            {unread && !chatOpen && <span aria-hidden className="pointer-events-none absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-[var(--app-window)]" />}
+          </span>
         }
+        menu={<ChannelMenu channelId={channel.id} />}
         subtitle={
           live ? (
             <span className="tabular-nums">

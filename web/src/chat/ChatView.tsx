@@ -166,7 +166,7 @@ export function ChatView({ conversation, room = false }: { conversation: Convers
               </HeaderIcon>
             }
             title={channel.title}
-            actions={<ChannelMenu channelId={channel.id} />}
+            menu={<ChannelMenu channelId={channel.id} />}
           />
           <OngoingCall />
         </>
@@ -288,12 +288,8 @@ function DmHeader({ dm, title }: { dm: Dm; title: string }) {
         }
         title={title}
         subtitle={group ? t('chat.members', { n: dm.members.length }) : online ? t('chat.online') : t('chat.offline')}
-        actions={
-          <>
-            <CallButtons dm={dm} />
-            <ConversationMenu dm={dm} onRename={() => setRenaming(true)} onLeave={() => setLeaving(true)} />
-          </>
-        }
+        actions={<CallButtons dm={dm} />}
+        menu={<ConversationMenu dm={dm} onRename={() => setRenaming(true)} onLeave={() => setLeaving(true)} />}
       />
       {renaming && <RenameGroup dm={dm} onClose={() => setRenaming(false)} />}
       {leaving && <ConfirmDialog title={t('chat.leaveTitle')} text={t('chat.leaveText')} confirmLabel={t('chat.leave')} onConfirm={leave} onClose={() => setLeaving(false)} />}
