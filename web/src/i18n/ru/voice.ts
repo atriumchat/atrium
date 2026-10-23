@@ -109,4 +109,7 @@ export const voice = {
   'voice.people.title': 'Участники · {n}',
   'voice.people.open': 'Все участники',
   'voice.people.close': 'Закрыть',
+  'voice.chat.title': 'Чат',
+  'voice.chat.open': 'Чат комнаты',
+  'voice.chat.close': 'Закрыть чат',
 } as const;

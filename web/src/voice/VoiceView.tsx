@@ -3,7 +3,8 @@ import { Popover, Spinner } from '@heroui/react';
 import { StartAudio, useIsSpeaking, useParticipants, useTracks, VideoTrack } from '@livekit/components-react';
 import type { TrackReference } from '@livekit/components-react';
 import { RemoteParticipant, Track, type Participant } from 'livekit-client';
-import { useStore, voiceMembers } from '../store';
+import { setVoiceChat, useStore, voiceMembers } from '../store';
+import { ChatView } from '../chat/ChatView';
 import { canShareScreen, joinVoice, leaveVoice, toggleCamera, toggleDeafen, toggleMute, toggleScreenShare } from './voice';
 import { useIsMobile } from '../hooks';
 import type { Channel } from '../types';
@@ -18,6 +19,7 @@ import { FaceStack } from '../shell/CallPill';
 import { useTileGrid } from './tileGrid';
 import { LineArt } from '../ui/Illustrations';
 import {
+  BubbleIcon,
   ExpandIcon,
   HeadphonesIcon,
   HeadphonesSlashIcon,
@@ -38,6 +40,8 @@ export function VoiceView({ channel }: { channel: Channel }) {
   const status = useStore((s) => s.voiceStatus);
   const room = useStore((s) => s.room);
   const live = myChannel === channel.id && status === 'connected' && room !== null;
+  const chatOpen = useStore((s) => s.voiceChatOpen);
+  const unread = useStore((s) => (s.unread[channel.id] ?? 0) > 0);
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -49,7 +53,17 @@ export function VoiceView({ channel }: { channel: Channel }) {
           </HeaderIcon>
         }
         title={channel.name}
-        actions={<ChannelMenu channelId={channel.id} />}
+        actions={
+          <>
+            <span className="relative">
+              <RoundButton label={chatOpen ? t('voice.chat.close') : t('voice.chat.open')} tone={chatOpen ? 'on' : 'plain'} onPress={() => setVoiceChat(!chatOpen)}>
+                <BubbleIcon />
+              </RoundButton>
+              {unread && !chatOpen && <span aria-hidden className="pointer-events-none absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-[var(--app-window)]" />}
+            </span>
+            <ChannelMenu channelId={channel.id} />
+          </>
+        }
         subtitle={
           live ? (
             <span className="tabular-nums">
@@ -58,8 +72,32 @@ export function VoiceView({ channel }: { channel: Channel }) {
           ) : undefined
         }
       />
-      {live ? <ConnectedStage channelId={channel.id} /> : <JoinPrompt channel={channel} connecting={myChannel === channel.id && status === 'connecting'} />}
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-w-0 flex-1 flex-col">
+          {live ? <ConnectedStage channelId={channel.id} /> : <JoinPrompt channel={channel} connecting={myChannel === channel.id && status === 'connecting'} />}
+        </div>
+        {chatOpen && <RoomChat channel={channel} />}
+      </div>
     </div>
+  );
+}
+
+/**
+ * The room's own chat beside the call, as in Discord: links and pictures while you talk. A column on the right on a
+ * computer; on a phone it covers the room, with the call going on under it.
+ */
+function RoomChat({ channel }: { channel: Channel }) {
+  const { t } = useT();
+  return (
+    <aside className="flex w-[360px] shrink-0 flex-col border-l border-white/[0.06] max-md:absolute max-md:inset-0 max-md:z-30 max-md:w-auto max-md:border-l-0 max-md:bg-[var(--app-window)]">
+      <header className="flex h-14 shrink-0 items-center gap-2 pl-5 pr-3">
+        <h3 className="min-w-0 flex-1 truncate text-[20px] font-light tracking-[-0.3px]">{t('voice.chat.title')}</h3>
+        <RoundButton size="sm" tone="ghost" label={t('voice.chat.close')} onPress={() => setVoiceChat(false)}>
+          <XIcon />
+        </RoundButton>
+      </header>
+      <ChatView key={channel.id} conversation={{ id: channel.id, kind: 'channel', title: channel.name }} room />
+    </aside>
   );
 }
 

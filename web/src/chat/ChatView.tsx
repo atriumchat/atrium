@@ -45,7 +45,8 @@ export type Conversation = { id: string; kind: 'channel' | 'dm'; title: string; 
 
 const fetchHistory = (c: Conversation, before: Message) => (c.kind === 'dm' ? api.dmMessages(c.id, before.createdAt, before.id) : api.messages(c.id, before.createdAt, before.id));
 
-export function ChatView({ conversation }: { conversation: Conversation }) {
+/** `room`: a voice room's own chat, shown beside the call without a header of its own. */
+export function ChatView({ conversation, room = false }: { conversation: Conversation; room?: boolean }) {
   const { t } = useT();
   const channel = conversation;
   const isDm = conversation.kind === 'dm';
@@ -116,7 +117,7 @@ export function ChatView({ conversation }: { conversation: Conversation }) {
   }
 
   const list = messages ?? [];
-  const placeholder = t(isGroup ? 'chat.placeholder.group' : isDm ? 'chat.placeholder.dm' : 'chat.placeholder.channel', { title: channel.title });
+  const placeholder = t(isGroup ? 'chat.placeholder.group' : isDm ? 'chat.placeholder.dm' : room ? 'chat.placeholder.room' : 'chat.placeholder.channel', { title: channel.title });
 
   return (
     <div
@@ -147,11 +148,11 @@ export function ChatView({ conversation }: { conversation: Conversation }) {
         <div className="pointer-events-none absolute inset-3 z-20 flex flex-col items-center justify-center gap-1 rounded-[24px] border-2 border-dashed border-accent bg-window/90 text-center">
           <div className="text-[20px] font-medium">{t('chat.drop.title')}</div>
           <div className="text-[15px] text-muted">
-            {t(isGroup ? 'chat.drop.group' : isDm ? 'chat.drop.dm' : 'chat.drop.channel', { title: channel.title })}
+            {t(isGroup ? 'chat.drop.group' : isDm ? 'chat.drop.dm' : room ? 'chat.drop.room' : 'chat.drop.channel', { title: channel.title })}
           </div>
         </div>
       )}
-      {dm ? (
+      {room ? null : dm ? (
         <>
           <DmHeader dm={dm} title={channel.title} />
           <DmCallPanel dm={dm} />
@@ -184,8 +185,8 @@ export function ChatView({ conversation }: { conversation: Conversation }) {
         {loaded && !hasMore && list.length === 0 ? (
           <EmptyState
             art={isGroup ? 'group' : isDm ? 'chat' : 'channel'}
-            title={isDm ? channel.title : `#${channel.title}`}
-            text={t(isGroup ? 'chat.start.group' : isDm ? 'chat.start.dm' : 'chat.start.channel')}
+            title={isDm || room ? channel.title : `#${channel.title}`}
+            text={t(isGroup ? 'chat.start.group' : isDm ? 'chat.start.dm' : room ? 'chat.start.room' : 'chat.start.channel')}
           />
         ) : (
           <div className="flex-1" />
@@ -203,6 +204,11 @@ export function ChatView({ conversation }: { conversation: Conversation }) {
                 <Avatar user={peer} size={72} />
                 <h2 className="mt-3 truncate text-[28px] font-light leading-9 tracking-[-0.6px]">{channel.title}</h2>
                 <p className="text-[15px] text-muted">{t('chat.intro.dm', { title: channel.title })}</p>
+              </>
+            ) : room ? (
+              <>
+                <h2 className="truncate text-[22px] font-light leading-8 tracking-[-0.4px]">{channel.title}</h2>
+                <p className="text-[15px] text-muted">{t('chat.start.room')}</p>
               </>
             ) : (
               <>

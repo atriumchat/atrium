@@ -197,7 +197,8 @@ async def message_send(sid, data):
         content, attachments, upload_ids = message_body(user["id"], data)
     except Rejected as e:
         return socket_rejected(e)
-    if not query("SELECT 1 FROM channels WHERE id = ? AND kind = 'text' AND deleted_at IS NULL", (channel_id,)):
+    # Text channels, and voice rooms' own chat (the messages beside the call).
+    if not query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NULL", (channel_id,)):
         return {"ok": False, "error": "Нет такого канала"}
     try:
         reply_to = reply_target("messages", "channel_id", channel_id, data)

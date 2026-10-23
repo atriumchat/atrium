@@ -492,6 +492,8 @@ function VoiceItem({ channel }: { channel: Channel }) {
   const members = voiceMembers(voiceState, channel.id);
   const lit = active && !isMobile;
   const names = members.map((m) => users[m.userId]?.name ?? '…').join(', ');
+  // The room's chat: a white dot for new messages there, as on a text channel.
+  const unread = useStore((s) => (s.unread[channel.id] ?? 0) > 0 && !s.mutedChannels.includes(channel.id) && !(active && s.voiceChatOpen));
 
   return (
     <div className="group relative">
@@ -514,6 +516,7 @@ function VoiceItem({ channel }: { channel: Channel }) {
             </span>
           )}
         </span>
+        {unread && <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-foreground md:group-hover:hidden" />}
         {connectedHere ? (
           <CallPill>
             <CallDuration />

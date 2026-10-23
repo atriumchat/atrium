@@ -16,6 +16,8 @@ export type ShellSlice = {
   /** Groups of channels; empty on a server without any (or one from before categories). */
   categories: Category[];
   selectedChannelId: string | null;
+  /** A voice room's chat is shown beside the call; only then is it read. */
+  voiceChatOpen: boolean;
   canManageChannels: boolean;
   /** Channels this person muted: no counter, nothing on the app badge. */
   mutedChannels: string[];
@@ -43,6 +45,7 @@ export function shellSlice(): ShellSlice {
     channels: [],
     categories: [],
     selectedChannelId: null,
+    voiceChatOpen: false,
     canManageChannels: false,
     mutedChannels: [],
     siteUpdate: false,
@@ -74,18 +77,32 @@ export function setChannels(channels: Channel[]) {
 
 /** Open a channel or room. On the phone it opens over the tab you're on, so back returns there. */
 export function selectChannel(channelId: string) {
+  set((s) => {
+    // A voice room's chat waits for its panel: opening the room isn't reading it.
+    const read = !isVoiceRoom(s, channelId) || s.voiceChatOpen;
+    return {
+      mode: 'server',
+      selectedChannelId: channelId,
+      unread: read ? { ...s.unread, [channelId]: 0 } : s.unread,
+      mobileDetail: true,
+    };
+  });
+}
+
+const isVoiceRoom = (s: State, channelId: string | null) => s.channels.find((c) => c.id === channelId)?.kind === 'voice';
+
+/** Show or hide the open voice room's chat beside the call. */
+export function setVoiceChat(open: boolean) {
   set((s) => ({
-    mode: 'server',
-    selectedChannelId: channelId,
-    unread: { ...s.unread, [channelId]: 0 },
-    mobileDetail: true,
+    voiceChatOpen: open,
+    unread: open && s.selectedChannelId ? { ...s.unread, [s.selectedChannelId]: 0 } : s.unread,
   }));
 }
 
 /** The conversation currently on screen (channel or DM id), used for unread counting. */
 export function openConversationId(s: State = get()): string | null {
   if (s.isMobile && !s.mobileDetail) return null;
-  if (s.mode === 'server') return s.selectedChannelId;
+  if (s.mode === 'server') return isVoiceRoom(s, s.selectedChannelId) && !s.voiceChatOpen ? null : s.selectedChannelId;
   return isHomePage(s.homeView) ? null : s.homeView;
 }
 

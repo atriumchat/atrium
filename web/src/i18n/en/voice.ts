@@ -113,4 +113,7 @@ export const voice = {
   'voice.people.title': 'People · {n}',
   'voice.people.open': 'Everyone in the call',
   'voice.people.close': 'Close',
+  'voice.chat.title': 'Chat',
+  'voice.chat.open': 'Room chat',
+  'voice.chat.close': 'Close chat',
 } satisfies Record<keyof typeof source, Entry>;

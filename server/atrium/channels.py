@@ -199,7 +199,8 @@ def unread_counts(user: dict) -> tuple[dict[str, int], dict[str, int]]:
     since = lambda conversation_id: marks.get(conversation_id, user["createdAt"])  # noqa: E731
     mention = f"%<@{user['id']}>%"
     unread, mentions = {}, {}
-    conversations = [("messages", "channel_id", c["id"]) for c in query("SELECT id FROM channels WHERE kind = 'text' AND deleted_at IS NULL")]
+    # Voice rooms count too: they have a chat of their own beside the call.
+    conversations = [("messages", "channel_id", c["id"]) for c in query("SELECT id FROM channels WHERE deleted_at IS NULL")]
     conversations += [("dm_messages", "dm_id", r["dm_id"]) for r in query("SELECT dm_id FROM dm_members WHERE user_id = ?", (user["id"],))]
     with connect_db() as conn:
         for table, column, conversation_id in conversations:
@@ -223,7 +224,7 @@ class ReadIn(BaseModel):
 
 async def save_read(user: dict, conversation_id: str, at: int) -> bool:
     """Read a channel or DM up to `at` (a message time); never goes backwards. Other tabs and devices hear of it."""
-    readable = query("SELECT 1 FROM channels WHERE id = ? AND kind = 'text' AND deleted_at IS NULL", (conversation_id,)) or dm_for(user["id"], conversation_id)
+    readable = query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NULL", (conversation_id,)) or dm_for(user["id"], conversation_id)
     if not readable:
         return False
     at = min(at, now_ms())
