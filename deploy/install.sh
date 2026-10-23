@@ -880,56 +880,37 @@ app_server_name() {
   printf '%s' "$name"
 }
 
-# write_landing SEED: a seed install's cover page, the server's name and a way into the app, in Atrium's black and
-# white: near-black page, white type set large and light, a white pill button. It still shares nothing that would tie
-# installs together (no Atrium name or mark, no common files, no scripts): one HTML file whose layout, type, wording and
-# icon come from SEED (LANDING_SEED in .env, so an update keeps the look) and class names that are random.
+# The server's icon as the app has it (its path on app.DOMAIN, e.g. /api/server/icon?v=…), empty while there's none.
+app_server_icon() {
+  local json re='"serverIcon": ?"(/[^"]*)"'
+  json=$(curl -fsS --max-time 5 http://127.0.0.1:8000/api/setup 2>/dev/null) || return 0
+  [[ $json =~ $re ]] && printf '%s' "${BASH_REMATCH[1]}"
+  return 0
+}
+
+# Where "make your own" leads: Atrium's own site.
+ATRIUM_SITE=https://atriumcalls.vercel.app
+
+# write_landing SEED: the root domain's page, for someone who comes to it: whose server this is (its icon and name),
+# the way in, and under it an offer to make one of their own. Atrium's black and white, one HTML file, no scripts.
+# Class names are random per install (SEED, LANDING_SEED in .env, keeps them across updates).
 write_landing() {
-  local n=$1 layout font weight track radius label shape name
-  local bg fg line accent ink icon w t b layout_css dir=$ATRIUM_TMP/landing
-  # The first two choices (a hue, dark or light) went with the old coloured covers; skipped, so the rest stay put.
-  n=$((n / 720))
-  layout=$((n % 3)) n=$((n / 3))
-  font=$((n % 4)) n=$((n / 4))
-  radius=$((n % 3)) n=$((n / 3))
-  label=$((n % 3)) n=$((n / 3))
-  shape=$((n % 3))
-  bg='#0c0c0e' fg='#ededef' line='#26262b' accent='#ffffff' ink='#0c0c0e'
-
-  case $font in
-    0) font='system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' weight=300 track=-0.03em ;;
-    1) font='"Helvetica Neue", Helvetica, Arial, sans-serif' weight=300 track=-0.04em ;;
-    2) font='system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' weight=400 track=-0.02em ;;
-    *) font='"Helvetica Neue", Helvetica, Arial, sans-serif' weight=200 track=-0.03em ;;
-  esac
-  radius=999px
-  case $label in 0) label=Войти ;; 1) label=Открыть ;; *) label=Вход ;; esac
-  icon="fill='%23${accent#\#}'"
-  case $shape in
-    0) icon="%3Ccircle cx='8' cy='8' r='8' $icon/%3E" ;;
-    1) icon="%3Crect width='16' height='16' rx='4' $icon/%3E" ;;
-    *) icon="%3Cpath d='M8 0 16 8 8 16 0 8z' $icon/%3E" ;;
-  esac
-
+  local name icon initial tile w t s b f dir=$ATRIUM_TMP/landing
+  RANDOM=$(( $1 % 32768 ))
   # The name people gave the server in the browser setup; the domain while it's still the default one.
   name=$(app_server_name)
   [[ -n $name && ${name,,} != atrium ]] || name=$DOMAIN
+  initial=${name:0:1}
+  initial=${initial^^}
   name=${name//&/&amp;} name=${name//</&lt;} name=${name//>/&gt;} name=${name//\"/&quot;} name=${name//\'/&#39;}
-
-  w=$(css_name) t=$(css_name) b=$(css_name)
-  case $layout in
-    0) layout_css="body { align-items: center; justify-content: center; padding: 24px; }
-.$w { text-align: center; }
-.$t { font-size: clamp(40px, 10vw, 104px); }
-.$b { margin-top: 36px; }" ;;
-    1) layout_css="body { align-items: flex-end; padding: max(24px, 6vw); }
-.$w { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 24px 40px; }
-.$t { font-size: clamp(44px, 12vw, 144px); }" ;;
-    *) layout_css="body { align-items: center; justify-content: center; padding: 16px; }
-.$w { width: 100%; max-width: 400px; padding: 40px 32px; border: 1px solid $line; border-radius: 20px; }
-.$t { font-size: 32px; }
-.$b { display: block; margin-top: 28px; text-align: center; }" ;;
-  esac
+  initial=${initial//&/&amp;} initial=${initial//</&lt;} initial=${initial//>/&gt;}
+  icon=$(app_server_icon)
+  w=$(css_name) t=$(css_name) s=$(css_name) b=$(css_name) f=$(css_name) tile=$(css_name)
+  if [[ -n $icon ]]; then
+    icon="<img src=\"https://app.$DOMAIN${icon//\"/}\" alt=\"\">"
+  else
+    icon="<span>$initial</span>"
+  fi
 
   rm -rf "$dir" || return
   mkdir -p "$dir" || return
@@ -940,25 +921,33 @@ write_landing() {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="$bg">
+<meta name="theme-color" content="#0c0c0e">
 <title>$name</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E$icon%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%23ffffff'/%3E%3C/svg%3E">
 <style>
 * { box-sizing: border-box; }
 html, body { margin: 0; }
-body { display: flex; min-height: 100vh; min-height: 100dvh; background: $bg; color: $fg; font-family: $font; -webkit-font-smoothing: antialiased; }
-.$t { margin: 0; font-weight: $weight; letter-spacing: $track; line-height: 1.05; overflow-wrap: anywhere; }
-.$b { display: inline-block; padding: 14px 28px; border-radius: $radius; background: $accent; color: $ink; font: 600 17px/1.2 system-ui, sans-serif; text-decoration: none; }
-.$b:hover { opacity: 0.88; }
-.$b:focus-visible { outline: 2px solid $fg; outline-offset: 3px; }
-$layout_css
+body { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; background: #0c0c0e; color: #ededef; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+.$w { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; padding: 48px 24px 24px; text-align: center; }
+.$tile { display: grid; width: 104px; height: 104px; margin-bottom: 28px; place-items: center; overflow: hidden; border-radius: 26px; background: #ffffff; color: #0c0c0e; font-size: 44px; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,.35), 0 18px 40px rgba(0,0,0,.5); }
+.$tile img { width: 100%; height: 100%; object-fit: cover; }
+.$t { max-width: 640px; margin: 0; font-size: clamp(36px, 7vw, 56px); font-weight: 300; letter-spacing: -0.03em; line-height: 1.08; overflow-wrap: anywhere; }
+.$s { margin: 12px 0 0; color: #8b8b93; font-size: 17px; line-height: 1.4; }
+.$b { display: inline-flex; height: 56px; margin-top: 36px; padding: 0 40px; align-items: center; border-radius: 999px; background: #ffffff; color: #0c0c0e; font-size: 17px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.$b:hover { background: #e4e4e7; }
+.$b:focus-visible, .$f a:focus-visible { outline: 2px solid #ededef; outline-offset: 3px; }
+.$f { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; padding: 24px; border-top: 1px solid #1c1c20; color: #8b8b93; font-size: 15px; }
+.$f a { color: #ededef; text-underline-offset: 3px; white-space: nowrap; }
 </style>
 </head>
 <body>
 <main class="$w">
+<div class="$tile">$icon</div>
 <h1 class="$t">$name</h1>
-<a class="$b" href="https://app.$DOMAIN">$label</a>
+<p class="$s">Голос, чат и показ экрана · по приглашению</p>
+<a class="$b" href="https://app.$DOMAIN">Войти</a>
 </main>
+<footer class="$f"><span>Нужен такой же для своей компании?</span><a href="$ATRIUM_SITE/?utm_source=cover">Сделать свой сервер</a></footer>
 </body>
 </html>
 EOF
