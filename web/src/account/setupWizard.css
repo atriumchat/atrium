@@ -42,7 +42,7 @@
 .flow-discord-clip {
   display: block;
   width: 100%;
-  aspect-ratio: 960 / 562;
+  aspect-ratio: 1584 / 1080;
   border-radius: var(--gx-radius-popover);
 }
 .flow-discord-list {
