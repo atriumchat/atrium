@@ -936,8 +936,13 @@ body { display: flex; flex-direction: column; min-height: 100vh; min-height: 100
 .$b { display: inline-flex; height: 56px; margin-top: 36px; padding: 0 40px; align-items: center; border-radius: 999px; background: #ffffff; color: #0c0c0e; font-size: 17px; font-weight: 600; text-decoration: none; white-space: nowrap; }
 .$b:hover { background: #e4e4e7; }
 .$b:focus-visible, .$f a:focus-visible { outline: 2px solid #ededef; outline-offset: 3px; }
-.$f { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; padding: 24px; border-top: 1px solid #1c1c20; color: #8b8b93; font-size: 15px; }
-.$f a { color: #ededef; text-underline-offset: 3px; white-space: nowrap; }
+.$f { padding: 0 16px 24px; }
+.$f a { display: flex; width: 100%; max-width: 480px; margin: 0 auto; align-items: center; gap: 16px; padding: 14px 14px 14px 16px; border: 1px solid #26262b; border-radius: 20px; background: linear-gradient(180deg, #141417, #0e0e10); color: #ededef; text-decoration: none; transition: border-color .15s ease, transform .15s ease; }
+.$f a:hover { border-color: #4a4a52; transform: translateY(-1px); }
+.$f svg { flex: none; width: 44px; height: 44px; padding: 10px; border-radius: 12px; background: #ededef; color: #0c0c0e; }
+.$f b { display: block; font-size: 16px; font-weight: 500; }
+.$f small { display: block; margin-top: 2px; color: #8b8b93; font-size: 14px; }
+.$f i { flex: none; margin-left: auto; display: grid; width: 36px; height: 36px; place-items: center; border-radius: 999px; background: #ededef; color: #0c0c0e; font-style: normal; font-size: 18px; }
 </style>
 </head>
 <body>
@@ -947,7 +952,7 @@ body { display: flex; flex-direction: column; min-height: 100vh; min-height: 100
 <p class="$s">Голос, чат и показ экрана · по приглашению</p>
 <a class="$b" href="https://app.$DOMAIN">Войти</a>
 </main>
-<footer class="$f"><span>Нужен такой же для своей компании?</span><a href="$ATRIUM_SITE/?utm_source=cover">Сделать свой сервер</a></footer>
+<footer class="$f"><a href="$ATRIUM_SITE/?utm_source=cover"><svg viewBox="-10 -25 150 150" aria-hidden="true"><path fill="currentColor" d="M53.37 0L76.63 0A7 7 0 0 1 82.92 3.92L126.47 92.8A5 5 0 0 1 121.98 100L89 100A2 2 0 0 1 87 98L87 62A22 22 0 0 0 43 62L43 98A2 2 0 0 1 41 100L8.02 100A5 5 0 0 1 3.53 92.8L47.08 3.92A7 7 0 0 1 53.37 0Z"/></svg><span><b>Свой сервер за 5 минут</b><small>Голос, чат и экран для своей компании</small></span><i>→</i></a></footer>
 </body>
 </html>
 EOF
