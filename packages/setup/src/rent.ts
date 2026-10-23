@@ -6,11 +6,15 @@
  *
  * Strings in, strings out: the HTTP is the platform's (`Http`): fetch on the phone, the main process on the desktop.
  */
+// Our referral code: HostVDS's site reads affiliate_uuid on whatever page it opens on (saveReferrerData), so it rides
+// on the sign-up link itself and the person still lands straight on the form.
+const AFFILIATE = 'affiliate_uuid=e8b7525a-aa13-433f-8b48-a9ed78477cd6';
+
 export const RENT = {
   host: 'HostVDS',
-  url: 'https://hostvds.com',
+  url: `https://hostvds.com/?${AFFILIATE}`,
   /** Straight to the pages of their panel a person needs: signing up, paying in, the API's login and password. */
-  signUp: 'https://hostvds.com/sign-up',
+  signUp: `https://hostvds.com/sign-up?${AFFILIATE}`,
   pay: 'https://hostvds.com/control/billing/make-payment',
   key: 'https://hostvds.com/control/account/api',
   api: 'https://os-api.hostvds.com',
