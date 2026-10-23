@@ -5,7 +5,7 @@ import { ListHead } from './ListHead';
 import { CallPill, FaceStack } from './CallPill';
 import { Popover } from '@heroui/react';
 import { api } from '../api';
-import { selectChannel, setChannels, showError, useStore, voiceMembers } from '../store';
+import { selectChannel, setChannels, setVoiceChat, showError, useStore, voiceMembers } from '../store';
 import { joinVoice } from '../voice/voice';
 import { ensureHistory } from '../chat/history';
 import { useT } from '../i18n';
@@ -15,7 +15,7 @@ import { CallDuration } from '../voice/CallDuration';
 import { ChannelMenu } from './ChannelMenu';
 import { RoundButton, VolumeSlider } from '../ui/ui';
 import { EmptyState } from '../ui/Illustrations';
-import { BellSlashIcon, ChevronDownIcon, DotsIcon, HashIcon, HeadphonesSlashIcon, MicSlashIcon, PencilIcon, PlusIcon, SpeakerIcon, TrashIcon, VideoIcon } from '../ui/icons';
+import { BellSlashIcon, BubbleIcon, ChevronDownIcon, DotsIcon, HashIcon, HeadphonesSlashIcon, MicSlashIcon, PencilIcon, PlusIcon, SpeakerIcon, TrashIcon, VideoIcon } from '../ui/icons';
 
 export function Sidebar() {
   const { t } = useT();
@@ -426,18 +426,21 @@ function itemClass(active: boolean, strong = false) {
 
 /**
  * A row's "…" (ChannelMenu), Discord's gear: shown on hover on a computer; on a phone it's in the channel's
- * header. Rows that have one make room for it while hovered.
+ * header. Rows that have one make room for it while hovered. It sits on the middle of the row's first line: 20px down
+ * a one-line row, 18px when people are listed under the name.
  */
-function RowMenu({ channelId }: { channelId: string }) {
+function RowMenu({ channelId, top = 'top-5' }: { channelId: string; top?: string }) {
   return (
     <ChannelMenu
       channelId={channelId}
-      className="absolute right-2 top-[18px] h-7 w-7 -translate-y-1/2 text-muted opacity-0 hover:text-foreground group-hover:opacity-100 aria-expanded:opacity-100 data-[focus-visible=true]:opacity-100 max-md:hidden [&_svg]:size-4"
+      className={`absolute right-2 ${top} h-7 w-7 -translate-y-1/2 text-muted opacity-0 hover:text-foreground group-hover:opacity-100 aria-expanded:opacity-100 data-[focus-visible=true]:opacity-100 max-md:hidden [&_svg]:size-4`}
     />
   );
 }
 
 const ROW_MENU_ROOM = 'md:group-hover:pr-9';
+// A voice room's row has two buttons on hover: its chat and "…".
+const ROW_TWO_BUTTONS_ROOM = 'md:group-hover:pr-[72px]';
 
 function TextItem({ channel }: { channel: Channel }) {
   const { t } = useT();
@@ -484,6 +487,7 @@ function TextItem({ channel }: { channel: Channel }) {
  * (yours) or the headcount in a pill. The room you're in lists everyone under it instead, to set each one's volume.
  */
 function VoiceItem({ channel }: { channel: Channel }) {
+  const { t } = useT();
   const active = useStore((s) => s.selectedChannelId === channel.id);
   const connectedHere = useStore((s) => s.voiceChannelId === channel.id && s.voiceStatus === 'connected');
   const voiceState = useStore((s) => s.voiceState);
@@ -494,13 +498,15 @@ function VoiceItem({ channel }: { channel: Channel }) {
   const names = members.map((m) => users[m.userId]?.name ?? '…').join(', ');
   // The room's chat: a white dot for new messages there, as on a text channel.
   const unread = useStore((s) => (s.unread[channel.id] ?? 0) > 0 && !s.mutedChannels.includes(channel.id) && !(active && s.voiceChatOpen));
+  const twoLines = members.length > 0 && !connectedHere;
+  const top = twoLines ? 'top-[18px]' : 'top-5';
 
   return (
     <div className="group relative">
       {/* A click joins on a computer; on a phone it opens the room first, with a Join button, like Discord's app. */}
       <button
         onClick={() => (isMobile ? selectChannel(channel.id) : joinVoice(channel.id))}
-        className={`flex w-full items-center gap-2.5 rounded-[18px] px-4 text-left transition-colors ${members.length && !connectedHere ? 'py-2' : 'h-10 max-md:h-11'} ${ROW_MENU_ROOM} ${
+        className={`flex w-full items-center gap-2.5 rounded-[18px] px-4 text-left transition-colors ${twoLines ? 'py-2' : 'h-10 max-md:h-11'} ${ROW_TWO_BUTTONS_ROOM} ${
           lit || connectedHere ? 'bg-default text-foreground' : members.length ? 'text-foreground hover:bg-white/[0.04]' : 'text-muted hover:bg-white/[0.04] hover:text-foreground'
         }`}
       >
@@ -525,7 +531,20 @@ function VoiceItem({ channel }: { channel: Channel }) {
           members.length > 0 && <CallPill>{members.length}</CallPill>
         )}
       </button>
-      <RowMenu channelId={channel.id} />
+      {/* The room's chat without joining, as Discord's bubble on a voice channel. On a phone it's in the room's header. */}
+      <button
+        type="button"
+        aria-label={t('voice.chat.open')}
+        title={t('voice.chat.open')}
+        onClick={() => {
+          selectChannel(channel.id);
+          setVoiceChat(true);
+        }}
+        className={`absolute right-10 ${top} flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted opacity-0 outline-none transition-colors hover:bg-default hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-focus group-hover:opacity-100 max-md:hidden`}
+      >
+        <BubbleIcon size={16} />
+      </button>
+      <RowMenu channelId={channel.id} top={top} />
       {connectedHere && members.length > 0 && (
         <ul className="pb-1 pl-8 pt-1">
           {members.map((m) => (
