@@ -37,12 +37,14 @@ export function LanguageRow() {
 
 export function AccountSettings() {
   const isMobile = useStore((s) => s.isMobile);
+  // A demo's guest has no password to change and nothing to recover.
+  const guest = useStore((s) => s.isGuest);
   if (isMobile) {
     return (
       // The nick is on the "Profile" page with the photo; here only what's rarely touched.
       <Rows className="mt-2">
-        <PasswordRow />
-        <RecoveryRow />
+        {!guest && <PasswordRow />}
+        {!guest && <RecoveryRow />}
         <BlockedRow />
       </Rows>
     );
@@ -53,8 +55,8 @@ export function AccountSettings() {
       <NameField className="mt-6" />
       <Rows className="mt-8">
         <LanguageRow />
-        <PasswordRow />
-        <RecoveryRow />
+        {!guest && <PasswordRow />}
+        {!guest && <RecoveryRow />}
         <BlockedRow />
       </Rows>
     </>
@@ -92,6 +94,7 @@ export function NickRow() {
 function NameField({ onSaved, className = '' }: { onSaved?: () => void; className?: string }) {
   const { t } = useT();
   const me = useStore((s) => s.me);
+  const guest = useStore((s) => s.isGuest);
   const id = useId();
   const [name, setName] = useState(me?.name ?? '');
   const [password, setPassword] = useState('');
@@ -120,8 +123,15 @@ function NameField({ onSaved, className = '' }: { onSaved?: () => void; classNam
         {t('account.nick.title')}
       </label>
       <input id={id} value={name} maxLength={32} onChange={(e) => setName(e.target.value)} className={field} autoComplete="username" autoFocus={!!onSaved} />
-      {/* A new nick is confirmed with the password, right under it. */}
-      {changed && (
+      {/* A new nick is confirmed with the password, right under it; a demo's guest has none and just saves. */}
+      {changed && guest && (
+        <div className="mt-2 flex gap-2 max-md:flex-col">
+          <Primary type="submit" isPending={busy} className="shrink-0">
+            {t('account.nick.save')}
+          </Primary>
+        </div>
+      )}
+      {changed && !guest && (
         <div className="mt-2 flex gap-2 max-md:flex-col">
           <input
             type="password"

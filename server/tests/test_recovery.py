@@ -18,6 +18,8 @@ def bearer(token: str) -> dict:
 def server(client):
     """A set-up server: the admin, plus a member who signed up with the admin's invite."""
     r = client.post("/api/setup", json={"code": "friends", "serverName": "Тест", "name": "Админ", "password": PASSWORD})
+    if r.status_code == 409:  # another test file set the server up first, with the same admin
+        r = client.post("/api/login", json={"name": "Админ", "password": PASSWORD})
     assert r.status_code == 200, r.text
     admin = r.json()
     code = client.get("/api/invite", headers=bearer(admin["token"])).json()["code"]

@@ -74,6 +74,8 @@ function historyQuery(before?: number, beforeId?: string) {
 export const api = {
   register: (invite: string, name: string, password: string) => request<Session>('/api/register', post({ invite, name, password })),
   login: (name: string, password: string) => request<Session>('/api/login', post({ name, password })),
+  /** A public demo's way in (GUEST_MODE on the server): an account made on the spot, no form. */
+  guest: () => request<Session>('/api/guest', post({})),
   updateMe: (bio: string) => request<User>('/api/me', { method: 'PATCH', body: JSON.stringify({ bio }) }),
   uploadAvatar: (file: File) =>
     request<User>('/api/me/avatar', { method: 'POST', body: file, headers: { 'Content-Type': file.type || 'application/octet-stream' } }),
@@ -141,7 +143,7 @@ export const api = {
   reset: (token: string, password: string) => request<Session>('/api/reset', post({ token, password })),
   block: (userId: string) => request<string[]>(`/api/blocks/${userId}`, { method: 'PUT' }),
   unblock: (userId: string) => request<string[]>(`/api/blocks/${userId}`, { method: 'DELETE' }),
-  setupStatus: () => request<{ needed: boolean; serverName: string; serverIcon: string | null }>('/api/setup'),
+  setupStatus: () => request<{ needed: boolean; serverName: string; serverIcon: string | null; guest?: boolean }>('/api/setup'),
   setupCheck: (code: string) => request<{ ok: boolean }>('/api/setup/check', post({ code })),
   setup: (code: string, serverName: string, name: string, password: string) =>
     request<{ token: string; user: User }>('/api/setup', post({ code, serverName, name, password })),

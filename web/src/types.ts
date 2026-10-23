@@ -136,6 +136,8 @@ export type Bootstrap = {
   hasRecoveryKey: boolean;
   /** This account holds the admin flag (canManageChannels is also true while the server has no admin at all). */
   isAdmin: boolean;
+  /** A public demo's guest: in without a password, so nothing here asks for one. */
+  isGuest?: boolean;
   /** Every call goes only through the relay on 443 (RELAY_ONLY on the server). */
   relayOnly?: boolean;
 };

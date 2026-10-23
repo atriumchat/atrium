@@ -10,6 +10,7 @@ export type AccountSlice = {
   myStatusUntil: number | null;
   hasRecoveryKey: boolean;
   isAdmin: boolean;
+  isGuest: boolean;
 };
 
 export function accountSlice(): AccountSlice {
@@ -20,6 +21,7 @@ export function accountSlice(): AccountSlice {
     myStatusUntil: null,
     hasRecoveryKey: false,
     isAdmin: false,
+    isGuest: false,
   };
 }
 
@@ -43,6 +45,7 @@ export function initStore(data: Bootstrap) {
     myStatusUntil: data.myStatusUntil ?? null,
     hasRecoveryKey: !!data.hasRecoveryKey,
     isAdmin: !!data.isAdmin,
+    isGuest: !!data.isGuest,
     serverRelayOnly: !!data.relayOnly,
     selectedChannelId: data.channels.some((c) => c.id === get().selectedChannelId) ? get().selectedChannelId : firstText?.id ?? data.channels[0]?.id ?? null,
   });

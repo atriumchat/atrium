@@ -30,6 +30,7 @@ Everything is in `deploy/.env`. The installer writes it; after editing it by han
 | `INVITE_LIMIT` | `5` | How many people one personal link can register |
 | `UPLOAD_MB_PER_DAY` | `500` | How many megabytes of files one person can upload per day |
 | `RELAY_ONLY` | off | `1`: all calls only through TURN on 443, no direct or UDP paths |
+| `GUEST_MODE` | off | `1`: a public demo; whoever opens the app gets in at once as "Guest NNNN", no invite or password |
 | `ATRIUM_REGISTRY`, `ATRIUM_VERSION`, `ATRIUM_APP_DIGEST`, `ATRIUM_CADDY_DIGEST` | from the release | Which images to run; written by the installer |
 
 Don't edit `livekit.yaml` by hand: every install and update rewrites it from

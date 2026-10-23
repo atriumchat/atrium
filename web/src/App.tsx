@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Spinner, Toast } from '@heroui/react';
-import { api, ApiError, getToken } from './api';
+import { api, ApiError, getToken, setToken } from './api';
 import { initStore } from './store';
 import { connectSocket } from './socket';
 import { clearInviteFromUrl } from './people/invite';
@@ -19,7 +19,7 @@ import type { Session } from './types';
 import { endSession } from './account/session';
 import { useT } from './i18n';
 
-type Phase = 'loading' | 'login' | 'setup' | 'reset' | 'key' | 'where' | 'ready' | 'offline';
+type Phase = 'checking' | 'loading' | 'login' | 'setup' | 'reset' | 'key' | 'where' | 'ready' | 'offline';
 
 export function App() {
   const { t } = useT();
@@ -27,13 +27,27 @@ export function App() {
   const [resetToken] = useState(resetFromUrl);
   const [newKey, setNewKey] = useState<NewKey | null>(() => (getToken() ? loadNewKey() : null));
   const [phase, setPhase] = useState<Phase>(
-    DEMO ? 'setup' : resetToken ? 'reset' : newKey ? 'key' : getToken() ? 'loading' : 'login',
+    DEMO ? 'setup' : resetToken ? 'reset' : newKey ? 'key' : getToken() ? 'loading' : 'checking',
   );
 
-  // Signed out on a server with no accounts yet: that's a fresh install, so the setup wizard instead of sign-in.
+  // Signed out: the server says what comes next. No accounts yet is a fresh install, so the setup wizard; a public
+  // demo (guest mode) lets you straight in as a guest; anywhere else, sign-in.
   useEffect(() => {
     if (getToken() || resetToken || demo) return;
-    api.setupStatus().then((s) => s.needed && setPhase('setup'), () => undefined);
+    api.setupStatus().then(
+      async (s) => {
+        if (s.needed) return setPhase('setup');
+        if (!s.guest) return setPhase('login');
+        try {
+          const session = await api.guest();
+          setToken(session.token);
+          signedIn(session);
+        } catch {
+          setPhase('login');
+        }
+      },
+      () => setPhase('login'),
+    );
   }, [resetToken]);
 
   // Sign-up, recovery and a reset link end here: the new recovery key comes first, then the app.

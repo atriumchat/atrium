@@ -17,6 +17,7 @@ from .config import (
     AVATAR_DIR,
     INVITE_ALPHABET,
     INVITE_CODE,
+    GUEST_MODE,
     INVITE_LIMIT,
     LIVEKIT_URL,
     MAX_AVATAR_UPLOAD,
@@ -258,6 +259,45 @@ def check_login_limits(request: Request, name: str) -> None:
     LOGIN_BY_NICK.check(nick)
 
 
+@router.post("/api/guest")
+async def guest(request: Request, response: Response):
+    """GUEST_MODE only: a fresh account named "Guest NNNN", a friend of the first admin, as if invited by them. Its
+    password is random and never shown, so it has no recovery key either: the session is the account."""
+    if not GUEST_MODE:
+        raise ApiError(404, "notFound", "Not found")
+    REGISTER_BY_IP.check(client_ip(request))
+    admins = query("SELECT * FROM users WHERE is_admin = 1 ORDER BY created_at LIMIT 1")
+    if not admins:
+        raise ApiError(409, "setupNeeded", "Сначала настройте сервер по ссылке от установщика")
+    inviter = admins[0]
+    password_hash = await password_work(hash_password, secrets.token_urlsafe(24))
+    for _ in range(20):
+        name = f"Guest {secrets.randbelow(9000) + 1000}"
+        created_at = now_ms()
+        user_id = uuid.uuid4().hex
+        try:
+            with connect_db() as conn:
+                conn.execute(
+                    "INSERT INTO users (id, name, name_key, password_hash, color, created_at, invited_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (user_id, name, name.casefold(), password_hash, secrets.choice(USER_COLORS), created_at, inviter["id"]),
+                )
+                a, b = ordered_pair(inviter["id"], user_id)
+                conn.execute(
+                    "INSERT INTO friendships (user_a, user_b, requested_by, status, created_at) VALUES (?, ?, ?, 'accepted', ?)",
+                    (a, b, inviter["id"], created_at),
+                )
+            break
+        except sqlite3.IntegrityError:
+            continue
+    else:
+        raise ApiError(503, "guestFull", "Try again")
+    user = public_user(query("SELECT * FROM users WHERE id = ?", (user_id,))[0])
+    await sio.emit("user:new", user)
+    await notify_friends_changed(inviter["id"])
+    set_media_cookie(request, response, user_id)
+    return {"token": issue_token(user_id), "user": user, "serverName": server_name()}
+
+
 @router.post("/api/login")
 async def login(body: LoginIn, request: Request, response: Response):
     check_login_limits(request, body.name)
@@ -388,14 +428,16 @@ async def expire_statuses() -> None:
 
 class NameChangeIn(BaseModel):
     name: str = Field(min_length=1, max_length=32)
-    password: str = Field(max_length=128)
+    password: str = Field("", max_length=128)
 
 
 @router.patch("/api/me/name")
 async def change_name(body: NameChangeIn, request: Request, user: dict = Depends(current_user)):
     LOGIN_BY_NAME.check(f"change:{user['id']}")
     row = query("SELECT * FROM users WHERE id = ?", (user["id"],))[0]
-    if not await password_work(verify_password, body.password, row["password_hash"]):
+    # A demo's guest never saw their password; the admin's nick still needs it.
+    guest = GUEST_MODE and not is_admin(user)
+    if not guest and not await password_work(verify_password, body.password, row["password_hash"]):
         raise ApiError(403, "badPassword", "Неверный пароль")
     name = " ".join(body.name.split())
     check_nick(name)
@@ -775,7 +817,7 @@ def setup_needed() -> bool:
 @router.get("/api/setup")
 def setup_status():
     """Whether this server still waits for its first-run setup (no accounts yet)."""
-    return {"needed": setup_needed(), "serverName": server_name(), "serverIcon": icon_url()}
+    return {"needed": setup_needed(), "serverName": server_name(), "serverIcon": icon_url(), "guest": GUEST_MODE}
 
 
 class SetupCodeIn(BaseModel):
@@ -859,6 +901,8 @@ def bootstrap(request: Request, response: Response, user: dict = Depends(current
         "serverName": server_name(),
         "serverIcon": icon_url(),
         "relayOnly": RELAY_ONLY,
+        # On a public demo everyone but the admin is a guest: no password they know, so none is asked for.
+        "isGuest": GUEST_MODE and not is_admin(user),
         "canManageChannels": is_admin(user),
         "mutedChannels": muted_channels(user["id"]),
         **dict(zip(("unread", "mentions"), unread_counts(user))),
