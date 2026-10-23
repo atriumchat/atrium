@@ -5,6 +5,8 @@ import { inviteLink } from '../people/invite';
 import { AtriumMark } from '../ui/Logo';
 import { IconCropper, centred, cropToBlob, cropToUrl, loadImage, type Crop } from '../ui/IconCropper';
 import { KeyStep } from './KeyStep';
+import type { DiscordPreview } from '../types';
+import discordClip from './discord-template.mp4';
 import { adminForm, codeFrom, CODE_LENGTH, firstRun, type FirstRunStep } from '@atrium/setup';
 import { FlowPrimary, FlowSecondary, FlowShell, FlowStep, LineField, TextAction } from '@atrium/ui-web';
 import { LangButton } from '../ui/LangButton';
@@ -13,17 +15,17 @@ import './setupWizard.css';
 /**
  * First run on a fresh server, shown while it has no accounts, in the flow look (DESIGN.md) as the phone app does it
  * in "Your own server" (mobile/app/own.tsx). The desktop app's "Your own server" and the installer open it with the
- * setup code in the address (?setup=CODE). The server's name and icon, the admin, their recovery key, the first
- * invite link; then the app.
+ * setup code in the address (?setup=CODE). The server's name and icon, the admin, their recovery key, the channels of
+ * a Discord server by its template link (or not), the first invite link; then the app.
  */
 
 type StepId = FirstRunStep;
 
-// Design work, development only: #step=server (or code, admin, key, invite) opens that step with made-up answers and
+// Design work, development only: #step=server (or code, admin, key, discord, invite) opens that step with made-up answers and
 // nothing sent to the server.
-const DEMO_HASH = import.meta.env.DEV ? window.location.hash.match(/step=(intro|code|server|admin|key|invite|done)\b/)?.[1] : undefined;
+const DEMO_HASH = import.meta.env.DEV ? window.location.hash.match(/step=(intro|code|server|admin|key|discord|invite|done)\b/)?.[1] : undefined;
 export const DEMO = (DEMO_HASH === 'intro' ? 'server' : DEMO_HASH === 'done' ? 'invite' : DEMO_HASH) as StepId | undefined;
-const ORDER: StepId[] = ['code', 'server', 'crop', 'admin', 'key', 'invite'];
+const ORDER: StepId[] = ['code', 'server', 'crop', 'admin', 'key', 'discord', 'invite'];
 const past = (id: StepId) => !!DEMO && ORDER.indexOf(DEMO) > ORDER.indexOf(id);
 
 export function SetupWizard({ onDone }: { onDone: () => void }) {
@@ -53,6 +55,8 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   const [iconSent, setIconSent] = useState(false);
 
   const [key, setKey] = useState(account ? 'K7QM-2XPA-9DHR-T4WC-8NBE-3VLY' : '');
+  const [discordLink, setDiscordLink] = useState('');
+  const [found, setFound] = useState<DiscordPreview | null>(null);
   const [link, setLink] = useState(account ? `${window.location.origin}/?invite=7F3K9QAB` : '');
   const [linkSent, setLinkSent] = useState<'copied' | 'shared' | null>(null);
 
@@ -186,6 +190,24 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     });
   }
 
+  /* ---------- the channels from Discord ---------- */
+
+  function lookDiscord() {
+    if (!discordLink.trim() || busy) return;
+    if (DEMO) return setFound(DEMO_DISCORD);
+    void run(async () => setFound(await api.discordPreview(discordLink.trim())));
+  }
+
+  function moveDiscord() {
+    if (busy) return;
+    if (DEMO) return go('invite');
+    void run(async () => {
+      // A server just made has only its starter channels, nobody has written in them: the imported ones take their place.
+      await api.discordImport(discordLink.trim(), [], true);
+      go('invite');
+    });
+  }
+
   /* ---------- the invite ---------- */
 
   useEffect(() => {
@@ -303,7 +325,50 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
 
       case 'key':
         // Copied or downloaded, then on; the file says the server and the nick (downloadKey).
-        return <KeyStep value={{ key, name: nick.trim(), serverName: name }} title={t('setup.key.title')} sub={t('setup.key.sub')} error={error} onNext={() => go('invite')} />;
+        return <KeyStep value={{ key, name: nick.trim(), serverName: name }} title={t('setup.key.title')} sub={t('setup.key.sub')} error={error} onNext={() => go('discord')} />;
+
+      case 'discord':
+        return (
+          <FlowStep
+            title={t('settings.server.import')}
+            sub={t('settings.server.importSub')}
+            error={error}
+            onSubmit={found ? moveDiscord : lookDiscord}
+            actions={
+              <>
+                <FlowPrimary type="submit" busy={busy} disabled={!discordLink.trim()}>{found ? t('settings.server.importGo') : t('settings.server.importLook')}</FlowPrimary>
+                <FlowSecondary onPress={() => go('invite')}>{t('setup.server.skip')}</FlowSecondary>
+              </>
+            }
+          >
+            {found ? (
+              <ul className="flow-discord-list">
+                {found.loose.length ? (
+                  <li>
+                    <b>{t('settings.server.importLoose')}</b>
+                    <span>{found.loose.map(channelLabel).join(' · ')}</span>
+                  </li>
+                ) : null}
+                {found.categories.map((c) => (
+                  <li key={c.key}>
+                    <b>{c.name}</b>
+                    <span>{c.channels.map(channelLabel).join(' · ')}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <video className="flow-discord-clip" src={discordClip} autoPlay loop muted playsInline aria-label={t('settings.server.importHow')} />
+            )}
+            <LineField
+              label={t('settings.server.importLink')}
+              value={discordLink}
+              onChange={(e) => (setDiscordLink(e.target.value), setFound(null), setError(''))}
+              placeholder="https://discord.new/…"
+              autoCapitalize="off"
+              spellCheck={false}
+            />
+          </FlowStep>
+        );
 
       case 'invite':
         return (
@@ -343,3 +408,16 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     </FlowShell>
   );
 }
+
+const channelLabel = (c: { name: string; kind: 'text' | 'voice' }) => (c.kind === 'text' ? `# ${c.name}` : c.name);
+
+/** The made-up template the design walk-through shows (#step=discord). */
+const DEMO_DISCORD: DiscordPreview = {
+  name: 'Friends',
+  roles: 0,
+  loose: [],
+  categories: [
+    { key: 'c1', name: 'Text Channels', channels: [{ key: 'h1', name: 'general', kind: 'text' }, { key: 'h2', name: 'clips-and-highlights', kind: 'text' }] },
+    { key: 'c2', name: 'Voice Channels', channels: [{ key: 'h3', name: 'Lobby', kind: 'voice' }, { key: 'h4', name: 'Gaming', kind: 'voice' }] },
+  ],
+};

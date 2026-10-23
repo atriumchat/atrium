@@ -37,3 +37,32 @@
   border-radius: var(--gx-radius-popover);
   overflow: hidden;
 }
+
+/* "Перенести из Discord": how to get the template link, on a loop; then what the template brings. */
+.flow-discord-clip {
+  display: block;
+  width: 100%;
+  aspect-ratio: 960 / 562;
+  border-radius: var(--gx-radius-popover);
+}
+.flow-discord-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-inter);
+}
+.flow-discord-list b {
+  display: block;
+  font-size: 17px;
+  font-weight: 500;
+}
+.flow-discord-list span {
+  display: block;
+  overflow: hidden;
+  color: var(--gx-muted);
+  font-size: 15px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

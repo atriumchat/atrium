@@ -95,8 +95,11 @@ export const ownOnDesktop = defineFlow<'server' | 'rent' | 'rent-pay' | 'rent-ke
   },
 });
 
-/** The server's first run in a browser (the web wizard): its code, name and icon, the admin, the key, the invite. */
-export const firstRun = defineFlow<'code' | 'server' | 'crop' | 'admin' | 'key' | 'invite', 'server' | 'account' | 'friends', { askCode: boolean }>({
+/**
+ * The server's first run in a browser (the web wizard): its code, name and icon, the admin, the key, the channels from
+ * a Discord server (or not), the invite.
+ */
+export const firstRun = defineFlow<'code' | 'server' | 'crop' | 'admin' | 'key' | 'discord' | 'invite', 'server' | 'account' | 'friends', { askCode: boolean }>({
   parts: ['server', 'account', 'friends'],
   steps: {
     code: { fill: 0.1, part: 'server' },
@@ -105,6 +108,7 @@ export const firstRun = defineFlow<'code' | 'server' | 'crop' | 'admin' | 'key' 
     crop: { fill: 0.3, part: 'server', back: 'server' },
     admin: { fill: 0.5, part: 'account', back: 'server' },
     key: { fill: 0.72, part: 'account' },
+    discord: { fill: 0.8, part: 'friends' },
     invite: { fill: 0.9, part: 'friends' },
   },
 });
