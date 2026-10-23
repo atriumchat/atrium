@@ -895,7 +895,7 @@ ATRIUM_SITE=https://atriumcalls.vercel.app
 # the way in, and under it an offer to make one of their own. Atrium's black and white, one HTML file, no scripts.
 # Class names are random per install (SEED, LANDING_SEED in .env, keeps them across updates).
 write_landing() {
-  local name icon initial tile w r t s l b o dir=$ATRIUM_TMP/landing
+  local name icon initial tile w t s b f dir=$ATRIUM_TMP/landing
   RANDOM=$(( $1 % 32768 ))
   # The name people gave the server in the browser setup; the domain while it's still the default one.
   name=$(app_server_name)
@@ -905,7 +905,7 @@ write_landing() {
   name=${name//&/&amp;} name=${name//</&lt;} name=${name//>/&gt;} name=${name//\"/&quot;} name=${name//\'/&#39;}
   initial=${initial//&/&amp;} initial=${initial//</&lt;} initial=${initial//>/&gt;}
   icon=$(app_server_icon)
-  w=$(css_name) r=$(css_name) t=$(css_name) s=$(css_name) l=$(css_name) b=$(css_name) o=$(css_name) tile=$(css_name)
+  w=$(css_name) t=$(css_name) s=$(css_name) b=$(css_name) f=$(css_name) tile=$(css_name)
   if [[ -n $icon ]]; then
     icon="<img src=\"https://app.$DOMAIN${icon//\"/}\" alt=\"\">"
   else
@@ -921,46 +921,33 @@ write_landing() {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#0c0c0e">
 <title>$name</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%23ffffff'/%3E%3C/svg%3E">
 <style>
 * { box-sizing: border-box; }
 html, body { margin: 0; }
-body { display: flex; min-height: 100vh; min-height: 100dvh; justify-content: center; background: #000; color: #f2f2f4; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
-.$w { display: flex; width: 100%; max-width: 556px; flex-direction: column; justify-content: center; padding: 56px 38px; }
-.$r { height: 12px; margin-bottom: 28px; background: repeating-linear-gradient(90deg, rgba(255,255,255,.13) 0 2px, transparent 2px 10px) bottom / 100% 8px no-repeat, repeating-linear-gradient(90deg, rgba(255,255,255,.13) 0 2px, transparent 2px 50px) bottom / 100% 12px no-repeat; }
-.$tile { display: grid; width: 72px; height: 72px; margin-bottom: 24px; place-items: center; overflow: hidden; border-radius: 18px; background: #f2f2f4; color: #000; font-size: 32px; font-weight: 500; }
+body { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; background: #0c0c0e; color: #ededef; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+.$w { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; padding: 48px 24px 24px; text-align: center; }
+.$tile { display: grid; width: 104px; height: 104px; margin-bottom: 28px; place-items: center; overflow: hidden; border-radius: 26px; background: #ffffff; color: #0c0c0e; font-size: 44px; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,.35), 0 18px 40px rgba(0,0,0,.5); }
 .$tile img { width: 100%; height: 100%; object-fit: cover; }
-.$t { margin: 0; font-size: 44px; font-weight: 300; letter-spacing: -0.03em; line-height: 1.1; overflow-wrap: anywhere; }
-.$s { margin: 10px 0 0; color: #8b8b93; font-size: 17px; line-height: 1.4; }
-.$l { margin: 36px 0 0; padding: 0; list-style: none; border-top: 1px solid #1f1f23; }
-.$l li { display: flex; justify-content: space-between; gap: 16px; padding: 16px 0; border-bottom: 1px solid #1f1f23; font-size: 17px; }
-.$l li span:last-child { color: #8b8b93; white-space: nowrap; }
-.$b { display: flex; height: 56px; margin-top: 36px; align-items: center; justify-content: center; border-radius: 999px; background: #f2f2f4; color: #000; font-size: 17px; font-weight: 600; text-decoration: none; white-space: nowrap; }
-.$b:hover { background: #fff; }
-.$o { display: flex; margin-top: 56px; align-items: center; justify-content: space-between; gap: 16px; padding-top: 20px; border-top: 1px solid #1f1f23; }
-.$o p { margin: 0; color: #8b8b93; font-size: 15px; line-height: 1.4; }
-.$o a { display: inline-flex; height: 40px; padding: 0 18px; align-items: center; border: 1px solid #3a3a40; border-radius: 999px; color: #f2f2f4; font-size: 15px; font-weight: 500; text-decoration: none; white-space: nowrap; }
-.$o a:hover { border-color: #f2f2f4; }
-.$b:focus-visible, .$o a:focus-visible { outline: 2px solid #f2f2f4; outline-offset: 3px; }
-@media (max-width: 480px) { .$w { padding: 40px 24px; } .$t { font-size: 36px; } .$o { flex-direction: column; align-items: flex-start; } }
+.$t { max-width: 640px; margin: 0; font-size: clamp(36px, 7vw, 56px); font-weight: 300; letter-spacing: -0.03em; line-height: 1.08; overflow-wrap: anywhere; }
+.$s { margin: 12px 0 0; color: #8b8b93; font-size: 17px; line-height: 1.4; }
+.$b { display: inline-flex; height: 56px; margin-top: 36px; padding: 0 40px; align-items: center; border-radius: 999px; background: #ffffff; color: #0c0c0e; font-size: 17px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.$b:hover { background: #e4e4e7; }
+.$b:focus-visible, .$f a:focus-visible { outline: 2px solid #ededef; outline-offset: 3px; }
+.$f { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; padding: 24px; border-top: 1px solid #1c1c20; color: #8b8b93; font-size: 15px; }
+.$f a { color: #ededef; text-underline-offset: 3px; white-space: nowrap; }
 </style>
 </head>
 <body>
 <main class="$w">
-<div class="$r"></div>
 <div class="$tile">$icon</div>
 <h1 class="$t">$name</h1>
-<p class="$s">Сервер для своих</p>
-<ul class="$l">
-<li><span>Голос и показ экрана</span><span>в один клик</span></li>
-<li><span>Чат и файлы</span><span>на этом сервере</span></li>
-<li><span>Вход</span><span>по приглашению</span></li>
-</ul>
+<p class="$s">Голос, чат и показ экрана · по приглашению</p>
 <a class="$b" href="https://app.$DOMAIN">Войти</a>
-<div class="$o"><p>Свой такой же сервер — для своей компании</p><a href="$ATRIUM_SITE/?utm_source=cover">Сделать свой</a></div>
 </main>
+<footer class="$f"><span>Нужен такой же для своей компании?</span><a href="$ATRIUM_SITE/?utm_source=cover">Сделать свой сервер</a></footer>
 </body>
 </html>
 EOF
