@@ -889,7 +889,7 @@ app_server_icon() {
 }
 
 # Where "make your own" leads: Atrium's own site.
-ATRIUM_SITE=https://atriumcalls.vercel.app
+ATRIUM_SITE=https://www.atriumcalls.app
 
 # write_landing SEED: the root domain's page, for someone who comes to it: whose server this is (its icon and name),
 # the way in, and under it an offer to make one of their own. Atrium's black and white, one HTML file, no scripts.

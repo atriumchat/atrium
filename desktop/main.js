@@ -69,7 +69,7 @@ try {
 }
 let START_URL = APP_URL;
 // Where "Your own server" on the first start leads.
-const SERVER_GUIDE = 'https://gomex.party/server-install';
+const SERVER_GUIDE = { ru: 'https://www.atriumcalls.app/server-install', en: 'https://www.atriumcalls.app/en/server-install' };
 // The app's own updates come from the project's GitHub Releases whatever server it talks to, and only signed ones
 // install (updater.js). release-desktop.sh puts the manifest's address into package.json, like the server's; a build
 // without it never updates.
@@ -510,7 +510,7 @@ ipcMain.handle('address:language', (event, choice) => {
 
 ipcMain.handle('address:guide', (event) => {
   if (!fromPage(event, 'start.html')) return;
-  shell.openExternal(SERVER_GUIDE);
+  shell.openExternal(SERVER_GUIDE[i18n.getLang()] ?? SERVER_GUIDE.ru);
 });
 
 /* ---------- "Your own server": setting up a server from the app (desktop/ui's onboarding page, built into ui-dist; server-setup.js) ---------- */
