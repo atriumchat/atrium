@@ -29,7 +29,15 @@ export type MyInvite = {
 
 /** A channel in the trash: when it was deleted (ms) and how many messages it still holds. */
 export type DeletedChannel = Channel & { deletedAt: number; messages: number };
-export type Channel = { id: string; name: string; kind: 'text' | 'voice'; position: number };
+/** A server channel; `categoryId` is the category it's in (none: the plain text/voice sections; older servers send none). */
+export type Channel = { id: string; name: string; kind: 'text' | 'voice'; position: number; categoryId?: string | null };
+
+/** A group of channels in the list, as Discord's categories. */
+export type Category = { id: string; name: string; position: number };
+
+/** A Discord server template as the server read it: what moving it over would make (keys for leaving things out). */
+export type DiscordChannel = { key: string; name: string; kind: 'text' | 'voice' };
+export type DiscordPreview = { name: string; categories: { key: string; name: string; channels: DiscordChannel[] }[]; loose: DiscordChannel[]; roles: number };
 
 /**
  * Something attached to a message: a picture (width/height are its stored size, to reserve space before it
@@ -103,6 +111,8 @@ export type Bootstrap = {
   me: User;
   users: User[];
   channels: Channel[];
+  /** Since categories came in; older servers send none. */
+  categories?: Category[];
   livekitUrl: string;
   serverName: string;
   /** The server's own icon (/api/server/icon?v=…), or null for Atrium's mark. */

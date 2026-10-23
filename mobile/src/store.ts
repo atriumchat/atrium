@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { create } from 'zustand';
 import { io, type Socket } from 'socket.io-client';
 import { api, ApiError, getCredentials, loadCredentials, saveCredentials } from './api';
-import { mergeMessages, type Bootstrap, type CallState, type Channel, type Dm, type Friend, type Message, type User, type VoiceEntry } from './protocol';
+import { mergeMessages, type Bootstrap, type CallState, type Category, type Channel, type Dm, type Friend, type Message, type User, type VoiceEntry } from './protocol';
 import { t } from './i18n';
 
 type State = {
@@ -121,6 +121,7 @@ function connect() {
     const calls = useStore.getState().calls;
     if (calls[channelId]?.participants.some((p) => p.userId === useStore.getState().data?.me.id)) void cleanupVoice?.();
   });
+  live.on('categories', (categories: Category[]) => useStore.setState((s) => ({ data: s.data ? { ...s.data, categories } : null })));
   live.on('channels', (channels: Channel[]) => {
     useStore.setState((s) => ({ data: s.data ? { ...s.data, channels } : null }));
   });

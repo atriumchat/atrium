@@ -1,5 +1,5 @@
 import { errorText, t, type Params } from './i18n';
-import type { Bootstrap, Channel, DeletedChannel, Dm, Friend, InboxItem, Message, MyInvite, MyStatus, Session, Upload, User } from './types';
+import type { Bootstrap, Channel, DeletedChannel, Dm, Friend, InboxItem, Message, MyInvite, MyStatus, Session, Upload, User, Category, DiscordPreview } from './types';
 
 type ServerInfo = { serverName: string; serverIcon: string | null };
 
@@ -106,7 +106,16 @@ export const api = {
   bootstrap: () => request<Bootstrap>('/api/bootstrap'),
   messages: (channelId: string, before?: number, beforeId?: string) =>
     request<Message[]>(`/api/channels/${channelId}/messages${historyQuery(before, beforeId)}`),
-  createChannel: (name: string, kind: Channel['kind']) => request<Channel[]>('/api/channels', post({ name, kind })),
+  createChannel: (name: string, kind: Channel['kind'], categoryId?: string | null) =>
+    request<Channel[]>('/api/channels', post({ name, kind, ...(categoryId ? { categoryId } : {}) })),
+  createCategory: (name: string) => request<Category[]>('/api/categories', post({ name })),
+  renameCategory: (id: string, name: string) => request<Category[]>(`/api/categories/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) }),
+  deleteCategory: (id: string) => request<Category[]>(`/api/categories/${id}`, { method: 'DELETE' }),
+  moveChannel: (id: string, categoryId: string | null) =>
+    request<Channel[]>(`/api/channels/${id}/category`, { method: 'PUT', body: JSON.stringify({ categoryId }) }),
+  discordPreview: (link: string) => request<DiscordPreview>('/api/import/discord/preview', post({ link })),
+  discordImport: (link: string, skip: string[], replaceEmpty: boolean) =>
+    request<{ channels: Channel[]; categories: Category[]; added: number; removed: number }>('/api/import/discord', post({ link, skip, replaceEmpty })),
   renameChannel: (id: string, name: string) =>
     request<Channel[]>(`/api/channels/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) }),
   reorderChannels: (ids: string[]) => request<Channel[]>('/api/channels/order', { method: 'PUT', body: JSON.stringify({ ids }) }),

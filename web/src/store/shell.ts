@@ -1,4 +1,4 @@
-import type { Channel } from '../types';
+import type { Category, Channel } from '../types';
 import type { DesktopUpdate } from '../desktop';
 import { get, set, type State } from './core';
 
@@ -13,6 +13,8 @@ export type ShellSlice = {
   /** The server's icon, or null: Atrium's mark stands in. */
   serverIcon: string | null;
   channels: Channel[];
+  /** Groups of channels; empty on a server without any (or one from before categories). */
+  categories: Category[];
   selectedChannelId: string | null;
   canManageChannels: boolean;
   /** Channels this person muted: no counter, nothing on the app badge. */
@@ -39,6 +41,7 @@ export function shellSlice(): ShellSlice {
     serverName: 'Atrium',
     serverIcon: null,
     channels: [],
+    categories: [],
     selectedChannelId: null,
     canManageChannels: false,
     mutedChannels: [],

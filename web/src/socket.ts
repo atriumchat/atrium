@@ -1,5 +1,5 @@
 import { io, type Socket } from 'socket.io-client';
-import type { CallState, Channel, Message, MyStatus, Reaction, User, VoiceEntry } from './types';
+import type { CallState, Channel, Message, MyStatus, Reaction, User, VoiceEntry, Category } from './types';
 import { api, setToken } from './api';
 import { desktop } from './desktop';
 import { errorText, t } from './i18n';
@@ -209,6 +209,7 @@ export function connectSocket(token: string, onUnauthorized: () => void) {
   });
 
   socket.on('presence', (online: string[]) => useStore.setState({ online }));
+  socket.on('categories', (categories: Category[]) => useStore.setState({ categories }));
   socket.on('channels', (channels: Channel[]) => {
     setChannels(channels);
     // The voice room you're in was deleted: hang up.

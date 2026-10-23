@@ -32,6 +32,7 @@ export function initStore(data: Bootstrap) {
     me: data.me,
     users: Object.fromEntries(data.users.map((u) => [u.id, u])),
     channels: data.channels,
+    categories: data.categories ?? [],
     canManageChannels: data.canManageChannels,
     mutedChannels: data.mutedChannels,
     unread: data.unread ?? {},

@@ -16,7 +16,21 @@ router = APIRouter()
 
 
 def list_channels() -> list[dict]:
-    return query("SELECT id, name, kind, position FROM channels WHERE deleted_at IS NULL ORDER BY position, created_at")
+    return query(
+        "SELECT id, name, kind, position, category_id AS categoryId FROM channels WHERE deleted_at IS NULL ORDER BY position, created_at"
+    )
+
+
+def list_categories() -> list[dict]:
+    return query("SELECT id, name, position FROM categories ORDER BY position, created_at")
+
+
+async def send_layout() -> list[dict]:
+    """The categories, then the channels, to everyone (clients from before categories just ignore the first)."""
+    await sio.emit("categories", list_categories())
+    channels = list_channels()
+    await sio.emit("channels", channels)
+    return channels
 
 
 def mentions_in(content: str) -> tuple[list[str], bool]:
@@ -143,6 +157,19 @@ def reply_target(table: str, conversation_column: str, conversation_id: str, dat
 class ChannelIn(BaseModel):
     name: str = Field(min_length=1, max_length=32)
     kind: str = Field(pattern="^(text|voice)$")
+    categoryId: str | None = Field(default=None, max_length=64)
+
+
+class CategoryIn(BaseModel):
+    name: str = Field(min_length=1, max_length=32)
+
+
+class CategoryOrderIn(BaseModel):
+    ids: list[str] = Field(max_length=100)
+
+
+class ChannelCategoryIn(BaseModel):
+    categoryId: str | None = Field(default=None, max_length=64)
 
 
 class ChannelRenameIn(BaseModel):
@@ -293,14 +320,13 @@ async def create_channel(body: ChannelIn, user: dict = Depends(current_user)):
     if not is_admin(user):
         raise ApiError(403, "adminCreateChannels", "Каналы создаёт только админ")
     name = channel_name(body.name, body.kind)
+    category = category_or_404(body.categoryId)["id"] if body.categoryId else None
     position = query("SELECT COALESCE(MAX(position), 0) + 1 AS p FROM channels WHERE deleted_at IS NULL")[0]["p"]
     execute(
-        "INSERT INTO channels (id, name, kind, position, created_at) VALUES (?, ?, ?, ?, ?)",
-        (uuid.uuid4().hex, name, body.kind, position, now_ms()),
+        "INSERT INTO channels (id, name, kind, position, created_at, category_id) VALUES (?, ?, ?, ?, ?, ?)",
+        (uuid.uuid4().hex, name, body.kind, position, now_ms(), category),
     )
-    channels = list_channels()
-    await sio.emit("channels", channels)
-    return channels
+    return await send_layout()
 
 
 @router.patch("/api/channels/{channel_id}")
@@ -309,32 +335,28 @@ async def rename_channel(channel_id: str, body: ChannelRenameIn, user: dict = De
         raise ApiError(403, "adminRenameChannels", "Каналы переименовывает только админ")
     channel = channel_or_404(channel_id)
     execute("UPDATE channels SET name = ? WHERE id = ?", (channel_name(body.name, channel["kind"]), channel_id))
-    channels = list_channels()
-    await sio.emit("channels", channels)
-    return channels
+    return await send_layout()
 
 
 @router.put("/api/channels/order")
 async def reorder_channels(body: ChannelOrderIn, user: dict = Depends(current_user)):
-    """The new order of one kind of channel (dragged in the list); the other kind keeps its places."""
+    """The new order of one kind of channel in one category (or in none), dragged in the list; the rest keep their places."""
     if not is_admin(user):
         raise ApiError(403, "adminMoveChannels", "Каналы двигает только админ")
     current = list_channels()
     by_id = {c["id"]: c for c in current}
-    kinds = {by_id[i]["kind"] for i in body.ids if i in by_id}
-    if len(kinds) != 1:
+    groups = {(by_id[i]["kind"], by_id[i]["categoryId"]) for i in body.ids if i in by_id}
+    if len(groups) != 1:
         raise ApiError(400, "wrongList", "Не тот список")
-    kind = kinds.pop()
-    same = [c["id"] for c in current if c["kind"] == kind]
+    group = groups.pop()
+    same = [c["id"] for c in current if (c["kind"], c["categoryId"]) == group]
     if sorted(body.ids) != sorted(same):
         raise ApiError(409, "channelsChanged", "Список каналов изменился")
     moved = iter(body.ids)
-    order = [next(moved) if c["kind"] == kind else c["id"] for c in current]
+    order = [next(moved) if (c["kind"], c["categoryId"]) == group else c["id"] for c in current]
     with connect_db() as conn:
         conn.executemany("UPDATE channels SET position = ? WHERE id = ?", list(enumerate(order)))
-    channels = list_channels()
-    await sio.emit("channels", channels)
-    return channels
+    return await send_layout()
 
 
 @router.put("/api/channels/{channel_id}/mute")
@@ -397,9 +419,9 @@ async def restore_channel(channel_id: str, user: dict = Depends(current_user)):
     if not query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NOT NULL", (channel_id,)):
         raise ApiError(404, "noChannel", "Нет такого канала")
     execute("UPDATE channels SET deleted_at = NULL WHERE id = ?", (channel_id,))
-    channels = list_channels()
-    await sio.emit("channels", channels)
-    return channels
+    # Its category may have gone meanwhile: then it comes back to the plain sections.
+    execute("UPDATE channels SET category_id = NULL WHERE id = ? AND category_id NOT IN (SELECT id FROM categories)", (channel_id,))
+    return await send_layout()
 
 
 @router.delete("/api/channels/{channel_id}")
@@ -410,8 +432,7 @@ async def delete_channel(channel_id: str, user: dict = Depends(current_user)):
         raise ApiError(400, "lastTextChannel", "Последний текстовый канал удалить нельзя")
     execute("UPDATE channels SET deleted_at = ? WHERE id = ?", (now_ms(), channel_id))
     purge_deleted_channels()
-    channels = list_channels()
-    await sio.emit("channels", channels)
+    channels = await send_layout()
     # Whoever was in the room is hung up; their apps leave the LiveKit room once the channel is gone.
     in_room = [sid for sid, e in voice.items() if e["kind"] == "channel" and e["channelId"] == channel_id]
     for sid in in_room:
@@ -419,6 +440,77 @@ async def delete_channel(channel_id: str, user: dict = Depends(current_user)):
     if in_room:
         await sio.emit("voice:state", voice_payload())
     return channels
+
+
+def category_or_404(category_id: str | None) -> dict:
+    rows = query("SELECT * FROM categories WHERE id = ?", (category_id,)) if category_id else []
+    if not rows:
+        raise ApiError(404, "noCategory", "Нет такой категории")
+    return rows[0]
+
+
+def category_name(raw: str) -> str:
+    name = " ".join(raw.split())
+    if not name:
+        raise ApiError(400, "emptyName", "Пустое название")
+    return name
+
+
+@router.post("/api/categories")
+async def create_category(body: CategoryIn, user: dict = Depends(current_user)):
+    if not is_admin(user):
+        raise ApiError(403, "adminCategories", "Категориями управляет только админ")
+    position = query("SELECT COALESCE(MAX(position), 0) + 1 AS p FROM categories")[0]["p"]
+    execute("INSERT INTO categories (id, name, position, created_at) VALUES (?, ?, ?, ?)", (uuid.uuid4().hex, category_name(body.name), position, now_ms()))
+    await send_layout()
+    return list_categories()
+
+
+@router.patch("/api/categories/{category_id}")
+async def rename_category(category_id: str, body: CategoryIn, user: dict = Depends(current_user)):
+    if not is_admin(user):
+        raise ApiError(403, "adminCategories", "Категориями управляет только админ")
+    category_or_404(category_id)
+    execute("UPDATE categories SET name = ? WHERE id = ?", (category_name(body.name), category_id))
+    await send_layout()
+    return list_categories()
+
+
+@router.delete("/api/categories/{category_id}")
+async def delete_category(category_id: str, user: dict = Depends(current_user)):
+    """The category goes; its channels stay, in the plain sections."""
+    if not is_admin(user):
+        raise ApiError(403, "adminCategories", "Категориями управляет только админ")
+    category_or_404(category_id)
+    with connect_db() as conn:
+        conn.execute("UPDATE channels SET category_id = NULL WHERE category_id = ?", (category_id,))
+        conn.execute("DELETE FROM categories WHERE id = ?", (category_id,))
+    await send_layout()
+    return list_categories()
+
+
+@router.put("/api/categories/order")
+async def reorder_categories(body: CategoryOrderIn, user: dict = Depends(current_user)):
+    if not is_admin(user):
+        raise ApiError(403, "adminCategories", "Категориями управляет только админ")
+    if sorted(body.ids) != sorted(c["id"] for c in list_categories()):
+        raise ApiError(409, "categoriesChanged", "Список категорий изменился")
+    with connect_db() as conn:
+        conn.executemany("UPDATE categories SET position = ? WHERE id = ?", list(enumerate(body.ids)))
+    await send_layout()
+    return list_categories()
+
+
+@router.put("/api/channels/{channel_id}/category")
+async def move_channel(channel_id: str, body: ChannelCategoryIn, user: dict = Depends(current_user)):
+    """Into a category (at its end), or out of any (categoryId null) back into the plain sections."""
+    if not is_admin(user):
+        raise ApiError(403, "adminMoveChannels", "Каналы двигает только админ")
+    channel_or_404(channel_id)
+    category = category_or_404(body.categoryId)["id"] if body.categoryId else None
+    position = query("SELECT COALESCE(MAX(position), 0) + 1 AS p FROM channels WHERE deleted_at IS NULL")[0]["p"]
+    execute("UPDATE channels SET category_id = ?, position = ? WHERE id = ?", (category, position, channel_id))
+    return await send_layout()
 
 
 # The other atrium modules import this one too: they come last, once everything above is defined.

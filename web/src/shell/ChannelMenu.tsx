@@ -9,9 +9,9 @@ import { Avatar } from '../ui/Avatar';
 import type { Channel } from '../types';
 import { ConfirmDialog, Dialog } from '../ui/Dialog';
 import { EmptyState } from '../ui/Illustrations';
-import { BellIcon, BellSlashIcon, CheckIcon, DotsIcon, PencilIcon, SearchIcon, TrashIcon, UserPlusIcon } from '../ui/icons';
+import { BellIcon, BellSlashIcon, CheckIcon, DotsIcon, FolderIcon, PencilIcon, SearchIcon, TrashIcon, UserPlusIcon } from '../ui/icons';
 
-type Action = 'read' | 'mute' | 'invite' | 'rename' | 'delete';
+type Action = 'read' | 'mute' | 'invite' | 'rename' | 'move' | 'delete';
 
 /**
  * A server channel's "…", in its header and on its row in the list. Everyone can mark a text channel read and
@@ -25,7 +25,8 @@ export function ChannelMenu({ channelId, className = '' }: { channelId: string; 
   const unread = useStore((s) => s.unread[channelId] ?? 0);
   const muted = useStore((s) => s.mutedChannels.includes(channelId));
   // Which channel a dialog is for: the same menu may be showing another channel once this one is gone.
-  const [dialog, setDialog] = useState<{ action: 'invite' | 'rename' | 'delete'; id: string } | null>(null);
+  const [dialog, setDialog] = useState<{ action: 'invite' | 'rename' | 'move' | 'delete'; id: string } | null>(null);
+  const hasCategories = useStore((s) => s.categories.length > 0);
   const channel = channels.find((c) => c.id === channelId);
   if (!channel) return null;
   const isText = channel.kind === 'text';
@@ -35,7 +36,7 @@ export function ChannelMenu({ channelId, className = '' }: { channelId: string; 
     try {
       if (action === 'read') markRead(channel.id);
       if (action === 'mute') useStore.setState({ mutedChannels: await api.muteChannel(channel.id, !muted) });
-      if (action === 'invite' || action === 'rename' || action === 'delete') setDialog({ action, id: channel.id });
+      if (action === 'invite' || action === 'rename' || action === 'move' || action === 'delete') setDialog({ action, id: channel.id });
     } catch (e) {
       showError(e instanceof Error ? e.message : t('shell.menu.failed'));
     }
@@ -56,6 +57,7 @@ export function ChannelMenu({ channelId, className = '' }: { channelId: string; 
   const admin: ReactNode[] = [];
   if (canManage) {
     admin.push(<Item key="rename" id="rename" label={t('shell.menu.rename')} icon={<PencilIcon size={16} />} />);
+    if (hasCategories) admin.push(<Item key="move" id="move" label={t('shell.menu.move')} icon={<FolderIcon size={16} />} />);
   }
   if (personal.length + admin.length === 0) return null;
 
@@ -84,6 +86,7 @@ export function ChannelMenu({ channelId, className = '' }: { channelId: string; 
       </Dropdown>
       {dialog?.id === channel.id && dialog.action === 'invite' && <InviteToRoom channel={channel} onClose={() => setDialog(null)} />}
       {dialog?.id === channel.id && dialog.action === 'rename' && <RenameChannel channel={channel} onClose={() => setDialog(null)} />}
+      {dialog?.id === channel.id && dialog.action === 'move' && <MoveChannel channel={channel} onClose={() => setDialog(null)} />}
       {dialog?.id === channel.id && dialog.action === 'delete' && <DeleteChannel channel={channel} onClose={() => setDialog(null)} />}
     </>
   );
@@ -183,6 +186,42 @@ function InviteToRoom({ channel, onClose }: { channel: Channel; onClose: () => v
           })}
         </ul>
       )}
+    </Dialog>
+  );
+}
+
+/** Into one of the categories, or out of them (the plain sections): one tap moves it, to the category's end. */
+function MoveChannel({ channel, onClose }: { channel: Channel; onClose: () => void }) {
+  const { t } = useT();
+  const categories = useStore((s) => s.categories);
+  const current = channel.categoryId ?? null;
+
+  async function move(categoryId: string | null) {
+    if (categoryId === current) return onClose();
+    try {
+      setChannels(await api.moveChannel(channel.id, categoryId));
+      onClose();
+    } catch (e) {
+      showError(e instanceof Error ? e.message : t('shell.menu.failed'));
+    }
+  }
+
+  const options: { id: string | null; name: string }[] = [{ id: null, name: t('shell.menu.noCategory') }, ...categories.map((c) => ({ id: c.id, name: c.name }))];
+  return (
+    <Dialog sheet title={t('shell.menu.move')} subtitle={channel.kind === 'text' ? `# ${channel.name}` : channel.name} onClose={onClose}>
+      <div className="flex flex-col gap-0.5 pb-2">
+        {options.map((o) => (
+          <button
+            key={o.id ?? 'none'}
+            type="button"
+            onClick={() => void move(o.id)}
+            className={`flex h-11 items-center justify-between gap-3 rounded-full px-4 text-left text-[15px] transition-colors hover:bg-white/[0.06] ${o.id === current ? 'bg-default font-medium' : ''}`}
+          >
+            <span className="truncate">{o.name}</span>
+            {o.id === current && <CheckIcon size={16} className="shrink-0" />}
+          </button>
+        ))}
+      </div>
     </Dialog>
   );
 }

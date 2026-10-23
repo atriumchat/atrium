@@ -1,4 +1,5 @@
 import { useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
+import { Dropdown, Label } from '@heroui/react';
 import { InviteButton } from '../people/Invites';
 import { ListHead } from './ListHead';
 import { CallPill, FaceStack } from './CallPill';
@@ -8,17 +9,18 @@ import { selectChannel, setChannels, showError, useStore, voiceMembers } from '.
 import { joinVoice } from '../voice/voice';
 import { ensureHistory } from '../chat/history';
 import { useT } from '../i18n';
-import type { Channel, VoiceEntry } from '../types';
+import type { Category, Channel, VoiceEntry } from '../types';
 import { Avatar } from '../ui/Avatar';
 import { CallDuration } from '../voice/CallDuration';
 import { ChannelMenu } from './ChannelMenu';
 import { RoundButton, VolumeSlider } from '../ui/ui';
 import { EmptyState } from '../ui/Illustrations';
-import { BellSlashIcon, HashIcon, HeadphonesSlashIcon, MicSlashIcon, PlusIcon, SpeakerIcon, VideoIcon } from '../ui/icons';
+import { BellSlashIcon, ChevronDownIcon, DotsIcon, HashIcon, HeadphonesSlashIcon, MicSlashIcon, PencilIcon, PlusIcon, SpeakerIcon, TrashIcon, VideoIcon } from '../ui/icons';
 
 export function Sidebar() {
   const { t } = useT();
   const channels = useStore((s) => s.channels);
+  const categories = useStore((s) => s.categories);
   const serverName = useStore((s) => s.serverName);
   const people = useStore((s) => Object.keys(s.users).length);
   const online = useStore((s) => s.online.length);
@@ -28,6 +30,12 @@ export function Sidebar() {
   // The admin reorders by dragging, on a computer and over the whole list (not a search result).
   const canDrag = useStore((s) => s.canManageChannels && !s.isMobile) && !query;
   const drag = useChannelDrag(channels);
+  const canManage = useStore((s) => s.canManageChannels);
+  // Channels in no category (or one that's gone) stand in the plain sections; with categories about, an empty plain
+  // section is left out.
+  const known = new Set(categories.map((c) => c.id));
+  const loose = visible.filter((c) => !c.categoryId || !known.has(c.categoryId));
+  const plain = (kind: Channel['kind']) => categories.length === 0 || loose.some((c) => c.kind === kind);
 
   return (
     <aside className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -45,24 +53,43 @@ export function Sidebar() {
           <EmptyState compact art="search" title={t('shell.sidebar.noResults.title')} text={t('shell.sidebar.noResults.text')} />
         ) : (
           <>
-            <Section title={t('shell.sidebar.textChannels')} kind="text">
-              {visible
-                .filter((c) => c.kind === 'text')
-                .map((c) => (
-                  <Draggable key={c.id} channel={c} drag={canDrag ? drag : null}>
-                    <TextItem channel={c} />
-                  </Draggable>
-                ))}
-            </Section>
-            <Section title={t('shell.sidebar.voiceRooms')} kind="voice">
-              {visible
-                .filter((c) => c.kind === 'voice')
-                .map((c) => (
-                  <Draggable key={c.id} channel={c} drag={canDrag ? drag : null}>
-                    <VoiceItem channel={c} />
-                  </Draggable>
-                ))}
-            </Section>
+            {plain('text') && (
+              <Section title={t('shell.sidebar.textChannels')} kind="text">
+                {loose
+                  .filter((c) => c.kind === 'text')
+                  .map((c) => (
+                    <Draggable key={c.id} channel={c} drag={canDrag ? drag : null}>
+                      <TextItem channel={c} />
+                    </Draggable>
+                  ))}
+              </Section>
+            )}
+            {plain('voice') && (
+              <Section title={t('shell.sidebar.voiceRooms')} kind="voice">
+                {loose
+                  .filter((c) => c.kind === 'voice')
+                  .map((c) => (
+                    <Draggable key={c.id} channel={c} drag={canDrag ? drag : null}>
+                      <VoiceItem channel={c} />
+                    </Draggable>
+                  ))}
+              </Section>
+            )}
+            {categories.map((category) => {
+              const inside = visible.filter((c) => c.categoryId === category.id);
+              // A search hides the categories it finds nothing in.
+              if (query && inside.length === 0) return null;
+              return (
+                <CategorySection key={category.id} category={category}>
+                  {[...inside.filter((c) => c.kind === 'text'), ...inside.filter((c) => c.kind === 'voice')].map((c) => (
+                    <Draggable key={c.id} channel={c} drag={canDrag ? drag : null}>
+                      {c.kind === 'text' ? <TextItem channel={c} /> : <VoiceItem channel={c} />}
+                    </Draggable>
+                  ))}
+                </CategorySection>
+              );
+            })}
+            {canManage && !query && <NewCategory />}
           </>
         )}
       </nav>
@@ -86,11 +113,13 @@ function useChannelDrag(channels: Channel[]) {
     setDragged(null);
     setOver(null);
     if (!dragged || !target || target.id === dragged.id) return;
-    const same = channels.filter((c) => c.kind === dragged.kind && c.id !== dragged.id);
+    // One kind within one category (or none): the list the server reorders.
+    const group = (c: Channel) => c.kind === dragged.kind && (c.categoryId ?? null) === (dragged.categoryId ?? null);
+    const same = channels.filter((c) => group(c) && c.id !== dragged.id);
     const at = same.findIndex((c) => c.id === target.id) + (target.after ? 1 : 0);
     same.splice(at, 0, dragged);
     const moved = same.values();
-    const next = channels.map((c) => (c.kind === dragged.kind ? moved.next().value! : c)).map((c, position) => ({ ...c, position }));
+    const next = channels.map((c) => (group(c) ? moved.next().value! : c)).map((c, position) => ({ ...c, position }));
     if (next.every((c, i) => c.id === channels[i].id)) return;
     const before = channels;
     setChannels(next);
@@ -108,7 +137,7 @@ function useChannelDrag(channels: Channel[]) {
 function Draggable({ channel, drag, children }: { channel: Channel; drag: Drag | null; children: ReactNode }) {
   if (!drag) return <>{children}</>;
   const { dragged, over, setDragged, setOver, drop } = drag;
-  const accepts = dragged?.kind === channel.kind;
+  const accepts = dragged?.kind === channel.kind && (dragged?.categoryId ?? null) === (channel.categoryId ?? null);
   const line = accepts && over?.id === channel.id && dragged?.id !== channel.id ? (over.after ? 'bottom' : 'top') : null;
 
   function onDragOver(e: DragEvent<HTMLDivElement>) {
@@ -204,6 +233,187 @@ function Section({ title, kind, children }: { title: string; kind: Channel['kind
       )}
       <div className="space-y-0.5">{children}</div>
     </section>
+  );
+}
+
+/** Which categories are folded, on this device. */
+const FOLDED = 'atrium.folded';
+function readFolded(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(FOLDED) ?? '[]');
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * A category: its name folds it (the open channel and a room with people in it still show, as in Discord); the
+ * admin adds a text channel or a voice room to it with "+", renames and deletes it from "…" (its channels stay).
+ */
+function CategorySection({ category, children }: { category: Category; children: ReactNode }) {
+  const { t } = useT();
+  const canManage = useStore((s) => s.canManageChannels);
+  const [folded, setFolded] = useState(() => readFolded().includes(category.id));
+  const [adding, setAdding] = useState<Channel['kind'] | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const [name, setName] = useState('');
+
+  function fold() {
+    const next = !folded;
+    setFolded(next);
+    try {
+      const rest = readFolded().filter((id) => id !== category.id);
+      localStorage.setItem(FOLDED, JSON.stringify(next ? [...rest, category.id] : rest));
+    } catch {
+      // Private mode: folding just isn't remembered.
+    }
+  }
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    const value = name.trim();
+    try {
+      if (renaming && value) useStore.setState({ categories: await api.renameCategory(category.id, value) });
+      if (adding && value) setChannels(await api.createChannel(value, adding, category.id));
+    } catch (err) {
+      showError(err instanceof Error ? err.message : t('shell.sidebar.createFailed'));
+    }
+    setName('');
+    setAdding(null);
+    setRenaming(false);
+  }
+
+  async function remove() {
+    try {
+      useStore.setState({ categories: await api.deleteCategory(category.id) });
+    } catch (err) {
+      showError(err instanceof Error ? err.message : t('shell.menu.failed'));
+    }
+  }
+
+  const items = Array.isArray(children) ? children : [children];
+  return (
+    <section className="pt-4">
+      <div className="group/cat flex items-center justify-between pb-1 pl-3">
+        <button type="button" onClick={fold} aria-expanded={!folded} className="flex min-w-0 items-center gap-1 text-[14px] font-medium text-muted hover:text-foreground max-md:text-[17px] max-md:font-semibold max-md:text-foreground">
+          <span className="truncate">{category.name}</span>
+          <ChevronDownIcon size={14} className={`shrink-0 transition-transform ${folded ? '-rotate-90' : ''}`} />
+        </button>
+        {canManage ? (
+          <Dropdown>
+            <Dropdown.Trigger aria-label={t('shell.category.actions', { name: category.name })} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted outline-none hover:bg-white/[0.06] hover:text-foreground data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus">
+              <DotsIcon size={16} />
+            </Dropdown.Trigger>
+            <Dropdown.Popover placement="bottom end" className="min-w-56">
+              <Dropdown.Menu
+                aria-label={t('shell.category.actions', { name: category.name })}
+                onAction={(key) => {
+                  if (key === 'text' || key === 'voice') {
+                    setAdding(key);
+                    setRenaming(false);
+                    setName('');
+                    setFolded(false);
+                  }
+                  if (key === 'rename') {
+                    setRenaming(true);
+                    setAdding(null);
+                    setName(category.name);
+                  }
+                  if (key === 'delete') void remove();
+                }}
+              >
+                <Dropdown.Item id="text" textValue={t('shell.sidebar.createText')}>
+                  <Label>{t('shell.sidebar.createText')}</Label>
+                  <HashIcon size={16} className="ml-auto text-muted" />
+                </Dropdown.Item>
+                <Dropdown.Item id="voice" textValue={t('shell.sidebar.createVoice')}>
+                  <Label>{t('shell.sidebar.createVoice')}</Label>
+                  <SpeakerIcon size={16} className="ml-auto text-muted" />
+                </Dropdown.Item>
+                <Dropdown.Item id="rename" textValue={t('shell.menu.rename')}>
+                  <Label>{t('shell.menu.rename')}</Label>
+                  <PencilIcon size={16} className="ml-auto text-muted" />
+                </Dropdown.Item>
+                <Dropdown.Item id="delete" textValue={t('shell.category.delete')} variant="danger">
+                  <Label>{t('shell.category.delete')}</Label>
+                  <TrashIcon size={16} className="ml-auto text-danger" />
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown.Popover>
+          </Dropdown>
+        ) : (
+          <span className="h-7" />
+        )}
+      </div>
+      {(adding || renaming) && (
+        <form onSubmit={submit} className="pb-2">
+          <input
+            autoFocus
+            value={name}
+            maxLength={32}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={() => {
+              setAdding(null);
+              setRenaming(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key !== 'Escape') return;
+              setAdding(null);
+              setRenaming(false);
+            }}
+            placeholder={renaming ? t('shell.category.name') : adding === 'text' ? t('shell.sidebar.nameChannel') : t('shell.sidebar.nameRoom')}
+            aria-label={renaming ? t('shell.category.name') : adding === 'text' ? t('shell.sidebar.nameTextChannel') : t('shell.sidebar.nameVoiceRoom')}
+            className="h-10 w-full rounded-full bg-default px-4 text-[15px] outline-none placeholder:text-faint focus:ring-2 focus:ring-focus"
+          />
+        </form>
+      )}
+      {!folded && <div className="space-y-0.5">{items}</div>}
+    </section>
+  );
+}
+
+/** The admin's "New category" at the foot of the list. */
+function NewCategory() {
+  const { t } = useT();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    const value = name.trim();
+    setOpen(false);
+    setName('');
+    if (!value) return;
+    try {
+      useStore.setState({ categories: await api.createCategory(value) });
+    } catch (err) {
+      showError(err instanceof Error ? err.message : t('shell.menu.failed'));
+    }
+  }
+
+  return open ? (
+    <form onSubmit={submit} className="pt-4">
+      <input
+        autoFocus
+        value={name}
+        maxLength={32}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={() => !name && setOpen(false)}
+        onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
+        placeholder={t('shell.category.name')}
+        aria-label={t('shell.category.name')}
+        className="h-10 w-full rounded-full bg-default px-4 text-[15px] outline-none placeholder:text-faint focus:ring-2 focus:ring-focus"
+      />
+    </form>
+  ) : (
+    <button
+      type="button"
+      onClick={() => setOpen(true)}
+      className="mt-4 flex h-9 items-center gap-2 rounded-full px-3 text-[14px] font-medium text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
+    >
+      <PlusIcon size={16} />
+      {t('shell.category.new')}
+    </button>
   );
 }
 

@@ -1,11 +1,12 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { toast } from '@heroui/react';
 import { api } from '../api';
 import { useT } from '../i18n';
 import { setChannels, showError, useStore } from '../store';
 import { ServerMark } from '../ui/Logo';
 import { IconCropper, centred, cropToBlob, loadImage, type Crop } from '../ui/IconCropper';
 import { shortStamp } from '../chat/format';
-import type { DeletedChannel } from '../types';
+import type { DeletedChannel, DiscordChannel, DiscordPreview } from '../types';
 import { Primary, Quiet, Row, RowValue, Rows, Secondary, SubPage, field, fieldLabel, useSub } from '../ui/settings';
 
 /**
@@ -20,6 +21,7 @@ export function ServerSettings() {
       <Rows title={t('settings.server.title')} className="mt-6">
         <IconRow />
         <NameRow />
+        <ImportRow />
         <TrashRow />
       </Rows>
     );
@@ -31,6 +33,7 @@ export function ServerSettings() {
       </Rows>
       <NameField className="mt-6" />
       <Rows className="mt-6">
+        <ImportRow />
         <TrashRow />
       </Rows>
     </>
@@ -172,6 +175,111 @@ function NameField({ onSaved, className = '' }: { onSaved?: () => void; classNam
         )}
       </div>
     </form>
+  );
+}
+
+/**
+ * A Discord server's categories and channels, from its template link (Discord: Server Settings → Server Template):
+ * the server reads the template, shows what it would make, everything ticked; "Move over" makes it.
+ */
+function ImportRow() {
+  const { t } = useT();
+  const sub = useSub();
+  const id = useId();
+  const [link, setLink] = useState('');
+  const [found, setFound] = useState<DiscordPreview | null>(null);
+  const [skip, setSkip] = useState<string[]>([]);
+  const [replaceEmpty, setReplaceEmpty] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  async function look(e: FormEvent) {
+    e.preventDefault();
+    if (!link.trim()) return;
+    setBusy(true);
+    try {
+      setFound(await api.discordPreview(link.trim()));
+      setSkip([]);
+    } catch (err) {
+      showError(err instanceof Error ? err.message : t('settings.server.failed'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function move() {
+    setBusy(true);
+    try {
+      const done = await api.discordImport(link.trim(), skip, replaceEmpty);
+      useStore.setState({ categories: done.categories });
+      setChannels(done.channels);
+      toast.success(t('settings.server.importDone', { n: done.added }));
+      setFound(null);
+      setLink('');
+      sub.hide();
+    } catch (err) {
+      showError(err instanceof Error ? err.message : t('settings.server.failed'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const toggle = (key: string) => setSkip((list) => (list.includes(key) ? list.filter((k) => k !== key) : [...list, key]));
+  const tick = (key: string, label: string, strong = false, inner = false) => (
+    <label key={key} className={`flex h-10 cursor-pointer items-center gap-3 rounded-full px-3 text-[15px] hover:bg-white/[0.04] ${inner ? 'pl-9' : ''} ${strong ? 'font-medium' : 'text-muted'}`}>
+      <input type="checkbox" checked={!skip.includes(key)} onChange={() => toggle(key)} className="h-4 w-4 accent-white" />
+      <span className="truncate">{label}</span>
+    </label>
+  );
+  const channel = (c: DiscordChannel, inner: boolean) => tick(c.key, c.kind === 'text' ? `# ${c.name}` : c.name, false, inner);
+
+  return (
+    <>
+      <Row title={t('settings.server.import')} value={t('settings.server.importSub')} onPress={sub.show} />
+      <SubPage
+        key={sub.key}
+        open={sub.open}
+        title={t('settings.server.import')}
+        onClose={sub.hide}
+        footer={found ? <Primary onPress={move} isPending={busy}>{t('settings.server.importGo')}</Primary> : undefined}
+      >
+        <form onSubmit={look} className="mt-2">
+          <label htmlFor={id} className={fieldLabel}>
+            {t('settings.server.importLink')}
+          </label>
+          <div className="flex gap-2 max-md:flex-col">
+            <input id={id} value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://discord.new/…" autoCapitalize="off" spellCheck={false} className={field} />
+            <Primary type="submit" isPending={busy && !found} isDisabled={!link.trim()} className="shrink-0">
+              {t('settings.server.importLook')}
+            </Primary>
+          </div>
+          <p className="mt-2 text-[13px] text-muted">{t('settings.server.importHow')}</p>
+        </form>
+        {found && (
+          <div className="mt-6">
+            {found.loose.length > 0 && (
+              <div className="pb-2">
+                <p className="px-3 pb-1 text-[13px] text-muted">{t('settings.server.importLoose')}</p>
+                {found.loose.map((c) => channel(c, false))}
+              </div>
+            )}
+            {found.categories.map((c) => (
+              <div key={c.key} className="pb-2">
+                {tick(c.key, c.name, true)}
+                {!skip.includes(c.key) && c.channels.map((x) => channel(x, true))}
+              </div>
+            ))}
+            {found.roles > 0 && <p className="px-3 pt-2 text-[13px] text-muted">{t('settings.server.importRoles', { n: found.roles })}</p>}
+            <label className="mt-4 flex cursor-pointer items-center gap-3 px-3 text-[15px]">
+              <input type="checkbox" checked={replaceEmpty} onChange={(e) => setReplaceEmpty(e.target.checked)} className="h-4 w-4 accent-white" />
+              {t('settings.server.importReplace')}
+            </label>
+            <Primary onPress={move} isPending={busy} className="mt-6 max-md:hidden">
+              {t('settings.server.importGo')}
+            </Primary>
+          </div>
+        )}
+      </SubPage>
+    </>
   );
 }
 

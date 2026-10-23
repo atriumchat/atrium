@@ -17,10 +17,14 @@ import { CallDuration } from './CallPill';
 import { SearchRow, TabHeader } from './TabHeader';
 import type { Channel, VoiceEntry } from '../protocol';
 
-/** The server's channels: a search field, then text channels and voice rooms in two sections. */
+/**
+ * The server's channels: a search field, then text channels and voice rooms in two sections, then each category with
+ * its channels (text first). With categories about, an empty plain section is left out.
+ */
 export function ServerTab() {
   const { t } = useT();
   const channels = useStore((s) => s.data?.channels);
+  const categories = useStore((s) => s.data?.categories) ?? [];
   const [filter, setFilter] = useState('');
   const query = filter.trim().toLowerCase();
   const visible = (query ? channels?.filter((c) => c.name.toLowerCase().includes(query)) : channels) ?? [];
@@ -43,8 +47,27 @@ export function ServerTab() {
           <EmptyState compact art="search" title={t('shell.sidebar.noResults.title')} text={t('shell.sidebar.noResults.text')} />
         ) : (
           <>
-            <Section title={t('shell.sidebar.textChannels')} kind="text">{visible.filter((c) => c.kind === 'text').map((c) => <TextItem key={c.id} channel={c} />)}</Section>
-            <Section title={t('shell.sidebar.voiceRooms')} kind="voice">{visible.filter((c) => c.kind === 'voice').map((c) => <VoiceItem key={c.id} channel={c} />)}</Section>
+            {(() => {
+              const known = new Set(categories.map((c) => c.id));
+              const loose = visible.filter((c) => !c.categoryId || !known.has(c.categoryId));
+              const plain = (kind: Channel['kind']) => categories.length === 0 || loose.some((c) => c.kind === kind);
+              return (
+                <>
+                  {plain('text') ? <Section title={t('shell.sidebar.textChannels')} kind="text">{loose.filter((c) => c.kind === 'text').map((c) => <TextItem key={c.id} channel={c} />)}</Section> : null}
+                  {plain('voice') ? <Section title={t('shell.sidebar.voiceRooms')} kind="voice">{loose.filter((c) => c.kind === 'voice').map((c) => <VoiceItem key={c.id} channel={c} />)}</Section> : null}
+                  {categories.map((category) => {
+                    const inside = visible.filter((c) => c.categoryId === category.id);
+                    if (query && inside.length === 0) return null;
+                    return (
+                      <Section key={category.id} title={category.name}>
+                        {inside.filter((c) => c.kind === 'text').map((c) => <TextItem key={c.id} channel={c} />)}
+                        {inside.filter((c) => c.kind === 'voice').map((c) => <VoiceItem key={c.id} channel={c} />)}
+                      </Section>
+                    );
+                  })}
+                </>
+              );
+            })()}
           </>
         )}
       </ScrollView>
@@ -52,10 +75,12 @@ export function ServerTab() {
   );
 }
 
-function Section({ title, kind, children }: { title: string; kind: Channel['kind']; children: React.ReactNode }) {
+/** A section of the list; with `kind`, the admin's "+" adds a channel or room to it (categories are managed on a computer). */
+function Section({ title, kind, children }: { title: string; kind?: Channel['kind']; children: React.ReactNode }) {
   const { t } = useT();
   const canManage = useStore((s) => s.data?.canManageChannels);
   function add() {
+    if (!kind) return;
     Alert.prompt(kind === 'text' ? t('shell.sidebar.createText') : t('shell.sidebar.createVoice'), undefined, [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('common.save'), onPress: (name?: string) => {
@@ -68,7 +93,7 @@ function Section({ title, kind, children }: { title: string; kind: Channel['kind
     <View style={{ paddingTop: 16 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 4, paddingLeft: 12, minHeight: 36 }}>
         <Text style={{ fontSize: 18, fontWeight: '600' }}>{title}</Text>
-        {canManage ? <RoundButton size="sm" tone="ghost" label={kind === 'text' ? t('shell.sidebar.createText') : t('shell.sidebar.createVoice')} onPress={add}>{(c) => <PlusIcon size={20} color={c} />}</RoundButton> : null}
+        {canManage && kind ? <RoundButton size="sm" tone="ghost" label={kind === 'text' ? t('shell.sidebar.createText') : t('shell.sidebar.createVoice')} onPress={add}>{(c) => <PlusIcon size={20} color={c} />}</RoundButton> : null}
       </View>
       <View style={{ gap: 2 }}>{children}</View>
     </View>

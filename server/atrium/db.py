@@ -46,6 +46,13 @@ CREATE TABLE IF NOT EXISTS channels (
   position INTEGER NOT NULL,
   created_at INTEGER NOT NULL
 );
+-- Groups of channels in the list, Discord's categories; a channel in none stands in the plain text/voice sections.
+CREATE TABLE IF NOT EXISTS categories (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS messages (
   id TEXT PRIMARY KEY,
   channel_id TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
@@ -179,6 +186,10 @@ def init_db() -> None:
         if "deleted_at" not in {row[1] for row in conn.execute("PRAGMA table_info(channels)")}:
             # A deleted channel waits in the trash (messages and all) until it is brought back or the week is out.
             conn.execute("ALTER TABLE channels ADD COLUMN deleted_at INTEGER")
+        if "category_id" not in {row[1] for row in conn.execute("PRAGMA table_info(channels)")}:
+            # The category a channel is in (categories.id), none for the plain sections. No foreign key: a category's
+            # deletion moves its channels out by hand (delete_category).
+            conn.execute("ALTER TABLE channels ADD COLUMN category_id TEXT")
         user_columns = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
         if "bio" not in user_columns:
             conn.execute("ALTER TABLE users ADD COLUMN bio TEXT NOT NULL DEFAULT ''")

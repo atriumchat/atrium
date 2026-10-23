@@ -1,5 +1,5 @@
 import type { Message } from '../../web/src/types';
-export type { Attachment, Bootstrap, CallState, Channel, Dm, Friend, InboxItem, Message, MyInvite, MyStatus, Session, Upload, User, VoiceEntry } from '../../web/src/types';
+export type { Attachment, Bootstrap, CallState, Category, Channel, Dm, Friend, InboxItem, Message, MyInvite, MyStatus, Session, Upload, User, VoiceEntry } from '../../web/src/types';
 
 export function parseMediaCookie(header: string | null): string | null {
   const value = header?.match(/(?:^|,\s*)gx_media=([^;,\s]+)/)?.[1];
