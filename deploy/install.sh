@@ -868,26 +868,6 @@ css_name() {
   printf '%s%s' "${letters:RANDOM % 26:1}" "${r,,}"
 }
 
-# landing_colors HUE DARK: "bg fg line accent ink" (#rrggbb each) for a dark (1) or light (0) page in that hue.
-# ink is black or white, whichever reads better on the accent.
-landing_colors() {
-  awk -v h="$1" -v dark="$2" '
-    function mn(a, b) { return a < b ? a : b }
-    function mx(a, b) { return a > b ? a : b }
-    function ch(n, s, l,   k) { k = (n + h / 30) % 12; return l - s * mn(l, 1 - l) * mx(-1, mn(mn(k - 3, 9 - k), 1)) }
-    function hex(s, l) {
-      R = ch(0, s / 100, l / 100); G = ch(8, s / 100, l / 100); B = ch(4, s / 100, l / 100)
-      return sprintf("#%02x%02x%02x", R * 255 + .5, G * 255 + .5, B * 255 + .5)
-    }
-    function lin(c) { return c <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ^ 2.4 }
-    BEGIN {
-      if (dark) { bg = hex(18, 7); fg = hex(20, 94); line = hex(14, 20); accent = hex(70, 62) }
-      else { bg = hex(35, 96); fg = hex(30, 12); line = hex(20, 84); accent = hex(75, 40) }
-      y = .2126 * lin(R) + .7152 * lin(G) + .0722 * lin(B)
-      print bg, fg, line, accent, ((y + .05) / .05 > 1.05 / (y + .05) ? "#000000" : "#ffffff")
-    }'
-}
-
 # The server's name as the app has it: given in the browser setup (SERVER_NAME from .env until then).
 app_server_name() {
   local json name re='"serverName": ?"(([^"\\]|\\.)*)"'
@@ -900,29 +880,29 @@ app_server_name() {
   printf '%s' "$name"
 }
 
-# write_landing SEED: a seed install's cover page, the server's name and a way into the app. It shares nothing with
-# other installs (no Atrium brand, no common files, no scripts): one HTML file whose colours, layout, type, wording
-# and icon come from SEED (LANDING_SEED in .env, so an update keeps the look) and class names that are random.
+# write_landing SEED: a seed install's cover page, the server's name and a way into the app, in Atrium's black and
+# white: near-black page, white type set large and light, a white pill button. It still shares nothing that would tie
+# installs together (no Atrium name or mark, no common files, no scripts): one HTML file whose layout, type, wording and
+# icon come from SEED (LANDING_SEED in .env, so an update keeps the look) and class names that are random.
 write_landing() {
-  local n=$1 hue dark layout font weight track radius label shape name
+  local n=$1 layout font weight track radius label shape name
   local bg fg line accent ink icon w t b layout_css dir=$ATRIUM_TMP/landing
-  hue=$((n % 360)) n=$((n / 360))
-  dark=$((n % 2)) n=$((n / 2))
+  # The first two choices (a hue, dark or light) went with the old coloured covers; skipped, so the rest stay put.
+  n=$((n / 720))
   layout=$((n % 3)) n=$((n / 3))
   font=$((n % 4)) n=$((n / 4))
   radius=$((n % 3)) n=$((n / 3))
   label=$((n % 3)) n=$((n / 3))
   shape=$((n % 3))
-  read -r bg fg line accent ink < <(landing_colors "$hue" "$dark")
-  [[ $ink == '#'* ]] || return 1
+  bg='#0c0c0e' fg='#ededef' line='#26262b' accent='#ffffff' ink='#0c0c0e'
 
   case $font in
-    0) font='system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' weight=700 track=-0.03em ;;
-    1) font='Georgia, "Times New Roman", serif' weight=400 track=-0.01em ;;
-    2) font='"Helvetica Neue", Helvetica, Arial, sans-serif' weight=800 track=-0.04em ;;
-    *) font='ui-monospace, "SF Mono", Menlo, Consolas, monospace' weight=500 track=0 ;;
+    0) font='system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' weight=300 track=-0.03em ;;
+    1) font='"Helvetica Neue", Helvetica, Arial, sans-serif' weight=300 track=-0.04em ;;
+    2) font='system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' weight=400 track=-0.02em ;;
+    *) font='"Helvetica Neue", Helvetica, Arial, sans-serif' weight=200 track=-0.03em ;;
   esac
-  case $radius in 0) radius=999px ;; 1) radius=12px ;; *) radius=3px ;; esac
+  radius=999px
   case $label in 0) label=Войти ;; 1) label=Открыть ;; *) label=Вход ;; esac
   icon="fill='%23${accent#\#}'"
   case $shape in
