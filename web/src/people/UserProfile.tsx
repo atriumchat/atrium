@@ -23,7 +23,8 @@ export function UserProfile(props: { userId: string; children: ReactNode; placem
       <Popover.Trigger aria-label={t('people.profile.label', { name })} className={props.className ?? 'cursor-pointer'}>
         {props.children}
       </Popover.Trigger>
-      <Popover.Content placement={props.placement ?? 'right top'} className="w-80 overflow-hidden p-0">
+      {/* On a low window the card scrolls instead of losing its last rows under the edge. */}
+      <Popover.Content placement={props.placement ?? 'right top'} className="max-h-[calc(100dvh-24px)] w-80 overflow-y-auto p-0">
         <Popover.Dialog className="p-0 outline-none">
           <ProfileCard userId={props.userId} onClose={() => setOpen(false)} />
         </Popover.Dialog>
@@ -124,8 +125,8 @@ export function ProfileCard({ userId, onClose }: { userId: string; onClose: () =
 
         <div className="overflow-hidden rounded-[18px] bg-default">
           <BlockButton userId={userId} name={user.name} />
+          {isAdmin && !user.admin && <ServerActions user={user} />}
         </div>
-        {isAdmin && !user.admin && <ServerActions user={user} />}
         {isAdmin && !user.removed && <ResetLinkButton userId={userId} name={user.name} />}
       </div>
     </div>
@@ -313,8 +314,11 @@ function ServerActions({ user }: { user: User }) {
   }
 
   const row = 'w-full px-4 py-3 text-left text-[15px] transition-colors hover:bg-white/[0.06]';
+  const line = <div className="ml-4 h-px bg-white/[0.08]" />;
+  // Rows of the card's last group, under the personal block.
   return (
-    <div className="overflow-hidden rounded-[18px] bg-default">
+    <>
+      {line}
       {user.removed ? (
         <button onClick={() => void run(() => api.letBack(user.id))} className={row}>
           {t('people.admin.letBack')}
@@ -324,7 +328,7 @@ function ServerActions({ user }: { user: User }) {
           <button onClick={() => setAsking('kick')} className={`${row} text-danger`}>
             {t('people.admin.kick')}
           </button>
-          <div className="ml-4 h-px bg-white/[0.08]" />
+          {line}
           <button onClick={() => setAsking('ban')} className={`${row} text-danger`}>
             {t('people.admin.ban')}
           </button>
@@ -339,7 +343,7 @@ function ServerActions({ user }: { user: User }) {
           onClose={() => setAsking(null)}
         />
       )}
-    </div>
+    </>
   );
 }
 
