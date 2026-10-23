@@ -155,6 +155,28 @@ def can_see_upload(user_id: str, upload: dict) -> bool:
 
 
 PRIVATE_IMAGE_HEADERS = {"Cache-Control": "private, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff"}
+# Video and audio play in the chat, so they go out as what they are (the player needs the type, and Range for
+# seeking, which FileResponse answers). Chosen by the file's extension, never by what the uploader claimed; with
+# nosniff and the download disposition kept, none of these can be rendered as a page.
+PLAYABLE_TYPES = {
+    "mp4": "video/mp4",
+    "m4v": "video/mp4",
+    "mov": "video/quicktime",
+    "webm": "video/webm",
+    "ogv": "video/ogg",
+    "mp3": "audio/mpeg",
+    "m4a": "audio/mp4",
+    "aac": "audio/aac",
+    "ogg": "audio/ogg",
+    "oga": "audio/ogg",
+    "opus": "audio/ogg",
+    "wav": "audio/wav",
+    "flac": "audio/flac",
+}
+
+
+def playable_type(file_name: str) -> str | None:
+    return PLAYABLE_TYPES.get(file_name.rsplit(".", 1)[-1].lower()) if "." in file_name else None
 
 
 def check_upload_room(user_id: str, size: int) -> None:
@@ -236,7 +258,7 @@ def upload_file(name: str, user: dict = Depends(media_user)):
         # Never rendered in the browser (an uploaded HTML page would run on our domain): always a download.
         quoted = urllib.parse.quote(rows[0]["file_name"])
         headers = {**PRIVATE_IMAGE_HEADERS, "Content-Disposition": f"attachment; filename*=UTF-8''{quoted}"}
-        return FileResponse(path, media_type="application/octet-stream", headers=headers)
+        return FileResponse(path, media_type=playable_type(rows[0]["file_name"]) or "application/octet-stream", headers=headers)
     return FileResponse(path, media_type="image/webp", headers=PRIVATE_IMAGE_HEADERS)
 
 

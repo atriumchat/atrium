@@ -9,7 +9,7 @@ const SINGLE_MAX_W = 420;
 const SINGLE_MAX_H = 360;
 const TILE = 180;
 
-/** Pictures and files under a message. */
+/** Pictures, video, audio and files under a message. */
 export function MessageAttachments({ attachments }: { attachments: Attachment[] }) {
   const images = attachments.filter((a) => a.kind !== 'file');
   const files = attachments.filter((a) => a.kind === 'file');
@@ -18,9 +18,10 @@ export function MessageAttachments({ attachments }: { attachments: Attachment[] 
       <MessageImages attachments={images} />
       {files.length > 0 && (
         <div className="mt-1 flex flex-col gap-1.5">
-          {files.map((f) => (
-            <FileCard key={f.url} file={f} />
-          ))}
+          {files.map((f) => {
+            const media = playable(f.name);
+            return media ? <MediaFile key={f.url} file={f} kind={media} /> : <FileCard key={f.url} file={f} />;
+          })}
         </div>
       )}
     </>
@@ -31,6 +32,53 @@ export function fileSize(bytes = 0) {
   if (bytes < 1024) return t('chat.size.b', { n: bytes });
   if (bytes < 1024 * 1024) return t('chat.size.kb', { n: (bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0) });
   return t('chat.size.mb', { n: (bytes / 1024 / 1024).toFixed(1) });
+}
+
+// What the server sends as video or audio (PLAYABLE_TYPES in uploads.py), by the same extensions.
+const VIDEO = new Set(['mp4', 'm4v', 'mov', 'webm', 'ogv']);
+const AUDIO = new Set(['mp3', 'm4a', 'aac', 'ogg', 'oga', 'opus', 'wav', 'flac']);
+
+function playable(name = ''): 'video' | 'audio' | null {
+  const ext = name.includes('.') ? name.split('.').pop()!.toLowerCase() : '';
+  return VIDEO.has(ext) ? 'video' : AUDIO.has(ext) ? 'audio' : null;
+}
+
+/**
+ * Video and audio play right in the chat, with the browser's own controls in their dark look. A codec the browser
+ * can't play falls back to the plain file card, so it can still be downloaded.
+ */
+function MediaFile({ file, kind }: { file: Attachment; kind: 'video' | 'audio' }) {
+  const [failed, setFailed] = useState(false);
+  const { open, menu } = useAttachmentMenu();
+  if (failed) return <FileCard file={file} />;
+  if (kind === 'video') {
+    return (
+      <>
+        <video
+          src={file.url}
+          controls
+          preload="metadata"
+          playsInline
+          onError={() => setFailed(true)}
+          onContextMenu={open(file)}
+          className="max-h-[360px] w-full max-w-[420px] rounded-[12px] bg-black [color-scheme:dark]"
+        />
+        {menu}
+      </>
+    );
+  }
+  return (
+    <>
+      <div onContextMenu={open(file)} className="flex w-full max-w-[420px] flex-col gap-2 rounded-[20px] bg-default px-4 py-3">
+        <span className="flex min-w-0 items-baseline gap-2">
+          <span className="min-w-0 flex-1 truncate text-[14px] text-foreground">{file.name}</span>
+          <span className="shrink-0 text-[12px] text-muted">{fileSize(file.size)}</span>
+        </span>
+        <audio src={file.url} controls preload="metadata" onError={() => setFailed(true)} className="h-9 w-full [color-scheme:dark]" />
+      </div>
+      {menu}
+    </>
+  );
 }
 
 /** Any non-picture file: its type in a circle, name, size, and the whole card downloads it. */
