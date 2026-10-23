@@ -1,5 +1,5 @@
 import { Fragment, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type DragEvent, type Ref } from 'react';
-import { Button, Dropdown, Input, Label, TextField } from '@heroui/react';
+import { Button, Dropdown, Input, Label, ScrollShadow, TextField } from '@heroui/react';
 import { api } from '../api';
 import { addDm, getSessionEpoch, mergeMessages, openFriends, openPicker, PAGE_SIZE, refreshDms, setEditing, setHasMore, setReplyingTo, showError, useStore, voiceMembers } from '../store';
 import { deleteMessage, editMessage, sendMessage, sendTyping, toggleReaction } from '../socket';
@@ -172,8 +172,10 @@ export function ChatView({ conversation, room = false }: { conversation: Convers
         </>
       )}
 
-      <div
+      {/* Messages fade out under the header and over the composer instead of being cut off; only on a side that has more. */}
+      <ScrollShadow
         ref={scrollRef}
+        size={32}
         onScroll={(e) => {
           const el = e.currentTarget;
           stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
@@ -238,7 +240,7 @@ export function ChatView({ conversation, room = false }: { conversation: Convers
             </Fragment>
           );
         })}
-      </div>
+      </ScrollShadow>
 
       <TypingLine channelId={channel.id} onVisibilityChange={keepPinned} />
       <Composer
