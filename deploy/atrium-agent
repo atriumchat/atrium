@@ -5,7 +5,8 @@
 # arguments: no shell, no files, no forwarding. Even a broken or stolen copy of the app can do nothing here but these.
 set -euo pipefail
 
-dir=$(cd "$(dirname "$0")/.." && pwd)
+# It lives in $ATRIUM_DIR/deploy, next to .env, docker-compose.yml and backup.sh.
+dir=$(cd "$(dirname "$0")" && pwd)
 installer=https://github.com/atriumchat/atrium/releases/latest/download/install.sh
 
 case ${SSH_ORIGINAL_COMMAND:-} in
@@ -22,7 +23,7 @@ case ${SSH_ORIGINAL_COMMAND:-} in
     ;;
   backup)
     # A backup now, the same as the nightly one.
-    exec "$dir/deploy/backup.sh"
+    exec "$dir/backup.sh"
     ;;
   logs)
     cd "$dir"

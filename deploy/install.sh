@@ -16,8 +16,8 @@
 # restore lists the nightly backups in /root/atrium-backups/daily with their date and size and asks which one to put
 # back (ATRIUM_YES=1 ATRIUM_RESTORE=<folder name, e.g. 2026-10-18> asks nothing). It first saves the current data as one
 # more backup, pre-restore-<time>, in the same folder, then stops the app, puts the chosen database and files back,
-# starts the app and checks that it answers. Works on the same server and on a new one with the backups copied to
-# /root/atrium-backups/daily after a normal install.
+# starts the app and checks that it answers; whatever fails on the way, the app is started again. Works on the same
+# server and on a new one with the backups copied to /root/atrium-backups/daily after a normal install.
 # uninstall asks first (ATRIUM_YES=1 skips the question), then removes: the containers and their images, ATRIUM_DIR
 # (/opt/atrium: .env, the data, the files), /root/atrium-backups, the nightly backup service and timer, this installer's
 # copy (/root/atrium-install.sh) and log (/var/log/atrium-install.log), and what it changed for SSH: its key-only
@@ -135,6 +135,8 @@ relay_output() {
   done
 }
 DIED=0
+# Set while restore has the app stopped: on any way out, cleanup starts it again.
+APP_DOWN=0
 die() {
   DIED=1
   say
@@ -157,6 +159,10 @@ cleanup() {
   trap - ERR
   [[ -n $BG_PID ]] && kill_tree "$BG_PID"
   (( TTY )) && printf '\e[?25h'
+  if (( APP_DOWN )); then
+    (cd "$ATRIUM_DIR/deploy" && docker compose up -d app) >>"$LOG" 2>&1 \
+      || bad "Приложение не запустилось: cd $ATRIUM_DIR/deploy && docker compose up -d app"
+  fi
   # Anything that failed without saying so (set -e): at least say where to look.
   if (( rc != 0 && rc != 130 && ! DIED )); then
     say
@@ -1197,6 +1203,51 @@ show_link() {
 
 BACKUPS=/root/atrium-backups/daily
 
+# The data folder belongs to the app's user, so anything in it may be a planted symlink: the steps below copy, move and
+# delete names there, and never write through one. A symlink found in place of the database or a media folder is not
+# kept and is replaced like the rest.
+DATA_NAMES=(hangout.db hangout.db-wal hangout.db-shm avatars uploads)
+
+# The current data, with the app stopped, into a pre-restore copy. The database is compared byte for byte: a full disk
+# can leave a short file behind. The pictures are hard links where the filesystem allows.
+restore_keep() {
+  local data=$1 to=$2 name
+  mkdir -p "$to/media" || return
+  for name in "${DATA_NAMES[@]}"; do
+    [[ -L $data/$name ]] && { log "restore: $data/$name is a symlink, not kept"; continue; }
+    if [[ -f $data/$name ]]; then
+      { cp -a "$data/$name" "$to/$name" && cmp -s "$data/$name" "$to/$name"; } 2>>"$LOG" || return
+    elif [[ -d $data/$name ]]; then
+      cp -al "$data/$name" "$to/media/" 2>>"$LOG" || cp -a "$data/$name" "$to/media/" 2>>"$LOG" || return
+    fi
+  done
+  chmod -R go-rwx "$to"
+}
+
+# The chosen backup copied whole into a fresh folder next to the data.
+restore_stage() {
+  local from=$1 to=$2 dir
+  rm -rf "$to" && mkdir "$to" || return
+  { cp -a "$from/hangout.db" "$to/hangout.db" && cmp -s "$from/hangout.db" "$to/hangout.db"; } 2>>"$LOG" || return
+  for dir in avatars uploads; do
+    [[ -d $from/media/$dir ]] || continue
+    cp -a "$from/media/$dir" "$to/$dir" 2>>"$LOG" || return
+  done
+}
+
+# Then put in place by renames: the current names moved aside (a symlink moves as itself), the new ones moved in.
+restore_swap() {
+  local data=$1 new=$2 old=$3 name
+  rm -rf "$old" && mkdir "$old" || return
+  for name in "${DATA_NAMES[@]}"; do
+    if [[ -e $data/$name || -L $data/$name ]]; then mv "$data/$name" "$old/" || return; fi
+  done
+  for name in "${DATA_NAMES[@]}"; do
+    if [[ -e $new/$name ]]; then mv "$new/$name" "$data/" || return; fi
+  done
+  rm -rf "$new" "$old"
+}
+
 # `restore`: the data of a nightly backup back in place (a channel's history lost, a server that broke). What was there
 # is kept first as pre-restore-<time>, so a wrong choice can be undone with the same command.
 restore_all() {
@@ -1205,9 +1256,12 @@ restore_all() {
   local data=$ATRIUM_DIR/deploy/data names=() name pick="${ATRIUM_RESTORE:-}" size
   [[ -d $BACKUPS ]] || die "Бэкапов нет: $BACKUPS"
   # Newest first; only folders that hold a database count.
-  while IFS= read -r name; do
-    [[ $name != .* && -f $BACKUPS/$name/hangout.db ]] && names+=("$name")
-  done < <(find "$BACKUPS" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -r)
+  local all=("$BACKUPS"/*/) i
+  for (( i = ${#all[@]} - 1; i >= 0; i-- )); do
+    name=${all[i]%/}
+    name=${name##*/}
+    [[ -f $BACKUPS/$name/hangout.db ]] && names+=("$name")
+  done
   (( ${#names[@]} )) || die "В $BACKUPS нет ни одной копии"
 
   if [[ ${ATRIUM_YES:-} == 1 ]]; then
@@ -1237,36 +1291,28 @@ restore_all() {
   [[ $pick != */* && $pick != .* && -f $BACKUPS/$pick/hangout.db ]] || die "Нет такой копии: $pick"
 
   cd "$ATRIUM_DIR/deploy"
+  [[ -L $data ]] && die "$data — ссылка, а не папка: restore её не трогает"
   local saved
   saved=pre-restore-$(date +%F_%H%M%S)
+  APP_DOWN=1
   docker compose stop app >>"$LOG" 2>&1 || die "Не остановить приложение. Смотри лог."
   ok "Приложение остановлено"
 
-  # With the app stopped, the files are whole: the current data are copied as they are (pictures hard-linked).
-  mkdir -p "$BACKUPS/$saved/media"
-  cp -a "$data"/hangout.db* "$BACKUPS/$saved/" 2>>"$LOG" || true
-  local dir
-  for dir in avatars uploads; do
-    [[ -d $data/$dir ]] && { cp -al "$data/$dir" "$BACKUPS/$saved/media/" 2>>"$LOG" || cp -a "$data/$dir" "$BACKUPS/$saved/media/"; }
-  done
-  chmod -R go-rwx "$BACKUPS/$saved"
+  # Nothing live is touched until both copies are whole: the current data kept aside, the chosen backup laid out next
+  # to the data. Any failure up to here leaves the data as they were, and the app comes back on them.
+  restore_keep "$data" "$BACKUPS/$saved" \
+    || { rm -rf "${BACKUPS:?}/$saved"; die "Не сохранить нынешние данные (места хватает?). Ничего не изменено."; }
   ok "Нынешние данные: $saved"
-
-  rm -f "$data"/hangout.db "$data"/hangout.db-wal "$data"/hangout.db-shm
-  cp -a "$BACKUPS/$pick/hangout.db" "$data/hangout.db"
-  for dir in avatars uploads; do
-    if [[ -d $BACKUPS/$pick/media/$dir ]]; then
-      mkdir -p "$data/$dir"
-      rsync -a --delete "$BACKUPS/$pick/media/$dir/" "$data/$dir/"
-    else
-      rm -rf "${data:?}/$dir"
-    fi
-  done
+  restore_stage "$BACKUPS/$pick" "$data/.restore-new" \
+    || { rm -rf "$data/.restore-new"; die "Не разложить $pick (места хватает?). Ничего не изменено."; }
+  restore_swap "$data" "$data/.restore-new" "$data/.restore-old" \
+    || die "Не подменить данные. Данные до возврата: $BACKUPS/$saved"
   chown -R 10001:10001 "$data"
   chmod 700 "$data"
   ok "Данные из $pick"
 
   docker compose up -d app >>"$LOG" 2>&1 || die "Не запустить приложение. Данные до возврата: $BACKUPS/$saved"
+  APP_DOWN=0
   local i
   for i in $(seq 1 90); do
     curl -fs --max-time 3 -o /dev/null http://127.0.0.1:8000/api/setup && break

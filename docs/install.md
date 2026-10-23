@@ -76,7 +76,7 @@ curl -fsSL https://github.com/atriumchat/atrium/releases/latest/download/install
 The installer lists the backups with their date and size and asks which one to restore
 (`ATRIUM_YES=1 ATRIUM_RESTORE=2026-10-18` skips the question). It saves the current data as a `pre-restore-<time>`
 backup in the same folder, stops the app, puts the data back, starts the app and checks that it responds. To undo a
-wrong pick, run `restore` again and choose the `pre-restore-…` backup.
+wrong pick, run `restore` again and choose the `pre-restore-…` backup. If a step fails (a full disk, say), the data stay as they were and the app is started again.
 
 A deleted channel doesn't need this: it stays in "Server → Deleted channels" for a week, and an admin can restore
 it from there.
