@@ -191,7 +191,7 @@ else
   }
   for file in "$fixed"/Atrium-*; do swap_asset "$file"; done
   swap_asset "$fixed/update.json"
-  gh release edit "$channel" -R "$repo" --notes "$channel_notes" --prerelease --latest=false --draft=false >/dev/null
+  gh release edit "$channel" -R "$repo" --title "Atrium для компьютера" --notes "$channel_notes" --prerelease --latest=false --draft=false >/dev/null
 fi
 
 # == What installed apps and download buttons now get.
