@@ -17,6 +17,7 @@ from atrium.config import WEB_DIST
 from atrium.db import init_db
 from atrium.errors import ApiError
 from atrium.realtime import sio
+from atrium.telemetry import ping_loop
 from atrium.uploads import housekeeping
 from atrium.users import expire_statuses
 
@@ -55,6 +56,7 @@ background_tasks: set[asyncio.Task] = set()  # held here: the loop keeps only we
 async def on_startup() -> None:
     background_tasks.add(asyncio.create_task(housekeeping()))
     background_tasks.add(asyncio.create_task(expire_statuses()))
+    background_tasks.add(asyncio.create_task(ping_loop()))
 
 
 app = socketio.ASGIApp(sio, other_asgi_app=api, on_startup=on_startup)

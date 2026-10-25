@@ -41,6 +41,18 @@ export type Category = { id: string; name: string; position: number };
 
 /** A Discord server template as the server read it: what moving it over would make (keys for leaving things out). */
 export type DiscordChannel = { key: string; name: string; kind: 'text' | 'voice' };
+/** What an early-access server sends once a week, counted on the server over the last 7 days. */
+export type EarlyAccessNumbers = {
+  server: string;
+  version: string;
+  days_since_install: number;
+  members: number;
+  voice3_people: number;
+  active2d: number;
+  voice3_days: number;
+};
+export type EarlyAccess = { enabled: boolean; numbers: EarlyAccessNumbers; lastSent: { at: number; numbers: EarlyAccessNumbers } | null };
+
 export type DiscordPreview = { name: string; categories: { key: string; name: string; channels: DiscordChannel[] }[]; loose: DiscordChannel[]; roles: number };
 
 /**

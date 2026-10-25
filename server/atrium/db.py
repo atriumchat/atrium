@@ -289,6 +289,14 @@ def init_db() -> None:
               key TEXT PRIMARY KEY,
               value TEXT NOT NULL
             );
+            -- Who was in a voice room on which day (UTC), and whether 3+ people were in it together: the only thing early
+            -- access counts from (telemetry.py). Rows older than 30 days are dropped.
+            CREATE TABLE IF NOT EXISTS voice_days (
+              user_id TEXT NOT NULL,
+              day TEXT NOT NULL,
+              crowded INTEGER NOT NULL DEFAULT 0,
+              PRIMARY KEY (user_id, day)
+            );
             CREATE TABLE IF NOT EXISTS blocks (
               user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
               blocked_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

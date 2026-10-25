@@ -229,3 +229,60 @@ def test_restore_failure_before_the_swap_keeps_the_data_and_restarts_the_app(tmp
     if fails_into == 'pre-restore':
         assert not list(backups.glob('pre-restore-*'))
     assert docker == ['compose stop app','compose up -d app']
+
+
+LISTING = '''[
+  {"tag_name": "desktop", "prerelease": true},
+  {"tag_name": "desktop-v1.9.0", "prerelease": true},
+  {"tag_name": "v0.9.0-rc.2", "prerelease": true},
+  {"tag_name": "v0.9.0-rc.1", "prerelease": true},
+  {"tag_name": "v0.8.3", "prerelease": false},
+  {"tag_name": "v0.8.10", "prerelease": false}
+]'''
+
+
+@pytest.mark.parametrize('a,b,newer', [
+    ('0.9.0-rc.1', '0.8.3', True),
+    ('0.9.0', '0.9.0-rc.2', True),
+    ('0.9.0-rc.2', '0.9.0-rc.1', True),
+    ('0.9.0-rc.1', '0.9.0', False),
+    ('0.8.10', '0.8.9', True),
+    ('0.8.3', '0.8.3', False),
+])
+def test_installer_orders_versions_with_release_candidates_first(a, b, newer):
+    script = 'set -Eeuo pipefail\n' + function('newer_version') + f'\nif newer_version {a} {b}; then echo yes; else echo no; fi\n'
+    result = subprocess.run(['bash', '-c', script], capture_output=True, text=True)
+    assert result.stdout.strip() == ('yes' if newer else 'no'), result.stderr
+
+
+def test_installer_picks_the_newest_server_release_not_a_desktop_one():
+    script = 'set -Eeuo pipefail\n' + function('newer_version') + '\n' + function('newest_release') + '\nnewest_release\n'
+    result = subprocess.run(['bash', '-c', script], input=LISTING, capture_output=True, text=True)
+    assert result.stdout == '0.9.0-rc.2', result.stderr
+
+
+@pytest.mark.parametrize('channel,current,hops', [
+    ('{"channel":"early"}', '0.8.3', '0.9.0-rc.2'),
+    ('{"channel":"stable"}', '0.8.3', None),
+    ('{"channel":"early"}', '0.9.0', None),
+])
+def test_early_access_hands_the_update_to_a_newer_pre_release_only(tmp_path, channel, current, hops):
+    bins = tmp_path / 'bin'
+    bins.mkdir()
+    # The installer it hands over to: here it only says it was run, and with what.
+    executable(bins / 'sh', '#!/bin/bash\necho "HOP $ATRIUM_EARLY_HOP $*"\n')
+    executable(bins / 'curl', f'#!/bin/bash\ncase "$*" in *api/server/channel*) echo {channel!r};; *api.github.com*) cat {str(tmp_path / "listing.json")!r};; esac\n')
+    (tmp_path / 'listing.json').write_text(LISTING)
+    script = f'''set -Eeuo pipefail
+RELEASE_REPO=atriumchat/atrium RELEASE_VERSION={current} ATRIUM_TMP={str(tmp_path)!r}
+dim(){{ :; }}
+fetch(){{ echo "{"$1"}" > "$2"; }}
+''' + '\n'.join(function(name) for name in ('newer_version', 'newest_release', 'early_hop')) + '\nearly_hop update\necho STAYED\n'
+    env = {**os.environ, 'PATH': str(bins) + os.pathsep + os.environ['PATH']}
+    env.pop('ATRIUM_EARLY_HOP', None)
+    result = subprocess.run(['bash', '-c', script], env=env, capture_output=True, text=True)
+    if hops:
+        assert result.stdout.strip() == 'HOP 1 ' + str(tmp_path / 'early-install.sh') + ' update', result.stderr
+        assert (tmp_path / 'early-install.sh').read_text().strip().endswith(f'/v{hops}/install.sh')
+    else:
+        assert result.stdout.strip() == 'STAYED', result.stdout + result.stderr

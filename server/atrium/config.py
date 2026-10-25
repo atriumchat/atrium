@@ -39,6 +39,10 @@ INVITE_LIMIT = int(os.environ.get("INVITE_LIMIT", "5"))
 # A public demo: whoever opens the app gets an account at once, "Guest 1234", no nick or password to make up; they can
 # rename themselves and set a photo. Off everywhere else: a friends' server lets people in only by invite.
 GUEST_MODE = os.environ.get("GUEST_MODE", "") in ("1", "true", "yes")
+# The release this server runs: install.sh writes it to .env, which reaches the app through env_file.
+ATRIUM_VERSION = os.environ.get("ATRIUM_VERSION", "dev")
+# Where a server with early access sends its weekly numbers (telemetry.py).
+PING_URL = os.environ.get("ATRIUM_PING_URL", "https://www.atriumcalls.app/api/ping")
 # Invite codes: 8 characters without look-alikes (0/O, 1/I/L), shown as XXXX-XXXX.
 INVITE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 MAX_GROUP_MEMBERS = 10

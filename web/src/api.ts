@@ -1,5 +1,5 @@
 import { errorText, t, type Params } from './i18n';
-import type { Bootstrap, Channel, DeletedChannel, Dm, Friend, InboxItem, Message, MyInvite, MyStatus, Session, Upload, User, Category, DiscordPreview } from './types';
+import type { Bootstrap, Channel, DeletedChannel, Dm, Friend, InboxItem, Message, MyInvite, MyStatus, Session, Upload, User, Category, DiscordPreview, EarlyAccess } from './types';
 
 type ServerInfo = { serverName: string; serverIcon: string | null };
 
@@ -152,6 +152,9 @@ export const api = {
     request<ServerInfo>('/api/server/icon', { method: 'POST', body: image, headers: { 'Content-Type': image.type || 'application/octet-stream' } }),
   deleteServerIcon: () => request<ServerInfo>('/api/server/icon', { method: 'DELETE' }),
   renameServer: (name: string) => request<ServerInfo>('/api/server', { method: 'PATCH', body: JSON.stringify({ name }) }),
+  /** Early access: pre-releases for this server, and the weekly numbers it sends (exactly these). */
+  earlyAccess: () => request<EarlyAccess>('/api/server/early-access'),
+  setEarlyAccess: (enabled: boolean) => request<EarlyAccess>('/api/server/early-access', { method: 'PUT', body: JSON.stringify({ enabled }) }),
   checkToken: () => request<{ token: string; url: string }>('/api/check-token', { ...post(), signal: AbortSignal.timeout(15_000) }),
   markRead: (conversationId: string, at: number) => request<{ ok: boolean }>('/api/read', post({ conversationId, at })),
   inbox: (before?: number, beforeId?: string) => request<InboxItem[]>(`/api/inbox${historyQuery(before, beforeId)}`),

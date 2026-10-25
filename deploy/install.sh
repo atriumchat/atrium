@@ -11,7 +11,8 @@
 #   curl -fsSL https://cdn.jsdelivr.net/npm/@atriumchat/install/install.sh | sh
 # Where Node is already installed, the same package runs with npx (its bin is atrium-install):
 #   npx @atriumchat/install            # update: npx @atriumchat/install update
-# Re-running is an update: .env (all the secrets) and the data stay.
+# Re-running is an update: .env (all the secrets) and the data stay. A server with early access (the admin's switch in
+# the server's settings) updates to the newest pre-release too, not only to the stable release.
 # link prints the link with the setup code (https://app.DOMAIN/?setup=CODE) again, or says that setup is already done.
 # restore lists the nightly backups in /root/atrium-backups/daily with their date and size and asks which one to put
 # back (ATRIUM_YES=1 ATRIUM_RESTORE=<folder name, e.g. 2026-10-18> asks nothing). It first saves the current data as one
@@ -1407,6 +1408,46 @@ Atrium $RELEASE_VERSION — установка на этот сервер.
 EOF
 }
 
+# Is version $1 newer than $2? 0.9.0-rc.1 < 0.9.0-rc.2 < 0.9.0 < 0.9.1-rc.1.
+newer_version() {
+  local a=${1%%-*} b=${2%%-*} ap='' bp=''
+  [[ $1 == *-* ]] && ap=${1#*-}
+  [[ $2 == *-* ]] && bp=${2#*-}
+  if [[ $a != "$b" ]]; then
+    [[ $(printf '%s\n%s\n' "$a" "$b" | sort -V | tail -n1) == "$a" ]]
+    return
+  fi
+  if [[ -z $ap ]]; then [[ -n $bp ]]; return; fi
+  [[ -n $bp && $ap != "$bp" && $(printf '%s\n%s\n' "$ap" "$bp" | sort -V | tail -n1) == "$ap" ]]
+}
+
+# The newest server release in a GitHub releases listing (stdin), pre-releases included; the desktop app's tags
+# (desktop, desktop-v*) are not server releases.
+newest_release() {
+  local v best=''
+  while read -r v; do
+    if [[ -z $best ]] || newer_version "$v" "$best"; then best=$v; fi
+  done < <(sed -n 's/.*"tag_name": *"v\([0-9][^"]*\)".*/\1/p')
+  printf '%s' "$best"
+}
+
+# Early access: the switch lives in the app, so the app is asked. Turned on, an update goes to the newest release,
+# pre-releases included, by running that release's own installer instead of this one. Never to an older version; an
+# older server without the question, no answer or no GitHub API leaves the usual stable update.
+early_hop() {
+  [[ -n ${ATRIUM_EARLY_HOP:-} || -n ${ATRIUM_TARBALL:-} ]] && return 0
+  command -v curl >/dev/null || return 0
+  local channel listing latest
+  channel=$(curl -fs --max-time 5 http://127.0.0.1:8000/api/server/channel 2>/dev/null) || return 0
+  [[ $channel == *'"early"'* ]] || return 0
+  listing=$(curl -fsSL --max-time 15 "https://api.github.com/repos/$RELEASE_REPO/releases?per_page=30" 2>/dev/null) || return 0
+  latest=$(newest_release <<<"$listing")
+  [[ -n $latest ]] && newer_version "$latest" "$RELEASE_VERSION" || return 0
+  fetch "https://github.com/$RELEASE_REPO/releases/download/v$latest/install.sh" "$ATRIUM_TMP/early-install.sh" 60 || return 0
+  dim "Ранний доступ: обновляю до $latest"
+  ATRIUM_EARLY_HOP=1 exec sh "$ATRIUM_TMP/early-install.sh" "$@"
+}
+
 # The release to install: this installer's own, or a local/mirrored one given with its checksum.
 pick_release() {
   REGISTRY=${ATRIUM_REGISTRY:-$RELEASE_REGISTRY}
@@ -1514,6 +1555,8 @@ main() {
     *) usage >&2; exit 2 ;;
   esac
   [[ -n ${SERVER_NAME:-} ]] && ATRIUM_SERVER_NAME_SET=1
+  # Before the lock: the installer it may hand over to takes the lock itself.
+  if [[ $MODE == update ]]; then early_hop "$@"; fi
   # One installer at a time: two would share the log and both run docker compose. The lock goes with this process
   # (fd 9). No /run to write to means no root, which the server check reports anyway.
   if command -v flock >/dev/null && { exec 9>>"$LOCK"; } 2>/dev/null && ! flock -n 9; then

@@ -96,6 +96,10 @@ class ServerIn(BaseModel):
     name: str = Field(min_length=1, max_length=40)
 
 
+class EarlyAccessIn(BaseModel):
+    enabled: bool
+
+
 @router.patch("/api/server")
 async def rename_server(body: ServerIn, user: dict = Depends(current_user)):
     check_admin(user)
@@ -105,6 +109,30 @@ async def rename_server(body: ServerIn, user: dict = Depends(current_user)):
     execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('server_name', ?)", (title,))
     await announce()
     return server_info()
+
+
+def early_access_info() -> dict:
+    return {"enabled": telemetry.enabled(), "numbers": telemetry.numbers(), "lastSent": telemetry.last_sent()}
+
+
+@router.get("/api/server/early-access")
+def get_early_access(user: dict = Depends(current_user)):
+    """For the admin: whether it's on, and exactly the numbers a ping would send now."""
+    check_admin(user)
+    return early_access_info()
+
+
+@router.put("/api/server/early-access")
+def put_early_access(body: EarlyAccessIn, user: dict = Depends(current_user)):
+    check_admin(user)
+    telemetry.set_enabled(body.enabled)
+    return early_access_info()
+
+
+@router.get("/api/server/channel")
+def update_channel():
+    """Read by install.sh on update: early access takes pre-releases, everyone else stable releases only."""
+    return {"channel": "early" if telemetry.enabled() else "stable"}
 
 
 # The installed app's manifest: the built one, with the server's icon in place of Atrium's once there is one. Only
@@ -128,4 +156,5 @@ if WEB_DIST:
 # The other atrium modules import this one too: they come last, once everything above is defined.
 from .users import remove_avatar_file, server_name
 from .uploads import make_avatar, process_image
+from . import telemetry
 from .realtime import sio

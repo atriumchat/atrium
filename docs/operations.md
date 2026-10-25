@@ -31,6 +31,7 @@ Everything is in `deploy/.env`. The installer writes it; after editing it by han
 | `UPLOAD_MB_PER_DAY` | `500` | How many megabytes of files one person can upload per day |
 | `RELAY_ONLY` | off | `1`: all calls only through TURN on 443, no direct or UDP paths |
 | `GUEST_MODE` | off | `1`: a public demo; whoever opens the app gets in at once as "Guest NNNN", no invite or password |
+| `ATRIUM_PING_URL` | atriumcalls.app | Where a server with early access sends its weekly numbers (turned on by the admin, off by default) |
 | `ATRIUM_REGISTRY`, `ATRIUM_VERSION`, `ATRIUM_APP_DIGEST`, `ATRIUM_CADDY_DIGEST` | from the release | Which images to run; written by the installer |
 
 Don't edit `livekit.yaml` by hand: every install and update rewrites it from

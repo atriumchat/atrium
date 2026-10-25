@@ -24,9 +24,9 @@ type StepId = FirstRunStep;
 
 // Design work, development only: #step=server (or code, admin, key, discord, invite) opens that step with made-up answers and
 // nothing sent to the server.
-const DEMO_HASH = import.meta.env.DEV ? window.location.hash.match(/step=(intro|code|server|admin|key|discord|invite|done)\b/)?.[1] : undefined;
+const DEMO_HASH = import.meta.env.DEV ? window.location.hash.match(/step=(intro|code|server|admin|key|early|discord|invite|done)\b/)?.[1] : undefined;
 export const DEMO = (DEMO_HASH === 'intro' ? 'server' : DEMO_HASH === 'done' ? 'invite' : DEMO_HASH) as StepId | undefined;
-const ORDER: StepId[] = ['code', 'server', 'crop', 'admin', 'key', 'discord', 'invite'];
+const ORDER: StepId[] = ['code', 'server', 'crop', 'admin', 'key', 'early', 'discord', 'invite'];
 const past = (id: StepId) => !!DEMO && ORDER.indexOf(DEMO) > ORDER.indexOf(id);
 
 export function SetupWizard({ onDone }: { onDone: () => void }) {
@@ -192,6 +192,17 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     });
   }
 
+  /* ---------- early access ---------- */
+
+  function chooseEarly(on: boolean) {
+    if (busy) return;
+    if (DEMO || !on) return go('discord');
+    void run(async () => {
+      await api.setEarlyAccess(true);
+      go('discord');
+    });
+  }
+
   /* ---------- the channels from Discord ---------- */
 
   function lookDiscord() {
@@ -327,7 +338,24 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
 
       case 'key':
         // Copied or downloaded, then on; the file says the server and the nick (downloadKey).
-        return <KeyStep value={{ key, name: nick.trim(), serverName: name }} title={t('setup.key.title')} sub={t('setup.key.sub')} error={error} onNext={() => go('discord')} />;
+        return <KeyStep value={{ key, name: nick.trim(), serverName: name }} title={t('setup.key.title')} sub={t('setup.key.sub')} error={error} onNext={() => go('early')} />;
+
+      case 'early':
+        // Off unless the admin says yes; the same switch is in the server's settings, with what exactly goes out.
+        return (
+          <FlowStep
+            title={t('setup.early.title')}
+            sub={t('setup.early.sub')}
+            error={error}
+            onSubmit={() => chooseEarly(true)}
+            actions={
+              <>
+                <FlowPrimary type="submit" busy={busy}>{t('setup.early.on')}</FlowPrimary>
+                <FlowSecondary onPress={() => chooseEarly(false)}>{t('setup.early.later')}</FlowSecondary>
+              </>
+            }
+          />
+        );
 
       case 'discord':
         return (

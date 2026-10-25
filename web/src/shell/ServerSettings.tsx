@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
-import { toast } from '@heroui/react';
+import { Label, Switch, toast } from '@heroui/react';
 import { api } from '../api';
 import { useT } from '../i18n';
 import { addUser, setChannels, showError, useStore } from '../store';
@@ -7,8 +7,8 @@ import { ServerMark } from '../ui/Logo';
 import { Avatar } from '../ui/Avatar';
 import { IconCropper, centred, cropToBlob, loadImage, type Crop } from '../ui/IconCropper';
 import { shortStamp } from '../chat/format';
-import type { DeletedChannel, DiscordChannel, DiscordPreview } from '../types';
-import { Primary, Quiet, Row, RowValue, Rows, Secondary, SubPage, field, fieldLabel, useSub } from '../ui/settings';
+import type { DeletedChannel, DiscordChannel, DiscordPreview, EarlyAccess } from '../types';
+import { Primary, Quiet, Row, RowFrame, RowValue, Rows, Secondary, SubPage, field, fieldLabel, useSub } from '../ui/settings';
 
 /**
  * The "Server" page of the settings, for the admin: the server's icon and name, as in the first-run setup. On the
@@ -25,6 +25,7 @@ export function ServerSettings() {
         <ImportRow />
         <TrashRow />
         <RemovedRow />
+        <EarlyRow />
       </Rows>
     );
   }
@@ -38,12 +39,82 @@ export function ServerSettings() {
         <ImportRow />
         <TrashRow />
         <RemovedRow />
+        <EarlyRow />
       </Rows>
     </>
   );
 }
 
 const apply = (info: { serverName: string; serverIcon: string | null }) => useStore.setState(info);
+
+/**
+ * Early access: pre-releases for this server, and once a week the seven numbers under "What is sent", exactly as
+ * they would go now. Off until the admin turns it on.
+ */
+function EarlyRow() {
+  const { t } = useT();
+  const [info, setInfo] = useState<EarlyAccess | null>(null);
+  const [busy, setBusy] = useState(false);
+  const sub = useSub();
+  useEffect(() => {
+    api.earlyAccess().then(setInfo, () => {});
+  }, []);
+  if (!info) return null;
+  const n = info.numbers;
+  const rows: [string, string | number][] = [
+    [t('settings.server.earlyId'), n.server],
+    [t('settings.server.earlyVersion'), n.version],
+    [t('settings.server.earlyDays'), n.days_since_install],
+    [t('settings.server.earlyMembers'), n.members],
+    [t('settings.server.earlyVoice3People'), n.voice3_people],
+    [t('settings.server.earlyActive2d'), n.active2d],
+    [t('settings.server.earlyVoice3Days'), n.voice3_days],
+  ];
+  return (
+    <>
+      <RowFrame>
+        <Switch
+          className="w-full"
+          isSelected={info.enabled}
+          isDisabled={busy}
+          onChange={async (on) => {
+            setBusy(true);
+            try {
+              setInfo(await api.setEarlyAccess(on));
+            } catch (e) {
+              showError(e instanceof Error ? e.message : String(e));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <Switch.Content className="flex w-full items-center justify-between gap-3">
+            <span className="min-w-0">
+              <Label className="text-[14px] font-medium max-md:text-[16px] max-md:font-normal">{t('settings.server.early')}</Label>
+              <span className="block text-[13px] leading-snug text-muted">{t('settings.server.earlyHint')}</span>
+            </span>
+            {/* Off, the track is a white tint: graphite would vanish in the phone's graphite cards. */}
+            <Switch.Control className="shrink-0 [--switch-control-bg:rgb(255_255_255/0.16)]">
+              <Switch.Thumb />
+            </Switch.Control>
+          </Switch.Content>
+        </Switch>
+      </RowFrame>
+      <Row title={t('settings.server.earlySent')} onPress={sub.show}>
+        <RowValue>{info.lastSent ? shortStamp(info.lastSent.at) : t('settings.server.earlyNever')}</RowValue>
+      </Row>
+      <SubPage open={sub.open} title={t('settings.server.earlySent')} onClose={sub.hide}>
+        <Rows className="max-md:mt-2">
+          {rows.map(([title, value]) => (
+            <Row key={title} title={title}>
+              <RowValue>{value}</RowValue>
+            </Row>
+          ))}
+        </Rows>
+      </SubPage>
+    </>
+  );
+}
 
 /** The icon's row, as in the setup wizard; a picked picture opens its crop on its own. */
 function IconRow() {

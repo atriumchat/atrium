@@ -164,6 +164,8 @@ async def voice_changed(entry: dict) -> None:
     if entry["kind"] == "dm":
         await sync_call(entry["channelId"])
     else:
+        # Who was in a voice room today, and whether 3+ were in it together (early access counts only this).
+        note_room(entry["channelId"])
         await sio.emit("voice:state", voice_payload())
 
 
@@ -608,3 +610,4 @@ from .channels import (
 )
 from .dms import dm_for, dm_member_ids, dm_message_out, dm_rooms
 from .uploads import claim_uploads, remove_upload_files
+from .telemetry import note_room
