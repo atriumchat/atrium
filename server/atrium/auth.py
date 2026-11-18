@@ -142,6 +142,14 @@ def public_user(row: dict) -> dict:
         "statusText": row.get("status_text") or "",
         **({"admin": True} if row.get("is_admin") else {}),
         **({"removed": True} if row.get("removed") else {}),
+        # Their roles, highest first: the first one with a colour colours their name.
+        "roles": [
+            r["role_id"]
+            for r in query(
+                "SELECT ur.role_id FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = ? ORDER BY r.position DESC",
+                (row["id"],),
+            )
+        ],
     }
 
 
@@ -198,10 +206,14 @@ def set_media_cookie(request: Request, response: Response, user_id: str, *, vers
     )
 
 
+def everyone_is_admin() -> bool:
+    """Nobody is an admin yet: everyone may manage the server, unless ADMINS says who will be."""
+    return not ADMINS and not query("SELECT 1 FROM users WHERE is_admin = 1 LIMIT 1")
+
+
 def is_admin(user: dict) -> bool:
     if query("SELECT 1 FROM users WHERE is_admin = 1 LIMIT 1"):
         return bool(query("SELECT 1 FROM users WHERE id = ? AND is_admin = 1", (user["id"],)))
-    # Nobody is an admin yet: everyone may manage the server, unless ADMINS says who will be.
     return not ADMINS
 
 

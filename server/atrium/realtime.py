@@ -26,7 +26,7 @@ from .config import (
 )
 from .errors import ApiError, Rejected, socket_error, socket_rejected
 from .db import connect_db, execute, now_ms, query
-from .auth import MESSAGES_BY_USER, RateLimit, current_user, is_admin, user_from_token
+from .auth import MESSAGES_BY_USER, RateLimit, current_user, user_from_token
 
 
 router = APIRouter()
@@ -105,8 +105,20 @@ def presence_payload() -> list[str]:
 
 
 def voice_payload() -> list[dict]:
-    """Who's in which server voice room; public to everyone. DM calls are private and go out as call:state."""
+    """Who's in which server voice room (send_voice_state filters private rooms). DM calls go out as call:state."""
     return [e for e in voice.values() if e["kind"] == "channel"]
+
+
+async def send_voice_state() -> None:
+    """Who's in which voice room, to everyone; while someone sits in a private room, each person gets the rooms they see."""
+    entries = voice_payload()
+    private = {r["id"] for r in query("SELECT id FROM channels WHERE private = 1")}
+    if not any(e["channelId"] in private for e in entries):
+        await sio.emit("voice:state", entries)
+        return
+    for user_id in set(online.values()):
+        hidden = hidden_channels(user_id)
+        await sio.emit("voice:state", [e for e in entries if e["channelId"] not in hidden], to=user_room(user_id))
 
 
 def user_room(user_id: str) -> str:
@@ -166,7 +178,7 @@ async def voice_changed(entry: dict) -> None:
     else:
         # Who was in a voice room today, and whether 3+ were in it together (early access counts only this).
         note_room(entry["channelId"])
-        await sio.emit("voice:state", voice_payload())
+        await send_voice_state()
 
 
 @sio.event
@@ -178,7 +190,8 @@ async def connect(sid, environ, auth):
     await sio.enter_room(sid, user_room(user["id"]))
     online[sid] = user["id"]
     await sio.emit("presence", presence_payload())
-    await sio.emit("voice:state", voice_payload(), to=sid)
+    hidden = hidden_channels(user["id"])
+    await sio.emit("voice:state", [e for e in voice_payload() if e["channelId"] not in hidden], to=sid)
     # Calls going on in this user's DMs/groups, including ones ringing them right now.
     for dm_id in list(calls):
         if dm_for(user["id"], dm_id):
@@ -205,7 +218,7 @@ async def message_send(sid, data):
     if MESSAGES_BY_USER.wait(user["id"]):
         return socket_error("tooFast", "Слишком часто, пауза пару секунд")
     # Text channels, and voice rooms' own chat (the messages beside the call).
-    if not query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NULL", (channel_id,)):
+    if not query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NULL", (channel_id,)) or not can_see_channel(user["id"], channel_id):
         return {"ok": False, "error": "Нет такого канала"}
     try:
         reply_to = reply_target("messages", "channel_id", channel_id, data)
@@ -224,9 +237,9 @@ async def message_send(sid, data):
         "INSERT INTO messages (id, channel_id, user_id, content, attachments, created_at, reply_to) VALUES (?, ?, ?, ?, ?, ?, ?)",
         (row["id"], row["channel_id"], row["user_id"], row["content"], row["attachments"], row["created_at"], row["reply_to"]),
     )
-    claim_uploads(upload_ids, "channel")
+    claim_uploads(upload_ids, f"channel:{channel_id}")
     message = message_out(row)
-    await sio.emit("message:new", message)
+    await emit_channel("message:new", message, channel_id)
     return {"ok": True, "message": message}
 
 
@@ -277,8 +290,8 @@ async def typing(sid, data):
     payload = {"channelId": channel_id, "userId": user["id"]}
     if dm_for(user["id"], channel_id):
         await sio.emit("typing", payload, to=[r for r in dm_rooms(channel_id) if r != user_room(user["id"])])
-    elif query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NULL", (channel_id,)):
-        await sio.emit("typing", payload, skip_sid=sid)
+    elif query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NULL", (channel_id,)) and can_see_channel(user["id"], channel_id):
+        await emit_channel("typing", payload, channel_id, skip_sid=sid)
 
 
 @sio.on("message:edit")
@@ -306,13 +319,13 @@ async def message_edit(sid, data):
 
 @sio.on("message:delete")
 async def message_delete(sid, data):
-    """Your own message, or anyone's in a server channel if you're an admin. Its pictures and files go with it."""
+    """Your own message, or anyone's in a server channel with the right to manage messages. Its pictures and files go with it."""
     user = (await sio.get_session(sid))["user"]
     found = find_message(str(event_data(data).get("id", "")))
     if not found or not can_read_message(user["id"], *found):
         return socket_error("noMessage", "Нет такого сообщения")
     table, row = found
-    if row["user_id"] != user["id"] and not (table == "messages" and is_admin(user)):
+    if row["user_id"] != user["id"] and not (table == "messages" and can(user, "manageMessages")):
         return socket_error("ownDeleteOnly", "Можно удалять только свои сообщения")
     upload_ids = [a["url"].rsplit("/", 1)[-1] for a in json.loads(row["attachments"])]
     with connect_db() as conn:
@@ -371,7 +384,7 @@ async def reaction_toggle(sid, data):
 def voice_target(user_id: str, target: str) -> str | None:
     """'channel' for a server voice room, 'dm' for a DM/group the user is in, None if they can't join it."""
     if query("SELECT 1 FROM channels WHERE id = ? AND kind = 'voice' AND deleted_at IS NULL", (target,)):
-        return "channel"
+        return "channel" if can_see_channel(user_id, target) else None
     dm = dm_for(user_id, target)
     if dm:
         if dm["kind"] == "dm" and any(blocked_between(user_id, m) for m in dm_member_ids(target) if m != user_id):
@@ -611,3 +624,4 @@ from .channels import (
 from .dms import dm_for, dm_member_ids, dm_message_out, dm_rooms
 from .uploads import claim_uploads, remove_upload_files
 from .telemetry import note_room
+from .roles import can, can_see_channel, emit_channel, hidden_channels

@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS dm_messages (
 );
 CREATE INDEX IF NOT EXISTS dm_messages_time ON dm_messages(dm_id, created_at);
 -- Images uploaded for messages; the file is UPLOAD_DIR/<id>.
--- scope says who may load it: NULL = not sent yet (uploader only), 'channel', or 'dm:<id>'.
+-- scope says who may load it: NULL = not sent yet (uploader only), 'channel:<id>', 'dm:<id>', or 'channel' (any channel; before roles).
 CREATE TABLE IF NOT EXISTS uploads (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id),
@@ -176,6 +176,65 @@ def seed_admins(conn: sqlite3.Connection) -> None:
         return
     marks = ", ".join("?" * len(ADMINS))
     conn.execute(f"UPDATE users SET is_admin = 1 WHERE name_key IN ({marks})", tuple(ADMINS))
+
+
+ROLES_TABLES = """
+-- Discord-style roles: a name, a colour for the nick (none: the name stays white), and a few permissions (roles.py).
+-- A higher position is a higher role; someone's top role colours their name and bounds what they may manage.
+CREATE TABLE IF NOT EXISTS roles (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  color TEXT,
+  position INTEGER NOT NULL,
+  permissions TEXT NOT NULL DEFAULT '[]',  -- JSON list of ALL_PERMISSIONS
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS user_roles (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role_id TEXT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+  PRIMARY KEY (user_id, role_id)
+);
+CREATE INDEX IF NOT EXISTS user_roles_role ON user_roles(role_id);
+-- Who sees a private channel (channels.private = 1), besides admins and roles that see every channel.
+CREATE TABLE IF NOT EXISTS channel_roles (
+  channel_id TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+  role_id TEXT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+  PRIMARY KEY (channel_id, role_id)
+);
+CREATE TABLE IF NOT EXISTS channel_users (
+  channel_id TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  PRIMARY KEY (channel_id, user_id)
+);
+"""
+
+ALL_PERMISSIONS = ["manageChannels", "manageRoles", "removeMembers", "manageMessages", "seeAllChannels"]
+# The admins' role made on upgrade and on a fresh server; renamed like any other role afterwards.
+ADMIN_ROLE_NAME = "Админ"
+
+
+def migrate_roles(conn: sqlite3.Connection) -> None:
+    """Roles and private channels. Upgrading a server from before them: every channel stays public, the admins get
+    a top role with every permission, and channel images, which all shared one 'channel' scope, are tied to their
+    own channel, so making a channel private hides its old pictures too."""
+    had_roles = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'roles'").fetchone()
+    conn.executescript(ROLES_TABLES)
+    if "private" not in {row[1] for row in conn.execute("PRAGMA table_info(channels)")}:
+        conn.execute("ALTER TABLE channels ADD COLUMN private INTEGER NOT NULL DEFAULT 0")
+    if had_roles:
+        return
+    role_id = uuid.uuid4().hex
+    conn.execute(
+        "INSERT INTO roles (id, name, color, position, permissions, created_at) VALUES (?, ?, NULL, 0, ?, ?)",
+        (role_id, ADMIN_ROLE_NAME, json.dumps(ALL_PERMISSIONS), now_ms()),
+    )
+    conn.execute("INSERT INTO user_roles (user_id, role_id) SELECT id, ? FROM users WHERE is_admin = 1", (role_id,))
+    for row in conn.execute("SELECT channel_id, attachments FROM messages WHERE attachments != '[]'").fetchall():
+        for a in json.loads(row["attachments"]):
+            conn.execute(
+                "UPDATE uploads SET scope = ? WHERE id = ? AND scope = 'channel'",
+                (f"channel:{row['channel_id']}", a["url"].rsplit("/", 1)[-1]),
+            )
 
 
 def init_db() -> None:
@@ -336,6 +395,7 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS dm_messages_user ON dm_messages(user_id);
             """
         )
+        migrate_roles(conn)
         # Channels and groups deleted before their reactions and read marks were cleaned up with them.
         conn.execute("DELETE FROM reactions WHERE message_id NOT IN (SELECT id FROM messages UNION ALL SELECT id FROM dm_messages)")
         conn.execute("DELETE FROM read_states WHERE conversation_id NOT IN (SELECT id FROM channels UNION ALL SELECT id FROM dms)")

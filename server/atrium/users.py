@@ -651,14 +651,19 @@ def refuse_removed(row: dict) -> None:
         raise ApiError(403, "removed", "Вход на этот сервер для вас закрыт")
 
 
-def moderation_target(user_id: str, admin: dict) -> dict:
-    if not is_account_admin(admin["id"]):
+def moderation_target(user_id: str, actor: dict) -> dict:
+    """The admin, or a role with the right to remove members, and then only someone below their own top role."""
+    owner = is_account_admin(actor["id"])
+    access = access_of(actor["id"])
+    if not owner and "removeMembers" not in access.role_permissions:
         raise ApiError(403, "adminOnly", "Это может только админ")
     rows = query("SELECT * FROM users WHERE id = ?", (user_id,))
     if not rows:
         raise ApiError(404, "noUser", "Нет такого пользователя")
     if rows[0]["is_admin"]:
         raise ApiError(403, "noAdminRemove", "Админа убрать нельзя")
+    if not owner and access_of(user_id).role_top >= access.role_top:
+        raise ApiError(403, "memberAbove", "Этот участник не ниже тебя")
     return rows[0]
 
 
@@ -866,6 +871,8 @@ async def setup(body: SetupIn, request: Request, response: Response):
                 (user_id, name, name.casefold(), password_hash, secrets.choice(USER_COLORS), now_ms()),
             )
             conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('server_name', ?)", (title,))
+            # The first admin wears the top role (the admins' role made with the database).
+            conn.execute("INSERT INTO user_roles (user_id, role_id) SELECT ?, id FROM roles ORDER BY position DESC LIMIT 1", (user_id,))
     except sqlite3.IntegrityError:
         raise ApiError(409, "alreadySetup", "Сервер уже настроен")
     user = public_user(query("SELECT * FROM users WHERE id = ?", (user_id,))[0])
@@ -895,7 +902,8 @@ def bootstrap(request: Request, response: Response, user: dict = Depends(current
     return {
         "me": {k: v for k, v in user.items() if k != "_authVersion"},
         "users": users,
-        "channels": list_channels(),
+        "channels": channels_for(user["id"]),
+        "roles": list_roles(),
         "categories": list_categories(),
         "livekitUrl": LIVEKIT_URL,
         "serverName": server_name(),
@@ -903,7 +911,7 @@ def bootstrap(request: Request, response: Response, user: dict = Depends(current
         "relayOnly": RELAY_ONLY,
         # On a public demo everyone but the admin is a guest: no password they know, so none is asked for.
         "isGuest": GUEST_MODE and not is_admin(user),
-        "canManageChannels": is_admin(user),
+        **access_payload(user["id"]),
         "mutedChannels": muted_channels(user["id"]),
         **dict(zip(("unread", "mentions"), unread_counts(user))),
         "blocked": blocked_ids(user["id"]),
@@ -912,7 +920,8 @@ def bootstrap(request: Request, response: Response, user: dict = Depends(current
 
 
 # The other atrium modules import this one too: they come last, once everything above is defined.
-from .channels import list_categories, list_channels, muted_channels, unread_counts
+from .channels import list_categories, muted_channels, unread_counts
+from .roles import access_of, access_payload, channels_for, list_roles
 from .uploads import PRIVATE_IMAGE_HEADERS, make_avatar, process_image
 from .realtime import disconnect_user, end_dm_voice, presence_payload, sio, user_room
 from .server import icon_url

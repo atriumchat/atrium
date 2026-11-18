@@ -10,28 +10,36 @@ from pydantic import BaseModel, Field
 from .config import MAX_ATTACHMENTS, MAX_MESSAGE_LEN, MAX_TIME, MENTION
 from .errors import ApiError, Rejected
 from .db import connect_db, execute, now_ms, query
-from .auth import current_user, is_admin
+from .auth import current_user
 
 
 router = APIRouter()
 
 
 def list_channels() -> list[dict]:
-    return query(
-        "SELECT id, name, kind, position, category_id AS categoryId FROM channels WHERE deleted_at IS NULL ORDER BY position, created_at"
+    """Every channel, private ones included: for what each person sees, channels_for()."""
+    rows = query(
+        "SELECT id, name, kind, position, category_id AS categoryId, private FROM channels WHERE deleted_at IS NULL ORDER BY position, created_at"
     )
+    return [{**r, "private": bool(r["private"])} for r in rows]
 
 
 def list_categories() -> list[dict]:
     return query("SELECT id, name, position FROM categories ORDER BY position, created_at")
 
 
-async def send_layout() -> list[dict]:
-    """The categories, then the channels, to everyone (clients from before categories just ignore the first)."""
+async def send_layout(user: dict | None = None) -> list[dict]:
+    """The categories, then the channels, to everyone (clients from before categories just ignore the first): one
+    list for all while every channel is public, otherwise each person's own. Returns what `user` sees."""
     await sio.emit("categories", list_categories())
     channels = list_channels()
-    await sio.emit("channels", channels)
-    return channels
+    if not any(c["private"] for c in channels):
+        await sio.emit("channels", channels)
+    else:
+        for user_id in online_users():
+            hidden = hidden_channels(user_id)
+            await sio.emit("channels", [c for c in channels if c["id"] not in hidden], to=user_room(user_id))
+    return channels_for(user["id"]) if user else channels
 
 
 def mentions_in(content: str) -> tuple[list[str], bool]:
@@ -107,13 +115,15 @@ def find_message(message_id: str) -> tuple[str, dict] | None:
 
 
 def can_read_message(user_id: str, table: str, row: dict) -> bool:
-    return table == "messages" or dm_for(user_id, row["dm_id"]) is not None
+    if table == "messages":
+        return can_see_channel(user_id, row["channel_id"])
+    return dm_for(user_id, row["dm_id"]) is not None
 
 
 async def emit_to_readers(event: str, payload: dict, table: str, row: dict) -> None:
-    """Channel messages are public to the server; DM ones go only to the members' tabs."""
+    """Channel messages go to whoever sees the channel; DM ones only to the members' tabs."""
     if table == "messages":
-        await sio.emit(event, payload)
+        await emit_channel(event, payload, row["channel_id"])
     else:
         await sio.emit(event, payload, to=dm_rooms(row["dm_id"]))
 
@@ -159,6 +169,8 @@ class ChannelIn(BaseModel):
     name: str = Field(min_length=1, max_length=32)
     kind: str = Field(pattern="^(text|voice)$")
     categoryId: str | None = Field(default=None, max_length=64)
+    # Made private from the start: seen by its maker (and admins) until access is given to roles or people.
+    private: bool = False
 
 
 class CategoryIn(BaseModel):
@@ -201,7 +213,7 @@ def unread_counts(user: dict) -> tuple[dict[str, int], dict[str, int]]:
     mention = f"%<@{user['id']}>%"
     unread, mentions = {}, {}
     # Voice rooms count too: they have a chat of their own beside the call.
-    conversations = [("messages", "channel_id", c["id"]) for c in query("SELECT id FROM channels WHERE deleted_at IS NULL")]
+    conversations = [("messages", "channel_id", c["id"]) for c in channels_for(user["id"])]
     conversations += [("dm_messages", "dm_id", r["dm_id"]) for r in query("SELECT dm_id FROM dm_members WHERE user_id = ?", (user["id"],))]
     with connect_db() as conn:
         for table, column, conversation_id in conversations:
@@ -225,7 +237,9 @@ class ReadIn(BaseModel):
 
 async def save_read(user: dict, conversation_id: str, at: int) -> bool:
     """Read a channel or DM up to `at` (a message time); never goes backwards. Other tabs and devices hear of it."""
-    readable = query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NULL", (conversation_id,)) or dm_for(user["id"], conversation_id)
+    readable = (
+        query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NULL", (conversation_id,)) and can_see_channel(user["id"], conversation_id)
+    ) or dm_for(user["id"], conversation_id)
     if not readable:
         return False
     at = max(0, min(at, now_ms()))
@@ -259,13 +273,15 @@ def inbox(before: int | None = Query(None, ge=0, le=MAX_TIME), before_id: str = 
     marks = read_marks(user)
     mention = f"%<@{user['id']}>%"
     boundary, cursor = history_boundary(before, before_id, "m.")
+    hidden = sorted(hidden_channels(user["id"]))
     channel_rows = query(
         f"""SELECT m.* FROM messages m JOIN channels c ON c.id = m.channel_id AND c.deleted_at IS NULL
            WHERE m.user_id != ? AND {boundary}
+             {f"AND c.id NOT IN ({', '.join('?' * len(hidden))})" if hidden else ""}
              AND (m.content LIKE ? OR m.content LIKE '%<@all>%'
                   OR m.reply_to IN (SELECT id FROM messages WHERE user_id = ?))
            ORDER BY m.created_at DESC, m.id DESC LIMIT 40""",
-        (user["id"], *cursor, mention, user["id"]),
+        (user["id"], *cursor, *hidden, mention, user["id"]),
     )
     dm_rows = query(
         f"""SELECT m.* FROM dm_messages m JOIN dm_members dm ON dm.dm_id = m.dm_id AND dm.user_id = ?
@@ -286,8 +302,7 @@ def inbox(before: int | None = Query(None, ge=0, le=MAX_TIME), before_id: str = 
 def channel_messages(channel_id: str, before: int | None = Query(None, ge=0, le=MAX_TIME), limit: int = 50,
                      before_id: str = Query("", alias="beforeId", max_length=64), user: dict = Depends(current_user)):
     limit = max(1, min(limit, 100))
-    if not query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NULL", (channel_id,)):
-        raise ApiError(404, "noChannel", "Нет такого канала")
+    channel_or_404(channel_id, user)
     boundary, cursor = history_boundary(before, before_id)
     rows = query(
         f"SELECT * FROM messages WHERE channel_id = ? AND {boundary} ORDER BY created_at DESC, id DESC LIMIT ?",
@@ -306,9 +321,10 @@ def channel_name(raw: str, kind: str) -> str:
     return name
 
 
-def channel_or_404(channel_id: str) -> dict:
+def channel_or_404(channel_id: str, user: dict | None = None) -> dict:
+    """A channel that isn't in the trash; with `user`, also one they see (a private one is 404 to everyone else)."""
     rows = query("SELECT * FROM channels WHERE id = ? AND deleted_at IS NULL", (channel_id,))
-    if not rows:
+    if not rows or (user and not can_see_channel(user["id"], channel_id)):
         raise ApiError(404, "noChannel", "Нет такого канала")
     return rows[0]
 
@@ -319,51 +335,58 @@ def muted_channels(user_id: str) -> list[str]:
 
 @router.post("/api/channels")
 async def create_channel(body: ChannelIn, user: dict = Depends(current_user)):
-    if not is_admin(user):
+    if not can(user, "manageChannels"):
         raise ApiError(403, "adminCreateChannels", "Каналы создаёт только админ")
     name = channel_name(body.name, body.kind)
     category = category_or_404(body.categoryId)["id"] if body.categoryId else None
     position = query("SELECT COALESCE(MAX(position), 0) + 1 AS p FROM channels WHERE deleted_at IS NULL")[0]["p"]
-    execute(
-        "INSERT INTO channels (id, name, kind, position, created_at, category_id) VALUES (?, ?, ?, ?, ?, ?)",
-        (uuid.uuid4().hex, name, body.kind, position, now_ms(), category),
-    )
-    return await send_layout()
+    channel_id = uuid.uuid4().hex
+    with connect_db() as conn:
+        conn.execute(
+            "INSERT INTO channels (id, name, kind, position, created_at, category_id) VALUES (?, ?, ?, ?, ?, ?)",
+            (channel_id, name, body.kind, position, now_ms(), category),
+        )
+        if body.private:
+            save_channel_access(conn, channel_id, True, set(), keep_myself(access_of(user["id"]), True, set(), set()))
+    return await send_layout(user)
 
 
 @router.patch("/api/channels/{channel_id}")
 async def rename_channel(channel_id: str, body: ChannelRenameIn, user: dict = Depends(current_user)):
-    if not is_admin(user):
+    if not can(user, "manageChannels"):
         raise ApiError(403, "adminRenameChannels", "Каналы переименовывает только админ")
-    channel = channel_or_404(channel_id)
+    channel = channel_or_404(channel_id, user)
     execute("UPDATE channels SET name = ? WHERE id = ?", (channel_name(body.name, channel["kind"]), channel_id))
-    return await send_layout()
+    return await send_layout(user)
 
 
 @router.put("/api/channels/order")
 async def reorder_channels(body: ChannelOrderIn, user: dict = Depends(current_user)):
     """The new order of one kind of channel in one category (or in none), dragged in the list; the rest keep their places."""
-    if not is_admin(user):
+    if not can(user, "manageChannels"):
         raise ApiError(403, "adminMoveChannels", "Каналы двигает только админ")
     current = list_channels()
-    by_id = {c["id"]: c for c in current}
+    # Private channels this person doesn't see keep their places; the ones they see swap among themselves.
+    hidden = hidden_channels(user["id"])
+    by_id = {c["id"]: c for c in current if c["id"] not in hidden}
     groups = {(by_id[i]["kind"], by_id[i]["categoryId"]) for i in body.ids if i in by_id}
     if len(groups) != 1:
         raise ApiError(400, "wrongList", "Не тот список")
     group = groups.pop()
-    same = [c["id"] for c in current if (c["kind"], c["categoryId"]) == group]
+    moving = lambda c: (c["kind"], c["categoryId"]) == group and c["id"] not in hidden  # noqa: E731
+    same = [c["id"] for c in current if moving(c)]
     if sorted(body.ids) != sorted(same):
         raise ApiError(409, "channelsChanged", "Список каналов изменился")
     moved = iter(body.ids)
-    order = [next(moved) if (c["kind"], c["categoryId"]) == group else c["id"] for c in current]
+    order = [next(moved) if moving(c) else c["id"] for c in current]
     with connect_db() as conn:
         conn.executemany("UPDATE channels SET position = ? WHERE id = ?", list(enumerate(order)))
-    return await send_layout()
+    return await send_layout(user)
 
 
 @router.put("/api/channels/{channel_id}/mute")
 async def mute_channel(channel_id: str, body: ChannelMuteIn, user: dict = Depends(current_user)):
-    channel_or_404(channel_id)
+    channel_or_404(channel_id, user)
     if body.muted:
         execute("INSERT OR IGNORE INTO channel_mutes (user_id, channel_id) VALUES (?, ?)", (user["id"], channel_id))
     else:
@@ -376,7 +399,7 @@ async def mute_channel(channel_id: str, body: ChannelMuteIn, user: dict = Depend
 
 def purge_channel(channel_id: str) -> None:
     """Delete a channel for good, with its messages, reactions, read marks and uploads."""
-    # All channels share the 'channel' upload scope, so this channel's images are found through its messages.
+    # Images sent before roles shared one 'channel' scope; going through the messages finds every one of them.
     upload_ids = sorted(
         {
             a["url"].rsplit("/", 1)[-1]
@@ -406,43 +429,45 @@ def purge_deleted_channels() -> int:
 
 @router.get("/api/channels/deleted")
 def deleted_channels(user: dict = Depends(current_user)):
-    if not is_admin(user):
+    if not can(user, "manageChannels"):
         raise ApiError(403, "adminSeeDeleted", "Удалённые каналы видит только админ")
-    return query(
+    hidden = hidden_channels(user["id"])
+    rows = query(
         """SELECT c.id, c.name, c.kind, c.deleted_at AS deletedAt,
                   (SELECT COUNT(*) FROM messages m WHERE m.channel_id = c.id) AS messages
            FROM channels c WHERE c.deleted_at IS NOT NULL ORDER BY c.deleted_at DESC"""
     )
+    return [r for r in rows if r["id"] not in hidden]
 
 
 @router.post("/api/channels/{channel_id}/restore")
 async def restore_channel(channel_id: str, user: dict = Depends(current_user)):
-    if not is_admin(user):
+    if not can(user, "manageChannels"):
         raise ApiError(403, "adminRestoreChannels", "Каналы возвращает только админ")
-    if not query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NOT NULL", (channel_id,)):
+    if not query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NOT NULL", (channel_id,)) or not can_see_channel(user["id"], channel_id):
         raise ApiError(404, "noChannel", "Нет такого канала")
     execute("UPDATE channels SET deleted_at = NULL WHERE id = ?", (channel_id,))
     # Its category may have gone meanwhile: then it comes back to the plain sections.
     execute("UPDATE channels SET category_id = NULL WHERE id = ? AND category_id NOT IN (SELECT id FROM categories)", (channel_id,))
-    return await send_layout()
+    return await send_layout(user)
 
 
 @router.delete("/api/channels/{channel_id}")
 async def delete_channel(channel_id: str, user: dict = Depends(current_user)):
-    if not is_admin(user):
+    if not can(user, "manageChannels"):
         raise ApiError(403, "adminDeleteChannels", "Каналы удаляет только админ")
-    if channel_or_404(channel_id)["kind"] == "text" and query("SELECT COUNT(*) AS n FROM channels WHERE kind = 'text' AND deleted_at IS NULL")[0]["n"] <= 1:
+    if channel_or_404(channel_id, user)["kind"] == "text" and query("SELECT COUNT(*) AS n FROM channels WHERE kind = 'text' AND deleted_at IS NULL")[0]["n"] <= 1:
         raise ApiError(400, "lastTextChannel", "Последний текстовый канал удалить нельзя")
     execute("UPDATE channels SET deleted_at = ? WHERE id = ?", (now_ms(), channel_id))
     # Clearing out week-old trash removes messages and files: off the event loop.
     await run_in_threadpool(purge_deleted_channels)
-    channels = await send_layout()
+    channels = await send_layout(user)
     # Whoever was in the room is hung up; their apps leave the LiveKit room once the channel is gone.
     in_room = [sid for sid, e in voice.items() if e["kind"] == "channel" and e["channelId"] == channel_id]
     for sid in in_room:
         del voice[sid]
     if in_room:
-        await sio.emit("voice:state", voice_payload())
+        await send_voice_state()
     return channels
 
 
@@ -462,7 +487,7 @@ def category_name(raw: str) -> str:
 
 @router.post("/api/categories")
 async def create_category(body: CategoryIn, user: dict = Depends(current_user)):
-    if not is_admin(user):
+    if not can(user, "manageChannels"):
         raise ApiError(403, "adminCategories", "Категориями управляет только админ")
     position = query("SELECT COALESCE(MAX(position), 0) + 1 AS p FROM categories")[0]["p"]
     execute("INSERT INTO categories (id, name, position, created_at) VALUES (?, ?, ?, ?)", (uuid.uuid4().hex, category_name(body.name), position, now_ms()))
@@ -472,7 +497,7 @@ async def create_category(body: CategoryIn, user: dict = Depends(current_user)):
 
 @router.patch("/api/categories/{category_id}")
 async def rename_category(category_id: str, body: CategoryIn, user: dict = Depends(current_user)):
-    if not is_admin(user):
+    if not can(user, "manageChannels"):
         raise ApiError(403, "adminCategories", "Категориями управляет только админ")
     category_or_404(category_id)
     execute("UPDATE categories SET name = ? WHERE id = ?", (category_name(body.name), category_id))
@@ -483,7 +508,7 @@ async def rename_category(category_id: str, body: CategoryIn, user: dict = Depen
 @router.delete("/api/categories/{category_id}")
 async def delete_category(category_id: str, user: dict = Depends(current_user)):
     """The category goes; its channels stay, in the plain sections."""
-    if not is_admin(user):
+    if not can(user, "manageChannels"):
         raise ApiError(403, "adminCategories", "Категориями управляет только админ")
     category_or_404(category_id)
     with connect_db() as conn:
@@ -495,7 +520,7 @@ async def delete_category(category_id: str, user: dict = Depends(current_user)):
 
 @router.put("/api/categories/order")
 async def reorder_categories(body: CategoryOrderIn, user: dict = Depends(current_user)):
-    if not is_admin(user):
+    if not can(user, "manageChannels"):
         raise ApiError(403, "adminCategories", "Категориями управляет только админ")
     if sorted(body.ids) != sorted(c["id"] for c in list_categories()):
         raise ApiError(409, "categoriesChanged", "Список категорий изменился")
@@ -508,16 +533,17 @@ async def reorder_categories(body: CategoryOrderIn, user: dict = Depends(current
 @router.put("/api/channels/{channel_id}/category")
 async def move_channel(channel_id: str, body: ChannelCategoryIn, user: dict = Depends(current_user)):
     """Into a category (at its end), or out of any (categoryId null) back into the plain sections."""
-    if not is_admin(user):
+    if not can(user, "manageChannels"):
         raise ApiError(403, "adminMoveChannels", "Каналы двигает только админ")
-    channel_or_404(channel_id)
+    channel_or_404(channel_id, user)
     category = category_or_404(body.categoryId)["id"] if body.categoryId else None
     position = query("SELECT COALESCE(MAX(position), 0) + 1 AS p FROM channels WHERE deleted_at IS NULL")[0]["p"]
     execute("UPDATE channels SET category_id = ?, position = ? WHERE id = ?", (category, position, channel_id))
-    return await send_layout()
+    return await send_layout(user)
 
 
 # The other atrium modules import this one too: they come last, once everything above is defined.
 from .dms import dm_for, dm_rooms
 from .uploads import attachment_out, remove_upload_files
-from .realtime import sio, user_room, voice, voice_payload
+from .realtime import send_voice_state, sio, user_room, voice
+from .roles import access_of, can, can_see_channel, channels_for, emit_channel, hidden_channels, keep_myself, online_users, save_channel_access

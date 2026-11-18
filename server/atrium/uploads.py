@@ -149,8 +149,10 @@ def can_see_upload(user_id: str, upload: dict) -> bool:
     scope = upload["scope"]
     if scope is None:
         return upload["user_id"] == user_id
-    if scope == "channel":
+    if scope == "channel":  # from before roles, not tied to a message any more (migrate_roles moved the rest)
         return True
+    if scope.startswith("channel:"):
+        return can_see_channel(user_id, scope[8:])
     return scope.startswith("dm:") and dm_for(user_id, scope[3:]) is not None
 
 
@@ -305,3 +307,4 @@ def sweep_orphan_media() -> None:
 # The other atrium modules import this one too: they come last, once everything above is defined.
 from .channels import purge_deleted_channels
 from .dms import dm_for
+from .roles import can_see_channel
