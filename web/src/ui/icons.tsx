@@ -182,6 +182,13 @@ export const DotsIcon = icon(
 export const CheckIcon = icon(<path d="M20 6 9 17l-5-5" />);
 export const XIcon = icon(<path d="M18 6 6 18M6 6l12 12" />);
 export const FolderIcon = icon(<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" />);
+export const LockIcon = icon(
+  <>
+    <rect x="5" y="10.5" width="14" height="10" rx="2" />
+    <path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3" />
+  </>,
+);
+export const ShieldIcon = icon(<path d="M12 3.5 5 6v5.5c0 4.2 2.9 7.6 7 9 4.1-1.4 7-4.8 7-9V6z" />);
 export const PencilIcon = icon(<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4zM13.5 6.5l4 4" />);
 export const TrashIcon = icon(<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7" />);
 export const CameraIcon = icon(

@@ -63,11 +63,17 @@ export function shellSlice(): ShellSlice {
 export function setChannels(channels: Channel[]) {
   const ids = new Set(channels.map((c) => c.id));
   set((s) => {
-    if (!s.selectedChannelId || ids.has(s.selectedChannelId)) return { channels };
-    const { [s.selectedChannelId]: _gone, ...unread } = s.unread;
+    // A channel deleted, or private and no longer yours to see: its counters go too, or they'd stay on the badge.
+    const gone = new Set(s.channels.filter((c) => !ids.has(c.id)).map((c) => c.id));
+    if (s.selectedChannelId && !ids.has(s.selectedChannelId)) gone.add(s.selectedChannelId);
+    const keep = (counts: Record<string, number>) => Object.fromEntries(Object.entries(counts).filter(([id]) => !gone.has(id)));
+    const unread = gone.size ? keep(s.unread) : s.unread;
+    const mentions = gone.size ? keep(s.mentions) : s.mentions;
+    if (!s.selectedChannelId || ids.has(s.selectedChannelId)) return { channels, unread, mentions };
     return {
       channels,
       unread,
+      mentions,
       selectedChannelId: channels.find((c) => c.kind === 'text')?.id ?? channels[0]?.id ?? null,
       // On a phone, step back to the channel list rather than drop into a channel nobody picked.
       mobileDetail: s.mode === 'server' ? false : s.mobileDetail,

@@ -176,4 +176,9 @@ export const people = {
   'people.move.download': 'Скачать',
   'people.move.copied': 'Скопировано',
   'people.move.imageFailed': 'Картинку не скопировать, скачайте её',
+  'people.roles.title': 'Роли',
+  'people.roles.edit': 'Изменить роли',
+  'people.roles.none': 'Нет ролей',
+  'people.roles.save': 'Сохранить',
+  'people.roles.find': 'Найти участника',
 } as const;

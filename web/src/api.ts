@@ -1,7 +1,8 @@
 import { errorText, t, type Params } from './i18n';
-import type { Bootstrap, Channel, DeletedChannel, Dm, Friend, InboxItem, Message, MyInvite, MyStatus, Session, Upload, User, Category, DiscordPreview, EarlyAccess } from './types';
+import type { Bootstrap, Channel, ChannelAccess, DeletedChannel, Dm, Friend, InboxItem, Message, MyInvite, MyStatus, Permission, Role, Session, Upload, User, Category, DiscordPreview, EarlyAccess } from './types';
 
 type ServerInfo = { serverName: string; serverIcon: string | null };
+type RoleIn = { name: string; color: string | null; permissions: Permission[] };
 
 const TOKEN_KEY = 'hangout_token';
 
@@ -139,6 +140,15 @@ export const api = {
   makeResetLink: (userId: string) => request<{ token: string; expiresAt: number }>(`/api/users/${userId}/reset-link`, post()),
   removeUser: (userId: string) => request<User>(`/api/users/${userId}/remove`, post()),
   letBack: (userId: string) => request<User>(`/api/users/${userId}/removed`, { method: 'DELETE' }),
+  createRole: (role: RoleIn) => request<Role[]>('/api/roles', post(role)),
+  updateRole: (id: string, role: RoleIn) => request<Role[]>(`/api/roles/${id}`, { method: 'PUT', body: JSON.stringify(role) }),
+  deleteRole: (id: string) => request<Role[]>(`/api/roles/${id}`, { method: 'DELETE' }),
+  /** The roles one may move (below one's own), highest first. */
+  reorderRoles: (ids: string[]) => request<Role[]>('/api/roles/order', { method: 'PUT', body: JSON.stringify({ ids }) }),
+  setUserRoles: (userId: string, roleIds: string[]) => request<User>(`/api/users/${userId}/roles`, { method: 'PUT', body: JSON.stringify({ roleIds }) }),
+  channelAccess: (id: string) => request<ChannelAccess>(`/api/channels/${id}/access`),
+  setChannelAccess: (id: string, access: ChannelAccess) =>
+    request<ChannelAccess>(`/api/channels/${id}/access`, { method: 'PUT', body: JSON.stringify(access) }),
   checkReset: (token: string) => request<{ name: string }>('/api/reset/check', post({ token })),
   reset: (token: string, password: string) => request<Session>('/api/reset', post({ token, password })),
   block: (userId: string) => request<string[]>(`/api/blocks/${userId}`, { method: 'PUT' }),

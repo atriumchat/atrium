@@ -14,7 +14,18 @@ export type User = {
   admin?: true;
   /** The admin took them off the server until they let them back; their messages stay. */
   removed?: true;
+  /** Their role ids, highest first (servers from before roles send none). */
+  roles?: string[];
 };
+
+/** What a role may do; the admin may do all of it. */
+export type Permission = 'manageChannels' | 'manageRoles' | 'removeMembers' | 'manageMessages' | 'seeAllChannels';
+
+/** A server role: a higher `position` is a higher role. `color` colours the nick of whoever has it as their top coloured role. */
+export type Role = { id: string; name: string; color: string | null; position: number; permissions: Permission[] };
+
+/** Who sees a private channel besides the admins and roles that see every channel. */
+export type ChannelAccess = { private: boolean; roleIds: string[]; userIds: string[] };
 
 export type MyStatus = 'online' | 'dnd' | 'invisible';
 
@@ -34,7 +45,7 @@ export type MyInvite = {
 /** A channel in the trash: when it was deleted (ms) and how many messages it still holds. */
 export type DeletedChannel = Channel & { deletedAt: number; messages: number };
 /** A server channel; `categoryId` is the category it's in (none: the plain text/voice sections; older servers send none). */
-export type Channel = { id: string; name: string; kind: 'text' | 'voice'; position: number; categoryId?: string | null };
+export type Channel = { id: string; name: string; kind: 'text' | 'voice'; position: number; categoryId?: string | null; private?: boolean };
 
 /** A group of channels in the list, as Discord's categories. */
 export type Category = { id: string; name: string; position: number };
@@ -134,6 +145,9 @@ export type Bootstrap = {
   /** The server's own icon (/api/server/icon?v=…), or null for Atrium's mark. */
   serverIcon?: string | null;
   canManageChannels: boolean;
+  /** Since roles: every role, highest first, and what you may do. */
+  roles?: Role[];
+  permissions?: Permission[];
   mutedChannels: string[];
   /** Unread messages and unread mentions of you, per channel and DM, from the server's read marks. */
   unread: Record<string, number>;

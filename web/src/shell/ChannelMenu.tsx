@@ -9,9 +9,10 @@ import { Avatar } from '../ui/Avatar';
 import type { Channel } from '../types';
 import { ConfirmDialog, Dialog } from '../ui/Dialog';
 import { EmptyState } from '../ui/Illustrations';
-import { BellIcon, BellSlashIcon, CheckIcon, DotsIcon, FolderIcon, PencilIcon, SearchIcon, TrashIcon, UserPlusIcon } from '../ui/icons';
+import { BellIcon, BellSlashIcon, CheckIcon, DotsIcon, FolderIcon, LockIcon, PencilIcon, SearchIcon, TrashIcon, UserPlusIcon } from '../ui/icons';
+import { ChannelAccessDialog } from './ChannelAccess';
 
-type Action = 'read' | 'mute' | 'invite' | 'rename' | 'move' | 'delete';
+type Action = 'read' | 'mute' | 'invite' | 'rename' | 'move' | 'access' | 'delete';
 
 /**
  * A server channel's "…", in its header and on its row in the list. Everyone can mark a text channel read and
@@ -25,7 +26,7 @@ export function ChannelMenu({ channelId, className = '' }: { channelId: string; 
   const unread = useStore((s) => s.unread[channelId] ?? 0);
   const muted = useStore((s) => s.mutedChannels.includes(channelId));
   // Which channel a dialog is for: the same menu may be showing another channel once this one is gone.
-  const [dialog, setDialog] = useState<{ action: 'invite' | 'rename' | 'move' | 'delete'; id: string } | null>(null);
+  const [dialog, setDialog] = useState<{ action: 'invite' | 'rename' | 'move' | 'access' | 'delete'; id: string } | null>(null);
   const hasCategories = useStore((s) => s.categories.length > 0);
   const channel = channels.find((c) => c.id === channelId);
   if (!channel) return null;
@@ -36,7 +37,7 @@ export function ChannelMenu({ channelId, className = '' }: { channelId: string; 
     try {
       if (action === 'read') markRead(channel.id);
       if (action === 'mute') useStore.setState({ mutedChannels: await api.muteChannel(channel.id, !muted) });
-      if (action === 'invite' || action === 'rename' || action === 'move' || action === 'delete') setDialog({ action, id: channel.id });
+      if (action === 'invite' || action === 'rename' || action === 'move' || action === 'access' || action === 'delete') setDialog({ action, id: channel.id });
     } catch (e) {
       showError(e instanceof Error ? e.message : t('shell.menu.failed'));
     }
@@ -58,6 +59,7 @@ export function ChannelMenu({ channelId, className = '' }: { channelId: string; 
   if (canManage) {
     admin.push(<Item key="rename" id="rename" label={t('shell.menu.rename')} icon={<PencilIcon size={16} />} />);
     if (hasCategories) admin.push(<Item key="move" id="move" label={t('shell.menu.move')} icon={<FolderIcon size={16} />} />);
+    admin.push(<Item key="access" id="access" label={t('shell.menu.access')} icon={<LockIcon size={16} />} />);
   }
   if (personal.length + admin.length === 0) return null;
 
@@ -87,6 +89,7 @@ export function ChannelMenu({ channelId, className = '' }: { channelId: string; 
       {dialog?.id === channel.id && dialog.action === 'invite' && <InviteToRoom channel={channel} onClose={() => setDialog(null)} />}
       {dialog?.id === channel.id && dialog.action === 'rename' && <RenameChannel channel={channel} onClose={() => setDialog(null)} />}
       {dialog?.id === channel.id && dialog.action === 'move' && <MoveChannel channel={channel} onClose={() => setDialog(null)} />}
+      {dialog?.id === channel.id && dialog.action === 'access' && <ChannelAccessDialog channel={channel} onClose={() => setDialog(null)} />}
       {dialog?.id === channel.id && dialog.action === 'delete' && <DeleteChannel channel={channel} onClose={() => setDialog(null)} />}
     </>
   );

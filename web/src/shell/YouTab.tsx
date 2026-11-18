@@ -9,7 +9,7 @@ import { InviteRow } from '../people/Invites';
 import { Avatar } from '../ui/Avatar';
 import { PushPage } from '../ui/PushPage';
 import { Primary, Row, RowIcon, Rows, field, fieldArea, fieldLabel } from '../ui/settings';
-import { CheckIcon, ChevronRightIcon, GearIcon, LogoutIcon, PencilIcon, UserIcon, XIcon } from '../ui/icons';
+import { CheckIcon, ChevronRightIcon, GearIcon, LogoutIcon, PencilIcon, ShieldIcon, UserIcon, XIcon } from '../ui/icons';
 import { RoundButton } from '../ui/ui';
 import { Badge } from './HomeSidebar';
 import { dateOnly } from '../chat/format';
@@ -17,9 +17,10 @@ import { AtriumMark } from '../ui/Logo';
 import { AccountSettings, LanguageRow, NickRow } from '../account/Account';
 import { CallsGroup } from '../voice/VoiceSettings';
 import { ServerSettings } from './ServerSettings';
+import { RolesSettings } from './RolesSettings';
 import { DURATIONS, statusLabel, StatusDot, saveStatus, untilText } from './MeCard';
 
-type Page = 'profile' | 'status' | 'bio' | 'account' | 'server' | 'settings';
+type Page = 'profile' | 'status' | 'bio' | 'account' | 'server' | 'roles' | 'settings';
 
 /**
  * The phone's "You" tab is your own card, as others see it (the native app's): your face and status (with when it
@@ -33,6 +34,7 @@ export function YouTab() {
   const statusText = useStore((s) => s.myStatusText);
   const until = useStore((s) => s.myStatusUntil);
   const isAdmin = useStore((s) => s.isAdmin);
+  const manageRoles = useStore((s) => s.permissions.includes('manageRoles'));
   const [page, setPage] = useState<Page | null>(null);
   const close = () => setPage(null);
   const back = () => setPage('profile');
@@ -93,7 +95,7 @@ export function YouTab() {
 
       <FriendsRow />
 
-      <PushPage open={page === 'settings' || page === 'account' || page === 'server'} title={t('shell.you.settings')} onBack={close}>
+      <PushPage open={page === 'settings' || page === 'account' || page === 'server' || page === 'roles'} title={t('shell.you.settings')} onBack={close}>
         <Rows className="mt-2">
           <InviteRow />
         </Rows>
@@ -118,6 +120,17 @@ export function YouTab() {
               }
               title={t('shell.you.server')}
               onPress={() => setPage('server')}
+            />
+          )}
+          {manageRoles && (
+            <Row
+              icon={
+                <RowIcon>
+                  <ShieldIcon />
+                </RowIcon>
+              }
+              title={t('settings.page.roles')}
+              onPress={() => setPage('roles')}
             />
           )}
         </Rows>
@@ -162,6 +175,9 @@ export function YouTab() {
       </PushPage>
       <PushPage open={page === 'server'} title={t('shell.you.server')} onBack={toSettings}>
         <ServerSettings />
+      </PushPage>
+      <PushPage open={page === 'roles'} title={t('settings.page.roles')} onBack={toSettings}>
+        <RolesSettings />
       </PushPage>
     </div>
   );

@@ -82,4 +82,12 @@ export const errors = {
   'err.removedUser': 'Let them back on the server first',
   'err.setupNeeded': 'Set the server up first, with the link from the installer',
   'err.tooManyTries': 'Too many attempts, retry in {minutes} min',
+  'err.noManageRoles': 'No permission to manage roles',
+  'err.noManageChannels': 'No permission to manage channels',
+  'err.noRole': 'Role not found',
+  'err.badPermission': 'Unknown permission',
+  'err.notYourPermission': 'You can\'t grant a permission you don\'t have',
+  'err.roleAbove': 'This role isn\'t below yours',
+  'err.memberAbove': 'This member isn\'t below you',
+  'err.rolesChanged': 'Roles changed, try again',
 } satisfies Record<keyof typeof source, Entry>;

@@ -157,4 +157,13 @@ export const shell = {
     one: '{n} conversation',
     other: '{n} conversations',
   },
+  'shell.menu.access': 'Access',
+  'shell.access.channelTitle': 'Access to #{name}',
+  'shell.access.roomTitle': 'Access to “{name}”',
+  'shell.access.private': 'Private',
+  'shell.access.roles': 'Roles',
+  'shell.access.people': 'Members',
+  'shell.access.save': 'Save',
+  'shell.access.cancel': 'Cancel',
+  'shell.private': 'Private',
 } satisfies Record<keyof typeof source, Entry>;

@@ -78,4 +78,12 @@ export const errors = {
   'err.removedUser': 'Сначала верните человека на сервер',
   'err.setupNeeded': 'Сначала настройте сервер по ссылке от установщика',
   'err.tooManyTries': { one: 'Слишком много попыток, повтор через {minutes} мин', few: 'Слишком много попыток, повтор через {minutes} мин', many: 'Слишком много попыток, повтор через {minutes} мин', other: 'Слишком много попыток, повтор через {minutes} мин' },
+  'err.noManageRoles': 'Нет права управлять ролями',
+  'err.noManageChannels': 'Нет права управлять каналами',
+  'err.noRole': 'Нет такой роли',
+  'err.badPermission': 'Нет такого права',
+  'err.notYourPermission': 'Нельзя выдать право, которого у вас нет',
+  'err.roleAbove': 'Эта роль не ниже вашей',
+  'err.memberAbove': 'Этот участник не ниже вас',
+  'err.rolesChanged': 'Список ролей изменился',
 } as const;

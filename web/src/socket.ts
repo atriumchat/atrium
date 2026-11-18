@@ -1,5 +1,5 @@
 import { io, type Socket } from 'socket.io-client';
-import type { CallState, Channel, Message, MyStatus, Reaction, User, VoiceEntry, Category } from './types';
+import type { CallState, Channel, Message, MyStatus, Permission, Reaction, Role, User, VoiceEntry, Category } from './types';
 import { api, setToken } from './api';
 import { desktop } from './desktop';
 import { errorText, t } from './i18n';
@@ -219,6 +219,11 @@ export function connectSocket(token: string, onUnauthorized: () => void) {
   // An admin renamed the server or changed its icon.
   socket.on('server:updated', ({ serverName, serverIcon }: { serverName: string; serverIcon: string | null }) =>
     useStore.setState({ serverName, serverIcon }),
+  );
+  // Roles changed (names, colours, order), or what you may do did.
+  socket.on('roles', (roles: Role[]) => useStore.setState({ roles }));
+  socket.on('me:access', ({ permissions, canManageChannels }: { permissions: Permission[]; canManageChannels: boolean }) =>
+    useStore.setState({ permissions, canManageChannels }),
   );
   socket.on('channels:muted', (mutedChannels: string[]) => useStore.setState({ mutedChannels }));
   socket.on('user:new', (user: User) => addUser(user));

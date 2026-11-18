@@ -1,7 +1,7 @@
 import { Fragment, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type DragEvent, type Ref } from 'react';
 import { Button, Dropdown, Input, Label, ScrollShadow, TextField } from '@heroui/react';
 import { api } from '../api';
-import { addDm, getSessionEpoch, mergeMessages, openFriends, openPicker, PAGE_SIZE, refreshDms, setEditing, setHasMore, setReplyingTo, showError, useStore, voiceMembers } from '../store';
+import { addDm, getSessionEpoch, mergeMessages, openFriends, openPicker, PAGE_SIZE, refreshDms, setEditing, setHasMore, setReplyingTo, showError, useNameColor, useStore, voiceMembers } from '../store';
 import { deleteMessage, editMessage, sendMessage, sendTyping, toggleReaction } from '../socket';
 import { joinVoice, leaveVoice } from '../voice/voice';
 import { dayDivider, fullStamp, sameDay, timeOf } from './format';
@@ -467,11 +467,12 @@ function MessageBody({ message, startsGroup }: { message: Message; startsGroup: 
   const { t } = useT();
   const user = useStore((s) => s.users[message.userId]);
   const meId = useStore((s) => s.me?.id);
-  const isAdmin = useStore((s) => s.canManageChannels);
+  const manageMessages = useStore((s) => s.permissions.includes('manageMessages'));
+  const nameColor = useNameColor(message.userId);
   const editing = useStore((s) => s.editingId === message.id);
   const [confirming, setConfirming] = useState(false);
   const mine = message.userId === meId;
-  const canDelete = mine || (!message.dm && isAdmin);
+  const canDelete = mine || (!message.dm && manageMessages);
   // A reply always shows who wrote it, like Discord, even in the middle of someone's run of messages.
   const showHeader = startsGroup || !!message.replyTo;
   const big = !message.replyTo && isEmojiOnly(message.content);
@@ -497,7 +498,7 @@ function MessageBody({ message, startsGroup }: { message: Message; startsGroup: 
           </UserProfile>
           <div className="flex items-baseline gap-2">
             <UserProfile userId={message.userId} className="cursor-pointer text-[16px] font-medium leading-[22px] hover:underline">
-              <span>{user?.name ?? t('chat.someone')}</span>
+              <span style={nameColor ? { color: nameColor } : undefined}>{user?.name ?? t('chat.someone')}</span>
             </UserProfile>
             {/* Just the time: the day is on the divider above; the full date is on hover. */}
             <span className="text-[12px] text-faint tabular-nums max-md:text-[13px]" title={fullStamp(message.createdAt)}>

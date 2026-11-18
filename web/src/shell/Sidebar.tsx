@@ -5,7 +5,7 @@ import { ListHead } from './ListHead';
 import { CallPill, FaceStack } from './CallPill';
 import { Popover } from '@heroui/react';
 import { api } from '../api';
-import { selectChannel, setChannels, setVoiceChat, showError, useStore, voiceMembers } from '../store';
+import { selectChannel, setChannels, setVoiceChat, showError, useNameColor, useStore, voiceMembers } from '../store';
 import { joinVoice } from '../voice/voice';
 import { ensureHistory } from '../chat/history';
 import { useT } from '../i18n';
@@ -15,7 +15,7 @@ import { CallDuration } from '../voice/CallDuration';
 import { ChannelMenu } from './ChannelMenu';
 import { RoundButton, VolumeSlider } from '../ui/ui';
 import { EmptyState } from '../ui/Illustrations';
-import { BellSlashIcon, BubbleIcon, ChevronDownIcon, DotsIcon, HashIcon, HeadphonesSlashIcon, MicSlashIcon, PencilIcon, PlusIcon, SpeakerIcon, TrashIcon, VideoIcon } from '../ui/icons';
+import { BellSlashIcon, BubbleIcon, ChevronDownIcon, DotsIcon, HashIcon, HeadphonesSlashIcon, LockIcon, MicSlashIcon, PencilIcon, PlusIcon, SpeakerIcon, TrashIcon, VideoIcon } from '../ui/icons';
 
 export function Sidebar() {
   const { t } = useT();
@@ -77,8 +77,8 @@ export function Sidebar() {
             )}
             {categories.map((category) => {
               const inside = visible.filter((c) => c.categoryId === category.id);
-              // A search hides the categories it finds nothing in.
-              if (query && inside.length === 0) return null;
+              // A search hides the categories it finds nothing in; so does having none of its channels to see.
+              if ((query || !canManage) && inside.length === 0) return null;
               return (
                 <CategorySection key={category.id} category={category}>
                   {[...inside.filter((c) => c.kind === 'text'), ...inside.filter((c) => c.kind === 'voice')].map((c) => (
@@ -468,6 +468,7 @@ function TextItem({ channel }: { channel: Channel }) {
       >
         <HashIcon size={18} className="shrink-0 opacity-60" />
         <span className="min-w-0 flex-1 truncate">{channel.name}</span>
+        {channel.private && <PrivateMark />}
         {muted && !showMentions && <BellSlashIcon size={14} className="shrink-0 md:group-hover:hidden" />}
         {showMentions ? (
           <span className="min-w-5 rounded-full bg-danger px-1.5 text-center text-[11px] font-medium leading-5 text-white md:group-hover:hidden">
@@ -512,7 +513,10 @@ function VoiceItem({ channel }: { channel: Channel }) {
       >
         <SpeakerIcon size={18} className={`shrink-0 ${connectedHere ? 'text-success' : 'opacity-60'}`} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[16px] font-medium leading-5">{channel.name}</span>
+          <span className="flex items-center gap-1.5">
+            <span className="min-w-0 truncate text-[16px] font-medium leading-5">{channel.name}</span>
+            {channel.private && <PrivateMark />}
+          </span>
           {members.length > 0 && !connectedHere && (
             <span className="mt-1.5 flex items-center gap-2">
               <FaceStack users={members.map((m) => users[m.userId])} ringBg={lit || connectedHere ? 'var(--default)' : 'var(--app-side)'} />
@@ -557,9 +561,21 @@ function VoiceItem({ channel }: { channel: Channel }) {
 }
 
 /** Person under a voice room, Discord-style. Click someone else in your room to set their volume. */
+/** A private channel's lock after its name. */
+function PrivateMark() {
+  const { t } = useT();
+  return (
+    <>
+      <LockIcon size={14} className="shrink-0 opacity-60" />
+      <span className="sr-only">{t('shell.private')}</span>
+    </>
+  );
+}
+
 function VoiceMember({ entry }: { entry: VoiceEntry }) {
   const { t } = useT();
   const user = useStore((s) => s.users[entry.userId]);
+  const color = useNameColor(entry.userId);
   const isMe = useStore((s) => s.me?.id === entry.userId);
   const inSameRoom = useStore((s) => s.voiceChannelId === entry.channelId && s.voiceStatus === 'connected');
   const speaking = useStore((s) => inSameRoom && s.speaking.includes(entry.userId));
@@ -567,7 +583,7 @@ function VoiceMember({ entry }: { entry: VoiceEntry }) {
   const content = (
     <>
       <Avatar user={user} size={22} speaking={speaking} ringBg="var(--app-side)" />
-      <span className={`min-w-0 flex-1 truncate text-left text-[15px] ${speaking ? 'text-foreground' : 'text-muted'}`}>
+      <span className={`min-w-0 flex-1 truncate text-left text-[15px] ${speaking ? 'text-foreground' : 'text-muted'}`} style={color ? { color } : undefined}>
         {user?.name ?? '…'}
       </span>
       {entry.screen && <span className="rounded-[4px] bg-danger px-1 text-[10px] font-bold uppercase leading-4 text-white">{t('shell.sidebar.live')}</span>}

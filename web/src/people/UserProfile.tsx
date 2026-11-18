@@ -1,7 +1,8 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { Button, Dropdown, Label, Popover } from '@heroui/react';
 import { api } from '../api';
-import { addUser, messageUser, showError, useStore } from '../store';
+import { addUser, messageUser, showError, useNameColor, useStore } from '../store';
+import { RoleChips, topOf, useMyTop, UserRolesEditor } from './Roles';
 import type { MyStatus, User } from '../types';
 import { Avatar } from '../ui/Avatar';
 import { ConfirmDialog } from '../ui/Dialog';
@@ -40,6 +41,14 @@ export function ProfileCard({ userId, onClose }: { userId: string; onClose: () =
   const isMe = useStore((s) => s.me?.id === userId);
   const online = useStore((s) => s.online.includes(userId));
   const isAdmin = useStore((s) => s.isAdmin);
+  const nameColor = useNameColor(userId);
+  const manageRoles = useStore((s) => s.permissions.includes('manageRoles'));
+  const myTop = useMyTop();
+  // Removing someone: the admin, or a role allowed to, and then only someone below one's own top role.
+  const canRemove = useStore(
+    (s) => !!s.users[userId] && !s.users[userId].admin && (s.isAdmin || (s.permissions.includes('removeMembers') && topOf(s.users[userId], s.roles) < myTop)),
+  );
+  const [editingRoles, setEditingRoles] = useState(false);
   const room = useStore((s) => {
     const entry = s.voiceState.find((v) => v.userId === userId);
     return entry ? s.channels.find((c) => c.id === entry.channelId)?.name : undefined;
@@ -58,7 +67,9 @@ export function ProfileCard({ userId, onClose }: { userId: string; onClose: () =
           <div className="-mt-11">
             <AvatarPicker />
           </div>
-          <h2 className="mt-2 text-[20px] font-bold leading-7">{user.name}</h2>
+          <h2 className="mt-2 text-[20px] font-bold leading-7" style={nameColor ? { color: nameColor } : undefined}>
+            {user.name}
+          </h2>
           <StatusPicker />
           <div className="my-3 h-px bg-separator" />
           <h3 className="text-[12px] text-faint">{t('people.profile.about')}</h3>
@@ -85,7 +96,9 @@ export function ProfileCard({ userId, onClose }: { userId: string; onClose: () =
         <div className="-mt-12 w-fit rounded-full bg-overlay p-1.5">
           <Avatar user={user} size={88} ringBg="var(--overlay)" />
         </div>
-        <h2 className="mt-1.5 max-w-full truncate text-[22px] font-bold leading-7">{user.name}</h2>
+        <h2 className="mt-1.5 max-w-full truncate text-[22px] font-bold leading-7" style={nameColor ? { color: nameColor } : undefined}>
+          {user.name}
+        </h2>
         <p className={`mt-0.5 flex items-center gap-1.5 text-[14px] ${room ? 'text-success' : 'text-muted'}`}>
           <span className={`size-2 rounded-full ${dot}`} />
           {presence}
@@ -110,6 +123,25 @@ export function ProfileCard({ userId, onClose }: { userId: string; onClose: () =
           </Fact>
           <div className="ml-4 h-px bg-white/[0.08]" />
           <Fact label={t('people.profile.since')}>{dateOnly(user.createdAt, { day: 'numeric', month: 'long', year: 'numeric' })}</Fact>
+          {(manageRoles || !!user.roles?.length) && (
+            <>
+              <div className="ml-4 h-px bg-white/[0.08]" />
+              <Fact label={t('people.roles.title')}>
+                {editingRoles ? (
+                  <UserRolesEditor user={user} onDone={() => setEditingRoles(false)} />
+                ) : (
+                  <>
+                    <RoleChips user={user} />
+                    {manageRoles && (
+                      <button type="button" onClick={() => setEditingRoles(true)} className="mt-1 text-[14px] text-muted hover:text-foreground hover:underline">
+                        {t('people.roles.edit')}
+                      </button>
+                    )}
+                  </>
+                )}
+              </Fact>
+            </>
+          )}
           {inviter && (
             <>
               <div className="ml-4 h-px bg-white/[0.08]" />
@@ -125,7 +157,7 @@ export function ProfileCard({ userId, onClose }: { userId: string; onClose: () =
 
         <div className="overflow-hidden rounded-[18px] bg-default">
           <BlockButton userId={userId} name={user.name} />
-          {isAdmin && !user.admin && <ServerActions user={user} />}
+          {canRemove && <ServerActions user={user} />}
         </div>
         {isAdmin && !user.removed && <ResetLinkButton userId={userId} name={user.name} />}
       </div>

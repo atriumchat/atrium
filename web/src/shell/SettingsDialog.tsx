@@ -7,11 +7,12 @@ import { showError, useStore } from '../store';
 import { AccountSettings } from '../account/Account';
 import { VoiceSettings } from '../voice/VoiceSettings';
 import { ServerSettings } from './ServerSettings';
+import { RolesSettings } from './RolesSettings';
 import { AtriumMark } from '../ui/Logo';
 import { Row, Rows, Secondary } from '../ui/settings';
-import { LogoutIcon, MicIcon, RefreshIcon, UserIcon } from '../ui/icons';
+import { LogoutIcon, MicIcon, RefreshIcon, ShieldIcon, UserIcon } from '../ui/icons';
 
-export type SettingsPage = 'account' | 'voice' | 'server' | 'app';
+export type SettingsPage = 'account' | 'voice' | 'server' | 'roles' | 'app';
 
 /**
  * The settings' sections: on the computer a list on the left, each opening its page; on the phone one page of them
@@ -20,12 +21,14 @@ export type SettingsPage = 'account' | 'voice' | 'server' | 'app';
 export function useSettingsPages() {
   const { t } = useT();
   const isAdmin = useStore((s) => s.isAdmin);
+  const manageRoles = useStore((s) => s.permissions.includes('manageRoles'));
   const pages: { id: SettingsPage; label: string; icon: ReactNode; content: ReactNode }[] = [
     { id: 'account', label: t('settings.page.account'), icon: <UserIcon size={18} />, content: <AccountSettings /> },
     { id: 'voice', label: t('settings.page.voice'), icon: <MicIcon size={18} />, content: <VoiceSettings /> },
   ];
   // The server's icon and name: the admin's alone, the server refuses anyone else.
   if (isAdmin) pages.push({ id: 'server', label: t('settings.page.server'), icon: <AtriumMark size={18} />, content: <ServerSettings /> });
+  if (manageRoles) pages.push({ id: 'roles', label: t('settings.page.roles'), icon: <ShieldIcon size={18} />, content: <RolesSettings /> });
   if (desktop?.update) pages.push({ id: 'app', label: t('settings.page.app'), icon: <RefreshIcon size={18} />, content: <AppSettings /> });
   return pages;
 }

@@ -1,5 +1,5 @@
-import type { Bootstrap, MyStatus, User } from '../types';
-import { get, resetStore, set } from './core';
+import type { Bootstrap, MyStatus, Permission, Role, User } from '../types';
+import { get, resetStore, set, useStore } from './core';
 
 /** You: who you're signed in as and your status. */
 export type AccountSlice = {
@@ -11,6 +11,9 @@ export type AccountSlice = {
   hasRecoveryKey: boolean;
   isAdmin: boolean;
   isGuest: boolean;
+  /** The server's roles, highest first, and what you may do through yours (everything, for the admin). */
+  roles: Role[];
+  permissions: Permission[];
 };
 
 export function accountSlice(): AccountSlice {
@@ -22,7 +25,27 @@ export function accountSlice(): AccountSlice {
     hasRecoveryKey: false,
     isAdmin: false,
     isGuest: false,
+    roles: [],
+    permissions: [],
   };
+}
+
+/** The colour of someone's nick: that of their highest role that has one; none keeps the usual white. */
+export function nameColor(user: User | undefined, roles: Role[]): string | undefined {
+  if (!user?.roles?.length) return undefined;
+  for (const id of user.roles) {
+    const color = roles.find((r) => r.id === id)?.color;
+    if (color) return color;
+  }
+  return undefined;
+}
+
+export function useNameColor(userId: string | undefined): string | undefined {
+  return useStore((s) => nameColor(userId ? s.users[userId] : undefined, s.roles));
+}
+
+export function useCan(permission: Permission): boolean {
+  return useStore((s) => s.permissions.includes(permission));
 }
 
 export function initStore(data: Bootstrap) {
@@ -49,6 +72,9 @@ export function initStore(data: Bootstrap) {
     hasRecoveryKey: !!data.hasRecoveryKey,
     isAdmin: !!data.isAdmin,
     isGuest: !!data.isGuest,
+    roles: data.roles ?? [],
+    // A server from before roles: its admin may do everything there is.
+    permissions: data.permissions ?? (data.isAdmin ? ['manageChannels', 'manageRoles', 'removeMembers', 'manageMessages', 'seeAllChannels'] : []),
     serverRelayOnly: !!data.relayOnly,
     selectedChannelId: data.channels.some((c) => c.id === get().selectedChannelId) ? get().selectedChannelId : firstText?.id ?? data.channels[0]?.id ?? null,
   });

@@ -155,4 +155,9 @@ export const people = {
   'people.move.download': 'Save',
   'people.move.copied': 'Copied',
   'people.move.imageFailed': 'Couldn\'t copy the picture, save it instead',
+  'people.roles.title': 'Roles',
+  'people.roles.edit': 'Edit roles',
+  'people.roles.none': 'No roles',
+  'people.roles.save': 'Save',
+  'people.roles.find': 'Find member',
 } satisfies Record<keyof typeof source, Entry>;

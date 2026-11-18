@@ -161,4 +161,13 @@ export const shell = {
     many: '{n} переписок',
     other: '{n} переписки',
   },
+  'shell.menu.access': 'Доступ',
+  'shell.access.channelTitle': 'Доступ к #{name}',
+  'shell.access.roomTitle': 'Доступ к «{name}»',
+  'shell.access.private': 'Приватный',
+  'shell.access.roles': 'Роли',
+  'shell.access.people': 'Участники',
+  'shell.access.save': 'Сохранить',
+  'shell.access.cancel': 'Отмена',
+  'shell.private': 'Приватный',
 } as const;
