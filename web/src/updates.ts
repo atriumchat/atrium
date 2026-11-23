@@ -7,13 +7,17 @@ import { desktop } from './desktop';
  * The site: every deploy changes it, but a tab or desktop window opened before keeps running the old code — the
  * desktop app can sit in the tray for weeks. So we compare the build we're running with the server's (after each
  * reconnect, i.e. after a deploy restarts the server, when the window comes back, and every half hour) and reload:
- * on our own while nobody's looking and no call is on, otherwise when the person clicks "Update".
+ * on our own while nobody's looking and no call is on, otherwise when the person clicks "Update". A build that raises
+ * index.html's "atrium-required" number is a must: an older window reloads into it as soon as no call is on, even in
+ * sight.
  *
  * The desktop app updates its own shell (desktop/updater.js); here we only mirror its state for the banner.
  */
 
 /** The bundle this page runs, e.g. "/assets/index-D909MJww.js". Null on the dev server, which reloads by itself. */
 const RUNNING = document.querySelector<HTMLScriptElement>('script[type="module"][src^="/assets/"]')?.getAttribute('src') ?? null;
+const REQUIRED = Number(document.querySelector('meta[name="atrium-required"]')?.getAttribute('content') ?? 0);
+let mustUpdate = false;
 
 export async function checkSiteUpdate() {
   if (!RUNNING || useStore.getState().siteUpdate) return;
@@ -21,6 +25,7 @@ export async function checkSiteUpdate() {
     const html = await fetch('/', { cache: 'no-store' }).then((r) => r.text());
     const latest = html.match(/<script[^>]*type="module"[^>]*src="(\/assets\/[^"]+)"/)?.[1];
     if (latest && latest !== RUNNING) {
+      mustUpdate = Number(html.match(/<meta name="atrium-required" content="(\d+)"/)?.[1] ?? 0) > REQUIRED;
       useStore.setState({ siteUpdate: true });
       reloadIfIdle();
     }
@@ -31,7 +36,7 @@ export async function checkSiteUpdate() {
 
 const idle = () => {
   const { siteUpdate, voiceChannelId } = useStore.getState();
-  return siteUpdate && document.hidden && !voiceChannelId;
+  return siteUpdate && (document.hidden || mustUpdate) && !voiceChannelId;
 };
 
 let reloadTimer: ReturnType<typeof setTimeout> | null = null;

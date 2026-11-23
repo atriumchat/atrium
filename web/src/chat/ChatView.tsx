@@ -751,10 +751,33 @@ type PendingFile = { key: string; name: string; size: number; preview?: string; 
 
 type MentionOption = { id: string; label: string; user?: User };
 
+/*
+ * What's typed and not sent, per conversation, for this tab only: it lives through a reload (an update reloads the
+ * window on its own) and a hop to another chat and back, and goes with the tab.
+ */
+const DRAFT_KEY = (id: string) => `atrium_draft:${id}`;
+
+function loadDraft(id: string): string {
+  try {
+    return sessionStorage.getItem(DRAFT_KEY(id)) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function saveDraft(id: string, text: string) {
+  try {
+    if (text) sessionStorage.setItem(DRAFT_KEY(id), text);
+    else sessionStorage.removeItem(DRAFT_KEY(id));
+  } catch {
+    // Storage unavailable: the draft just won't outlive this page.
+  }
+}
+
 function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: string; onResize: () => void; onSend: () => void }) {
   const { t } = useT();
   const { id, placeholder, onResize, onSend } = props;
-  const [text, setText] = useState('');
+  const [text, setText] = useState(() => loadDraft(id));
   const [pending, setPending] = useState<PendingFile[]>([]);
   const [caret, setCaret] = useState(0);
   const [pick, setPick] = useState(0);
@@ -801,6 +824,8 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
   }, [replyId]);
 
   useEffect(() => setPick(0), [mentionQuery]);
+
+  useEffect(() => saveDraft(id, text), [id, text]);
 
   useLayoutEffect(() => {
     const el = ref.current;
