@@ -531,14 +531,13 @@ function SoundTile({
             type="button"
             onClick={toggle}
             onPointerEnter={() => setTruncated(!!nameRef.current && nameRef.current.scrollWidth > nameRef.current.clientWidth)}
-            className={`relative flex h-full w-full items-center rounded-[12px] pl-[38px] pr-3 text-left text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus pointer-coarse:pr-8 ${menu ? "pr-8" : "pointer-fine:group-hover:pr-8 group-has-[:focus-visible]:pr-8"}`}
+            className={`relative flex h-full w-full items-center rounded-[12px] pl-[38px] pr-3 text-left text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus pointer-coarse:pr-8 ${menu ? "pr-8" : ""}`}
           >
             <span ref={nameRef} className="min-w-0 truncate">
               {sound.name}
             </span>
             {long && (
-              // On hover the star takes the end of the pill: the length steps aside for the name.
-              <span className={`ml-auto shrink-0 pl-2 text-[11px] text-muted ${menu ? "hidden" : "pointer-fine:group-hover:hidden group-has-[:focus-visible]:hidden"}`}>
+              <span className={`ml-auto shrink-0 pl-2 text-[11px] text-muted pointer-coarse:hidden ${menu ? "hidden" : ""}`}>
                 {clock(sound.durationMs)}
               </span>
             )}
@@ -572,16 +571,6 @@ function SoundTile({
             </span>
           </>
         )}
-      </button>
-      <button
-        type="button"
-        aria-label={star}
-        aria-pressed={favorite}
-        title={star}
-        onClick={() => toggleFavorite(sound.id)}
-        className={`${TILE_ACTION} absolute right-1 top-2 pointer-coarse:hidden ${favorite ? "text-foreground" : ""} ${menu ? "opacity-0" : REVEAL}`}
-      >
-        {favorite ? <StarFilledIcon size={14} /> : <StarIcon size={14} />}
       </button>
       <Dropdown isOpen={menu} onOpenChange={setMenu}>
         <Dropdown.Trigger
