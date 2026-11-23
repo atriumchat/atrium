@@ -21,7 +21,7 @@ import { ConfirmDialog, Dialog } from "../ui/Dialog";
 import { EmojiPicker } from "../ui/EmojiPicker";
 import {
   ChevronDownIcon,
-  DotsIcon,
+  DotsVerticalIcon,
   PencilIcon,
   PlayIcon,
   PlusIcon,
@@ -531,13 +531,14 @@ function SoundTile({
             type="button"
             onClick={toggle}
             onPointerEnter={() => setTruncated(!!nameRef.current && nameRef.current.scrollWidth > nameRef.current.clientWidth)}
-            className={`relative flex h-full w-full items-center rounded-[12px] pl-[38px] pr-3 text-left text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus pointer-coarse:pr-8 ${menu ? "pr-8" : ""}`}
+            className={`relative flex h-full w-full items-center rounded-[12px] pl-[38px] pr-3 text-left text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus pointer-coarse:pr-8 ${menu ? "pr-8" : "pointer-fine:group-hover:pr-8 group-has-[:focus-visible]:pr-8"}`}
           >
             <span ref={nameRef} className="min-w-0 truncate">
               {sound.name}
             </span>
             {long && (
-              <span className={`ml-auto shrink-0 pl-2 text-[11px] text-muted pointer-coarse:hidden ${menu ? "hidden" : ""}`}>
+              // On hover the menu's dots take the end of the pill: the length steps aside.
+              <span className={`ml-auto shrink-0 pl-2 text-[11px] text-muted pointer-coarse:hidden ${menu ? "hidden" : "pointer-fine:group-hover:hidden group-has-[:focus-visible]:hidden"}`}>
                 {clock(sound.durationMs)}
               </span>
             )}
@@ -575,10 +576,10 @@ function SoundTile({
       <Dropdown isOpen={menu} onOpenChange={setMenu}>
         <Dropdown.Trigger
           aria-label={t("voice.soundboard.actions", { name: sound.name })}
-          // With a mouse it's reached by right-click (as in Discord), so it only shows while open; a finger gets it always.
-          className={`${TILE_ACTION} absolute right-1 top-2 pointer-coarse:opacity-100 ${menu ? "opacity-100" : "opacity-0 focus-visible:opacity-100 pointer-fine:pointer-events-none"}`}
+          // On hover with a mouse (right-click opens it too); a finger gets it always.
+          className={`${TILE_ACTION} absolute right-1 top-2 pointer-coarse:opacity-100 ${menu ? "opacity-100" : REVEAL}`}
         >
-          <DotsIcon size={16} />
+          <DotsVerticalIcon size={16} />
         </Dropdown.Trigger>
         <Dropdown.Popover placement="bottom end" className="min-w-48">
           <Dropdown.Menu
