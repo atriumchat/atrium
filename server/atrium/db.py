@@ -393,7 +393,9 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS messages_time ON messages(created_at);
             CREATE INDEX IF NOT EXISTS messages_user ON messages(user_id);
             CREATE INDEX IF NOT EXISTS dm_messages_user ON dm_messages(user_id);
-            -- A person's own soundboard: short sounds they may play in a voice call. The file is SOUND_DIR/<file>.
+            -- A person's own soundboard: short sounds they may play in a voice call. The file is SOUND_DIR/<file>,
+            -- always Opus in Ogg after the server transcodes it; duration_ms is what the server measured on the stored
+            -- file, trimmed says the source ran past MAX_SOUND_MS and was cut. Old rows keep their file and type.
             CREATE TABLE IF NOT EXISTS sounds (
               id TEXT PRIMARY KEY,
               user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -402,11 +404,20 @@ def init_db() -> None:
               volume REAL NOT NULL DEFAULT 1,
               file TEXT NOT NULL,
               size INTEGER NOT NULL,
+              duration_ms INTEGER NOT NULL DEFAULT 0,
+              trimmed INTEGER NOT NULL DEFAULT 0,
               created_at INTEGER NOT NULL
             );
             CREATE INDEX IF NOT EXISTS sounds_user ON sounds(user_id);
             """
         )
+        sound_columns = {row[1] for row in conn.execute("PRAGMA table_info(sounds)")}
+        if "duration_ms" not in sound_columns:
+            # The length the server measured on the stored file (ms); 0 for sounds kept from before transcoding.
+            conn.execute("ALTER TABLE sounds ADD COLUMN duration_ms INTEGER NOT NULL DEFAULT 0")
+        if "trimmed" not in sound_columns:
+            # Whether the source ran past MAX_SOUND_MS and was cut, stored so the list and the upload agree.
+            conn.execute("ALTER TABLE sounds ADD COLUMN trimmed INTEGER NOT NULL DEFAULT 0")
         migrate_roles(conn)
         # Channels and groups deleted before their reactions and read marks were cleaned up with them.
         conn.execute("DELETE FROM reactions WHERE message_id NOT IN (SELECT id FROM messages UNION ALL SELECT id FROM dm_messages)")

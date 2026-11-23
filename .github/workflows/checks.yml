@@ -46,6 +46,8 @@ jobs:
           cache: pip
           cache-dependency-path: server/requirements*.txt
       - run: pip install -r server/requirements-dev.txt
+      # The soundboard tests transcode real audio, so ffmpeg must be there.
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: python -m pytest -q server/tests
       # bash -n and shellcheck on every script in deploy/ (shellcheck comes with the runner).
       - run: bash deploy/release.sh lint

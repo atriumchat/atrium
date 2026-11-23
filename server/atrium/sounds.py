@@ -1,12 +1,17 @@
-"""A personal soundboard: short sounds a person keeps and plays in a voice call.
+"""A personal soundboard: sounds a person keeps and plays in a voice call.
 
-The file is written to SOUND_DIR under a name of our own; the row holds its name, emoji and volume. In a call the
-server only says who played what (realtime.sound:play) and every client plays the file itself. A sound is its owner's:
-nobody else may edit or delete it, and only the people in the same call may load the file.
+The file is written to SOUND_DIR under a name of our own; the row holds its name, emoji and volume. Every upload is
+transcoded to Opus in Ogg with ffmpeg first (as a subprocess, never in-process), so a person may keep music as well as
+short reactions, and the server stores only what it produced itself. In a call the server only says who played what
+(realtime.sound:play) and every client plays the file itself. A sound is its owner's: nobody else may edit or delete
+it, and only the people in the same call may load the file.
 """
 
+import asyncio
+import json
 import math
 import shutil
+import subprocess
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -15,8 +20,11 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from .config import (
-    MAX_SOUND_BYTES,
+    FFMPEG,
+    FFPROBE,
+    MAX_SOUND_MS,
     MAX_SOUND_NAME,
+    MAX_SOUND_UPLOAD,
     MAX_SOUNDS_PER_USER,
     MIN_FREE_DISK,
     SOUND_DIR,
@@ -38,8 +46,86 @@ SOUND_TYPES = {
     "m4a": "audio/mp4",
     "webm": "audio/webm",
 }
+# The demuxer handed to ffmpeg for each kind, named explicitly so it never guesses from the name or the content.
+SOUND_DEMUXERS = {"mp3": "mp3", "ogg": "ogg", "wav": "wav", "flac": "flac", "m4a": "mov", "webm": "matroska"}
 # A sound's file never changes (edits touch only the row), so a browser may keep it for good.
 SOUND_HEADERS = {"Cache-Control": "private, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff"}
+
+# Every upload is transcoded to Opus in Ogg; the source is cut to the first minute.
+TRANSCODE_SECONDS = MAX_SOUND_MS // 1000
+TRANSCODE_TIMEOUT = 30
+TRANSCODE_MEMORY = 768 * 1024 * 1024
+# Two ffmpeg runs at once: each is a process of its own and the box is small (like PASSWORD_WORK in auth.py).
+TRANSCODES = asyncio.Semaphore(2)
+
+
+# 768 MB of memory and 30 s of CPU per ffmpeg/ffprobe run, so a hostile file can't take the box down. On Linux (the
+# image) util-linux's prlimit sets them on the child: a preexec_fn would run Python between fork and exec, which can
+# hang a threaded server. Without prlimit (macOS, in development) there's only the timeout.
+PRLIMIT = shutil.which("prlimit")
+
+
+def run_tool(command: list[str]) -> subprocess.CompletedProcess:
+    """Run ffmpeg/ffprobe: no shell, its own stdin, a hard timeout, and the resource ceilings where the OS has them."""
+    if PRLIMIT:
+        command = [PRLIMIT, f"--as={TRANSCODE_MEMORY}", f"--cpu={TRANSCODE_TIMEOUT}", "--", *command]
+    return subprocess.run(command, capture_output=True, timeout=TRANSCODE_TIMEOUT, stdin=subprocess.DEVNULL)
+
+
+def probe_audio(path, demuxer: str) -> tuple[int, float]:
+    """(channels, seconds) of the first audio stream: channels 0 when there is none, seconds 0 when it can't say."""
+    result = run_tool([
+        FFPROBE, "-hide_banner", "-loglevel", "error", "-protocol_whitelist", "file",
+        "-f", demuxer, "-i", str(path),
+        "-select_streams", "a:0",
+        "-show_entries", "stream=channels:format=duration",
+        "-of", "json",
+    ])
+    if result.returncode != 0:
+        raise ValueError("ffprobe could not read the file")
+    info = json.loads(result.stdout or b"{}")
+    channels = int((info.get("streams") or [{}])[0].get("channels") or 0)
+    try:
+        seconds = float((info.get("format") or {}).get("duration") or 0)
+    except (TypeError, ValueError):
+        seconds = 0.0
+    return channels, seconds
+
+
+def transcode(source, target, kind: str) -> tuple[int, int, bool]:
+    """Turn one upload into <id>.ogg with ffmpeg; (stored bytes, milliseconds, trimmed). Raises if it can't.
+
+    The channel count decides the bitrate: stereo at 128 kbit/s, mono at 64, and surround is downmixed to stereo. The
+    length comes from the file we just wrote, never from the client; a source past MAX_SOUND_MS is cut by ffmpeg's -t.
+    """
+    demuxer = SOUND_DEMUXERS[kind]
+    channels, source_seconds = probe_audio(source, demuxer)
+    stereo = channels >= 2
+    command = [
+        FFMPEG, "-nostdin", "-hide_banner", "-loglevel", "error", "-protocol_whitelist", "file",
+        "-f", demuxer, "-i", str(source),
+        "-map", "0:a:0", "-vn", "-sn", "-dn", "-map_metadata", "-1", "-t", str(TRANSCODE_SECONDS),
+        "-c:a", "libopus", "-b:a", "128k" if stereo else "64k", "-vbr", "on", "-application", "audio",
+        "-ar", "48000", "-ac", "2" if stereo else "1",
+        "-f", "ogg", str(target),
+    ]
+    if run_tool(command).returncode != 0 or not target.is_file():
+        raise ValueError("ffmpeg could not transcode the file")
+    _, stored_seconds = probe_audio(target, "ogg")
+    duration_ms = round(stored_seconds * 1000)
+    # A source longer than the cut: ffprobe knows, or, if it didn't say, a stored file that hit the ceiling.
+    trimmed = source_seconds > TRANSCODE_SECONDS if source_seconds > 0 else duration_ms >= MAX_SOUND_MS
+    return target.stat().st_size, duration_ms, trimmed
+
+
+def drop_files(paths) -> None:
+    """Remove a temp input or a half-written output; these aren't media, so a backup needn't keep them."""
+    for path in paths:
+        path.unlink(missing_ok=True)
+
+
+def ffmpeg_missing() -> bool:
+    return shutil.which(FFMPEG) is None
 
 
 def sound_kind(data: bytes) -> str | None:
@@ -68,6 +154,8 @@ def sound_out(sound: dict) -> dict:
         "emoji": sound["emoji"],
         "volume": sound["volume"],
         "url": f"/api/sounds/{sound['id']}/file",
+        "durationMs": sound["duration_ms"],
+        "trimmed": bool(sound["trimmed"]),
         "createdAt": sound["created_at"],
     }
 
@@ -126,37 +214,50 @@ def get_sounds(user: dict = Depends(current_user)):
 
 @router.post("/api/sounds")
 async def add_sound(request: Request, name: str = "", emoji: str = "", volume: float = 1, user: dict = Depends(current_user)):
-    """Raw bytes in the body (like /api/uploads): a short mp3, ogg, wav, m4a, flac or webm."""
-    if int(request.headers.get("content-length") or 0) > MAX_SOUND_BYTES:
-        raise ApiError(413, "soundTooBig", "Звук больше 512 КБ")
+    """Raw bytes in the body (like /api/uploads): mp3, ogg, wav, m4a, flac or webm; kept as Opus in Ogg, first minute only."""
+    if int(request.headers.get("content-length") or 0) > MAX_SOUND_UPLOAD:
+        raise ApiError(413, "soundTooBig", "Файл больше 20 МБ")
     data = await request.body()
     if not data:
         raise ApiError(400, "emptyFile", "Пустой файл")
-    if len(data) > MAX_SOUND_BYTES:
-        raise ApiError(413, "soundTooBig", "Звук больше 512 КБ")
+    if len(data) > MAX_SOUND_UPLOAD:
+        raise ApiError(413, "soundTooBig", "Файл больше 20 МБ")
     kind = sound_kind(data)
     if not kind:
         raise ApiError(415, "badSound", "Нужен звук: mp3, ogg, wav, m4a, flac или webm")
+    if ffmpeg_missing():
+        raise ApiError(503, "soundsUnavailable", "Звуки на этом сервере не работают: нет ffmpeg")
     sound = {"name": sound_name(name), "emoji": sound_emoji(emoji), "volume": sound_volume(volume)}
     if sound_count(user["id"]) >= MAX_SOUNDS_PER_USER:
         raise too_many()
     SOUNDS_BY_USER.check(user["id"])
     check_sound_room(len(data))
     sound_id = uuid.uuid4().hex
-    file_name = f"{sound_id}.{kind}"
+    source = SOUND_DIR / f".{sound_id}.in"
+    target = SOUND_DIR / f"{sound_id}.ogg"
     # Writing off the event loop: a slow disk mustn't hold up chat and calls.
-    await run_in_threadpool((SOUND_DIR / file_name).write_bytes, data)
+    await run_in_threadpool(source.write_bytes, data)
+    try:
+        async with TRANSCODES:
+            size, duration_ms, trimmed = await run_in_threadpool(transcode, source, target, kind)
+    except Exception:
+        # ffmpeg couldn't read it, ran too long or fell over: the upload and any half-written output both go.
+        await run_in_threadpool(drop_files, [source, target])
+        raise ApiError(415, "badSound", "Не получилось прочитать звук")
+    await run_in_threadpool(drop_files, [source])
     try:
         with connect_db() as conn:
             conn.execute(
-                "INSERT INTO sounds (id, user_id, name, emoji, volume, file, size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (sound_id, user["id"], sound["name"], sound["emoji"], sound["volume"], file_name, len(data), now_ms()),
+                "INSERT INTO sounds (id, user_id, name, emoji, volume, file, size, duration_ms, trimmed, created_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (sound_id, user["id"], sound["name"], sound["emoji"], sound["volume"], target.name, size,
+                 duration_ms, int(trimmed), now_ms()),
             )
             # Two uploads at once both passed the count above; the later one is rolled back here.
             if conn.execute("SELECT COUNT(*) FROM sounds WHERE user_id = ?", (user["id"],)).fetchone()[0] > MAX_SOUNDS_PER_USER:
                 raise too_many()
     except ApiError:
-        remove_media_files([SOUND_DIR / file_name])
+        remove_media_files([target])
         raise
     return sound_out(query("SELECT * FROM sounds WHERE id = ?", (sound_id,))[0])
 

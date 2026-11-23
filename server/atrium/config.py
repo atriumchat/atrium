@@ -2,6 +2,7 @@
 
 import os
 import re
+import shutil
 from pathlib import Path
 
 
@@ -57,8 +58,13 @@ MAX_ATTACHMENTS = 10
 # Any file that isn't a picture: kept as is (the disk is small, so the limit is too) and always downloaded, never shown.
 MAX_FILE_UPLOAD = 25 * 1024 * 1024
 MAX_FILE_NAME = 120
-# A soundboard sound: a short clip, so the cap is small and there can't be many of them.
-MAX_SOUND_BYTES = 512 * 1024
+# A soundboard sound: what a person picks (any of mp3/ogg/wav/flac/m4a/webm) and the length it is cut to. The server
+# transcodes every upload to Opus in Ogg itself, so the cap is on the picked file, not on what is kept; there can't be many.
+MAX_SOUND_UPLOAD = 20 * 1024 * 1024
+MAX_SOUND_MS = 60_000
+# The soundboard runs these as subprocesses (never in-process); set the paths to pin a particular build.
+FFMPEG = os.environ.get("FFMPEG", shutil.which("ffmpeg") or "ffmpeg")
+FFPROBE = os.environ.get("FFPROBE", shutil.which("ffprobe") or "ffprobe")
 MAX_SOUNDS_PER_USER = 20
 MAX_SOUND_NAME = 32
 # Mentions are stored by id so a renamed person is still mentioned: <@32-hex-id>, or <@all> for everyone.

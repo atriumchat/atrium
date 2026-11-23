@@ -15,6 +15,8 @@ RUN npm run build -w web
 # Backend; also serves the built client from the same origin.
 FROM python:3.13-slim
 WORKDIR /app
+# The soundboard transcodes every upload with ffmpeg (subprocess); the slim image has none.
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 COPY server/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 # Runs as this unprivileged user; deploy/install.sh gives it the data folder.

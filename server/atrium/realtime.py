@@ -349,6 +349,8 @@ READS_BY_USER = RateLimit(30, 10)
 CALL_QUALITY_BY_USER = RateLimit(10, 60)
 # A soundboard sound is short but goes to the whole room, so a few a second and then a pause.
 SOUND_PLAYS_BY_USER = RateLimit(4, 8)
+# Stopping is a tap, not a flood; a few a second and then a pause.
+SOUND_STOPS_BY_USER = RateLimit(10, 10)
 
 
 def is_emoji(text: str) -> bool:
@@ -543,9 +545,26 @@ async def sound_play(sid, data):
         "volume": sound["volume"],
         "name": sound["name"],
         "emoji": sound["emoji"],
+        # How long the stored file runs, and an id for this play alone, so a client can tell which one to stop.
+        "durationMs": sound["duration_ms"],
+        "playId": uuid.uuid4().hex,
     }
     # The sender's sid included: they play it too, and everyone sees who played what.
     await sio.emit("sound:played", payload, to=[s for s, e in voice.items() if e["channelId"] == entry["channelId"]])
+    return {"ok": True}
+
+
+@sio.on("sound:stop")
+async def sound_stop(sid, data=None):
+    """Stop the sound playing in your room, for everyone in it: they cut whatever they're playing."""
+    user = (await sio.get_session(sid))["user"]
+    entry = voice.get(sid)
+    if not entry:
+        return socket_error("noCall", "Нет такого звонка")
+    if SOUND_STOPS_BY_USER.wait(user["id"]):
+        return socket_error("tooFast", "Слишком часто, пауза пару секунд")
+    payload = {"userId": user["id"], "channelId": entry["channelId"]}
+    await sio.emit("sound:stopped", payload, to=[s for s, e in voice.items() if e["channelId"] == entry["channelId"]])
     return {"ok": True}
 
 
