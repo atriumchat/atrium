@@ -145,8 +145,20 @@ function isLong(durationMs: number): boolean {
   return durationMs > LONG_LIMIT_MS;
 }
 
-/** One clip sounding right now, whichever path started it; `stop` silences it and fires its `onEnded`. */
-type Play = { userId: string; stop: () => void };
+/**
+ * One clip sounding right now, whichever path started it; `stop` silences it and fires its `onEnded`. `base` is the
+ * clip's own volume; what's heard is that times the soundboard's master volume, so `refresh` re-applies it when
+ * either slider moves while the clip plays.
+ */
+type Play = { userId: string; stop: () => void; base: number; refresh: () => void };
+
+/** What's heard: the clip's own volume times the master one, kept within 0..1. */
+const level = (base: number) => Math.max(0, Math.min(1, get().soundboard.volume * base));
+
+/** Both sliders change what is already sounding, not only the next clip. */
+function refreshLevels() {
+  for (const play of playing) play.refresh();
+}
 
 // What's sounding right now, oldest first, across both paths: a fourth at once stops the first.
 const playing: Play[] = [];
@@ -167,10 +179,10 @@ function stopAll() {
 }
 
 /** A short clip from its decoded buffer, through the shared context. */
-function playBuffer(buffer: AudioBuffer, volume: number, userId: string, onEnded?: () => void): Play {
+function playBuffer(buffer: AudioBuffer, base: number, userId: string, onEnded?: () => void): Play {
   const context = audioCtx();
   const gain = context.createGain();
-  gain.gain.value = volume;
+  gain.gain.value = level(base);
   const source = context.createBufferSource();
   source.buffer = buffer;
   source.connect(gain).connect(context.destination);
@@ -184,6 +196,9 @@ function playBuffer(buffer: AudioBuffer, volume: number, userId: string, onEnded
   };
   const play: Play = {
     userId,
+    base,
+    // A short ramp: a jump in gain clicks.
+    refresh: () => gain.gain.setTargetAtTime(level(play.base), context.currentTime, 0.015),
     stop: () => {
       if (!started) {
         finish();
@@ -213,10 +228,10 @@ function playBuffer(buffer: AudioBuffer, volume: number, userId: string, onEnded
 }
 
 /** A long clip, streamed: seek to where the call is by now so everyone stays roughly together, cut off at 4 minutes. */
-function playLong(url: string, volume: number, arrived: number, userId: string, onEnded?: () => void, current: () => boolean = () => true): Play {
+function playLong(url: string, base: number, arrived: number, userId: string, onEnded?: () => void, current: () => boolean = () => true): Play {
   const audio = new Audio();
   audio.preload = 'auto';
-  audio.volume = Math.max(0, Math.min(1, volume));
+  audio.volume = level(base);
   const setSinkId = (audio as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> }).setSinkId;
   if (typeof setSinkId === 'function') {
     void setSinkId.call(audio, getPreferredDevice('audiooutput') ?? '').catch(() => undefined);
@@ -233,6 +248,10 @@ function playLong(url: string, volume: number, arrived: number, userId: string, 
   };
   const play: Play = {
     userId,
+    base,
+    refresh: () => {
+      audio.volume = level(play.base);
+    },
     stop: () => {
       audio.pause();
       audio.removeAttribute('src');
@@ -333,6 +352,7 @@ export function setSoundboard(patch: Partial<SoundboardSettings>) {
   const next = { ...get().soundboard, ...patch };
   set({ soundboard: next });
   saveSoundboard(next);
+  if (patch.volume !== undefined) refreshLevels();
   // Muting is local and immediate: nothing of the soundboard should keep sounding.
   if (next.muted) stopAll();
 }
@@ -362,6 +382,13 @@ function startPreview(play: Play) {
   if (old && old !== play) old.stop();
 }
 
+/** The clip you're listening to by yourself changes its own volume as the slider moves (the add/edit window's). */
+export function setPreviewVolume(volume: number) {
+  if (!preview) return;
+  preview.base = volume;
+  preview.refresh();
+}
+
 /** Stop listening to a preview. */
 export function stopPreview() {
   preview?.stop();
@@ -371,7 +398,6 @@ export function stopPreview() {
 
 /** Play a clip on this device only, ignoring mute: the sound picker's preview. Long clips stream like in a call. */
 export function previewSound(sound: Sound) {
-  const volume = get().soundboard.volume * sound.volume;
   let play: Play | null = null;
   // The tile shows a stop while this preview sounds; a newer preview or the end clears it.
   const ended = () => {
@@ -385,16 +411,16 @@ export function previewSound(sound: Sound) {
   };
   set({ previewing: sound.id });
   if (isLong(sound.durationMs)) {
-    start(playLong(sound.url, volume, Date.now(), '', ended));
+    start(playLong(sound.url, sound.volume, Date.now(), '', ended));
     return;
   }
   const cached = cachedBuffer(sound.url);
   if (cached) {
-    start(playBuffer(cached, volume, '', ended));
+    start(playBuffer(cached, sound.volume, '', ended));
     return;
   }
   void loadBuffer(sound.url).then((buffer) => {
-    if (buffer && get().previewing === sound.id) start(playBuffer(buffer, volume, '', ended));
+    if (buffer && get().previewing === sound.id) start(playBuffer(buffer, sound.volume, '', ended));
     else if (!buffer && get().previewing === sound.id) set({ previewing: null });
   });
 }
@@ -431,21 +457,20 @@ export function onSoundPlayed(event: SoundPlayedEvent) {
   }
   const { deafened, soundboard } = get();
   if (deafened || soundboard.muted) return;
-  const volume = soundboard.volume * event.volume;
   if (isLong(event.durationMs)) {
-    playLong(event.url, volume, at, event.userId, undefined, current);
+    playLong(event.url, event.volume, at, event.userId, undefined, current);
     return;
   }
   const cached = cachedBuffer(event.url);
   if (cached) {
-    playBuffer(cached, volume, event.userId);
+    playBuffer(cached, event.volume, event.userId);
     return;
   }
   void loadBuffer(event.url).then((buffer) => {
     if (!buffer || Date.now() - at > PLAY_DEADLINE || !current()) return;
     const now = get();
     if (now.deafened || now.soundboard.muted) return;
-    playBuffer(buffer, now.soundboard.volume * event.volume, event.userId);
+    playBuffer(buffer, event.volume, event.userId);
   });
 }
 

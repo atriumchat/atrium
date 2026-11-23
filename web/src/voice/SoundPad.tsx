@@ -47,6 +47,7 @@ import {
   setSoundboard,
   soundFileDuration,
   stopMySounds,
+  setPreviewVolume,
   stopPreview,
   toggleFavorite,
 } from "./soundboard";
@@ -825,7 +826,11 @@ function SoundDialog({
         </div>
         <Slider
           value={volume}
-          onChange={(v) => setVolume(Array.isArray(v) ? v[0] : v)}
+          onChange={(v) => {
+            const next = Array.isArray(v) ? v[0] : v;
+            setVolume(next);
+            setPreviewVolume(next);
+          }}
           minValue={0}
           maxValue={1}
           step={0.01}
