@@ -170,3 +170,9 @@ export type Bootstrap = {
 
 /** A message in the inbox: it mentions you or answers you; unread if it's past your read mark there. */
 export type InboxItem = Message & { unread: boolean };
+
+/** A soundboard clip someone uploaded; `url` loads with the media cookie and is cached by the browser. */
+export type Sound = { id: string; userId: string; name: string; emoji: string; volume: number; url: string; createdAt: number };
+
+/** What may be changed on a sound after it's uploaded. */
+export type SoundPatch = Partial<Pick<Sound, 'name' | 'emoji' | 'volume'>>;

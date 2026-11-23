@@ -166,4 +166,5 @@ export const shell = {
   'shell.access.save': 'Save',
   'shell.access.cancel': 'Cancel',
   'shell.private': 'Private',
+  'shell.menu.inviteLink': 'Link for new people',
 } satisfies Record<keyof typeof source, Entry>;

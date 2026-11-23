@@ -46,6 +46,26 @@ function slashed(paths: ReactNode) {
   };
 }
 
+/** Private channel variant, as in Discord: a small lock in the top-right corner, the glyph cut around it. */
+function locked(paths: ReactNode) {
+  return function LockedIcon(props: IconProps) {
+    const id = `l-${useId().replace(/:/g, '')}`;
+    return (
+      <Svg {...props}>
+        <defs>
+          <mask id={id}>
+            <rect width="24" height="24" fill="white" stroke="none" />
+            <rect x="12.5" y="0" width="11.5" height="15" rx="2.5" fill="black" stroke="none" />
+          </mask>
+        </defs>
+        <g mask={`url(#${id})`}>{paths}</g>
+        <rect x="15" y="7.2" width="8" height="6" rx="1.3" fill="currentColor" stroke="none" />
+        <path d="M16.9 7.2V5.6a2.1 2.1 0 0 1 4.2 0v1.6" strokeWidth={1.6} />
+      </Svg>
+    );
+  };
+}
+
 const mic = (
   <>
     <rect x="8.5" y="2" width="7" height="12.5" rx="3.5" fill="currentColor" stroke="none" />
@@ -76,19 +96,23 @@ export const HeadphonesSlashIcon = slashed(headphones);
 export const VideoIcon = icon(video);
 export const VideoSlashIcon = slashed(video);
 
-export const HashIcon = icon(<path d="M4.5 9h15M4 15h15M10 3.5 8 20.5M16 3.5l-2 17" />);
+const hash = <path d="M4.5 9h15M4 15h15M10 3.5 8 20.5M16 3.5l-2 17" />;
+export const HashIcon = icon(hash);
+export const HashLockIcon = locked(hash);
 
 const bell = <path d="M6 9a6 6 0 0 1 12 0c0 6.5 2.5 8 2.5 8h-17S6 15.5 6 9zM10.2 20.5a2 2 0 0 0 3.6 0" />;
 export const BellIcon = icon(bell);
 export const BellSlashIcon = slashed(bell);
 
-export const SpeakerIcon = icon(
+const speaker = (
   <>
     <path d="M3 9.2h3.6L11.2 5v14l-4.6-4.2H3z" fill="currentColor" strokeWidth={1.5} />
     <path d="M15 9a4.2 4.2 0 0 1 0 6" />
     <path d="M18 6.3a8 8 0 0 1 0 11.4" />
-  </>,
+  </>
 );
+export const SpeakerIcon = icon(speaker);
+export const SpeakerLockIcon = locked(speaker);
 
 export const ScreenIcon = icon(
   <>
@@ -264,3 +288,20 @@ export const UserIcon = icon(
     <path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" />
   </>,
 );
+
+export const SpeakerSlashIcon = slashed(speaker);
+
+/** The soundboard: a note. */
+export const SoundboardIcon = icon(
+  <>
+    <path d="M9 18V5.5l11-2V16" />
+    <circle cx="6" cy="18" r="3" />
+    <circle cx="17" cy="16" r="3" />
+  </>,
+);
+
+const STAR = 'm12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z';
+export const StarIcon = icon(<path d={STAR} />);
+export const StarFilledIcon = icon(<path d={STAR} fill="currentColor" />);
+
+export const PlayIcon = icon(<path d="M8 5.5v13l10.5-6.5z" fill="currentColor" />);

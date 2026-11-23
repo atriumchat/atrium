@@ -170,4 +170,5 @@ export const shell = {
   'shell.access.save': 'Сохранить',
   'shell.access.cancel': 'Отмена',
   'shell.private': 'Приватный',
+  'shell.menu.inviteLink': 'Ссылка для новых людей',
 } as const;

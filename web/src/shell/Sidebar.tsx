@@ -12,9 +12,11 @@ import { useT } from '../i18n';
 import type { Category, Channel, VoiceEntry } from '../types';
 import { Avatar } from '../ui/Avatar';
 import { CallDuration } from '../voice/CallDuration';
-import { ChannelMenu } from './ChannelMenu';
+import { SoundPlayedMark } from '../voice/SoundPad';
+import { ChannelMenu, InviteToRoom } from './ChannelMenu';
 import { RoundButton, VolumeSlider } from '../ui/ui';
 import { EmptyState } from '../ui/Illustrations';
+import { UserPlusIcon } from '../ui/icons';
 import { BellSlashIcon, BubbleIcon, ChevronDownIcon, DotsIcon, HashIcon, HeadphonesSlashIcon, LockIcon, MicSlashIcon, PencilIcon, PlusIcon, SpeakerIcon, TrashIcon, VideoIcon } from '../ui/icons';
 
 export function Sidebar() {
@@ -501,6 +503,7 @@ function VoiceItem({ channel }: { channel: Channel }) {
   const unread = useStore((s) => (s.unread[channel.id] ?? 0) > 0 && !s.mutedChannels.includes(channel.id) && !(active && s.voiceChatOpen));
   const twoLines = members.length > 0 && !connectedHere;
   const top = twoLines ? 'top-[18px]' : 'top-5';
+  const [inviting, setInviting] = useState(false);
 
   return (
     <div className="group relative">
@@ -554,13 +557,27 @@ function VoiceItem({ channel }: { channel: Channel }) {
           {members.map((m) => (
             <VoiceMember key={m.userId} entry={m} />
           ))}
+          {members.length === 1 && (
+            <li>
+              <button
+                type="button"
+                onClick={() => setInviting(true)}
+                className="flex h-8 w-full items-center gap-2 rounded-full px-1.5 text-left text-muted outline-none transition-colors hover:bg-default/50 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus"
+              >
+                <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full border border-dashed border-white/25">
+                  <UserPlusIcon size={13} />
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[15px]">{t('shell.menu.inviteToRoom')}</span>
+              </button>
+            </li>
+          )}
         </ul>
       )}
+      {inviting && <InviteToRoom channel={channel} onClose={() => setInviting(false)} />}
     </div>
   );
 }
 
-/** Person under a voice room, Discord-style. Click someone else in your room to set their volume. */
 /** A private channel's lock after its name. */
 function PrivateMark() {
   const { t } = useT();
@@ -572,6 +589,7 @@ function PrivateMark() {
   );
 }
 
+/** Person under a voice room, Discord-style. Click someone else in your room to set their volume. */
 function VoiceMember({ entry }: { entry: VoiceEntry }) {
   const { t } = useT();
   const user = useStore((s) => s.users[entry.userId]);
@@ -586,6 +604,7 @@ function VoiceMember({ entry }: { entry: VoiceEntry }) {
       <span className={`min-w-0 flex-1 truncate text-left text-[15px] ${speaking ? 'text-foreground' : 'text-muted'}`} style={color ? { color } : undefined}>
         {user?.name ?? '…'}
       </span>
+      <SoundPlayedMark userId={entry.userId} size={15} className="text-muted" />
       {entry.screen && <span className="rounded-[4px] bg-danger px-1 text-[10px] font-bold uppercase leading-4 text-white">{t('shell.sidebar.live')}</span>}
       {entry.video && <VideoIcon size={16} className="text-muted" />}
       {entry.deafened ? (

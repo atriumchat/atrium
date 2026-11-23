@@ -9,6 +9,7 @@ import { BypassHint, CallQuality } from '../voice/Bypass';
 import { DeviceMenu, SettingsMenu } from './SettingsMenu';
 import { MeCard, statusLabel } from './MeCard';
 import { RoundButton } from '../ui/ui';
+import { SoundboardButton } from '../voice/SoundPad';
 import {
   HeadphonesIcon,
   HeadphonesSlashIcon,
@@ -66,7 +67,7 @@ function VoiceStatus() {
         </RoundButton>
       </div>
       <BypassHint stats={stats} />
-      <div className="mt-2 grid grid-cols-2 gap-2">
+      <div className="mt-2 grid grid-cols-3 gap-2">
         <WideButton label={cameraOn ? t('shell.call.cameraOff') : t('shell.call.cameraOn')} on={cameraOn} disabled={!connected} onPress={toggleCamera}>
           {cameraOn ? <VideoIcon /> : <VideoSlashIcon />}
         </WideButton>
@@ -78,6 +79,7 @@ function VoiceStatus() {
         >
           <ScreenIcon />
         </WideButton>
+        <SoundboardButton look="panel" disabled={!connected} />
       </div>
     </div>
   );

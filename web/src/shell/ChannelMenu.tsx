@@ -11,6 +11,9 @@ import { ConfirmDialog, Dialog } from '../ui/Dialog';
 import { EmptyState } from '../ui/Illustrations';
 import { BellIcon, BellSlashIcon, CheckIcon, DotsIcon, FolderIcon, LockIcon, PencilIcon, SearchIcon, TrashIcon, UserPlusIcon } from '../ui/icons';
 import { ChannelAccessDialog } from './ChannelAccess';
+import { CopyButton } from '../ui/CopyButton';
+import { useMyInvite } from '../people/Invites';
+import { inviteLink } from '../people/invite';
 
 type Action = 'read' | 'mute' | 'invite' | 'rename' | 'move' | 'access' | 'delete';
 
@@ -108,7 +111,7 @@ function Item({ id, label, icon }: { id: Action; label: string; icon: ReactNode 
  * Friends to call into a voice room: each "Invite" sends them a room card in your DM, with a button to
  * join. People already in the room aren't offered.
  */
-function InviteToRoom({ channel, onClose }: { channel: Channel; onClose: () => void }) {
+export function InviteToRoom({ channel, onClose }: { channel: Channel; onClose: () => void }) {
   const { t, lang } = useT();
   const friends = useStore((s) => s.friends);
   const users = useStore((s) => s.users);
@@ -117,6 +120,9 @@ function InviteToRoom({ channel, onClose }: { channel: Channel; onClose: () => v
   const [filter, setFilter] = useState('');
   const [sent, setSent] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [mine] = useMyInvite();
+  const full = !!mine && mine.limit !== null && mine.invited.length >= mine.limit;
+  const link = mine && !full ? inviteLink(mine.code) : '';
   const q = filter.trim().toLowerCase();
   const candidates = friends
     .filter((f) => f.status === 'friend' && !inside.has(f.userId))
@@ -167,7 +173,7 @@ function InviteToRoom({ channel, onClose }: { channel: Channel; onClose: () => v
           <EmptyState compact art="group" title={t('shell.menu.allHere.title')} text={t('shell.menu.allHere.text')} plate="var(--overlay)" />
         )
       ) : (
-        <ul>
+        <ul className="md:max-h-[280px] md:overflow-y-auto">
           {candidates.map((u) => {
             const done = sent.includes(u.id);
             return (
@@ -189,6 +195,13 @@ function InviteToRoom({ channel, onClose }: { channel: Channel; onClose: () => v
           })}
         </ul>
       )}
+      <div className="mt-3 border-t border-white/[0.07] pt-4">
+        <span className="mb-2 block text-[13px] text-muted">{t('shell.menu.inviteLink')}</span>
+        <div className="flex h-[46px] items-center gap-1 rounded-[12px] border border-white/[0.07] bg-white/[0.03] pl-3.5 pr-1.5">
+          <span className={`min-w-0 flex-1 truncate text-[14px] ${full ? 'text-faint' : ''}`}>{mine ? inviteLink(mine.code).replace(/^https?:\/\//, '') : ''}</span>
+          <CopyButton text={link} />
+        </div>
+      </div>
     </Dialog>
   );
 }

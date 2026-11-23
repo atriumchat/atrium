@@ -25,6 +25,7 @@ import {
 } from './store';
 import { playSound } from './voice/sounds';
 import { leaveVoice } from './voice/voice';
+import { initSoundboard, onSoundPlayed, type SoundPlayedEvent } from './voice/soundboard';
 import { checkSiteUpdate } from './updates';
 import { plainText } from './ui/Markdown';
 import { invalidateHistory, refreshNewest } from './chat/history';
@@ -175,6 +176,8 @@ export function switchToken(token: string) {
 
 export function connectSocket(token: string, onUnauthorized: () => void) {
   unauthorized = onUnauthorized;
+  // Starts watching calls for the sounds to preload; only the first connect actually registers it.
+  initSoundboard();
   socket?.disconnect();
   socket = io({ path: '/socket.io', auth: { token } });
 
@@ -314,6 +317,9 @@ export function connectSocket(token: string, onUnauthorized: () => void) {
     void leaveVoice({ silent: true });
     showError(movedText());
   });
+
+  // Someone (you included) played a soundboard clip in your call: play it here too.
+  socket.on('sound:played', (event: SoundPlayedEvent) => onSoundPlayed(event));
 }
 
 export const movedText = () => t('common.callMoved');
@@ -366,6 +372,9 @@ export async function editMessage(id: string, content: string): Promise<boolean>
 export async function deleteMessage(id: string): Promise<boolean> {
   return (await ask('message:delete', { id }, t('chat.deleteFailed'))) !== null;
 }
+
+/** Play a soundboard clip for the whole call; the sound comes back to everyone as sound:played. */
+export const playSoundboard = (soundId: string) => ask('sound:play', { soundId }, t('voice.sound.failed'));
 
 export function toggleReaction(messageId: string, emoji: string) {
   void ask('reaction:toggle', { messageId, emoji }, t('chat.reactFailed'));

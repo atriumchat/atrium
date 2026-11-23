@@ -90,4 +90,8 @@ export const errors = {
   'err.roleAbove': 'This role isn\'t below yours',
   'err.memberAbove': 'This member isn\'t below you',
   'err.rolesChanged': 'Roles changed, try again',
+  'err.badSound': 'That sound won\'t do',
+  'err.soundTooBig': 'Sound is over 512 KB',
+  'err.tooManySounds': 'Up to {n} sounds',
+  'err.noSound': 'Sound not found',
 } satisfies Record<keyof typeof source, Entry>;

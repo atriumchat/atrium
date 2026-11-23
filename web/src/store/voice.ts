@@ -1,8 +1,35 @@
 import type { Room } from 'livekit-client';
 import { loadPrefs, type VoicePrefs } from '../prefs';
-import type { CallState, VoiceEntry } from '../types';
+import type { CallState, Sound, VoiceEntry } from '../types';
 import { get } from './core';
 import { isDmId } from './people';
+
+/** Soundboard settings for this device: master volume, mute and the favourite clip ids. */
+export type SoundboardSettings = { volume: number; muted: boolean; favorites: string[] };
+
+const SOUNDBOARD_KEY = 'atrium_soundboard';
+const DEFAULT_SOUNDBOARD: SoundboardSettings = { volume: 0.5, muted: false, favorites: [] };
+
+export function loadSoundboard(): SoundboardSettings {
+  try {
+    const saved: Partial<SoundboardSettings> = JSON.parse(localStorage.getItem(SOUNDBOARD_KEY) ?? '{}');
+    return {
+      volume: typeof saved.volume === 'number' ? saved.volume : DEFAULT_SOUNDBOARD.volume,
+      muted: typeof saved.muted === 'boolean' ? saved.muted : DEFAULT_SOUNDBOARD.muted,
+      favorites: Array.isArray(saved.favorites) ? saved.favorites.filter((id): id is string => typeof id === 'string') : [],
+    };
+  } catch {
+    return { ...DEFAULT_SOUNDBOARD };
+  }
+}
+
+export function saveSoundboard(settings: SoundboardSettings) {
+  try {
+    localStorage.setItem(SOUNDBOARD_KEY, JSON.stringify(settings));
+  } catch {
+    // Not remembered; still applied for this session.
+  }
+}
 
 /** Calls: who's in which room, and the call you're in (the LiveKit side lives in voice/voice.ts). */
 export type VoiceSlice = {
@@ -30,6 +57,13 @@ export type VoiceSlice = {
   /** Your camera straight from the device, shown in your tile while it's still being sent to the call. */
   cameraPreview: MediaStreamTrack | null;
   speaking: string[];
+
+  /** The soundboard clips you uploaded. */
+  mySounds: Sound[];
+  /** Soundboard settings, kept on this device. */
+  soundboard: SoundboardSettings;
+  /** userId -> ms of their last sound:played, for the indicator in the UI. */
+  soundPlays: Record<string, number>;
 };
 
 export function voiceSlice(): VoiceSlice {
@@ -50,6 +84,9 @@ export function voiceSlice(): VoiceSlice {
     cameraPending: false,
     cameraPreview: null,
     speaking: [],
+    mySounds: [],
+    soundboard: loadSoundboard(),
+    soundPlays: {},
   };
 }
 

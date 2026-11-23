@@ -33,6 +33,7 @@ import {
   XIcon,
 } from '../ui/icons';
 import { useT } from '../i18n';
+import { SoundboardButton, SoundPlayedMark } from './SoundPad';
 
 export function VoiceView({ channel }: { channel: Channel }) {
   const { t } = useT();
@@ -415,6 +416,11 @@ function Tile({ participant, camera, height }: { participant: Participant; camer
         <Avatar user={user} size={Math.round(Math.min(128, Math.max(28, height * 0.4)))} ringBg="transparent" />
       )}
       <div className={`pointer-events-none absolute inset-0 rounded-[16px] ${speaking ? 'ring-2 ring-inset ring-white' : ''}`} />
+      <SoundPlayedMark
+        userId={participant.identity}
+        size={small ? 12 : 14}
+        className={`absolute items-center justify-center rounded-full bg-black/55 text-white ${small ? 'right-1.5 top-1.5 size-5' : 'right-2.5 top-2.5 size-7'}`}
+      />
       <div
         className={`absolute flex max-w-[calc(100%-16px)] items-center gap-1.5 rounded-full bg-black/55 font-medium text-white ${small ? 'bottom-1.5 left-1.5 px-2 py-0.5 text-[12px]' : 'bottom-2.5 left-2.5 px-2.5 py-1 text-[13px]'}`}
       >
@@ -494,6 +500,7 @@ export function CallControls({ className = '' }: { className?: string }) {
           icon={<ScreenIcon size={18} />}
         />
       )}
+      <SoundboardButton look="control" />
       <button
         aria-label={t('voice.leave')}
         title={t('voice.leave')}

@@ -164,6 +164,22 @@ a,
   -webkit-tap-highlight-color: transparent;
 }
 
+/* A soundboard glyph by someone who just played a clip: in quickly, out slowly, once (voice/SoundPad.tsx, 2.5 s). */
+@keyframes sound-played {
+  0% {
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 /*
  * Someone being rung: a green ripple around their avatar. In a bubble (voice/Bubbles.tsx) the avatar is
  * scaled by --bubble-s, so the ripple's reach is divided by it to come out at 18px on screen.
