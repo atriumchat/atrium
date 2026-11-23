@@ -99,6 +99,7 @@ export function SoundboardButton({
   const label = t("voice.soundboard.label");
 
   function show(next: NonNullable<DialogState>) {
+    stopPreview();
     setOpen(false);
     setDialog(next);
   }
@@ -126,7 +127,14 @@ export function SoundboardButton({
       {face}
     </button>
   ) : (
-    <Popover isOpen={open} onOpenChange={setOpen}>
+    <Popover
+      isOpen={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        // The stop button lives inside the popover: closing it ends the preview, so nothing plays on with no way to stop.
+        if (!next) stopPreview();
+      }}
+    >
       <Popover.Trigger
         aria-label={label}
         className={`${BUTTON[look]} ${BUTTON_ENABLED}`}
@@ -198,6 +206,7 @@ function Panel({
   const sounds = useStore((s) => s.mySounds);
   const favorites = useStore((s) => s.soundboard.favorites);
   const playing = useStore((s) => s.myPlaying);
+  const listening = useStore((s) => s.previewing !== null);
   const [query, setQuery] = useState("");
   const [folded, setFolded] = useState<SectionId[]>([]);
   const [current, setCurrent] = useState<SectionId>("favorites");
@@ -288,7 +297,7 @@ function Panel({
             className="block h-10 w-full rounded-[12px] border border-white/[0.07] bg-white/[0.03] pl-10 pr-3 text-[15px] outline-none transition-colors placeholder:text-faint focus:border-white/40"
           />
         </label>
-        {playing && (
+        {(playing || listening) && (
           <button
             type="button"
             aria-label={t("voice.soundboard.stop")}
@@ -728,7 +737,8 @@ function SoundDialog({
       emoji,
       volume,
       createdAt: 0,
-      durationMs: fileMs ?? 0,
+      // Unknown length: stream it like a long clip rather than decode a whole file in memory.
+      durationMs: fileMs || LONG_MS + 1,
       url: local.current.url,
     });
   }

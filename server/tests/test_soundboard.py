@@ -305,6 +305,59 @@ def test_stopping_a_sound_reaches_only_the_room_and_is_rate_limited(server, audi
     assert asyncio.run(realtime.sound_stop("sid-admin", {}))["code"] == "tooFast"
 
 
+def stopped_to(emits):
+    """Who was told a sound stopped, as (userId, sorted sids) per event."""
+    return [(e[1]["userId"], sorted(e[2])) for e in emits if e[0] == "sound:stopped"]
+
+
+def test_a_person_leaving_stops_their_sounds_for_the_rest_of_the_room(server, audio):
+    client, people, emits = server
+    admin_id = people["admin"]["user"]["id"]
+    for key in ("admin", "alice", "bob"):
+        in_call(people, key, "room-1")
+    in_call(people, "carol", "room-2")
+
+    # Leaving on purpose.
+    emits.clear()
+    asyncio.run(realtime.voice_leave("sid-admin"))
+    assert stopped_to(emits) == [(admin_id, ["sid-alice", "sid-bob"])]
+
+    # The socket dropping with no goodbye.
+    in_call(people, "admin", "room-1")
+    emits.clear()
+    asyncio.run(realtime.disconnect("sid-admin"))
+    assert stopped_to(emits) == [(admin_id, ["sid-alice", "sid-bob"])]
+
+    # Going to another room: the room they left hears it, the one they joined doesn't.
+    in_call(people, "admin", "room-1")
+    emits.clear()
+    channel = next(c["id"] for c in client.get("/api/bootstrap", headers=bearer(people["admin"])).json()["channels"] if c["kind"] == "voice")
+    asyncio.run(realtime.voice_join("sid-admin", {"channelId": channel}))
+    assert stopped_to(emits) == [(admin_id, ["sid-alice", "sid-bob"])]
+
+    # Joining from another device ends the first one's sounds too.
+    realtime.voice.pop("sid-admin", None)
+    in_call(people, "admin", "room-1")
+    realtime.voice["sid-admin-2"] = {"channelId": "room-1", "userId": admin_id, "kind": "channel"}
+    emits.clear()
+    asyncio.run(realtime.end_other_devices("sid-admin-2"))
+    assert any(uid == admin_id for uid, _ in stopped_to(emits))
+
+
+def test_losing_access_to_a_room_stops_the_sounds_too(server, audio):
+    client, people, emits = server
+    room = client.post("/api/channels", json={"name": "Тихая", "kind": "voice", "private": True}, headers=bearer(people["admin"])).json()
+    room = next(c for c in room if c["name"] == "Тихая")
+    squad = client.post("/api/roles", json={"name": "Свои"}, headers=bearer(people["admin"])).json()[0]
+    client.put(f"/api/channels/{room['id']}/access", json={"private": True, "roleIds": [squad["id"]]}, headers=bearer(people["admin"]))
+    for key in ("alice", "bob"):
+        client.put(f"/api/users/{people[key]['user']['id']}/roles", json={"roleIds": [squad["id"]]}, headers=bearer(people["admin"]))
+        in_call(people, key, room["id"])
+    emits.clear()
+    client.put(f"/api/users/{people['alice']['user']['id']}/roles", json={"roleIds": []}, headers=bearer(people["admin"]))
+    assert (people["alice"]["user"]["id"], ["sid-bob"]) in stopped_to(emits)
+
+
 def test_the_orphan_sweep_covers_sound_files(server, audio):
     client, people, _ = server
     sound = upload(client, people["admin"], audio["mp3"]).json()

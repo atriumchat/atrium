@@ -173,9 +173,14 @@ function endPlay(play: Play) {
   if (i >= 0) playing.splice(i, 1);
 }
 
-/** Silence everything sounding right here; the server still plays it for the rest of the call. */
-function stopAll() {
-  for (const play of [...playing]) play.stop();
+/**
+ * Silence every call sound sounding right here (the server still plays them for the rest of the call) and forget
+ * which ones were mine. A preview is the listener's own and stays: muting the soundboard doesn't end it.
+ */
+export function stopCallSounds() {
+  for (const play of [...playing]) if (play !== preview) play.stop();
+  latestPlay.clear();
+  if (get().myPlaying) set({ myPlaying: null });
 }
 
 /** A short clip from its decoded buffer, through the shared context. */
@@ -255,6 +260,8 @@ function playLong(url: string, base: number, arrived: number, userId: string, on
     stop: () => {
       audio.pause();
       audio.removeAttribute('src');
+      // Dropping the attribute alone leaves the loaded stream alive; load() releases the decoder and the download.
+      audio.load();
       finish();
     },
   };
@@ -295,22 +302,35 @@ export async function loadMySounds(): Promise<void> {
 /** null if the file is a fine clip, otherwise a ready-to-show reason. */
 export async function checkSoundFile(file: File): Promise<string | null> {
   if (file.size > MAX_SOUND_BYTES) return t('voice.sound.tooBig');
-  try {
-    await audioCtx().decodeAudioData(await file.arrayBuffer());
-  } catch {
-    return t('voice.sound.notAudio');
-  }
-  return null;
+  return (await readDuration(file)) === null ? t('voice.sound.notAudio') : null;
 }
 
-/** How long the picked file is in ms, or null when it won't decode: the dialog says when the server will cut it. */
-export async function soundFileDuration(file: File): Promise<number | null> {
-  try {
-    const buffer = await audioCtx().decodeAudioData(await file.arrayBuffer());
-    return Math.round(buffer.duration * 1000);
-  } catch {
-    return null;
-  }
+/**
+ * The length of a file from its header, in ms, or null when the browser can't play it. Decoding it whole instead would
+ * take a minute and a gigabyte for a long mp3, and the server is the one that really checks the file.
+ */
+function readDuration(file: File): Promise<number | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const audio = new Audio();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const done = (ms: number | null) => {
+      if (timer) clearTimeout(timer);
+      audio.removeAttribute('src');
+      URL.revokeObjectURL(url);
+      resolve(ms);
+    };
+    audio.preload = 'metadata';
+    audio.onloadedmetadata = () => done(Number.isFinite(audio.duration) ? Math.round(audio.duration * 1000) : 0);
+    audio.onerror = () => done(null);
+    timer = setTimeout(() => done(null), 8000);
+    audio.src = url;
+  });
+}
+
+/** How long the picked file is in ms (0 when its header doesn't say), or null when it can't be read. */
+export function soundFileDuration(file: File): Promise<number | null> {
+  return readDuration(file);
 }
 
 export async function addSound(file: File, name: string, emoji: string, volume: number): Promise<boolean> {
@@ -354,7 +374,7 @@ export function setSoundboard(patch: Partial<SoundboardSettings>) {
   saveSoundboard(next);
   if (patch.volume !== undefined) refreshLevels();
   // Muting is local and immediate: nothing of the soundboard should keep sounding.
-  if (next.muted) stopAll();
+  if (next.muted) stopCallSounds();
 }
 
 export function toggleFavorite(id: string) {
@@ -367,8 +387,13 @@ export async function playSound(sound: Sound): Promise<boolean> {
   return (await playSoundboard(sound.id)) !== null;
 }
 
-/** Ask the server to stop every clip sounding in the call; everyone silences them on sound:stopped. */
+/**
+ * "Stop": what you're listening to by yourself ends here and now; your sound in the call, if one plays, is stopped for
+ * everyone (the server tells them with sound:stopped). Nothing goes to the server when there's no such sound.
+ */
 export async function stopMySounds(): Promise<boolean> {
+  stopPreview();
+  if (!get().myPlaying) return true;
   return (await stopSoundboard()) !== null;
 }
 
@@ -446,9 +471,14 @@ export function onSoundPlayed(event: SoundPlayedEvent) {
   // including one still loading, which then never starts.
   for (const play of [...playing]) if (play.userId === event.userId) play.stop();
   latestPlay.set(event.userId, event.playId);
-  const current = () => latestPlay.get(event.userId) === event.playId;
+  const current = () => {
+    const now = get();
+    return latestPlay.get(event.userId) === event.playId && !now.deafened && !now.soundboard.muted;
+  };
   const mine = event.userId === get().me?.id;
   const at = Date.now();
+  // Playing for the call replaces listening by yourself: never both at once.
+  if (mine) stopPreview();
   // Your own clip sounds for the call whether or not you hear it yourself, so its state (the fill, the stop button)
   // follows its length, not your speakers.
   if (mine) {
@@ -495,12 +525,15 @@ function trackCall() {
   if (!voiceChannelId || voiceStatus !== 'connected') {
     if (!callId) return;
     callId = null;
+    // Out of the call: whatever of it was still sounding (a minute of someone's music) ends with it.
+    stopCallSounds();
     loadedUsers.clear();
     if (preloadTimer) clearTimeout(preloadTimer);
     preloadTimer = null;
     return;
   }
   if (voiceChannelId !== callId) {
+    if (callId) stopCallSounds();
     callId = voiceChannelId;
     loadedUsers.clear();
     void loadMySounds();
@@ -542,6 +575,6 @@ export function initSoundboard() {
   useStore.subscribe(trackCall);
   // Deafening silences the soundboard at once, the way muting it does in setSoundboard.
   useStore.subscribe((s, prev) => {
-    if (!prev.deafened && s.deafened) stopAll();
+    if (!prev.deafened && s.deafened) stopCallSounds();
   });
 }

@@ -172,6 +172,13 @@ def restart_ring_timer(dm_id: str) -> None:
     call["timer"] = asyncio.create_task(stop_ringing())
 
 
+async def sound_ended(entry: dict) -> None:
+    """Someone left a room or a call: their soundboard sounds (a few minutes of music, maybe) stop for those still in it."""
+    to = [s for s, e in voice.items() if e["channelId"] == entry["channelId"]]
+    if to:
+        await sio.emit("sound:stopped", {"userId": entry["userId"], "channelId": entry["channelId"]}, to=to)
+
+
 async def voice_changed(entry: dict) -> None:
     if entry["kind"] == "dm":
         await sync_call(entry["channelId"])
@@ -204,6 +211,7 @@ async def disconnect(sid, reason=None):
     entry = voice.pop(sid, None)
     await sio.emit("presence", presence_payload())
     if entry:
+        await sound_ended(entry)
         await voice_changed(entry)
 
 
@@ -447,6 +455,7 @@ async def voice_join(sid, data):
         "kind": kind,
     }
     if previous and previous["channelId"] != target:
+        await sound_ended(previous)
         await voice_changed(previous)
     await end_other_devices(sid)
     await voice_changed(voice[sid])
@@ -459,6 +468,7 @@ async def end_other_devices(sid: str) -> None:
     for other in [s for s, e in voice.items() if e["userId"] == entry["userId"] and s != sid]:
         old = voice.pop(other)
         await sio.emit("voice:moved", to=other)
+        await sound_ended(old)
         if old["channelId"] != entry["channelId"]:
             # In the same room LiveKit drops the old connection itself (one per identity); elsewhere it's up to us.
             await run_in_threadpool(livekit_remove, livekit_room(old["kind"], old["channelId"]), entry["userId"])
@@ -469,6 +479,7 @@ async def end_other_devices(sid: str) -> None:
 async def voice_leave(sid, data=None):
     entry = voice.pop(sid, None)
     if entry:
+        await sound_ended(entry)
         await voice_changed(entry)
 
 

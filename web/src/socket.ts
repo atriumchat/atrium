@@ -25,7 +25,7 @@ import {
 } from './store';
 import { playSound } from './voice/sounds';
 import { leaveVoice } from './voice/voice';
-import { initSoundboard, onSoundPlayed, onSoundStopped, type SoundPlayedEvent, type SoundStoppedEvent } from './voice/soundboard';
+import { initSoundboard, onSoundPlayed, onSoundStopped, stopCallSounds, type SoundPlayedEvent, type SoundStoppedEvent } from './voice/soundboard';
 import { checkSiteUpdate } from './updates';
 import { plainText } from './ui/Markdown';
 import { invalidateHistory, refreshNewest } from './chat/history';
@@ -198,7 +198,11 @@ export function connectSocket(token: string, onUnauthorized: () => void) {
   });
 
   // Calls may end while we're offline; the server resends the live ones on reconnect.
-  socket.on('disconnect', () => useStore.setState({ calls: {} }));
+  // A stop sent while the socket was down never arrives: whatever of the call was sounding is cut off.
+  socket.on('disconnect', () => {
+    useStore.setState({ calls: {} });
+    stopCallSounds();
+  });
 
   socket.on('connect_error', (err) => {
     if (err.message === 'unauthorized' && Date.now() > ignoreAuthErrorsUntil) onUnauthorized();

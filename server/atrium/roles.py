@@ -176,6 +176,7 @@ async def access_changed() -> None:
     for sid, entry in lost:
         realtime.voice.pop(sid, None)
         await sio.emit("voice:ended", {"channelId": entry["channelId"]}, to=sid)
+        await realtime.sound_ended(entry)
     await send_voice_state()
     for user_id in online_users():
         await sio.emit("me:access", access_payload(user_id), to=user_room(user_id))
