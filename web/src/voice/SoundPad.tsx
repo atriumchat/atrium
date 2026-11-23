@@ -669,9 +669,18 @@ function SoundDialog({
   const input = useRef<HTMLInputElement>(null);
   const checkId = useRef(0);
   const local = useRef<{ file: File; url: string } | null>(null);
+  // Whether this window started a preview: closing it (cancel, the cross, Esc, a finished upload) ends that preview.
+  const listened = useRef(false);
+
+  function endListening() {
+    if (!listened.current) return;
+    listened.current = false;
+    stopPreview();
+  }
 
   useEffect(
     () => () => {
+      if (listened.current) stopPreview();
       if (local.current) URL.revokeObjectURL(local.current.url);
     },
     [],
@@ -685,6 +694,7 @@ function SoundDialog({
     const picked = e.target.files?.[0];
     e.target.value = "";
     if (!picked) return;
+    endListening();
     const id = ++checkId.current;
     setFile(picked);
     setFileError(null);
@@ -701,6 +711,7 @@ function SoundDialog({
   }
 
   function listen() {
+    listened.current = true;
     if (sound) {
       previewSound({ ...sound, volume });
       return;
@@ -724,6 +735,7 @@ function SoundDialog({
 
   async function submit() {
     if (!ready) return;
+    endListening();
     setBusy(true);
     const ok = sound
       ? await editSound(sound.id, { name: label, emoji, volume })
