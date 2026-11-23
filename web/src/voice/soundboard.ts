@@ -213,7 +213,7 @@ function playBuffer(buffer: AudioBuffer, volume: number, userId: string, onEnded
 }
 
 /** A long clip, streamed: seek to where the call is by now so everyone stays roughly together, cut off at a minute. */
-function playLong(url: string, volume: number, arrived: number, userId: string, onEnded?: () => void): Play {
+function playLong(url: string, volume: number, arrived: number, userId: string, onEnded?: () => void, current: () => boolean = () => true): Play {
   const audio = new Audio();
   audio.preload = 'auto';
   audio.volume = Math.max(0, Math.min(1, volume));
@@ -244,6 +244,11 @@ function playLong(url: string, volume: number, arrived: number, userId: string, 
   audio.oncanplay = () => {
     audio.oncanplay = null;
     if (done) return;
+    // Replaced by a newer sound of theirs, or stopped, while it was still loading.
+    if (!current()) {
+      finish();
+      return;
+    }
     const elapsed = (Date.now() - arrived) / 1000;
     // Already past the end (a slow network, a replayed event, past the minute): don't start it at all.
     if (elapsed >= MAX_LONG_SECONDS || elapsed >= audio.duration) {
@@ -383,9 +388,17 @@ function clearMyPlay(playId: string) {
   if (get().myPlaying?.playId === playId) set({ myPlaying: null });
 }
 
+/** Each person's latest play: anything of theirs still loading that isn't it doesn't start. */
+const latestPlay = new Map<string, string>();
+
 /** Someone played a clip (the sender included): show it on their tile and, unless muted or deafened, hear it. */
 export function onSoundPlayed(event: SoundPlayedEvent) {
   set((s) => ({ soundPlays: { ...s.soundPlays, [event.userId]: Date.now() } }));
+  // One sound per person at a time: a new one cuts off whatever they played before (other people's keep going),
+  // including one still loading, which then never starts.
+  for (const play of [...playing]) if (play.userId === event.userId) play.stop();
+  latestPlay.set(event.userId, event.playId);
+  const current = () => latestPlay.get(event.userId) === event.playId;
   const mine = event.userId === get().me?.id;
   const at = Date.now();
   // Your own clip sounds for the call whether or not you hear it yourself, so its state (the fill, the stop button)
@@ -398,7 +411,7 @@ export function onSoundPlayed(event: SoundPlayedEvent) {
   if (deafened || soundboard.muted) return;
   const volume = soundboard.volume * event.volume;
   if (isLong(event.durationMs)) {
-    playLong(event.url, volume, at, event.userId);
+    playLong(event.url, volume, at, event.userId, undefined, current);
     return;
   }
   const cached = cachedBuffer(event.url);
@@ -407,7 +420,7 @@ export function onSoundPlayed(event: SoundPlayedEvent) {
     return;
   }
   void loadBuffer(event.url).then((buffer) => {
-    if (!buffer || Date.now() - at > PLAY_DEADLINE) return;
+    if (!buffer || Date.now() - at > PLAY_DEADLINE || !current()) return;
     const now = get();
     if (now.deafened || now.soundboard.muted) return;
     playBuffer(buffer, now.soundboard.volume * event.volume, event.userId);
@@ -416,6 +429,7 @@ export function onSoundPlayed(event: SoundPlayedEvent) {
 
 /** The server stopped a user's clips (they asked, or they left): silence their plays here and drop your own state. */
 export function onSoundStopped(event: SoundStoppedEvent) {
+  latestPlay.delete(event.userId);
   for (const play of [...playing]) if (play.userId === event.userId) play.stop();
   if (get().me?.id === event.userId) set({ myPlaying: null });
 }
