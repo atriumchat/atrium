@@ -393,6 +393,18 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS messages_time ON messages(created_at);
             CREATE INDEX IF NOT EXISTS messages_user ON messages(user_id);
             CREATE INDEX IF NOT EXISTS dm_messages_user ON dm_messages(user_id);
+            -- A person's own soundboard: short sounds they may play in a voice call. The file is SOUND_DIR/<file>.
+            CREATE TABLE IF NOT EXISTS sounds (
+              id TEXT PRIMARY KEY,
+              user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              name TEXT NOT NULL,
+              emoji TEXT NOT NULL DEFAULT '',
+              volume REAL NOT NULL DEFAULT 1,
+              file TEXT NOT NULL,
+              size INTEGER NOT NULL,
+              created_at INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS sounds_user ON sounds(user_id);
             """
         )
         migrate_roles(conn)

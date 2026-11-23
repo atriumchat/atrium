@@ -347,6 +347,15 @@ RINGS_BY_USER = RateLimit(5, 60)
 READS_BY_USER = RateLimit(30, 10)
 # A report a minute plus one on leaving; a few extra for rejoins.
 CALL_QUALITY_BY_USER = RateLimit(10, 60)
+# A soundboard sound is short but goes to the whole room, so a few a second and then a pause.
+SOUND_PLAYS_BY_USER = RateLimit(4, 8)
+
+
+def is_emoji(text: str) -> bool:
+    """One emoji (with skin tone / ZWJ joins), never arbitrary text."""
+    if re.fullmatch(r"[0-9#*]\ufe0f?\u20e3", text):
+        return True
+    return bool(text) and len(text) <= MAX_EMOJI_LEN and bool(re.search(r"[\u2190-\u2bff\U0001f000-\U0001faff]", text)) and not re.search(r"[\w\s]", text)
 
 
 @sio.on("reaction:toggle")
@@ -357,9 +366,7 @@ async def reaction_toggle(sid, data):
     found = find_message(str(event_data(data).get("messageId", "")))
     if not found or not can_read_message(user["id"], *found):
         return socket_error("noMessage", "Нет такого сообщения")
-    # One emoji (with skin tone / ZWJ joins), never arbitrary text.
-    keycap = re.fullmatch(r"[0-9#*]\ufe0f?\u20e3", emoji)
-    if not keycap and (not emoji or len(emoji) > MAX_EMOJI_LEN or not re.search(r"[\u2190-\u2bff\U0001f000-\U0001faff]", emoji) or re.search(r"[\w\s]", emoji)):
+    if not is_emoji(emoji):
         return socket_error("notEmoji", "Это не эмодзи")
     if REACTIONS_BY_USER.wait(user["id"]):
         return socket_error("slowDown", "Не так быстро")
@@ -513,6 +520,33 @@ async def call_ring(sid, data):
     calls[dm_id]["ringing"] = set(dm_member_ids(dm_id)) - present
     restart_ring_timer(dm_id)
     await sio.emit("call:state", call_payload(dm_id), to=dm_rooms(dm_id))
+
+
+@sio.on("sound:play")
+async def sound_play(sid, data):
+    """Play your own sound for the room you're in: everyone there gets told and plays the file themselves."""
+    user = (await sio.get_session(sid))["user"]
+    entry = voice.get(sid)
+    if not entry:
+        return socket_error("noCall", "Нет такого звонка")
+    rows = query("SELECT * FROM sounds WHERE id = ? AND user_id = ?", (str(event_data(data).get("soundId", "")), user["id"]))
+    if not rows:
+        return socket_error("noSound", "Нет такого звука")
+    if SOUND_PLAYS_BY_USER.wait(user["id"]):
+        return socket_error("tooFast", "Слишком часто, пауза пару секунд")
+    sound = rows[0]
+    payload = {
+        "soundId": sound["id"],
+        "userId": user["id"],
+        "channelId": entry["channelId"],
+        "url": f"/api/sounds/{sound['id']}/file",
+        "volume": sound["volume"],
+        "name": sound["name"],
+        "emoji": sound["emoji"],
+    }
+    # The sender's sid included: they play it too, and everyone sees who played what.
+    await sio.emit("sound:played", payload, to=[s for s, e in voice.items() if e["channelId"] == entry["channelId"]])
+    return {"ok": True}
 
 
 class VoiceTokenIn(BaseModel):

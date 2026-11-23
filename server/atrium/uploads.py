@@ -25,6 +25,7 @@ from .config import (
     MAX_IMAGE_UPLOAD,
     MIN_FREE_DISK,
     PREVIEW_SIDE,
+    SOUND_DIR,
     UNSENT_UPLOAD_TTL_MS,
     UPLOAD_BYTES_PER_DAY,
     UPLOAD_DIR,
@@ -292,9 +293,10 @@ def sweep_orphan_media() -> None:
     uploads |= {preview_name(name) for name in uploads if name.endswith(".webp")}
     avatars = {r["avatar"] for r in query("SELECT avatar FROM users WHERE avatar IS NOT NULL")}
     avatars |= {r["value"] for r in query("SELECT value FROM settings WHERE key = 'server_icon'")}
+    sounds = {r["file"] for r in query("SELECT file FROM sounds")}
     cutoff = now_ms() / 1000 - 3600
     paths = []
-    for directory, keep in ((UPLOAD_DIR, uploads), (AVATAR_DIR, avatars)):
+    for directory, keep in ((UPLOAD_DIR, uploads), (AVATAR_DIR, avatars), (SOUND_DIR, sounds)):
         for path in directory.iterdir():
             try:
                 if path.is_file() and path.name not in keep and path.stat().st_mtime < cutoff:

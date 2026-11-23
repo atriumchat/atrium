@@ -57,6 +57,10 @@ MAX_ATTACHMENTS = 10
 # Any file that isn't a picture: kept as is (the disk is small, so the limit is too) and always downloaded, never shown.
 MAX_FILE_UPLOAD = 25 * 1024 * 1024
 MAX_FILE_NAME = 120
+# A soundboard sound: a short clip, so the cap is small and there can't be many of them.
+MAX_SOUND_BYTES = 512 * 1024
+MAX_SOUNDS_PER_USER = 20
+MAX_SOUND_NAME = 32
 # Mentions are stored by id so a renamed person is still mentioned: <@32-hex-id>, or <@all> for everyone.
 MENTION = re.compile(r"<@([0-9a-f]{32}|all)>")
 MAX_EMOJI_LEN = 32
@@ -84,6 +88,8 @@ AVATAR_DIR = DATA_DIR / "avatars"
 AVATAR_DIR.mkdir(exist_ok=True)
 UPLOAD_DIR = DATA_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
+SOUND_DIR = DATA_DIR / "sounds"
+SOUND_DIR.mkdir(exist_ok=True)
 
 # Times from clients are milliseconds; anything past 2^53 isn't one, and SQLite can't hold numbers past 2^63 anyway.
 MAX_TIME = 2**53
