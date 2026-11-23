@@ -523,7 +523,8 @@ function SoundTile({
         />
       )}
       <Tooltip delay={400} closeDelay={0}>
-        <Tooltip.Trigger>
+        {/* The trigger is a wrapper of its own: without the pill's size the button inside collapses to its text. */}
+        <Tooltip.Trigger className="block h-full w-full">
           <button
             type="button"
             onClick={toggle}
