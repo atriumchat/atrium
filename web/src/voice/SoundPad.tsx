@@ -493,7 +493,9 @@ function SoundTile({
 }) {
   const { t } = useT();
   const [menu, setMenu] = useState(false);
-  const shown = menu ? "opacity-100" : REVEAL;
+  // The full name as a tooltip only when the pill cuts it short.
+  const nameRef = useRef<HTMLSpanElement>(null);
+  const [truncated, setTruncated] = useState(false);
   const star = favorite
     ? t("voice.soundboard.unfavorite")
     : t("voice.soundboard.favorite");
@@ -522,17 +524,21 @@ function SoundTile({
           }}
         />
       )}
-      <Tooltip delay={400} closeDelay={0}>
+      <Tooltip delay={400} closeDelay={0} isDisabled={!truncated}>
         {/* The trigger is a wrapper of its own: without the pill's size the button inside collapses to its text. */}
         <Tooltip.Trigger className="block h-full w-full">
           <button
             type="button"
             onClick={toggle}
-            className={`relative flex h-full w-full items-center rounded-[12px] pl-[38px] pr-3 text-left text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus pointer-coarse:pr-8 ${menu ? "pr-[52px]" : "pointer-fine:group-hover:pr-[52px] group-has-[:focus-visible]:pr-[52px]"}`}
+            onPointerEnter={() => setTruncated(!!nameRef.current && nameRef.current.scrollWidth > nameRef.current.clientWidth)}
+            className={`relative flex h-full w-full items-center rounded-[12px] pl-[38px] pr-3 text-left text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus pointer-coarse:pr-8 ${menu ? "pr-8" : "pointer-fine:group-hover:pr-8 group-has-[:focus-visible]:pr-8"}`}
           >
-            <span className="min-w-0 truncate">{sound.name}</span>
+            <span ref={nameRef} className="min-w-0 truncate">
+              {sound.name}
+            </span>
             {long && (
-              <span className="ml-auto shrink-0 pl-2 text-[11px] text-muted">
+              // On hover the star takes the end of the pill: the length steps aside for the name.
+              <span className={`ml-auto shrink-0 pl-2 text-[11px] text-muted ${menu ? "hidden" : "pointer-fine:group-hover:hidden group-has-[:focus-visible]:hidden"}`}>
                 {clock(sound.durationMs)}
               </span>
             )}
@@ -573,14 +579,15 @@ function SoundTile({
         aria-pressed={favorite}
         title={star}
         onClick={() => toggleFavorite(sound.id)}
-        className={`${TILE_ACTION} absolute right-[30px] top-2 pointer-coarse:hidden ${favorite ? "text-foreground" : ""} ${shown}`}
+        className={`${TILE_ACTION} absolute right-1 top-2 pointer-coarse:hidden ${favorite ? "text-foreground" : ""} ${menu ? "opacity-0" : REVEAL}`}
       >
         {favorite ? <StarFilledIcon size={14} /> : <StarIcon size={14} />}
       </button>
       <Dropdown isOpen={menu} onOpenChange={setMenu}>
         <Dropdown.Trigger
           aria-label={t("voice.soundboard.actions", { name: sound.name })}
-          className={`${TILE_ACTION} absolute right-1 top-2 ${shown} pointer-coarse:opacity-100`}
+          // With a mouse it's reached by right-click (as in Discord), so it only shows while open; a finger gets it always.
+          className={`${TILE_ACTION} absolute right-1 top-2 pointer-coarse:opacity-100 ${menu ? "opacity-100" : "opacity-0 focus-visible:opacity-100 pointer-fine:pointer-events-none"}`}
         >
           <DotsIcon size={16} />
         </Dropdown.Trigger>
