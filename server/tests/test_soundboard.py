@@ -55,7 +55,7 @@ def audio():
     return {
         "mp3": make_audio("sine=frequency=440:duration=1", "mp3"),
         "wav": make_audio("sine=frequency=330:duration=1", "wav"),
-        "long": make_audio("sine=frequency=220:duration=70", "mp3", "-ac", "2"),
+        "long": make_audio("sine=frequency=220:duration=250", "mp3", "-ac", "2"),
     }
 
 
@@ -142,7 +142,7 @@ def test_upload_shows_in_the_list_and_bad_files_are_refused(server, audio):
     garbage = client.post("/api/sounds", params={"name": "x"}, content=b"ID3" + b"\0" * 100, headers=bearer(admin))
     assert garbage.status_code == 415 and garbage.json()["code"] == "badSound"
 
-    big = upload(client, admin, b"ID3" + b"\0" * (20 * 1024 * 1024), name="big")
+    big = upload(client, admin, b"ID3" + b"\0" * (50 * 1024 * 1024), name="big")
     assert big.status_code == 413 and big.json()["code"] == "soundTooBig"
 
     assert client.post("/api/sounds", content=audio["mp3"], headers=bearer(admin)).json()["code"] == "emptyName"
@@ -173,11 +173,11 @@ def test_a_wav_is_stored_as_opus_ogg(server, audio):
     assert r.content[:4] == b"OggS" and r.headers["content-type"] == "audio/ogg"
 
 
-def test_a_source_longer_than_a_minute_is_trimmed(server, audio):
+def test_a_source_longer_than_four_minutes_is_trimmed(server, audio):
     client, people, _ = server
     sound = upload(client, people["admin"], audio["long"], name="Song").json()
     assert sound["trimmed"] is True
-    assert 59_000 <= sound["durationMs"] <= 61_000
+    assert 239_000 <= sound["durationMs"] <= 241_000
     stored = sounds.SOUND_DIR / f"{sound['id']}.ogg"
     assert probe_channels(stored) == 2, "a stereo source is kept stereo at 128 kbit/s"
 

@@ -47,6 +47,7 @@ import {
   setSoundboard,
   soundFileDuration,
   stopMySounds,
+  stopPreview,
   toggleFavorite,
 } from "./soundboard";
 
@@ -56,7 +57,7 @@ const MAX_NAME = 32;
 const PLAYED_FOR = 2500;
 /** Clips longer than this show their length on the pill. */
 const LONG_MS = 10_000;
-const MAX_MS = 60_000;
+const MAX_MS = 240_000;
 
 function clock(ms: number) {
   const s = Math.round(ms / 1000);
@@ -493,6 +494,7 @@ function SoundTile({
 }) {
   const { t } = useT();
   const [menu, setMenu] = useState(false);
+  const previewing = useStore((s) => s.previewing === sound.id);
   // The full name as a tooltip only when the pill cuts it short.
   const nameRef = useRef<HTMLSpanElement>(null);
   const [truncated, setTruncated] = useState(false);
@@ -549,12 +551,13 @@ function SoundTile({
       <button
         type="button"
         aria-label={
-          playing ? t("voice.soundboard.stop") : t("voice.soundboard.preview")
+          playing || previewing ? t("voice.soundboard.stop") : t("voice.soundboard.preview")
         }
-        onClick={() => (playing ? void stopMySounds() : previewSound(sound))}
-        className="absolute left-1 top-1 flex size-8 items-center justify-center rounded-full outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-focus pointer-coarse:pointer-events-none"
+        onClick={() => (playing ? void stopMySounds() : previewing ? stopPreview() : previewSound(sound))}
+        // On a touch screen the whole pill plays; only a preview's stop takes the tap here (it began from the menu).
+        className={`absolute left-1 top-1 flex size-8 items-center justify-center rounded-full outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-focus ${previewing ? "" : "pointer-coarse:pointer-events-none"}`}
       >
-        {playing ? (
+        {playing || previewing ? (
           <StopIcon size={14} />
         ) : (
           <>

@@ -93,8 +93,14 @@ http://app.{$DOMAIN} {
 		-Server
 	}
 
-	# Biggest legit request is a 20 MB photo upload.
-	request_body {
+	# Biggest legit request is a 20 MB photo upload, or a soundboard sound: up to 50 MB in (a 4-minute WAV), stored
+	# much smaller once the server has compressed it.
+	@sound_upload path /api/sounds
+	request_body @sound_upload {
+		max_size 55MB
+	}
+	@other_upload not path /api/sounds
+	request_body @other_upload {
 		max_size 25MB
 	}
 }

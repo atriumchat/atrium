@@ -66,6 +66,8 @@ export type VoiceSlice = {
   soundPlays: Record<string, number>;
   /** Your own sound playing right now, for its playback fill in the UI; null when nothing of yours is sounding. */
   myPlaying: { soundId: string; playId: string; at: number; duration: number } | null;
+  /** The sound you're listening to by yourself (the picker's preview), until it ends or you stop it. */
+  previewing: string | null;
 };
 
 export function voiceSlice(): VoiceSlice {
@@ -90,6 +92,7 @@ export function voiceSlice(): VoiceSlice {
     soundboard: loadSoundboard(),
     soundPlays: {},
     myPlaying: null,
+    previewing: null,
   };
 }
 

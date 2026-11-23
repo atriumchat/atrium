@@ -60,8 +60,8 @@ MAX_FILE_UPLOAD = 25 * 1024 * 1024
 MAX_FILE_NAME = 120
 # A soundboard sound: what a person picks (any of mp3/ogg/wav/flac/m4a/webm) and the length it is cut to. The server
 # transcodes every upload to Opus in Ogg itself, so the cap is on the picked file, not on what is kept; there can't be many.
-MAX_SOUND_UPLOAD = 20 * 1024 * 1024
-MAX_SOUND_MS = 60_000
+MAX_SOUND_UPLOAD = 50 * 1024 * 1024
+MAX_SOUND_MS = 240_000
 # The soundboard runs these as subprocesses (never in-process); set the paths to pin a particular build.
 FFMPEG = os.environ.get("FFMPEG", shutil.which("ffmpeg") or "ffmpeg")
 FFPROBE = os.environ.get("FFPROBE", shutil.which("ffprobe") or "ffprobe")

@@ -15,12 +15,12 @@ import { getPreferredDevice } from './devices';
 const get = useStore.getState;
 const set = useStore.setState;
 
-/** The picked file: bigger than this the server won't take it (it keeps a minute of it, up to 5 MB). */
-const MAX_SOUND_BYTES = 20 * 1024 * 1024;
+/** The picked file: bigger than this the server won't take it (it keeps the first 4 minutes, compressed). */
+const MAX_SOUND_BYTES = 50 * 1024 * 1024;
 /** Clips longer than this stream; short ones and old ones with no length (0) are decoded and preloaded. */
 const LONG_LIMIT_MS = 10_000;
-/** Whatever a file says, a streamed clip is cut off here (the server already trims it to a minute). */
-const MAX_LONG_SECONDS = 60;
+/** Whatever a file says, a streamed clip is cut off here (the server already trims it to 4 minutes). */
+const MAX_LONG_SECONDS = 240;
 /** A late clip is worse than none: one fetched more than this after the event is dropped, not played. */
 const PLAY_DEADLINE = 3000;
 /** How long your own clip counts as playing when its length is unknown (sounds from before lengths were kept). */
@@ -92,7 +92,7 @@ async function applySink(context: AudioContext) {
 }
 
 // Decoded clips by url, least recently dropped first (the same url plays from cache forever). Long clips never land
-// here: they stream, so a minute of music costs no memory.
+// here: they stream, so minutes of music cost no memory.
 const buffers = new Map<string, AudioBuffer>();
 
 function cachedBuffer(url: string): AudioBuffer | undefined {
@@ -212,7 +212,7 @@ function playBuffer(buffer: AudioBuffer, volume: number, userId: string, onEnded
   return play;
 }
 
-/** A long clip, streamed: seek to where the call is by now so everyone stays roughly together, cut off at a minute. */
+/** A long clip, streamed: seek to where the call is by now so everyone stays roughly together, cut off at 4 minutes. */
 function playLong(url: string, volume: number, arrived: number, userId: string, onEnded?: () => void, current: () => boolean = () => true): Play {
   const audio = new Audio();
   audio.preload = 'auto';
@@ -250,7 +250,7 @@ function playLong(url: string, volume: number, arrived: number, userId: string, 
       return;
     }
     const elapsed = (Date.now() - arrived) / 1000;
-    // Already past the end (a slow network, a replayed event, past the minute): don't start it at all.
+    // Already past the end (a slow network, a replayed event, past the 4 minutes): don't start it at all.
     if (elapsed >= MAX_LONG_SECONDS || elapsed >= audio.duration) {
       finish();
       return;
@@ -356,24 +356,46 @@ export async function stopMySounds(): Promise<boolean> {
 let preview: Play | null = null;
 
 function startPreview(play: Play) {
-  if (preview && preview !== play) preview.stop();
+  // The new one first: the old one's end then sees it's no longer current and leaves the stop state alone.
+  const old = preview;
   preview = play;
+  if (old && old !== play) old.stop();
+}
+
+/** Stop listening to a preview. */
+export function stopPreview() {
+  preview?.stop();
+  preview = null;
+  set({ previewing: null });
 }
 
 /** Play a clip on this device only, ignoring mute: the sound picker's preview. Long clips stream like in a call. */
 export function previewSound(sound: Sound) {
   const volume = get().soundboard.volume * sound.volume;
+  let play: Play | null = null;
+  // The tile shows a stop while this preview sounds; a newer preview or the end clears it.
+  const ended = () => {
+    if (preview !== play) return;
+    preview = null;
+    set({ previewing: null });
+  };
+  const start = (next: Play) => {
+    play = next;
+    startPreview(next);
+  };
+  set({ previewing: sound.id });
   if (isLong(sound.durationMs)) {
-    startPreview(playLong(sound.url, volume, Date.now(), ''));
+    start(playLong(sound.url, volume, Date.now(), '', ended));
     return;
   }
   const cached = cachedBuffer(sound.url);
   if (cached) {
-    startPreview(playBuffer(cached, volume, ''));
+    start(playBuffer(cached, volume, '', ended));
     return;
   }
   void loadBuffer(sound.url).then((buffer) => {
-    if (buffer) startPreview(playBuffer(buffer, volume, ''));
+    if (buffer && get().previewing === sound.id) start(playBuffer(buffer, volume, '', ended));
+    else if (!buffer && get().previewing === sound.id) set({ previewing: null });
   });
 }
 

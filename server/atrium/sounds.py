@@ -51,7 +51,7 @@ SOUND_DEMUXERS = {"mp3": "mp3", "ogg": "ogg", "wav": "wav", "flac": "flac", "m4a
 # A sound's file never changes (edits touch only the row), so a browser may keep it for good.
 SOUND_HEADERS = {"Cache-Control": "private, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff"}
 
-# Every upload is transcoded to Opus in Ogg; the source is cut to the first minute.
+# Every upload is transcoded to Opus in Ogg; the source is cut to the first 4 minutes.
 TRANSCODE_SECONDS = MAX_SOUND_MS // 1000
 TRANSCODE_TIMEOUT = 30
 TRANSCODE_MEMORY = 768 * 1024 * 1024
@@ -214,14 +214,14 @@ def get_sounds(user: dict = Depends(current_user)):
 
 @router.post("/api/sounds")
 async def add_sound(request: Request, name: str = "", emoji: str = "", volume: float = 1, user: dict = Depends(current_user)):
-    """Raw bytes in the body (like /api/uploads): mp3, ogg, wav, m4a, flac or webm; kept as Opus in Ogg, first minute only."""
+    """Raw bytes in the body (like /api/uploads): mp3, ogg, wav, m4a, flac or webm; kept as Opus in Ogg, first 4 minutes only."""
     if int(request.headers.get("content-length") or 0) > MAX_SOUND_UPLOAD:
-        raise ApiError(413, "soundTooBig", "Файл больше 20 МБ")
+        raise ApiError(413, "soundTooBig", "Файл больше 50 МБ")
     data = await request.body()
     if not data:
         raise ApiError(400, "emptyFile", "Пустой файл")
     if len(data) > MAX_SOUND_UPLOAD:
-        raise ApiError(413, "soundTooBig", "Файл больше 20 МБ")
+        raise ApiError(413, "soundTooBig", "Файл больше 50 МБ")
     kind = sound_kind(data)
     if not kind:
         raise ApiError(415, "badSound", "Нужен звук: mp3, ogg, wav, m4a, flac или webm")
