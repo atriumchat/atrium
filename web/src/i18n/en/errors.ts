@@ -94,4 +94,5 @@ export const errors = {
   'err.soundTooBig': 'Sound is over 512 KB',
   'err.tooManySounds': 'Up to {n} sounds',
   'err.noSound': 'Sound not found',
+  'err.soundsUnavailable': 'Sounds don\'t work on this server',
 } satisfies Record<keyof typeof source, Entry>;

@@ -181,6 +181,30 @@ a,
 }
 
 /*
+ * My own clip playing, on its tile in the soundboard (voice/SoundPad.tsx): a fill sweeping left to right over the
+ * clip's length, or, while the length is not known yet, one short pulse. Neither loops.
+ */
+@keyframes sound-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes sound-pulse {
+  0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/*
  * Someone being rung: a green ripple around their avatar. In a bubble (voice/Bubbles.tsx) the avatar is
  * scaled by --bubble-s, so the ripple's reach is divided by it to come out at 18px on screen.
  */

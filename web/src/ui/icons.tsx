@@ -291,12 +291,12 @@ export const UserIcon = icon(
 
 export const SpeakerSlashIcon = slashed(speaker);
 
-/** The soundboard: a note. */
+/** The soundboard: a megaphone with three short sound lines (a note would read as music). */
 export const SoundboardIcon = icon(
   <>
-    <path d="M9 18V5.5l11-2V16" />
-    <circle cx="6" cy="18" r="3" />
-    <circle cx="17" cy="16" r="3" />
+    <path d="M3 10a1 1 0 0 1 1-1h3l8-4v14l-8-4H4a1 1 0 0 1-1-1z" fill="currentColor" strokeWidth={1.5} />
+    <path d="M7 15.2v3.3a1.5 1.5 0 0 0 3 0v-1.9" />
+    <path d="M18.5 8.2l2-1M19 12h2.5M18.5 15.8l2 1" />
   </>,
 );
 
@@ -305,3 +305,4 @@ export const StarIcon = icon(<path d={STAR} />);
 export const StarFilledIcon = icon(<path d={STAR} fill="currentColor" />);
 
 export const PlayIcon = icon(<path d="M8 5.5v13l10.5-6.5z" fill="currentColor" />);
+export const StopIcon = icon(<rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" />);

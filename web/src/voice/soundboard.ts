@@ -1,23 +1,30 @@
 import { api } from '../api';
 import { t } from '../i18n';
-import { playSoundboard } from '../socket';
+import { playSoundboard, stopSoundboard } from '../socket';
 import { saveSoundboard, showError, useStore, voiceMembers, type SoundboardSettings } from '../store';
 import type { Sound, SoundPatch } from '../types';
 import { getPreferredDevice } from './devices';
 
 /*
- * The soundboard: your clips (api.sounds) and everyone's in the call (api.roomSounds), decoded into AudioBuffers
- * and played through one shared AudioContext. The sender doesn't play locally: it hears its own clip through the
- * server's sound:played broadcast, like everyone else, so playSound only asks the server.
+ * The soundboard: your clips (api.sounds) and everyone's in the call (api.roomSounds). Short clips are decoded into
+ * AudioBuffers and played through one shared AudioContext; long ones stream through an <audio> element and are never
+ * decoded or preloaded. The sender doesn't play locally: it hears its own clip through the server's sound:played
+ * broadcast, like everyone else, so playSound only asks the server.
  */
 
 const get = useStore.getState;
 const set = useStore.setState;
 
-const MAX_SOUND_BYTES = 512 * 1024;
-const MAX_SOUND_SECONDS = 5.2;
+/** The picked file: bigger than this the server won't take it (it keeps a minute of it, up to 5 MB). */
+const MAX_SOUND_BYTES = 20 * 1024 * 1024;
+/** Clips longer than this stream; short ones and old ones with no length (0) are decoded and preloaded. */
+const LONG_LIMIT_MS = 10_000;
+/** Whatever a file says, a streamed clip is cut off here (the server already trims it to a minute). */
+const MAX_LONG_SECONDS = 60;
 /** A late clip is worse than none: one fetched more than this after the event is dropped, not played. */
 const PLAY_DEADLINE = 3000;
+/** How long your own clip counts as playing when its length is unknown (sounds from before lengths were kept). */
+const MY_PLAY_FALLBACK = 1500;
 const PRELOAD_DEBOUNCE = 400;
 const PRELOAD_CONCURRENCY = 4;
 const MAX_PLAYING = 3;
@@ -32,7 +39,12 @@ export type SoundPlayedEvent = {
   volume: number;
   name: string;
   emoji: string;
+  durationMs: number;
+  playId: string;
 };
+
+/** The server stopped a user's clips in a call (they asked, or they left): silence them here too. */
+export type SoundStoppedEvent = { userId: string; channelId: string };
 
 // One context for every clip, opened on first use; browsers only allow audio after a gesture, so it's resumed on
 // the first pointerdown/keydown (like voice/sounds.ts) and before each play.
@@ -79,7 +91,8 @@ async function applySink(context: AudioContext) {
   }
 }
 
-// Decoded clips by url, least recently used dropped first (the same url plays from cache forever).
+// Decoded clips by url, least recently dropped first (the same url plays from cache forever). Long clips never land
+// here: they stream, so a minute of music costs no memory.
 const buffers = new Map<string, AudioBuffer>();
 
 function cachedBuffer(url: string): AudioBuffer | undefined {
@@ -127,31 +140,123 @@ async function decodeUrl(url: string): Promise<AudioBuffer | null> {
   }
 }
 
-// What's sounding right now, oldest first: a fourth at once stops the first.
-const playing: AudioBufferSourceNode[] = [];
+/** Long clips (over 10 s) stream; short ones and old ones with no length are decoded. */
+function isLong(durationMs: number): boolean {
+  return durationMs > LONG_LIMIT_MS;
+}
 
-async function playBuffer(buffer: AudioBuffer, volume: number) {
+/** One clip sounding right now, whichever path started it; `stop` silences it and fires its `onEnded`. */
+type Play = { userId: string; stop: () => void };
+
+// What's sounding right now, oldest first, across both paths: a fourth at once stops the first.
+const playing: Play[] = [];
+
+function startPlay(play: Play) {
+  playing.push(play);
+  while (playing.length > MAX_PLAYING) playing.shift()?.stop();
+}
+
+function endPlay(play: Play) {
+  const i = playing.indexOf(play);
+  if (i >= 0) playing.splice(i, 1);
+}
+
+/** Silence everything sounding right here; the server still plays it for the rest of the call. */
+function stopAll() {
+  for (const play of [...playing]) play.stop();
+}
+
+/** A short clip from its decoded buffer, through the shared context. */
+function playBuffer(buffer: AudioBuffer, volume: number, userId: string, onEnded?: () => void): Play {
   const context = audioCtx();
-  await ensureRunning(context);
-  await applySink(context);
   const gain = context.createGain();
   gain.gain.value = volume;
   const source = context.createBufferSource();
   source.buffer = buffer;
   source.connect(gain).connect(context.destination);
-  playing.push(source);
-  source.onended = () => {
-    const i = playing.indexOf(source);
-    if (i >= 0) playing.splice(i, 1);
+  let done = false;
+  let started = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    endPlay(play);
+    onEnded?.();
   };
-  while (playing.length > MAX_PLAYING) {
+  const play: Play = {
+    userId,
+    stop: () => {
+      if (!started) {
+        finish();
+        return;
+      }
+      try {
+        source.stop();
+      } catch {
+        finish();
+      }
+    },
+  };
+  source.onended = finish;
+  startPlay(play);
+  void (async () => {
+    await ensureRunning(context);
+    await applySink(context);
+    if (done) return;
+    started = true;
     try {
-      playing.shift()?.stop();
+      source.start();
     } catch {
-      // Already ended.
+      finish();
     }
+  })();
+  return play;
+}
+
+/** A long clip, streamed: seek to where the call is by now so everyone stays roughly together, cut off at a minute. */
+function playLong(url: string, volume: number, arrived: number, userId: string, onEnded?: () => void): Play {
+  const audio = new Audio();
+  audio.preload = 'auto';
+  audio.volume = Math.max(0, Math.min(1, volume));
+  const setSinkId = (audio as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> }).setSinkId;
+  if (typeof setSinkId === 'function') {
+    void setSinkId.call(audio, getPreferredDevice('audiooutput') ?? '').catch(() => undefined);
   }
-  source.start();
+  audio.src = url;
+  let done = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    if (timer) clearTimeout(timer);
+    endPlay(play);
+    onEnded?.();
+  };
+  const play: Play = {
+    userId,
+    stop: () => {
+      audio.pause();
+      audio.removeAttribute('src');
+      finish();
+    },
+  };
+  audio.onended = finish;
+  audio.onerror = finish;
+  audio.oncanplay = () => {
+    audio.oncanplay = null;
+    if (done) return;
+    const elapsed = (Date.now() - arrived) / 1000;
+    // Already past the end (a slow network, a replayed event, past the minute): don't start it at all.
+    if (elapsed >= MAX_LONG_SECONDS || elapsed >= audio.duration) {
+      finish();
+      return;
+    }
+    audio.currentTime = elapsed;
+    startPlay(play);
+    timer = setTimeout(finish, Math.max(0, MAX_LONG_SECONDS - elapsed) * 1000);
+    void audio.play().catch(finish);
+  };
+  audio.load();
+  return play;
 }
 
 /** Your clips, from the server. */
@@ -166,13 +271,22 @@ export async function loadMySounds(): Promise<void> {
 /** null if the file is a fine clip, otherwise a ready-to-show reason. */
 export async function checkSoundFile(file: File): Promise<string | null> {
   if (file.size > MAX_SOUND_BYTES) return t('voice.sound.tooBig');
-  let buffer: AudioBuffer;
   try {
-    buffer = await audioCtx().decodeAudioData(await file.arrayBuffer());
+    await audioCtx().decodeAudioData(await file.arrayBuffer());
   } catch {
     return t('voice.sound.notAudio');
   }
-  return buffer.duration > MAX_SOUND_SECONDS ? t('voice.sound.tooLong') : null;
+  return null;
+}
+
+/** How long the picked file is in ms, or null when it won't decode: the dialog says when the server will cut it. */
+export async function soundFileDuration(file: File): Promise<number | null> {
+  try {
+    const buffer = await audioCtx().decodeAudioData(await file.arrayBuffer());
+    return Math.round(buffer.duration * 1000);
+  } catch {
+    return null;
+  }
 }
 
 export async function addSound(file: File, name: string, emoji: string, volume: number): Promise<boolean> {
@@ -214,6 +328,8 @@ export function setSoundboard(patch: Partial<SoundboardSettings>) {
   const next = { ...get().soundboard, ...patch };
   set({ soundboard: next });
   saveSoundboard(next);
+  // Muting is local and immediate: nothing of the soundboard should keep sounding.
+  if (next.muted) stopAll();
 }
 
 export function toggleFavorite(id: string) {
@@ -226,40 +342,88 @@ export async function playSound(sound: Sound): Promise<boolean> {
   return (await playSoundboard(sound.id)) !== null;
 }
 
-/** Play a clip on this device only, ignoring mute: the sound picker's preview. */
+/** Ask the server to stop every clip sounding in the call; everyone silences them on sound:stopped. */
+export async function stopMySounds(): Promise<boolean> {
+  return (await stopSoundboard()) !== null;
+}
+
+// The preview sounding right now: asking for another one stops it first, so previews never pile up.
+let preview: Play | null = null;
+
+function startPreview(play: Play) {
+  if (preview && preview !== play) preview.stop();
+  preview = play;
+}
+
+/** Play a clip on this device only, ignoring mute: the sound picker's preview. Long clips stream like in a call. */
 export function previewSound(sound: Sound) {
+  const volume = get().soundboard.volume * sound.volume;
+  if (isLong(sound.durationMs)) {
+    startPreview(playLong(sound.url, volume, Date.now(), ''));
+    return;
+  }
   const cached = cachedBuffer(sound.url);
   if (cached) {
-    void playBuffer(cached, get().soundboard.volume * sound.volume);
+    startPreview(playBuffer(cached, volume, ''));
     return;
   }
   void loadBuffer(sound.url).then((buffer) => {
-    if (buffer) void playBuffer(buffer, get().soundboard.volume * sound.volume);
+    if (buffer) startPreview(playBuffer(buffer, volume, ''));
   });
+}
+
+/** How long a clip is in ms, from the decoded cache: undefined for a long (streamed) clip or one not decoded yet. */
+export function soundDuration(url: string): number | undefined {
+  const buffer = cachedBuffer(url);
+  return buffer ? Math.round(buffer.duration * 1000) : undefined;
+}
+
+/** Drop the UI's playback state for one play, unless a newer play has already taken its place. */
+function clearMyPlay(playId: string) {
+  if (get().myPlaying?.playId === playId) set({ myPlaying: null });
 }
 
 /** Someone played a clip (the sender included): show it on their tile and, unless muted or deafened, hear it. */
 export function onSoundPlayed(event: SoundPlayedEvent) {
   set((s) => ({ soundPlays: { ...s.soundPlays, [event.userId]: Date.now() } }));
+  const mine = event.userId === get().me?.id;
+  const at = Date.now();
+  // Your own clip sounds for the call whether or not you hear it yourself, so its state (the fill, the stop button)
+  // follows its length, not your speakers.
+  if (mine) {
+    set({ myPlaying: { soundId: event.soundId, playId: event.playId, at, duration: event.durationMs } });
+    setTimeout(() => clearMyPlay(event.playId), Math.min(event.durationMs || MY_PLAY_FALLBACK, MAX_LONG_SECONDS * 1000));
+  }
   const { deafened, soundboard } = get();
   if (deafened || soundboard.muted) return;
-  const cached = cachedBuffer(event.url);
-  if (cached) {
-    void playBuffer(cached, soundboard.volume * event.volume);
+  const volume = soundboard.volume * event.volume;
+  if (isLong(event.durationMs)) {
+    playLong(event.url, volume, at, event.userId);
     return;
   }
-  const at = Date.now();
+  const cached = cachedBuffer(event.url);
+  if (cached) {
+    playBuffer(cached, volume, event.userId);
+    return;
+  }
   void loadBuffer(event.url).then((buffer) => {
     if (!buffer || Date.now() - at > PLAY_DEADLINE) return;
     const now = get();
     if (now.deafened || now.soundboard.muted) return;
-    void playBuffer(buffer, now.soundboard.volume * event.volume);
+    playBuffer(buffer, now.soundboard.volume * event.volume, event.userId);
   });
 }
 
+/** The server stopped a user's clips (they asked, or they left): silence their plays here and drop your own state. */
+export function onSoundStopped(event: SoundStoppedEvent) {
+  for (const play of [...playing]) if (play.userId === event.userId) play.stop();
+  if (get().me?.id === event.userId) set({ myPlaying: null });
+}
+
 /*
- * Preloading: while in a call, fetch and decode everyone's clips so the first play is instant. Tracked per call —
- * a new call (or leaving one) forgets who was loaded, while the decoded buffers stay in the LRU above.
+ * Preloading: while in a call, fetch and decode everyone's short clips so the first play is instant; long ones are
+ * left alone. Tracked per call — a new call (or leaving one) forgets who was loaded, while the decoded buffers stay
+ * in the LRU above.
  */
 let callId: string | null = null;
 const loadedUsers = new Set<string>();
@@ -297,7 +461,7 @@ async function preloadCall(channelId: string) {
   } catch {
     return;
   }
-  const queue = sounds.filter((s) => !buffers.has(s.url));
+  const queue = sounds.filter((s) => !isLong(s.durationMs) && !buffers.has(s.url));
   await Promise.all(
     Array.from({ length: PRELOAD_CONCURRENCY }, async () => {
       while (queue.length) {
@@ -315,4 +479,8 @@ export function initSoundboard() {
   if (started) return;
   started = true;
   useStore.subscribe(trackCall);
+  // Deafening silences the soundboard at once, the way muting it does in setSoundboard.
+  useStore.subscribe((s, prev) => {
+    if (!prev.deafened && s.deafened) stopAll();
+  });
 }

@@ -172,7 +172,19 @@ export type Bootstrap = {
 export type InboxItem = Message & { unread: boolean };
 
 /** A soundboard clip someone uploaded; `url` loads with the media cookie and is cached by the browser. */
-export type Sound = { id: string; userId: string; name: string; emoji: string; volume: number; url: string; createdAt: number };
+export type Sound = {
+  id: string;
+  userId: string;
+  name: string;
+  emoji: string;
+  volume: number;
+  url: string;
+  createdAt: number;
+  /** How long the clip is in ms (0 when the server doesn't know); clips over 10 s stream instead of decoding. */
+  durationMs: number;
+  /** The server cut the uploaded file down to its first minute. */
+  trimmed?: boolean;
+};
 
 /** What may be changed on a sound after it's uploaded. */
 export type SoundPatch = Partial<Pick<Sound, 'name' | 'emoji' | 'volume'>>;

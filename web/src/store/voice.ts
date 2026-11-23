@@ -64,6 +64,8 @@ export type VoiceSlice = {
   soundboard: SoundboardSettings;
   /** userId -> ms of their last sound:played, for the indicator in the UI. */
   soundPlays: Record<string, number>;
+  /** Your own sound playing right now, for its playback fill in the UI; null when nothing of yours is sounding. */
+  myPlaying: { soundId: string; playId: string; at: number; duration: number } | null;
 };
 
 export function voiceSlice(): VoiceSlice {
@@ -87,6 +89,7 @@ export function voiceSlice(): VoiceSlice {
     mySounds: [],
     soundboard: loadSoundboard(),
     soundPlays: {},
+    myPlaying: null,
   };
 }
 

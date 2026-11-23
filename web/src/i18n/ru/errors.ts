@@ -90,4 +90,5 @@ export const errors = {
   'err.soundTooBig': 'Звук больше 512 КБ',
   'err.tooManySounds': 'Не больше {n} звуков',
   'err.noSound': 'Нет такого звука',
+  'err.soundsUnavailable': 'Звуки на этом сервере не работают',
 } as const;
