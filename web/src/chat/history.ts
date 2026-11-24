@@ -1,6 +1,5 @@
-import { t } from '../i18n';
 import { api } from '../api';
-import { compareMessages, getSessionEpoch, mergeMessages, PAGE_SIZE, setHasMore, showError, useStore } from '../store';
+import { compareMessages, getSessionEpoch, mergeMessages, PAGE_SIZE, setHasMore, useStore } from '../store';
 
 const inFlight = new Map<string, Promise<void>>();
 
@@ -12,20 +11,18 @@ export function ensureHistory(id: string, kind: 'channel' | 'dm', { quiet = fals
   if (useStore.getState().hasMore[id] !== undefined) return Promise.resolve();
   const epoch = getSessionEpoch();
   const key = `${epoch}:${id}`;
-  const running = inFlight.get(key);
-  if (running) return running;
-  const job = (kind === 'dm' ? api.dmMessages(id) : api.messages(id))
-    .then((list) => {
-      if (epoch !== getSessionEpoch()) return;
-      mergeMessages(id, list);
-      setHasMore(id, list.length === PAGE_SIZE);
-    })
-    .catch((e) => {
-      if (!quiet && epoch === getSessionEpoch()) showError(t('chat.loadFailed', { error: e instanceof Error ? e.message : String(e) }));
-    })
-    .finally(() => inFlight.delete(key));
-  inFlight.set(key, job);
-  return job;
+  let job = inFlight.get(key);
+  if (!job) {
+    job = (kind === 'dm' ? api.dmMessages(id) : api.messages(id))
+      .then((list) => {
+        if (epoch !== getSessionEpoch()) return;
+        mergeMessages(id, list);
+        setHasMore(id, list.length === PAGE_SIZE);
+      })
+      .finally(() => inFlight.delete(key));
+    inFlight.set(key, job);
+  }
+  return quiet ? job.catch(() => undefined) : job;
 }
 
 /** After start-up, quietly fetch the newest conversations and the text channels, one at a time. */
@@ -49,6 +46,7 @@ export async function warmUpHistory() {
  */
 export async function refreshNewest(id: string, kind: 'channel' | 'dm') {
   const epoch = getSessionEpoch();
+  if (useStore.getState().searchContext?.conversation === id) useStore.setState({ searchContext: null });
   const known = new Set((useStore.getState().messages[id] ?? []).map((m) => m.id));
   const page = await (kind === 'dm' ? api.dmMessages(id) : api.messages(id));
   if (epoch !== getSessionEpoch()) return;

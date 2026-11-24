@@ -31,7 +31,7 @@ export function serverBadgeCount(s: ReturnType<typeof useStore.getState>) {
 /** Unread DMs + incoming friend requests, shown on the home button (and the phone's Messages tab) like Discord. */
 export function homeBadgeCount(s: ReturnType<typeof useStore.getState>) {
   return (
-    s.dms.reduce((n, d) => n + (s.homeView === d.id && s.mode === 'home' ? 0 : (s.unread[d.id] ?? 0)), 0) +
+    s.dms.reduce((n, d) => n + (s.unread[d.id] ?? 0), 0) +
     s.friends.filter((f) => f.status === 'incoming').length
   );
 }

@@ -130,7 +130,7 @@ function FeedRow(props: { active: boolean; onPress: () => void; onWarm: () => vo
       onClick={props.onPress}
       onPointerEnter={props.onWarm}
       onFocus={props.onWarm}
-      className={`flex w-full items-center gap-3 text-left transition-colors ${props.big ? 'h-[68px] rounded-[20px] px-3 active:bg-default/60' : 'h-[60px] rounded-[16px] px-2.5'} ${props.active ? 'bg-default' : 'hover:bg-white/[0.04]'}`}
+      className={`flex w-full items-center gap-3 text-left transition-colors ${props.big ? 'h-[68px] rounded-panel px-3 active:bg-default/60' : 'h-[60px] rounded-surface px-2.5'} ${props.active ? 'bg-default' : 'hover:bg-white/[0.04]'}`}
     >
       {props.avatar}
       <span className="min-w-0 flex-1">
@@ -182,7 +182,7 @@ export function ConversationRow({ dm, large = false }: { dm: Dm; large?: boolean
   return (
     <button
       onClick={() => openDm(dm.id)}
-      className={`flex w-full items-center gap-2.5 rounded-full px-1.5 text-left transition-colors ${large ? 'h-[68px] rounded-[20px] px-3' : 'h-11 pr-3'} ${
+      className={`flex w-full items-center gap-2.5 rounded-full px-1.5 text-left transition-colors ${large ? 'h-[68px] rounded-panel px-3' : 'h-11 pr-3'} ${
         active ? 'bg-default text-foreground' : unread ? 'text-foreground hover:bg-default/50' : `${large ? 'text-foreground' : 'text-muted'} hover:text-foreground`
       }`}
     >

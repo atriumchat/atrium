@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Atrium quick switch regressions</title>
+<h1>Atrium quick switch regressions</h1>
+<button id="run" disabled>Run checks</button>
+<pre id="output" aria-live="polite">Ready</pre>
+<div id="fixture" class="h-[580px]"></div>
+<script type="module">
+import { createElement as h } from 'react';
+import { createRoot } from 'react-dom/client';
+import { api } from '/src/api.ts';
+import { applyTokens } from '/src/applyTokens.ts';
+import { t } from '/src/i18n/index.ts';
+import { Shell } from '/src/shell/Shell.tsx';
+import { initStore, openDm, resetStore, selectChannel, setChannels, useStore } from '/src/store/index.ts';
+import '/src/index.css';
+
+applyTokens();
+const run = document.getElementById('run');
+const fixture = document.getElementById('fixture');
+const output = document.getElementById('output');
+const get = useStore.getState;
+const me = { id: 'me', name: 'Self' };
+const alice = { id: 'alice', name: 'Alice' };
+const text = { id: 'text', kind: 'text', name: 'General', position: 0 };
+const voice = { id: 'voice', kind: 'voice', name: 'General voice', position: 1 };
+const dms = [
+  { id: 'dm', kind: 'dm', userId: alice.id, name: '', members: [me.id, alice.id], ownerId: null, lastMessageAt: 0, preview: null },
+  { id: 'group', kind: 'group', name: 'Planning', members: [me.id, alice.id], ownerId: me.id, lastMessageAt: 0, preview: null },
+];
+const account = (person = me) => ({
+  me: person, users: [person, alice], channels: [text, voice], serverName: 'Fixture', canManageChannels: false,
+  mutedChannels: [], unread: {}, mentions: {}, blocked: [],
+});
+const palette = () => document.querySelector(`[role="combobox"][aria-label="${t('shell.switch.placeholder')}"]`);
+const button = (label) => document.querySelector(`button[aria-label="${label}"]`);
+const key = (element, value, options = {}) => element.dispatchEvent(
+  new KeyboardEvent('keydown', { key: value, bubbles: true, cancelable: true, ...options }),
+);
+const resultNames = () => [...document.querySelectorAll('[role="option"]')].map((option) => option.children[1].textContent);
+const selectedName = (input) => document.getElementById(input.getAttribute('aria-activedescendant'))?.children[1].textContent;
+function equal(actual, expected) {
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(JSON.stringify({ actual, expected }));
+}
+async function waitFor(condition, description) {
+  for (let i = 0; i < 100; i++) {
+    const value = condition();
+    if (value) return value;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error('Timed out: ' + description);
+}
+function change(input, value) {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+run.onclick = async () => {
+  run.disabled = true;
+  document.body.dataset.result = 'running';
+  output.textContent = 'Running checks…';
+  const saved = { ...api };
+  let voiceRequests = 0;
+  api.markRead = async () => ({ ok: true });
+  api.messages = api.dmMessages = api.searchMessages = async () => [];
+  api.myInvite = async () => ({ code: 'FIXTURE', invited: [], limit: null });
+  api.checkToken = async () => { throw new Error('No network for fixture'); };
+  api.voiceToken = async () => { voiceRequests++; throw new Error('Quick switch attempted to join'); };
+  const root = createRoot(fixture);
+  try {
+    initStore(account());
+    useStore.setState({ dms });
+    selectChannel(text.id);
+    openDm(dms[0].id);
+    openDm(dms[1].id);
+    openDm(dms[0].id);
+    root.render(h(Shell));
+    const opener = await waitFor(() => fixture.querySelector('[aria-keyshortcuts]'), 'quick switch trigger');
+    opener.focus();
+    equal(key(opener, 'k', { ctrlKey: true }), false);
+    let input = await waitFor(() => palette() === document.activeElement && palette(), 'input focus');
+    equal(resultNames(), ['Alice', 'Planning', 'General']);
+    key(input, 'ArrowDown');
+    await waitFor(() => selectedName(input) === 'Planning', 'ArrowDown selection');
+    key(input, 'ArrowUp');
+    await waitFor(() => selectedName(input) === 'Alice', 'ArrowUp selection');
+    key(input, 'Escape');
+    await waitFor(() => !palette() && document.activeElement === opener, 'restore focus on Escape');
+    output.textContent += '\nPASS Ctrl+K, deduplicated recents, keyboard selection and Escape focus';
+
+    const composer = await waitFor(() => fixture.querySelector('main textarea'), 'chat composer');
+    composer.focus();
+    key(composer, 'л', { metaKey: true, code: 'KeyK' });
+    input = await waitFor(() => palette() === document.activeElement && palette(), 'input focus on physical ⌘K');
+    key(input, 'Escape');
+    await waitFor(() => !palette() && document.activeElement === composer, 'restore focus to chat composer');
+
+    for (const label of [t('settings.title'), t('chat.search.title')]) {
+      button(label).click();
+      if (label === t('chat.search.title')) {
+        const search = await waitFor(() => fixture.querySelector('[data-message-search-input]'), 'message search field in header');
+        change(search, 'General');
+        await waitFor(() => [...fixture.querySelectorAll('button')].some((item) => item.textContent.includes(t('chat.search.runWords', { query: 'General' }))), 'search query');
+        key(search, 'Enter');
+      }
+      const dialog = await waitFor(() => document.querySelector('[data-slot="modal-dialog"], [data-message-search-panel]'), label + ' panel');
+      const control = dialog.querySelector('input, button');
+      control.focus();
+      if (dialog.tagName === 'ASIDE') {
+        equal(key(control, 'k', { ctrlKey: true }), false);
+        const switchInput = await waitFor(() => palette() === document.activeElement && palette(), 'quick switch from search panel');
+        key(switchInput, 'Escape');
+        await waitFor(() => !palette() && document.activeElement === control, 'restore focus to search panel');
+      } else {
+        equal(key(control, 'k', { ctrlKey: true }), true);
+        equal(key(control, 'k', { metaKey: true }), true);
+        equal(palette(), null);
+        equal(document.activeElement === control, true);
+      }
+      if (dialog.tagName === 'ASIDE') {
+        dialog.querySelector(`button[aria-label="${t('common.close')}"]`).click();
+      } else {
+        key(control, 'Escape');
+      }
+      await waitFor(() => !dialog.isConnected, 'close ' + label);
+    }
+    output.textContent += '\nPASS shortcut in composer, focus kept in modal dialogs, and quick switch available from docked message search';
+
+    opener.focus();
+    key(opener, 'k', { metaKey: true });
+    input = await waitFor(() => palette() === document.activeElement && palette(), 'input focus on physical ⌘K');
+    change(input, '  GENERAL  ');
+    await waitFor(() => resultNames().length === 2, 'title search');
+    equal(resultNames(), ['General', 'General voice']);
+    key(input, 'ArrowDown');
+    await waitFor(() => selectedName(input) === 'General voice', 'voice room selection');
+    key(input, 'Enter', { isComposing: true });
+    equal(get().mode, 'home');
+    key(input, 'Enter');
+    await waitFor(() => !palette(), 'close after entering room');
+    equal([get().mode, get().selectedChannelId, get().voiceStatus, get().voiceChannelId, voiceRequests], ['server', voice.id, 'idle', null, 0]);
+    output.textContent += '\nPASS ⌘K on Cyrillic layout, case-insensitive search and voice room without a call';
+
+    await waitFor(() => document.activeElement === opener, 'restore focus after room navigation');
+    opener.click();
+    input = await waitFor(() => palette() === document.activeElement && palette(), 'input focus from visible button');
+    setChannels([voice]);
+    useStore.setState({ dms: dms.slice(1) });
+    await waitFor(() => resultNames().length === 2, 'removed conversations disappear');
+    equal(resultNames(), ['General voice', 'Planning']);
+    change(input, 'plan');
+    await waitFor(() => selectedName(input) === 'Planning', 'group match');
+    key(input, 'Enter');
+    await waitFor(() => !palette(), 'close after opening group');
+    equal([get().mode, get().homeView], ['home', 'group']);
+    initStore(account({ id: 'another', name: 'Another' }));
+    equal(get().recentConversations, []);
+    output.textContent += '\nPASS removed targets stay hidden, direct group navigation and account reset';
+    document.body.dataset.result = 'pass';
+  } catch (error) {
+    document.body.dataset.result = 'fail';
+    output.textContent += '\nFAIL ' + error.stack;
+  } finally {
+    root.unmount();
+    resetStore();
+    Object.assign(api, saved);
+    run.disabled = false;
+  }
+};
+run.disabled = false;
+</script>
+</html>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Spinner, Toast } from '@heroui/react';
 import { api, ApiError, getToken, setToken } from './api';
 import { initStore } from './store';
@@ -7,6 +7,7 @@ import { clearInviteFromUrl } from './people/invite';
 import { FlowProvider } from '@atrium/ui-web';
 import { Login } from './account/Login';
 import { DEMO_KEY, DEMO_RESET_TOKEN, demo, demoPlatform } from './account/demo';
+import { MessageRoute } from './chat/MessageTools';
 import { Shell } from './shell/Shell';
 import { MetroShell } from './metro/MetroShell';
 import { TruncationHint } from './ui/TruncationHint';
@@ -34,20 +35,24 @@ export function App() {
   // demo (guest mode) lets you straight in as a guest; anywhere else, sign-in.
   useEffect(() => {
     if (getToken() || resetToken || demo) return;
+    let active = true;
     api.setupStatus().then(
       async (s) => {
+        if (!active) return;
         if (s.needed) return setPhase('setup');
         if (!s.guest) return setPhase('login');
         try {
           const session = await api.guest();
+          if (!active) return;
           setToken(session.token);
           signedIn(session);
         } catch {
-          setPhase('login');
+          if (active) setPhase('login');
         }
       },
-      () => setPhase('login'),
+      () => { if (active) setPhase('login'); },
     );
+    return () => { active = false; };
   }, [resetToken]);
 
   // Sign-up, recovery and a reset link end here: the new recovery key comes first, then the app.
@@ -71,31 +76,35 @@ export function App() {
     setPhase(newcomer && whereToUseNeeded() ? 'where' : 'loading');
   }
 
-  const start = useCallback(async () => {
-    try {
-      const data = await api.bootstrap();
-      initStore(data);
-      // Already a member: an invite link opened again has nothing left to do.
-      clearInviteFromUrl();
-      connectSocket(getToken()!, () => {
-        storeNewKey(null);
-        endSession();
-      });
-      setPhase('ready');
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 401) {
-        storeNewKey(null);
-        endSession();
-      } else {
-        setPhase('offline');
-      }
-    }
-  }, []);
-
   useEffect(() => {
     // A design mock (account/demo.ts) has no server to ask.
-    if (phase === 'loading' && !demo) start();
-  }, [phase, start]);
+    if (phase !== 'loading' || demo) return;
+    let active = true;
+    async function start() {
+      try {
+        const data = await api.bootstrap();
+        if (!active) return;
+        initStore(data);
+        // Already a member: an invite link opened again has nothing left to do.
+        clearInviteFromUrl();
+        connectSocket(getToken()!, () => {
+          storeNewKey(null);
+          endSession();
+        });
+        setPhase('ready');
+      } catch (e) {
+        if (!active) return;
+        if (e instanceof ApiError && e.status === 401) {
+          storeNewKey(null);
+          endSession();
+        } else {
+          setPhase('offline');
+        }
+      }
+    }
+    void start();
+    return () => { active = false; };
+  }, [phase]);
 
   return (
     // The flows' own words (the back button's label) in the app's language, for every flow screen below.
@@ -133,7 +142,7 @@ export function App() {
       ) : phase === 'login' ? (
         <Login onLoggedIn={signedIn} />
       ) : phase === 'ready' ? (
-        <Shell />
+        <><Shell /><MessageRoute /></>
       ) : (
         <Splash offline={phase === 'offline'} retry={() => setPhase('loading')} />
       )}

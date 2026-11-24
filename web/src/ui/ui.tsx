@@ -39,19 +39,17 @@ export function RoundButton(props: {
           : '';
   return (
     <Tooltip delay={300} closeDelay={0}>
-      <Tooltip.Trigger>
-        <Button
-          isIconOnly
-          variant={variant}
-          aria-label={props.label}
-          aria-pressed={tone === 'on' ? true : undefined}
-          isDisabled={props.isDisabled}
-          onPress={props.onPress}
-          className={`rounded-full p-0 ${SIZES[props.size ?? 'md']} ${toneClass} ${props.alert ? 'text-danger' : ''} ${props.className ?? ''}`}
-        >
-          {props.children}
-        </Button>
-      </Tooltip.Trigger>
+      <Button
+        isIconOnly
+        variant={variant}
+        aria-label={props.label}
+        aria-pressed={tone === 'on' ? true : undefined}
+        isDisabled={props.isDisabled}
+        onPress={props.onPress}
+        className={`rounded-full p-0 ${SIZES[props.size ?? 'md']} ${toneClass} ${props.alert ? 'text-danger' : ''} ${props.className ?? ''}`}
+      >
+        {props.children}
+      </Button>
       <Tooltip.Content placement={props.placement ?? 'top'}>{props.label}</Tooltip.Content>
     </Tooltip>
   );

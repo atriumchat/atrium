@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MIN_PASSWORD, signInFlow, type SignInStep as Step } from '@atrium/setup';
 import { FlowPrimary, FlowShell, FlowStep, LineField, RadioRow, TextAction } from '@atrium/ui-web';
 import { api, setToken } from '../api';
@@ -28,7 +28,10 @@ export function Login({ onLoggedIn }: { onLoggedIn: (session: Session, signedUp:
   const [signIn] = useState(() => new URLSearchParams(window.location.search).has('signin'));
   const [step, setStep] = useState<{ id: Step; back: boolean; n: number }>({ id: linkCode ? 'invite' : signIn ? 'login' : 'start', back: false, n: 0 });
   useEffect(() => {
-    if (signIn) window.history.replaceState(null, '', window.location.pathname);
+    if (!signIn) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('signin');
+    window.history.replaceState(null, '', url);
   }, [signIn]);
   const [way, setWay] = useState<Way>('login');
   const [invite, setInvite] = useState(linkCode ?? '');
@@ -39,8 +42,10 @@ export function Login({ onLoggedIn }: { onLoggedIn: (session: Session, signedUp:
   const [key, setKey] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
 
   function go(id: Step, back = false) {
+    if (submitting.current) return;
     setError(null);
     setStep((s) => ({ id, back, n: s.n + 1 }));
   }
@@ -68,6 +73,8 @@ export function Login({ onLoggedIn }: { onLoggedIn: (session: Session, signedUp:
   }, [step.id, code]);
 
   async function submit() {
+    if (submitting.current) return;
+    submitting.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -84,6 +91,7 @@ export function Login({ onLoggedIn }: { onLoggedIn: (session: Session, signedUp:
     } catch (err) {
       setError(err instanceof Error ? err.message : t('account.login.failed'));
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }
@@ -119,10 +127,10 @@ export function Login({ onLoggedIn }: { onLoggedIn: (session: Session, signedUp:
             title={t('account.login.tabLogin')}
             sub={t('account.start.haveSub')}
             error={error}
-            onBack={back('login')}
+            onBack={busy ? undefined : back('login')}
             onSubmit={() => ready && void submit()}
             actions={<FlowPrimary type="submit" busy={busy} disabled={!ready}>{t('account.login.submitLogin')}</FlowPrimary>}
-            below={<TextAction onPress={() => go('recover')}>{t('account.login.forgotPassword')}</TextAction>}
+            below={!busy && <TextAction onPress={() => go('recover')}>{t('account.login.forgotPassword')}</TextAction>}
           >
             {nickField}
             <LineField label={t('account.login.password')} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" />
@@ -157,7 +165,7 @@ export function Login({ onLoggedIn }: { onLoggedIn: (session: Session, signedUp:
             title={t('account.account')}
             sub={inviter ? t('account.login.invitedBy', { name: inviter }) : undefined}
             error={error}
-            onBack={back('account')}
+            onBack={busy ? undefined : back('account')}
             onSubmit={() => ready && void submit()}
             actions={<FlowPrimary type="submit" busy={busy} disabled={!ready}>{t('account.login.submitRegister')}</FlowPrimary>}
           >
@@ -174,7 +182,7 @@ export function Login({ onLoggedIn }: { onLoggedIn: (session: Session, signedUp:
             title={t('account.login.recoverTitle')}
             sub={t('account.login.recoverHint')}
             error={error}
-            onBack={back('recover')}
+            onBack={busy ? undefined : back('recover')}
             onSubmit={() => ready && void submit()}
             actions={<FlowPrimary type="submit" busy={busy} disabled={!ready}>{t('account.recoverGo')}</FlowPrimary>}
           >

@@ -1,5 +1,6 @@
+import { api, type UnreadMarker } from '../api';
 import type { Message } from '../types';
-import { get, set, type State } from './core';
+import { get, getSessionEpoch, set, showError, type State } from './core';
 import { openConversationId, pageActive } from './shell';
 import { refreshDms } from './people';
 
@@ -9,6 +10,8 @@ export const compareMessages = (a: Message, b: Message) => a.createdAt - b.creat
 
 /** Messages: loaded history, unread counts, typing, the composer's reply and edit. */
 export type ChatSlice = {
+  firstUnread: Record<string, string>;
+  manualUnread: Record<string, string>;
   messages: Record<string, Message[]>;
   hasMore: Record<string, boolean>; // key present = history for the channel was loaded
   unread: Record<string, number>;
@@ -21,10 +24,12 @@ export type ChatSlice = {
   editingId: string | null;
   /** A message to scroll to and flash once its conversation is open (from the inbox). */
   jumpTo: string | null;
+  searchContext: { conversation: string; messages: Message[] } | null;
 };
 
 export function chatSlice(): ChatSlice {
   return {
+    firstUnread: {}, manualUnread: {},
     messages: {},
     hasMore: {},
     unread: {},
@@ -33,11 +38,34 @@ export function chatSlice(): ChatSlice {
     replyingTo: {},
     editingId: null,
     jumpTo: null,
+    searchContext: null,
   };
 }
 
+export function applyUnreadMarker(event: UnreadMarker) {
+  const id = event.conversationId;
+  const s = get();
+  if (!s.channels.some(c => c.id === id) && !s.dms.some(d => d.id === id)) return;
+  set({ firstUnread: {...s.firstUnread, ...(event.first && {[id]: event.first})},
+    manualUnread: {...s.manualUnread, [id]: event.token}, unread: {...s.unread, [id]: event.count},
+    mentions: {...s.mentions, [id]: event.mentions} });
+}
+
+export function forgetUnreadMarker(id: string, token: string) {
+  if (get().manualUnread[id] !== token) return;
+  const manualUnread = {...get().manualUnread};
+  delete manualUnread[id];
+  set(s => ({ manualUnread, unread: {...s.unread, [id]: 0}, mentions: {...s.mentions, [id]: 0} }));
+}
+
 export function markRead(channelId: string) {
-  set((s) => ({ unread: { ...s.unread, [channelId]: 0 } }));
+  const token = get().manualUnread[channelId];
+  if (token) {
+    const epoch = getSessionEpoch();
+    void api.markRead(channelId, Date.now(), token).then(() => {
+      if (epoch === getSessionEpoch()) forgetUnreadMarker(channelId, token);
+    }, e => { if (epoch === getSessionEpoch()) showError(String(e)); });
+  } else set((s) => ({ unread: { ...s.unread, [channelId]: 0 } }));
 }
 
 /** `list` with `incoming` merged in, de-duplicated by id and kept in time order. Untouched messages keep their objects. */
@@ -60,23 +88,30 @@ export function mergeMessages(channelId: string, incoming: Message[]) {
 /** Replace a message in place (after an edit or a reaction), keeping its position. */
 export function patchMessage(channelId: string, id: string, patch: Partial<Message>) {
   set((s) => {
+    const update = (list: Message[]) => list.map((m) => m.id === id ? { ...m, ...patch } : m);
+    const context = s.searchContext;
     const list = s.messages[channelId];
-    if (!list?.some((m) => m.id === id)) return {};
-    return { messages: { ...s.messages, [channelId]: list.map((m) => (m.id === id ? { ...m, ...patch } : m)) } };
+    return {
+      ...(list?.some((m) => m.id === id) && { messages: { ...s.messages, [channelId]: update(list) } }),
+      ...(context?.conversation === channelId && { searchContext: { ...context, messages: update(context.messages) } }),
+    };
   });
 }
 
 /** A deleted message disappears, and replies to it say so. */
 export function removeMessage(channelId: string, id: string) {
   set((s) => {
-    const list = s.messages[channelId];
-    if (!list) return {};
-    const next = list
-      .filter((m) => m.id !== id)
+    const remove = (list: Message[]) => list.filter((m) => m.id !== id)
       .map((m) => (m.replyTo?.id === id ? { ...m, replyTo: { id, deleted: true as const } } : m));
+    const list = s.messages[channelId];
+    const context = s.searchContext;
     const replyingTo = { ...s.replyingTo };
     if (replyingTo[channelId] === id) delete replyingTo[channelId];
-    return { messages: { ...s.messages, [channelId]: next }, replyingTo, editingId: s.editingId === id ? null : s.editingId };
+    return {
+      ...(list && { messages: { ...s.messages, [channelId]: remove(list) } }),
+      ...(context?.conversation === channelId && { searchContext: { ...context, messages: remove(context.messages) } }),
+      replyingTo, editingId: s.editingId === id ? null : s.editingId,
+    };
   });
 }
 
@@ -116,7 +151,8 @@ export function receiveMessage(message: Message) {
       const preview = { userId: message.userId, text: message.content.slice(0, 140), images: message.attachments.length };
       next.dms = s.dms.map((d) => (d.id === id ? { ...d, lastMessageAt: message.createdAt, preview } : d)).sort((a, b) => b.lastMessageAt - a.lastMessageAt);
     }
-    if (counts) {
+    if (counts || (s.manualUnread[id] && message.userId !== me?.id)) {
+      if (!s.unread[id]) next.firstUnread = { ...s.firstUnread, [id]: message.id };
       next.unread = { ...s.unread, [id]: (s.unread[id] ?? 0) + 1 };
       if (mentioned) next.mentions = { ...s.mentions, [id]: (s.mentions[id] ?? 0) + 1 };
     }
@@ -149,6 +185,7 @@ const trimTimers = new Map<string, ReturnType<typeof setTimeout>>();
 export function trimLeftConversation(s: State, prev: State) {
   const open = openConversationId(s);
   const left = openConversationId(prev);
+  if (s.searchContext && s.searchContext.conversation !== open) set({ searchContext: null });
   if (open) {
     clearTimeout(trimTimers.get(open));
     trimTimers.delete(open);

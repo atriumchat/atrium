@@ -311,9 +311,22 @@ export function BubbleCloud({ people, speaking, live }: Props) {
     }
     separate(list.current, (a, b) => (talking.has(a.id) && !talking.has(b.id) ? 0.1 : talking.has(b.id) && !talking.has(a.id) ? 0.9 : 0.5));
     let moved = changed ? Infinity : 0;
+    let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
     for (const n of list.current) {
-      place(els.current.get(n.id), n.x, n.y, n.r, max);
+      left = Math.min(left, n.x - n.r); right = Math.max(right, n.x + n.r);
+      top = Math.min(top, n.y - n.r); bottom = Math.max(bottom, n.y + n.r);
       moved = Math.max(moved, Math.abs(n.x - n.px), Math.abs(n.y - n.py), Math.abs(n.r - n.pr));
+    }
+    // Nominal spacing reserves room for one speaker. Several can grow at once, so fit their
+    // combined bounds to the stage without changing their relative positions or reading layout.
+    const padding = Math.min(GAP, w / 4, h / 4);
+    const scale = Math.min(1, (w - padding * 2) / (right - left), (h - padding * 2) / (bottom - top));
+    const cx = (left + right) / 2, cy = (top + bottom) / 2;
+    const halfW = (right - left) * scale / 2, halfH = (bottom - top) * scale / 2;
+    const fitX = Math.max(padding + halfW, Math.min(cx, w - padding - halfW));
+    const fitY = Math.max(padding + halfH, Math.min(cy, h - padding - halfH));
+    for (const n of list.current) {
+      place(els.current.get(n.id), fitX + (n.x - cx) * scale, fitY + (n.y - cy) * scale, n.r * scale, max);
     }
     return moved > SETTLED;
   }, [people, speaking, w, h]);

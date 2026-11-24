@@ -2,3 +2,4 @@ export { FlowPrimary, FlowProvider, FlowSecondary, FlowShell, FlowStep, KeptRow,
 export { Drum } from './Drum';
 export { EdgeTicks, TickRuler, useNarrow } from './EdgeTicks';
 export { parts } from './parts';
+export { Check, DocumentDuplicateIcon, EyeIcon, EyeSlashIcon, GlobeAltIcon } from './icons';

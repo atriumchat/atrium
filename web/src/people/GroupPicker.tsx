@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@heroui/react';
 import { api } from '../api';
-import { addDm, closePicker, messageUser, openDm, showError, useStore, type Picker } from '../store';
+import { addDm, closePicker, getNavigationRevision, getSessionEpoch, messageUser, openDm, showError, useStore, type Picker } from '../store';
 import { useT } from '../i18n';
 import { Avatar } from '../ui/Avatar';
 import { Dialog } from '../ui/Dialog';
@@ -24,6 +24,7 @@ function PickerDialog({ picker }: { picker: Picker }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [filter, setFilter] = useState('');
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
 
   const inside = new Set(dm?.members ?? []);
   const q = filter.trim().toLowerCase();
@@ -41,28 +42,37 @@ function PickerDialog({ picker }: { picker: Picker }) {
   const action = addingToGroup ? t('people.picker.add') : picker.mode === 'create' && selected.length <= 1 ? t('people.picker.openChat') : t('people.picker.createGroup');
 
   function toggle(id: string) {
-    setSelected((list) => (list.includes(id) ? list.filter((x) => x !== id) : left > 0 ? [...list, id] : list));
+    setSelected((list) => (list.includes(id) ? list.filter((x) => x !== id) : list.length < MAX_MEMBERS - base ? [...list, id] : list));
   }
 
   async function submit() {
+    if (submitting.current || selected.length === 0 || (picker.mode === 'add' && !dm)) return;
+    submitting.current = true;
     setBusy(true);
+    const epoch = getSessionEpoch();
+    const navigation = getNavigationRevision();
+    const stillOpen = () => epoch === getSessionEpoch() && useStore.getState().picker === picker;
     try {
       if (picker.mode === 'create' && selected.length === 1) {
-        closePicker();
-        await messageUser(selected[0]);
+        if (await messageUser(selected[0], stillOpen) && stillOpen()) closePicker();
       } else if (addingToGroup && dm) {
-        addDm(await api.addGroupMembers(dm.id, selected));
-        closePicker();
+        const group = await api.addGroupMembers(dm.id, selected);
+        if (epoch !== getSessionEpoch()) return;
+        addDm(group);
+        if (stillOpen()) closePicker();
       } else {
         // A new group: from scratch, or the people of a 1:1 DM plus the new ones.
         const group = await api.createGroup([...(dm?.userId ? [dm.userId] : []), ...selected]);
+        if (epoch !== getSessionEpoch()) return;
         addDm(group);
+        if (!stillOpen()) return;
         closePicker();
-        openDm(group.id);
+        if (navigation === getNavigationRevision()) openDm(group.id);
       }
     } catch (e) {
-      showError(e instanceof Error ? e.message : t('people.failed'));
+      if (stillOpen()) showError(e instanceof Error ? e.message : t('people.failed'));
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }
@@ -84,7 +94,7 @@ function PickerDialog({ picker }: { picker: Picker }) {
         </>
       }
     >
-      <label className="mb-2 flex h-10 items-center gap-2 rounded-[12px] bg-default px-3 text-muted focus-within:ring-2 focus-within:ring-focus">
+      <label className="mb-2 flex h-10 items-center gap-2 rounded-row bg-default px-3 text-muted focus-within:ring-2 focus-within:ring-focus">
         <SearchIcon size={16} />
         <input
           autoFocus
@@ -110,7 +120,8 @@ function PickerDialog({ picker }: { picker: Picker }) {
                 <button
                   onClick={() => toggle(u.id)}
                   aria-pressed={on}
-                  className="flex h-12 w-full items-center gap-3 rounded-[12px] px-2 text-left hover:bg-default/60"
+                  disabled={busy}
+                  className="flex h-12 w-full items-center gap-3 rounded-row px-2 text-left hover:bg-default/60"
                 >
                   <Avatar user={u} size={32} ringBg="var(--overlay)" />
                   <span className="min-w-0 flex-1 truncate text-[16px]">{u.name}</span>

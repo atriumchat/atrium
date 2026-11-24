@@ -913,14 +913,14 @@ def bootstrap(request: Request, response: Response, user: dict = Depends(current
         "isGuest": GUEST_MODE and not is_admin(user),
         **access_payload(user["id"]),
         "mutedChannels": muted_channels(user["id"]),
-        **dict(zip(("unread", "mentions"), unread_counts(user))),
+        **unread_snapshot(user),
         "blocked": blocked_ids(user["id"]),
         **my_account(user["id"]),
     }
 
 
 # The other atrium modules import this one too: they come last, once everything above is defined.
-from .channels import list_categories, muted_channels, unread_counts
+from .channels import list_categories, muted_channels, unread_snapshot
 from .roles import access_of, access_payload, channels_for, list_roles
 from .uploads import PRIVATE_IMAGE_HEADERS, make_avatar, process_image
 from .realtime import disconnect_user, end_dm_voice, presence_payload, sio, user_room

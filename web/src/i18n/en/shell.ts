@@ -21,6 +21,8 @@ export const shell = {
     other: '{name}, {n} mentions',
   },
   'shell.sidebar.unread': '{name}, new messages',
+  'shell.sidebar.roomChat': 'Open chat for {name}',
+  'shell.sidebar.roomChatUnread': 'Open chat for {name}, new messages',
   'shell.sidebar.live': 'Live',
   'shell.sidebar.volume': 'Volume: {name}',
 
@@ -62,12 +64,24 @@ export const shell = {
   'shell.tab.server': 'Server',
   'shell.tab.you': 'Profile',
 
+  'shell.switch.title': 'Quick switch',
+  'shell.switch.placeholder': 'Find a channel, room, or chat',
+  'shell.switch.recent': 'Recently opened',
+  'shell.switch.results': 'Search results',
+  'shell.switch.channel': 'Channel',
+  'shell.switch.voice': 'Voice room',
+  'shell.switch.dm': 'Direct message',
+  'shell.switch.group': 'Group chat',
+  'shell.switch.emptyRecent': 'No recently opened conversations',
+  'shell.switch.emptyResults': 'No matching conversations',
+
   'shell.content.noChannel.title': 'No channel selected',
   'shell.content.noChannel.text': 'Channel opens here',
 
   'shell.header.back': 'Back',
   'shell.header.onlineLabel': 'Online: {n}',
   'shell.header.onlineCount': '{n} online',
+  'shell.header.members': 'Server members',
   'shell.header.onlineGroup': 'Online — {n}',
   'shell.header.offlineGroup': 'Offline — {n}',
   'shell.header.inRoom': 'In room “{room}”',

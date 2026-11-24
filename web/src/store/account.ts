@@ -63,6 +63,8 @@ export function initStore(data: Bootstrap) {
     categories: data.categories ?? [],
     canManageChannels: data.canManageChannels,
     mutedChannels: data.mutedChannels,
+    firstUnread: data.firstUnread ?? {},
+    manualUnread: data.manualUnread ?? {},
     unread: data.unread ?? {},
     mentions: data.mentions ?? {},
     blocked: data.blocked ?? [],

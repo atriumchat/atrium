@@ -51,7 +51,7 @@ export function FriendsView() {
     <div className="flex min-h-0 flex-1 flex-col">
       {isMobile ? (
         // Phone: the title row with "add" as a round button, the tabs on their own row underneath.
-        <header className="mx-2 mt-2 shrink-0 rounded-[24px] bg-default p-2">
+        <header className="mx-2 mt-2 shrink-0 rounded-popover bg-default p-2">
           <div className="flex items-center gap-1">
             <BackButton />
             <h1 className="flex-1 text-[16px] font-medium">{t('people.friends.title')}</h1>
@@ -68,13 +68,13 @@ export function FriendsView() {
       ) : (
         // A computer: the title big and light like every other screen's, "Add friend" and the inbox beside it, the tabs
         // under it. A narrow window turns "Add friend" into a round icon.
-        <header className="@container shrink-0 px-6 pb-2 pt-5">
-          <div className="flex items-center gap-2">
-            <h1 className="min-w-0 flex-1 truncate text-[32px] font-light leading-[38px] tracking-[-0.8px]">{t('people.friends.title')}</h1>
+        <header className="@container shrink-0 px-(--app-pane-inset) pb-2">
+          <div className="flex h-(--app-header-height) items-center gap-2">
+            <h1 className="min-w-0 flex-1 truncate text-[30px] font-light leading-9 tracking-[-0.8px]">{t('people.friends.title')}</h1>
             <button
               onClick={() => setTab('add')}
               aria-label={t('people.friends.add')}
-              className={`flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-full text-[15px] font-medium transition-colors @max-[34rem]:w-10 @min-[34rem]:px-5 ${
+              className={`flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-full text-[15px] font-medium transition-colors @max-[34rem]:w-10 @min-[34rem]:rounded-control-sm @min-[34rem]:px-(--app-radius-control-sm) ${
                 tab === 'add' ? 'bg-default text-foreground' : 'bg-accent text-accent-foreground hover:opacity-90'
               }`}
             >
@@ -82,9 +82,9 @@ export function FriendsView() {
               <span className="@max-[34rem]:hidden">{t('people.friends.add')}</span>
             </button>
             {/* In the desktop app the bell is in the window's title row (TitleBar). */}
-            {!desktop && <InboxButton />}
+            {!desktop && <InboxButton inHeader />}
           </div>
-          <div className="no-scrollbar mt-3 flex items-center gap-1 overflow-x-auto">
+          <div className="no-scrollbar flex items-center gap-1 overflow-x-auto">
             {tabButton('online', t('people.friends.online'))}
             {tabButton('all', t('people.friends.all'))}
             {tabButton('pending', pendingLabel)}
@@ -92,7 +92,7 @@ export function FriendsView() {
         </header>
       )}
 
-      <div className="flex flex-1 flex-col overflow-y-auto px-5 pb-4 pt-2 max-md:px-1 max-md:pt-3">
+      <div className="flex flex-1 flex-col overflow-y-auto px-(--app-pane-inset) pb-4 pt-2 max-md:px-1 max-md:pt-3">
         {/* The rooms first: where people are talking right now, a tap away. On the phone they're on the home tab. */}
         {tab !== 'add' && !isMobile && <RoomCards grid />}
         {tab === 'add' ? (
@@ -235,7 +235,7 @@ function AddFriend() {
           aria-label={t('people.friends.nickLabel')}
           className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-faint"
         />
-        <Button type="submit" isPending={busy} isDisabled={!name.trim()} className="h-10 rounded-full px-5">
+        <Button type="submit" isPending={busy} isDisabled={!name.trim()} className="h-10 rounded-control-sm px-(--app-radius-control-sm)">
           {t('people.friends.send')}
         </Button>
       </form>

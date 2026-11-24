@@ -19,6 +19,8 @@ export const shell = {
     other: '{name}, {n} упоминания',
   },
   'shell.sidebar.unread': '{name}, есть новые сообщения',
+  'shell.sidebar.roomChat': 'Чат комнаты «{name}»',
+  'shell.sidebar.roomChatUnread': 'Чат комнаты «{name}», есть новые сообщения',
   'shell.sidebar.live': 'В эфире',
   'shell.sidebar.volume': 'Громкость: {name}',
 
@@ -62,12 +64,24 @@ export const shell = {
   'shell.tab.server': 'Сервер',
   'shell.tab.you': 'Профиль',
 
+  'shell.switch.title': 'Быстрый переход',
+  'shell.switch.placeholder': 'Найти канал, комнату или чат',
+  'shell.switch.recent': 'Недавно открытые',
+  'shell.switch.results': 'Результаты поиска',
+  'shell.switch.channel': 'Канал',
+  'shell.switch.voice': 'Голосовая комната',
+  'shell.switch.dm': 'Личный чат',
+  'shell.switch.group': 'Групповой чат',
+  'shell.switch.emptyRecent': 'Недавно открытых разговоров пока нет',
+  'shell.switch.emptyResults': 'Ничего не найдено',
+
   'shell.content.noChannel.title': 'Канал не выбран',
   'shell.content.noChannel.text': 'Здесь откроется канал',
 
   'shell.header.back': 'Назад',
   'shell.header.onlineLabel': 'В сети: {n}',
   'shell.header.onlineCount': '{n} в сети',
+  'shell.header.members': 'Участники сервера',
   'shell.header.onlineGroup': 'В сети — {n}',
   'shell.header.offlineGroup': 'Не в сети — {n}',
   'shell.header.inRoom': 'В комнате «{room}»',

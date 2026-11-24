@@ -3,11 +3,26 @@ import { AlertDialog, Button, Drawer, Modal } from '@heroui/react';
 import { useT } from '../i18n';
 import { useIsMobile } from '../hooks';
 import { showError } from '../store';
+import { XIcon } from './icons';
 
 // The phone's sheet: from the bottom almost to the top, the status bar plus a little left above it. A share of its
 // frame, not of the screen, so it shrinks with the keyboard and the buttons at its foot stay in view.
 const SHEET = 'h-[calc(100%_-_max(12px,_env(safe-area-inset-top)_+_8px))] max-h-none rounded-t-[32px] p-0 pb-[env(safe-area-inset-bottom)]';
-// A window on the computer is the app's own window surface with its edge, as Settings is, not HeroUI's lighter overlay.
+// With enter animations disabled the trigger can become inert before the dialog takes focus.
+// Keep Escape and Tab inside the new window while respecting a field that already took focus.
+export function focusReducedMotionDialog(backdrop: HTMLDivElement | null) {
+  if (!backdrop || !window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const frame = requestAnimationFrame(() => {
+    const dialog = backdrop.querySelector<HTMLElement>('[role="dialog"], [role="alertdialog"]');
+    if (!dialog || dialog.closest('[inert]')) return;
+    if (dialog === document.activeElement || !dialog.contains(document.activeElement)) {
+      const initial = dialog.querySelector<HTMLElement>('[data-slot="modal-close-trigger"], [data-initial-focus]');
+      (initial ?? dialog).focus({ preventScroll: true });
+    }
+  });
+  return () => cancelAnimationFrame(frame);
+}
+
 const WINDOW = 'border border-edge [--overlay:var(--app-window)]';
 // HeroUI's Drawer leaves in 200ms.
 const SHEET_EXIT_MS = 220;
@@ -47,7 +62,7 @@ function Sheet({
           <Drawer.Body className="mx-0 px-0 text-[15px] text-foreground">{children}</Drawer.Body>
           {footer && <Drawer.Footer className="block">{footer}</Drawer.Footer>}
           {/* Last, so the handle, title and body keep their spacing as neighbours. */}
-          <Drawer.CloseTrigger />
+          <Drawer.CloseTrigger><XIcon size={16} /></Drawer.CloseTrigger>
         </Drawer.Dialog>
       </Drawer.Content>
     </Drawer.Backdrop>
@@ -77,6 +92,7 @@ export function Dialog({
   sheet?: boolean;
 }) {
   const isMobile = useIsMobile();
+  const { t } = useT();
   if (isMobile) {
     return (
       <Sheet
@@ -95,10 +111,10 @@ export function Dialog({
     );
   }
   return (
-    <Modal.Backdrop isOpen onOpenChange={(open) => !open && onClose()}>
+    <Modal.Backdrop ref={focusReducedMotionDialog} isOpen onOpenChange={(open) => !open && onClose()}>
       <Modal.Container size="md" placement="auto">
         <Modal.Dialog className={`${WINDOW} ${sheet ? 'max-h-[80vh]' : ''}`}>
-          <Modal.CloseTrigger />
+          <Modal.CloseTrigger aria-label={t('common.close')}><XIcon size={16} /></Modal.CloseTrigger>
           <Modal.Header className="gap-1 pr-8">
             <Modal.Heading className="text-[18px] font-medium">{title}</Modal.Heading>
             {subtitle && <p className="text-[14px] text-muted">{subtitle}</p>}
@@ -129,6 +145,7 @@ export function Window({
   footer?: ReactNode;
 }) {
   const isMobile = useIsMobile();
+  const { t } = useT();
   if (isMobile) {
     return (
       <Sheet label={label} onClose={onClose} footer={footer}>
@@ -137,10 +154,10 @@ export function Window({
     );
   }
   return (
-    <Modal.Backdrop isOpen onOpenChange={(open) => !open && onClose()}>
+    <Modal.Backdrop ref={focusReducedMotionDialog} isOpen onOpenChange={(open) => !open && onClose()}>
       <Modal.Container size="sm" placement="center">
         <Modal.Dialog aria-label={label} className={`${WINDOW} ${className}`}>
-          <Modal.CloseTrigger className="z-10" />
+          <Modal.CloseTrigger aria-label={t('common.close')} className="z-10"><XIcon size={16} /></Modal.CloseTrigger>
           {children}
           {footer}
         </Modal.Dialog>
@@ -181,7 +198,7 @@ export function ConfirmDialog({
   }
 
   return (
-    <AlertDialog.Backdrop isOpen onOpenChange={(open) => !open && onClose()} isDismissable>
+    <AlertDialog.Backdrop ref={focusReducedMotionDialog} isOpen onOpenChange={(open) => !open && onClose()} isDismissable>
       <AlertDialog.Container size="sm">
         <AlertDialog.Dialog>
           <AlertDialog.Header>
@@ -192,7 +209,7 @@ export function ConfirmDialog({
             <p className="text-[14px] text-muted">{text}</p>
           </AlertDialog.Body>
           <AlertDialog.Footer>
-            <Button variant="tertiary" onPress={onClose} className="rounded-full">
+            <Button data-initial-focus variant="tertiary" onPress={onClose} className="rounded-full">
               {t('common.cancel')}
             </Button>
             <Button variant="danger" onPress={confirm} isPending={busy} className="rounded-full text-white [--button-fg:white]">

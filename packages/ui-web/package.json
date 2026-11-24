@@ -17,7 +17,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@atrium/ui-common": "*"
+    "@atrium/ui-common": "*",
+    "@heroicons/react": "2.2.0"
   },
   "peerDependencies": {
     "react": "^19.3.0",

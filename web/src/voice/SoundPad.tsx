@@ -22,6 +22,7 @@ import { EmojiPicker } from "../ui/EmojiPicker";
 import {
   ChevronDownIcon,
   DotsVerticalIcon,
+  HeadphonesIcon,
   PencilIcon,
   PlayIcon,
   PlusIcon,
@@ -47,7 +48,6 @@ import {
   setSoundboard,
   soundFileDuration,
   stopMySounds,
-  setPreviewVolume,
   stopPreview,
   toggleFavorite,
 } from "./soundboard";
@@ -71,12 +71,11 @@ type DialogState =
   | { kind: "delete"; sound: Sound }
   | null;
 
-// The same two faces as the neighbours: the 40px pill in the call panel, the labelled 44px button in the call controls.
+// Match the bottom-left panel and the controls under the call.
 const BUTTON = {
   panel:
     "flex h-10 w-full items-center justify-center rounded-full bg-default text-foreground [&_svg]:size-5",
-  control:
-    "flex h-11 items-center gap-2 whitespace-nowrap rounded-full bg-default px-3.5 text-[15px] font-medium text-foreground @[640px]:px-4",
+  control: "call-control @max-[23rem]:w-8 @max-[23rem]:min-w-8",
 } as const;
 const BUTTON_ENABLED =
   "outline-none transition-colors hover:bg-[#28282d] aria-expanded:bg-[#28282d] data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus";
@@ -98,6 +97,10 @@ export function SoundboardButton({
   const [dialog, setDialog] = useState<DialogState>(null);
   const label = t("voice.soundboard.label");
 
+  useEffect(() => {
+    if (open) return () => stopPreview();
+  }, [open]);
+
   function show(next: NonNullable<DialogState>) {
     stopPreview();
     setOpen(false);
@@ -108,14 +111,7 @@ export function SoundboardButton({
     setOpen(true);
   }
 
-  const face = (
-    <>
-      <SoundboardIcon size={look === "control" ? 18 : 20} />
-      {look === "control" && (
-        <span className="hidden @[800px]:inline">{label}</span>
-      )}
-    </>
-  );
+  const face = <SoundboardIcon size={20} />;
   const trigger = disabled ? (
     <button
       type="button"
@@ -129,14 +125,13 @@ export function SoundboardButton({
   ) : (
     <Popover
       isOpen={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        // The stop button lives inside the popover: closing it ends the preview, so nothing plays on with no way to stop.
-        if (!next) stopPreview();
-      }}
+      onOpenChange={setOpen}
     >
-      <Popover.Trigger
+      <Popover.Trigger<'button'>
+        render={(props) => <button {...props} />}
+        type="button"
         aria-label={label}
+        title={label}
         className={`${BUTTON[look]} ${BUTTON_ENABLED}`}
       >
         {face}
@@ -161,14 +156,7 @@ export function SoundboardButton({
 
   return (
     <>
-      {look === "panel" && !disabled ? (
-        <Tooltip delay={300} closeDelay={0}>
-          <Tooltip.Trigger>{trigger}</Tooltip.Trigger>
-          <Tooltip.Content>{label}</Tooltip.Content>
-        </Tooltip>
-      ) : (
-        trigger
-      )}
+      {trigger}
       {dialog?.kind === "add" && <SoundDialog onClose={hide} />}
       {dialog?.kind === "edit" && (
         <SoundDialog sound={dialog.sound} onClose={hide} />
@@ -294,7 +282,7 @@ function Panel({
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("voice.soundboard.search")}
             aria-label={t("voice.soundboard.search")}
-            className="block h-10 w-full rounded-[12px] border border-white/[0.07] bg-white/[0.03] pl-10 pr-3 text-[15px] outline-none transition-colors placeholder:text-faint focus:border-white/40"
+            className="block h-10 w-full rounded-row border border-white/[0.07] bg-white/[0.03] pl-10 pr-3 text-[15px] outline-none transition-colors placeholder:text-faint focus:border-white/40"
           />
         </label>
         {(playing || listening) && (
@@ -302,8 +290,11 @@ function Panel({
             type="button"
             aria-label={t("voice.soundboard.stop")}
             title={t("voice.soundboard.stop")}
-            onClick={() => void stopMySounds()}
-            className="flex size-10 shrink-0 items-center justify-center rounded-[12px] text-foreground outline-none transition-colors hover:bg-white/[0.08] focus-visible:ring-2 focus-visible:ring-focus"
+            onClick={() => {
+              stopPreview();
+              void stopMySounds();
+            }}
+            className="flex size-10 shrink-0 items-center justify-center rounded-row text-foreground outline-none transition-colors hover:bg-white/[0.08] focus-visible:ring-2 focus-visible:ring-focus"
           >
             <StopIcon size={16} />
           </button>
@@ -318,20 +309,19 @@ function Panel({
           >
             {sections.map((s) => (
               <Tooltip key={s.id} delay={300} closeDelay={0}>
-                <Tooltip.Trigger>
-                  <button
-                    type="button"
-                    aria-label={s.title}
-                    aria-current={active === s.id || undefined}
-                    onClick={() => jump(s.id)}
-                    className={`flex size-8 items-center justify-center rounded-[10px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus ${active === s.id ? "bg-white/[0.1] text-foreground" : "text-muted hover:bg-white/[0.05] hover:text-foreground"}`}
-                  >
-                    {s.id === "favorites" ? (
-                      <StarIcon size={18} />
-                    ) : (
-                      <SoundboardIcon size={18} />
-                    )}
-                  </button>
+                <Tooltip.Trigger<'button'>
+                  render={(props) => <button {...props} />}
+                  type="button"
+                  aria-label={s.title}
+                  aria-current={active === s.id || undefined}
+                  onClick={() => jump(s.id)}
+                  className={`flex size-8 items-center justify-center rounded-tight outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus ${active === s.id ? "bg-white/[0.1] text-foreground" : "text-muted hover:bg-white/[0.05] hover:text-foreground"}`}
+                >
+                  {s.id === "favorites" ? (
+                    <StarIcon size={18} />
+                  ) : (
+                    <SoundboardIcon size={18} />
+                  )}
                 </Tooltip.Trigger>
                 <Tooltip.Content placement="right">{s.title}</Tooltip.Content>
               </Tooltip>
@@ -366,10 +356,10 @@ function Panel({
                 <button
                   type="button"
                   onClick={onAdd}
-                  className="flex h-10 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-[12px] border border-dashed border-white/20 px-2 text-[13px] text-muted outline-none transition-colors hover:border-white/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus"
+                  className="flex h-10 w-full items-center justify-center gap-1.5 rounded-row border border-dashed border-white/20 px-2 text-[13px] text-muted outline-none transition-colors hover:border-white/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   <PlusIcon size={14} className="shrink-0" />
-                  <span className="min-w-0 truncate">
+                  <span className="min-w-0 text-center leading-tight">
                     {t("voice.soundboard.add")}
                   </span>
                 </button>
@@ -413,7 +403,7 @@ function Section({
         {icon}
         <span className="min-w-0 truncate">{title}</span>
       </button>
-      {!folded && <div className="grid grid-cols-3 gap-1.5">{children}</div>}
+      {!folded && <div className="grid grid-cols-2 gap-1.5">{children}</div>}
     </section>
   );
 }
@@ -428,7 +418,7 @@ function VolumeButton() {
     <Popover>
       <Popover.Trigger
         aria-label={label}
-        className={`flex size-10 shrink-0 items-center justify-center rounded-[12px] outline-none transition-colors hover:bg-white/[0.08] hover:text-foreground aria-expanded:bg-white/[0.08] aria-expanded:text-foreground data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus ${muted ? "text-foreground" : "text-muted"}`}
+        className={`flex size-10 shrink-0 items-center justify-center rounded-row outline-none transition-colors hover:bg-white/[0.08] hover:text-foreground aria-expanded:bg-white/[0.08] aria-expanded:text-foreground data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus ${muted ? "text-foreground" : "text-muted"}`}
       >
         {muted ? <SpeakerSlashIcon size={18} /> : <SpeakerIcon size={18} />}
       </Popover.Trigger>
@@ -476,19 +466,9 @@ function VolumeButton() {
 }
 
 const TILE_ACTION =
-  "flex size-6 items-center justify-center rounded-full text-muted outline-none transition-[background-color,color,opacity] hover:bg-white/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus";
-// Shown on hover and for the keyboard; on a touch screen only the "…" stays, and it holds the rest.
-const REVEAL =
-  "opacity-0 pointer-fine:group-hover:opacity-100 group-has-[:focus-visible]:opacity-100";
-const CONCEAL =
-  "pointer-fine:group-hover:opacity-0 group-has-[:focus-visible]:opacity-0";
+  "relative flex size-7 shrink-0 items-center justify-center rounded-full text-muted outline-none transition-colors hover:bg-white/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus";
 
-/**
- * One clip as a 40px pill: the emoji, then the name on one line (the tooltip has all of it). A click plays it for the
- * call; while it plays (`playing`) a fill sweeps across the pill over the clip's length. On hover the emoji turns
- * into a play glyph (listening, only you hear it) and the star and "…" show at the right end; a right-click opens
- * the same menu with edit and delete. The buttons sit beside the pill's own button, not in it.
- */
+/** Clicking the pill plays to the call. The headphones button previews or stops a local listen. */
 function SoundTile({
   sound,
   favorite,
@@ -505,19 +485,17 @@ function SoundTile({
   const { t } = useT();
   const [menu, setMenu] = useState(false);
   const previewing = useStore((s) => s.previewing === sound.id);
-  // The full name as a tooltip only when the pill cuts it short.
-  const nameRef = useRef<HTMLSpanElement>(null);
-  const [truncated, setTruncated] = useState(false);
   const star = favorite
     ? t("voice.soundboard.unfavorite")
     : t("voice.soundboard.favorite");
   const long = sound.durationMs > LONG_MS;
-  const toggle = () => void (playing ? stopMySounds() : playSound(sound));
+  const broadcast = t(playing ? "voice.soundboard.stopForCall" : "voice.soundboard.playForCall", { name: sound.name });
+  const previewLabel = t(previewing ? "voice.soundboard.stopPreview" : "voice.soundboard.previewOnly", { name: sound.name });
 
   return (
     <div
       data-playing={playing ? "" : undefined}
-      className="group relative h-10 overflow-hidden rounded-[12px] bg-[color-mix(in_oklab,var(--overlay),white_6%)] transition-colors hover:bg-[color-mix(in_oklab,var(--overlay),white_11%)] data-[playing]:bg-[color-mix(in_oklab,var(--overlay),white_14%)] data-[playing]:shadow-[inset_0_0_0_1px_rgb(255_255_255/0.22)]"
+      className="relative flex h-10 min-w-0 items-center overflow-hidden rounded-row bg-[color-mix(in_oklab,var(--overlay),white_6%)] transition-colors hover:bg-[color-mix(in_oklab,var(--overlay),white_11%)] data-[playing]:bg-[color-mix(in_oklab,var(--overlay),white_14%)] data-[playing]:shadow-[inset_0_0_0_1px_rgb(255_255_255/0.22)]"
       onContextMenu={(e) => {
         e.preventDefault();
         setMenu(true);
@@ -536,84 +514,58 @@ function SoundTile({
           }}
         />
       )}
-      <Tooltip delay={400} closeDelay={0} isDisabled={!truncated}>
-        {/* The trigger is a wrapper of its own: without the pill's size the button inside collapses to its text. */}
-        <Tooltip.Trigger className="block h-full w-full">
-          <button
-            type="button"
-            onClick={toggle}
-            onPointerEnter={() => setTruncated(!!nameRef.current && nameRef.current.scrollWidth > nameRef.current.clientWidth)}
-            className={`relative flex h-full w-full items-center rounded-[12px] pl-[38px] pr-3 text-left text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus pointer-coarse:pr-8 ${menu ? "pr-8" : "pointer-fine:group-hover:pr-8 group-has-[:focus-visible]:pr-8"}`}
-          >
-            <span ref={nameRef} className="min-w-0 truncate">
-              {sound.name}
-            </span>
-            {long && (
-              // On hover the menu's dots take the end of the pill: the length steps aside.
-              <span className={`ml-auto shrink-0 pl-2 text-[11px] text-muted pointer-coarse:hidden ${menu ? "hidden" : "pointer-fine:group-hover:hidden group-has-[:focus-visible]:hidden"}`}>
-                {clock(sound.durationMs)}
-              </span>
-            )}
-          </button>
-        </Tooltip.Trigger>
-        <Tooltip.Content>{sound.name}</Tooltip.Content>
-      </Tooltip>
-      <button
-        type="button"
-        aria-label={
-          playing || previewing ? t("voice.soundboard.stop") : t("voice.soundboard.preview")
-        }
-        onClick={() => (playing ? void stopMySounds() : previewing ? stopPreview() : previewSound(sound))}
-        // On a touch screen the whole pill plays; only a preview's stop takes the tap here (it began from the menu).
-        className={`absolute left-1 top-1 flex size-8 items-center justify-center rounded-full outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-focus ${previewing ? "" : "pointer-coarse:pointer-events-none"}`}
-      >
-        {playing || previewing ? (
-          <StopIcon size={14} />
-        ) : (
-          <>
-            <span
-              className={`flex items-center justify-center text-[17px] leading-none transition-opacity ${CONCEAL}`}
-            >
-              {sound.emoji || (
-                <SoundboardIcon size={16} className="text-muted" />
-              )}
-            </span>
-            <span
-              className={`absolute flex items-center justify-center transition-opacity ${REVEAL}`}
-            >
-              <PlayIcon size={13} />
-            </span>
-          </>
-        )}
-      </button>
-      <Dropdown isOpen={menu} onOpenChange={setMenu}>
-        <Dropdown.Trigger
-          aria-label={t("voice.soundboard.actions", { name: sound.name })}
-          // On hover with a mouse (right-click opens it too); a finger gets it always.
-          className={`${TILE_ACTION} absolute right-1 top-2 pointer-coarse:opacity-100 ${menu ? "opacity-100" : REVEAL}`}
+      <Tooltip delay={400} closeDelay={0}>
+        <Tooltip.Trigger<'button'>
+          render={(props) => <button {...props} />}
+          type="button"
+          aria-label={broadcast}
+          onClick={() => {
+            if (playing) void stopMySounds();
+            else {
+              stopPreview();
+              void playSound(sound);
+            }
+          }}
+          className="relative flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-l-[12px] pl-2 pr-1 text-left text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
         >
+          <span aria-hidden className="flex size-5 shrink-0 items-center justify-center text-[17px] leading-none">
+            {playing ? <StopIcon size={13} /> : sound.emoji || <SoundboardIcon size={15} className="text-muted" />}
+          </span>
+          <span className="min-w-0 flex-1 truncate">{sound.name}</span>
+          {long && <span className="shrink-0 text-[11px] text-muted">{clock(sound.durationMs)}</span>}
+        </Tooltip.Trigger>
+        <Tooltip.Content>{broadcast}</Tooltip.Content>
+      </Tooltip>
+      <Tooltip delay={300} closeDelay={0}>
+        <Tooltip.Trigger<'button'>
+          render={(props) => <button {...props} />}
+          type="button"
+          aria-label={previewLabel}
+          onClick={() => previewing ? stopPreview() : previewSound(sound)}
+          className={`${TILE_ACTION} ${previewing ? "bg-white/10 text-foreground" : ""}`}
+        >
+          {previewing ? <StopIcon size={14} /> : <HeadphonesIcon size={16} />}
+        </Tooltip.Trigger>
+        <Tooltip.Content>{previewLabel}</Tooltip.Content>
+      </Tooltip>
+      <Dropdown isOpen={menu} onOpenChange={setMenu}>
+        <Dropdown.Trigger aria-label={t("voice.soundboard.actions", { name: sound.name })} className={`${TILE_ACTION} mr-1`}>
           <DotsVerticalIcon size={16} />
         </Dropdown.Trigger>
         <Dropdown.Popover placement="bottom end" className="min-w-48">
           <Dropdown.Menu
             aria-label={t("voice.soundboard.actions", { name: sound.name })}
             onAction={(key) => {
-              if (key === "preview") previewSound(sound);
               if (key === "favorite") toggleFavorite(sound.id);
               if (key === "edit") onEdit();
               if (key === "delete") onDelete();
             }}
           >
             <MenuItem
-              id="preview"
-              label={t("voice.soundboard.preview")}
-              icon={<PlayIcon size={16} />}
-            />
-            <MenuItem
               id="favorite"
               label={star}
               icon={
-                favorite ? <StarFilledIcon size={16} /> : <StarIcon size={16} />
+                favorite ? <StarFilledIcon size={16} /> : <StarIcon size={16} className="text-muted" />
               }
             />
             <MenuItem
@@ -679,17 +631,16 @@ function SoundDialog({
   const checkId = useRef(0);
   const local = useRef<{ file: File; url: string } | null>(null);
   // Whether this window started a preview: closing it (cancel, the cross, Esc, a finished upload) ends that preview.
-  const listened = useRef(false);
+  const listened = useRef<ReturnType<typeof previewSound> | null>(null);
 
   function endListening() {
-    if (!listened.current) return;
-    listened.current = false;
-    stopPreview();
+    listened.current?.stop();
+    listened.current = null;
   }
 
   useEffect(
     () => () => {
-      if (listened.current) stopPreview();
+      listened.current?.stop();
       if (local.current) URL.revokeObjectURL(local.current.url);
     },
     [],
@@ -720,9 +671,8 @@ function SoundDialog({
   }
 
   function listen() {
-    listened.current = true;
     if (sound) {
-      previewSound({ ...sound, volume });
+      listened.current = previewSound({ ...sound, volume });
       return;
     }
     if (!file || fileError) return;
@@ -730,7 +680,7 @@ function SoundDialog({
       if (local.current) URL.revokeObjectURL(local.current.url);
       local.current = { file, url: URL.createObjectURL(file) };
     }
-    previewSound({
+    listened.current = previewSound({
       id: "",
       userId: "",
       name,
@@ -835,7 +785,7 @@ function SoundDialog({
             <EmojiPicker
               label={t("voice.soundboard.emojiPick")}
               onPick={setEmoji}
-              className="flex size-[46px] shrink-0 items-center justify-center rounded-[12px] border border-white/[0.07] bg-white/[0.03] text-[22px] outline-none transition-colors hover:border-white/20 aria-expanded:border-white/40 data-[focus-visible=true]:border-white/40"
+              className="flex size-[46px] shrink-0 items-center justify-center rounded-row border border-white/[0.07] bg-white/[0.03] text-[22px] outline-none transition-colors hover:border-white/20 aria-expanded:border-white/40 data-[focus-visible=true]:border-white/40"
             >
               {emoji || <SmileIcon size={20} className="text-muted" />}
             </EmojiPicker>
@@ -851,7 +801,7 @@ function SoundDialog({
           onChange={(v) => {
             const next = Array.isArray(v) ? v[0] : v;
             setVolume(next);
-            setPreviewVolume(next);
+            listened.current?.setVolume(next);
           }}
           minValue={0}
           maxValue={1}

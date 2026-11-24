@@ -1,5 +1,9 @@
 import { Fragment, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type DragEvent, type Ref } from 'react';
 import { Button, Dropdown, Input, Label, ScrollShadow, TextField } from '@heroui/react';
+import { ArrowUpIcon, PlusIcon } from '@heroicons/react/24/solid';
+import { MessageTools, PinsButton } from './MessageTools';
+import { openMessage } from './messageNavigation';
+import { forgetUnreadMarker } from '../store/chat';
 import { api } from '../api';
 import { addDm, getSessionEpoch, mergeMessages, openFriends, openPicker, PAGE_SIZE, refreshDms, setEditing, setHasMore, setReplyingTo, showError, useNameColor, useStore, voiceMembers } from '../store';
 import { deleteMessage, editMessage, sendMessage, sendTyping, toggleReaction } from '../socket';
@@ -24,7 +28,7 @@ import { invitedRoom, Markdown, mentionsToNames, namesToMentions, plainText } fr
 import { RoomCard } from '../voice/RoomCard';
 import { RoundButton } from '../ui/ui';
 import { EmptyState } from '../ui/Illustrations';
-import { ArrowUpIcon, AtIcon, DotsIcon, HashIcon, LogoutIcon, PaperclipIcon, PencilIcon, PlusIcon, ReplyIcon, SmileIcon, TrashIcon, UserPlusIcon, XIcon } from '../ui/icons';
+import { AtIcon, DotsIcon, HashIcon, LogoutIcon, PaperclipIcon, PencilIcon, ReplyIcon, SmileIcon, TrashIcon, UserPlusIcon, XIcon } from '../ui/icons';
 
 const GROUP_GAP = 7 * 60_000;
 const TYPING_TTL = 4500;
@@ -50,9 +54,10 @@ export function ChatView({ conversation, room = false }: { conversation: Convers
   const { t } = useT();
   const channel = conversation;
   const isDm = conversation.kind === 'dm';
-  const messages = useStore((s) => s.messages[channel.id]);
+  const context = useStore((s) => s.searchContext?.conversation === channel.id ? s.searchContext.messages : null);
+  const messages = useStore((s) => context ?? s.messages[channel.id]);
   const loaded = useStore((s) => s.hasMore[channel.id] !== undefined);
-  const hasMore = useStore((s) => s.hasMore[channel.id] ?? false);
+  const hasMore = useStore((s) => !context && (s.hasMore[channel.id] ?? false));
   const peer = useStore((s) => (conversation.userId ? s.users[conversation.userId] : undefined));
   const dm = useStore((s) => (isDm ? s.dms.find((d) => d.id === conversation.id) : undefined));
   const isGroup = dm?.kind === 'group';
@@ -61,16 +66,53 @@ export function ChatView({ conversation, room = false }: { conversation: Convers
   const stickToBottom = useRef(true);
   const restoreFromBottom = useRef<number | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const loadingOlderRef = useRef(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyAttempt, setHistoryAttempt] = useState(0);
+  const [entry] = useState(() => {
+    const state = useStore.getState();
+    return {id: state.firstUnread[channel.id], token: state.manualUnread[channel.id]};
+  });
+  const manualFirst = useStore(s => s.manualUnread[channel.id] ? s.firstUnread[channel.id] : null);
+  const [lastManual, setLastManual] = useState<string | null>(null);
+  useEffect(() => { if (manualFirst) setLastManual(manualFirst); }, [manualFirst]);
+  const divider = manualFirst ?? lastManual ?? entry.id;
+  useEffect(() => {
+    if (!entry.id || useStore.getState().jumpTo || location.hash.startsWith('#message=')) return;
+    const readAt = Date.now();
+    let active = true;
+    void openMessage(entry.id, false, () => active).then(async ok => {
+      if (!ok || !active) return;
+      if (entry.token) {
+        try {
+          await api.markRead(channel.id, readAt, entry.token);
+          if (active) forgetUnreadMarker(channel.id, entry.token);
+        } catch (error) { if (active) showError(String(error)); }
+      }
+      if (useStore.getState().firstUnread[channel.id] === entry.id) {
+        useStore.setState(s => {
+          const firstUnread = {...s.firstUnread};
+          delete firstUnread[channel.id];
+          return {firstUnread};
+        });
+      }
+    });
+    return () => {active = false;};
+  }, [channel.id, entry]);
   const composer = useRef<ComposerHandle>(null);
   const [dragging, setDragging] = useState(false);
   // dragenter/dragleave fire for every child crossed; count them to know when the pointer really left.
   const dragDepth = useRef(0);
 
   useEffect(() => {
-    if (!loaded) void ensureHistory(channel.id, conversation.kind);
-    // `conversation` is stable per mounted chat (the view is keyed by id).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channel.id, loaded]);
+    if (loaded) return;
+    let active = true;
+    const epoch = getSessionEpoch();
+    void ensureHistory(channel.id, conversation.kind).catch((error: unknown) => {
+      if (active && epoch === getSessionEpoch()) setHistoryError(error instanceof Error ? error.message : String(error));
+    });
+    return () => { active = false; };
+  }, [channel.id, conversation.kind, historyAttempt, loaded]);
 
   const keepPinned = useCallback(() => {
     const el = scrollRef.current;
@@ -99,8 +141,9 @@ export function ChatView({ conversation, room = false }: { conversation: Convers
 
   async function loadOlder() {
     const oldest = messages?.[0];
-    if (!oldest || loadingOlder) return;
+    if (!oldest || loadingOlderRef.current) return;
     const epoch = getSessionEpoch();
+    loadingOlderRef.current = true;
     setLoadingOlder(true);
     try {
       const list = await fetchHistory(conversation, oldest);
@@ -112,6 +155,7 @@ export function ChatView({ conversation, room = false }: { conversation: Convers
     } catch (e) {
       if (epoch === getSessionEpoch()) showError(t('chat.loadFailed', { error: e instanceof Error ? e.message : String(e) }));
     } finally {
+      loadingOlderRef.current = false;
       setLoadingOlder(false);
     }
   }
@@ -145,7 +189,7 @@ export function ChatView({ conversation, room = false }: { conversation: Convers
       }}
     >
       {dragging && (
-        <div className="pointer-events-none absolute inset-3 z-20 flex flex-col items-center justify-center gap-1 rounded-[24px] border-2 border-dashed border-accent bg-window/90 text-center">
+        <div className="pointer-events-none absolute inset-3 z-20 flex flex-col items-center justify-center gap-1 rounded-popover border-2 border-dashed border-accent bg-window/90 text-center">
           <div className="text-[20px] font-medium">{t('chat.drop.title')}</div>
           <div className="text-[15px] text-muted">
             {t(isGroup ? 'chat.drop.group' : isDm ? 'chat.drop.dm' : room ? 'chat.drop.room' : 'chat.drop.channel', { title: channel.title })}
@@ -166,12 +210,17 @@ export function ChatView({ conversation, room = false }: { conversation: Convers
               </HeaderIcon>
             }
             title={channel.title}
+            actions={<PinsButton channel={channel.id}/>}
             menu={<ChannelMenu channelId={channel.id} />}
           />
           <OngoingCall />
         </>
       )}
 
+      {context && <button className="mx-auto my-1 rounded-full bg-default px-4 py-2 text-sm hover:bg-white/10" onClick={() => {
+        stickToBottom.current = true;
+        useStore.setState({ searchContext: null });
+      }}>{t('chat.search.latest')}</button>}
       {/* Messages fade out under the header and over the composer instead of being cut off; only on a side that has more. */}
       <ScrollShadow
         ref={scrollRef}
@@ -181,7 +230,7 @@ export function ChatView({ conversation, room = false }: { conversation: Convers
           stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
           if (el.scrollTop < 120 && hasMore) loadOlder();
         }}
-        className="flex flex-1 flex-col overflow-y-auto px-2 pb-2"
+        className="flex flex-1 flex-col overflow-y-auto px-[calc(var(--app-pane-inset)-8px)] pb-2"
       >
         {/* Nothing written yet: the conversation's drawing in the middle instead of the header at the top. */}
         {loaded && !hasMore && list.length === 0 ? (
@@ -193,8 +242,17 @@ export function ChatView({ conversation, room = false }: { conversation: Convers
         ) : (
           <div className="flex-1" />
         )}
-        {loaded && !hasMore && list.length > 0 && (
-          <div className="px-4 pb-2 pt-6">
+        {!loaded && historyError !== null && (
+          <div className="flex flex-col items-center gap-2 px-4 py-3 text-center text-[14px] text-muted">
+            <p role="status">{t('chat.loadFailed', { error: historyError })}</p>
+            <Button size="sm" onPress={() => {
+              setHistoryError(null);
+              setHistoryAttempt((n) => n + 1);
+            }}>{t('chat.retryHistory')}</Button>
+          </div>
+        )}
+        {!context && loaded && !hasMore && list.length > 0 && (
+          <div className="px-2 pb-2 pt-6">
             {isGroup && dm ? (
               <>
                 <DmAvatar dm={dm} size={72} />
@@ -223,7 +281,7 @@ export function ChatView({ conversation, room = false }: { conversation: Convers
             )}
           </div>
         )}
-        {hasMore && <div className="py-3 text-center text-[13px] text-muted">{loadingOlder ? t('chat.loadingOlder') : ''}</div>}
+        {hasMore && <div className="h-6 shrink-0 text-center text-[13px] leading-6 text-muted">{loadingOlder ? t('chat.loadingOlder') : ''}</div>}
 
         {list.map((m, i) => {
           const prev = list[i - 1];
@@ -236,7 +294,8 @@ export function ChatView({ conversation, room = false }: { conversation: Convers
                   <span className="rounded-full bg-default px-3 py-1 text-[12px] font-medium text-muted">{dayDivider(m.createdAt)}</span>
                 </div>
               )}
-              <MessageRow message={m} startsGroup={startsGroup} />
+              {m.id === divider && <div role="separator" className="my-2 flex items-center gap-2 px-3 text-xs font-medium text-accent before:h-px before:flex-1 before:bg-current after:h-px after:flex-1 after:bg-current">{t('chat.tools.divider')}</div>}
+              <MessageRow message={m} startsGroup={startsGroup || m.id === divider} />
             </Fragment>
           );
         })}
@@ -251,6 +310,7 @@ export function ChatView({ conversation, room = false }: { conversation: Convers
         onSend={() => {
           // Your own message always brings you down to it, even if you were reading history.
           stickToBottom.current = true;
+          if (context) useStore.setState({ searchContext: null });
         }}
       />
     </div>
@@ -308,7 +368,7 @@ function ConversationMenu({ dm, onRename, onLeave }: { dm: Dm; onRename: () => v
       <Dropdown>
         <Dropdown.Trigger
           aria-label={t('chat.more')}
-          className="flex h-10 w-10 items-center justify-center rounded-full text-foreground outline-none transition-colors hover:bg-white/10 data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus"
+          className="header-action"
         >
           <DotsIcon size={20} />
         </Dropdown.Trigger>
@@ -410,7 +470,7 @@ function OngoingCall() {
   const inside = room.channel.id === myRoom;
 
   return (
-    <div className="mx-2 mt-2 flex shrink-0 items-center gap-4 rounded-full bg-default py-2 pl-2 pr-2 max-md:gap-3 md:mx-6 md:mt-1">
+    <div className="mx-(--app-pane-inset) mt-2 flex shrink-0 items-center gap-4 rounded-control bg-default p-2 max-md:gap-3 md:mt-1">
       {/* On a phone only the first three faces, so the room name and the button still fit. */}
       <div className="flex shrink-0 items-center gap-1 max-md:[&>*:nth-child(n+4)]:hidden">
         {room.members.slice(0, 5).map((m) => (
@@ -452,7 +512,7 @@ const MessageRow = memo(function MessageRow(props: { message: Message; startsGro
   const [shown, setShown] = useState(false);
   if (blocked && !shown) {
     return (
-      <div className="py-1 pl-[68px] pr-4 text-[13px] text-faint">
+      <div id={`msg-${props.message.id}`} className="py-1 pl-[60px] pr-2 text-[13px] text-faint">
         {t('chat.blocked.label')} ·{' '}
         <button onClick={() => setShown(true)} className="text-muted hover:text-foreground hover:underline">
           {t('chat.blocked.show')}
@@ -486,14 +546,14 @@ function MessageBody({ message, startsGroup }: { message: Message; startsGroup: 
   return (
     <div
       id={`msg-${message.id}`}
-      className={`group relative rounded-[16px] pl-[68px] pr-4 transition-colors ${showHeader ? 'mt-4 pb-0.5 pt-0.5' : 'py-0.5'} ${
+      className={`group relative rounded-surface pl-[60px] pr-2 transition-colors ${showHeader ? 'mt-4 pb-0.5 pt-0.5' : 'py-0.5'} ${
         'hover:bg-white/[0.03]'
       } ${editing ? 'bg-white/[0.03]' : ''}`}
     >
       {message.replyTo && <ReplyLine reply={message.replyTo} />}
       {showHeader ? (
         <>
-          <UserProfile userId={message.userId} className={`absolute left-4 cursor-pointer rounded-full ${message.replyTo ? 'top-7' : 'top-1'}`}>
+          <UserProfile userId={message.userId} className={`absolute left-2 cursor-pointer rounded-full ${message.replyTo ? 'top-7' : 'top-1'}`}>
             <Avatar user={user} size={40} />
           </UserProfile>
           <div className="flex items-baseline gap-2">
@@ -507,7 +567,7 @@ function MessageBody({ message, startsGroup }: { message: Message; startsGroup: 
           </div>
         </>
       ) : (
-        <span className="absolute left-0 w-[60px] select-none text-right text-[11px] leading-[22px] text-faint opacity-0 group-hover:opacity-100">
+        <span className="absolute left-0 w-[52px] select-none text-right text-[11px] leading-[22px] text-faint opacity-0 group-hover:opacity-100">
           {timeOf(message.createdAt)}
         </span>
       )}
@@ -535,6 +595,7 @@ function MessageBody({ message, startsGroup }: { message: Message; startsGroup: 
       <Reactions message={message} meId={meId} />
       {!editing && (
         <MessageActions
+          message={message}
           onReact={(emoji) => toggleReaction(message.id, emoji)}
           onReply={() => setReplyingTo(message.channelId, message.id)}
           onEdit={mine && message.content !== undefined && !invitedRoom(message.content) ? () => setEditing(message.id) : undefined}
@@ -565,7 +626,7 @@ function ReplyLine({ reply }: { reply: NonNullable<Message['replyTo']> }) {
 
   function jump() {
     const el = document.getElementById(`msg-${reply.id}`);
-    if (!el) return;
+    if (!el) { void openMessage(reply.id); return; }
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     el.animate([{ backgroundColor: 'rgba(255,255,255,0.12)' }, { backgroundColor: 'transparent' }], { duration: 1400 });
   }
@@ -619,7 +680,7 @@ function Reactions({ message, meId }: { message: Message; meId: string | undefin
 }
 
 /** Hover bar at the message's top right: quick reactions, any emoji, reply, edit, delete. */
-function MessageActions(props: { onReact: (emoji: string) => void; onReply: () => void; onEdit?: () => void; onDelete?: (e?: { shiftKey?: boolean }) => void }) {
+function MessageActions(props: { message: Message; onReact: (emoji: string) => void; onReply: () => void; onEdit?: () => void; onDelete?: (e?: { shiftKey?: boolean }) => void }) {
   const { t } = useT();
   const btn = 'flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/10 hover:text-foreground';
   return (
@@ -636,6 +697,7 @@ function MessageActions(props: { onReact: (emoji: string) => void; onReply: () =
       <button onClick={props.onReply} aria-label={t('chat.reply')} title={t('chat.reply')} className={btn}>
         <ReplyIcon size={18} />
       </button>
+      <MessageTools message={props.message} className={btn}/>
       {props.onEdit && (
         <button onClick={props.onEdit} aria-label={t('chat.edit')} title={t('chat.edit')} className={btn}>
           <PencilIcon size={17} />
@@ -656,6 +718,8 @@ function EditBox({ message }: { message: Message }) {
   const users = useStore((s) => s.users);
   const [text, setText] = useState(() => mentionsToNames(message.content, users));
   const ref = useRef<HTMLTextAreaElement>(null);
+  const saving = useRef(false);
+  const [busy, setBusy] = useState(false);
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -671,10 +735,20 @@ function EditBox({ message }: { message: Message }) {
   }, []);
 
   async function save() {
+    if (saving.current) return;
     const content = namesToMentions(text.trim(), users);
     if (content === message.content) return setEditing(null);
     if (!content && message.attachments.length === 0) return showError(t('chat.emptyEdit'));
-    if (await editMessage(message.id, content)) setEditing(null);
+    saving.current = true;
+    setBusy(true);
+    const epoch = getSessionEpoch();
+    try {
+      const saved = await editMessage(message.id, content);
+      if (saved && ref.current && epoch === getSessionEpoch() && useStore.getState().editingId === message.id) setEditing(null);
+    } finally {
+      saving.current = false;
+      setBusy(false);
+    }
   }
 
   return (
@@ -682,21 +756,23 @@ function EditBox({ message }: { message: Message }) {
       <textarea
         ref={ref}
         value={text}
+        readOnly={busy}
         rows={1}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
+          if (e.nativeEvent.isComposing) return;
           if (e.key === 'Escape') setEditing(null);
-          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+          if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             void save();
           }
         }}
         aria-label={t('chat.editMessage')}
-        className="w-full resize-none rounded-[20px] bg-default px-4 py-2.5 text-[16px] leading-6 text-foreground outline-none"
+        className="w-full resize-none rounded-panel bg-default px-4 py-2.5 text-[16px] leading-6 text-foreground outline-none"
       />
       <div className="px-1 pt-1 text-[12px] text-faint">
         Esc — <button onClick={() => setEditing(null)} className="text-[#64a8ff] hover:underline">{t('chat.editCancel')}</button> · Enter —{' '}
-        <button onClick={() => void save()} className="text-[#64a8ff] hover:underline">{t('chat.editSave')}</button>
+        <button disabled={busy} onClick={() => void save()} className="text-[#64a8ff] hover:underline disabled:opacity-50">{t('chat.editSave')}</button>
       </div>
     </div>
   );
@@ -727,7 +803,7 @@ function TypingLine({ channelId, onVisibilityChange }: { channelId: string; onVi
   useLayoutEffect(onVisibilityChange, [visible, onVisibilityChange]);
 
   return (
-    <div className="flex h-6 shrink-0 items-center gap-1.5 px-8 text-[13px] text-muted">
+    <div className="flex h-6 shrink-0 items-center gap-1.5 px-(--app-pane-inset) text-[13px] text-muted">
       {visible && (
         <>
           <span className="flex gap-[3px]">
@@ -750,6 +826,16 @@ type ComposerHandle = { addFiles: (files: File[]) => void };
 type PendingFile = { key: string; name: string; size: number; preview?: string; upload?: Upload };
 
 type MentionOption = { id: string; label: string; user?: User };
+
+// An in-flight send can outlive its composer. Hold uploaded files for retry until the chat opens again.
+const sendDrafts = new Map<string, { text: string; files: PendingFile[]; result: Promise<boolean> | null }>();
+useStore.subscribe((state, previous) => {
+  if (state.me?.id !== previous.me?.id) sendDrafts.clear();
+});
+
+function revokePreview(file: PendingFile) {
+  if (file.preview?.startsWith('blob:')) URL.revokeObjectURL(file.preview);
+}
 
 /*
  * What's typed and not sent, per conversation, for this tab only: it lives through a reload (an update reloads the
@@ -777,19 +863,21 @@ function saveDraft(id: string, text: string) {
 function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: string; onResize: () => void; onSend: () => void }) {
   const { t } = useT();
   const { id, placeholder, onResize, onSend } = props;
-  const [text, setText] = useState(() => loadDraft(id));
-  const [pending, setPending] = useState<PendingFile[]>([]);
+  const [text, setText] = useState(() => sendDrafts.get(id)?.text ?? loadDraft(id));
+  const [pending, setPending] = useState<PendingFile[]>(() => sendDrafts.get(id)?.files ?? []);
+  const [sending, setSending] = useState(() => sendDrafts.get(id)?.result ?? null);
   const [caret, setCaret] = useState(0);
   const [pick, setPick] = useState(0);
+  const [dismissedMention, setDismissedMention] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
   const users = useStore((s) => s.users);
   const replyId = useStore((s) => s.replyingTo[id]);
-  const replyTo = useStore((s) => (replyId ? s.messages[id]?.find((m) => m.id === replyId) : undefined));
+  const replyTo = useStore((s) => (replyId ? (s.searchContext?.conversation === id ? s.searchContext.messages : s.messages[id])?.find((m) => m.id === replyId) : undefined));
   const uploading = pending.some((p) => !p.upload);
   const hasPending = pending.length > 0;
-  const canSend = !uploading && (text.trim().length > 0 || hasPending);
+  const canSend = !sending && !uploading && (text.trim().length > 0 || hasPending);
 
   // "@" right before the caret opens a list of people to mention.
   const mentionQuery = /(?:^|\s)@([^\s@]{0,32})$/.exec(text.slice(0, caret))?.[1];
@@ -804,18 +892,37 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
             .map((u) => ({ id: u.id, label: u.name, user: u })),
           ...(t('common.md.everyone').startsWith(mentionQuery.toLowerCase()) ? [{ id: 'all', label: t('common.md.everyone') }] : []),
         ];
-  const showMentions = options.length > 0;
+  const activeOption = options[pick] ?? options[0];
+  const showMentions = !sending && !!activeOption && dismissedMention !== text;
 
   useImperativeHandle(props.ref, () => ({ addFiles }));
 
   // Leaving the chat with pictures still attached: let the browser drop their local copies.
   const pendingNow = useRef(pending);
   pendingNow.current = pending;
-  useEffect(() => () => pendingNow.current.forEach((p) => p.preview && URL.revokeObjectURL(p.preview)), []);
+  useEffect(() => () => pendingNow.current.forEach(revokePreview), []);
+
+  useEffect(() => {
+    if (!sending) {
+      if (sendDrafts.get(id)?.result === null) sendDrafts.delete(id);
+      return;
+    }
+    let active = true;
+    void sending.then((sent) => {
+      if (!active) return;
+      if (sent) {
+        setText('');
+        pendingNow.current.forEach(revokePreview);
+        setPending([]);
+      }
+      setSending(null);
+    });
+    return () => { active = false; };
+  }, [id, sending]);
 
   // On a phone, focusing would pop the keyboard over the chat the moment it opens.
   useEffect(() => {
-    if (!isMobile) ref.current?.focus();
+    if (!isMobile && !document.activeElement?.closest('[data-message-search-panel]')) ref.current?.focus();
   }, [id, isMobile]);
 
   // Answering someone puts you straight back in the text field.
@@ -827,17 +934,36 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
 
   useEffect(() => saveDraft(id, text), [id, text]);
 
-  useLayoutEffect(() => {
+  const fitText = useCallback(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = '0px';
     el.style.height = `${Math.min(el.scrollHeight, 220)}px`;
-  }, [text]);
+  }, []);
+  useLayoutEffect(() => {
+    fitText();
+    onResize();
+  }, [fitText, onResize, text]);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let width = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (width === el.clientWidth) return;
+      width = el.clientWidth;
+      fitText();
+      onResize();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fitText, onResize]);
 
   // The preview strip and the reply line change the composer's height; keep the chat pinned to the newest message.
   useLayoutEffect(onResize, [hasPending, !!replyTo, onResize]);
 
   function addFiles(files: File[]) {
+    if (sendDrafts.get(id)?.result) return;
     const accepted = files.slice(0, Math.max(0, MAX_ATTACHMENTS - pending.length));
     if (accepted.length < files.length) showError(t('chat.maxAttachments', { n: MAX_ATTACHMENTS }));
     for (const file of accepted) {
@@ -857,7 +983,8 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
   }
 
   function remove(file: PendingFile) {
-    if (file.preview) URL.revokeObjectURL(file.preview);
+    if (sendDrafts.get(id)?.result) return;
+    revokePreview(file);
     setPending((list) => list.filter((p) => p.key !== file.key));
   }
 
@@ -872,23 +999,28 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
     });
   }
 
-  async function send() {
-    if (!canSend) return;
+  function send() {
+    if (!canSend || sendDrafts.get(id)?.result) return;
+    const epoch = getSessionEpoch();
     const content = namesToMentions(text.trim(), users);
-    const files = pending;
     const answering = replyId;
-    setText('');
-    setPending([]);
-    setReplyingTo(id, null);
+    saveDraft(id, text);
     onSend();
-    const ok = await sendMessage(id, content, files.map((p) => p.upload!.id), answering);
-    if (ok) {
-      files.forEach((p) => p.preview && URL.revokeObjectURL(p.preview));
-    } else {
-      setText((current) => current || mentionsToNames(content, users));
-      setPending((current) => (current.length ? current : files));
-      if (answering) setReplyingTo(id, answering);
-    }
+    // The mounted composer owns its blob URLs. A reopened one can use the uploaded previews.
+    const files = pending.map((file) => ({ ...file, preview: file.preview ? file.upload?.previewUrl ?? file.upload?.url : undefined }));
+    const result = sendMessage(id, content, files.map((file) => file.upload!.id), answering).then((sent) => {
+      if (epoch !== getSessionEpoch()) return false;
+      if (sent) {
+        sendDrafts.delete(id);
+        saveDraft(id, '');
+        if (useStore.getState().replyingTo[id] === answering) setReplyingTo(id, null);
+      } else {
+        sendDrafts.set(id, { text, files, result: null });
+      }
+      return sent;
+    });
+    sendDrafts.set(id, { text, files, result });
+    setSending(result);
   }
 
   function editLast() {
@@ -898,18 +1030,16 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
   }
 
   return (
-    <div className="relative flex items-end gap-3 px-6 pb-5 max-md:gap-2 max-md:px-2 max-md:pb-[max(8px,env(safe-area-inset-bottom))]">
+    <div className="relative shrink-0 px-(--app-pane-inset) pb-4 max-md:pb-[max(12px,env(safe-area-inset-bottom))]">
       {showMentions && (
-        <div role="listbox" aria-label={t('chat.mention')} className="absolute bottom-[calc(100%-8px)] left-[88px] right-[88px] z-20 rounded-[20px] border-[0.5px] border-white/10 bg-default p-1.5 shadow-[0_12px_32px_rgba(0,0,0,.5)] max-md:left-2 max-md:right-2">
+        <div role="listbox" aria-label={t('chat.mention')} className="absolute bottom-[calc(100%+4px)] inset-x-(--app-pane-inset) z-20 rounded-panel border-[0.5px] border-white/10 bg-default p-1.5 shadow-[0_12px_32px_rgba(0,0,0,.5)]">
           {options.map((o, i) => (
             <button
               key={o.id}
               role="option"
-              aria-selected={i === pick}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                insertMention(o);
-              }}
+              aria-selected={o === activeOption}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => insertMention(o)}
               onMouseEnter={() => setPick(i)}
               className={`flex h-10 w-full items-center gap-2.5 rounded-full px-2 text-left text-[15px] ${i === pick ? 'bg-white/10' : ''}`}
             >
@@ -926,9 +1056,6 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
           ))}
         </div>
       )}
-      <RoundButton size={isMobile ? 'md' : 'lg'} label={t('chat.attachFile')} onPress={() => fileInput.current?.click()} className="max-md:mb-1">
-        <PlusIcon strokeWidth={2.5} />
-      </RoundButton>
       <input
         ref={fileInput}
         type="file"
@@ -939,23 +1066,23 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
           e.target.value = '';
         }}
       />
-      <div className="flex min-h-12 min-w-0 flex-1 flex-col justify-center rounded-[24px] bg-default px-5">
+      <div data-chat-composer className="flex min-w-0 flex-col rounded-control bg-default">
         {replyTo && (
-          <div className="-mx-2 mt-2 flex items-center gap-2 rounded-full bg-white/[0.06] py-1.5 pl-3 pr-1.5 text-[13px] text-muted">
+          <div className="mx-3 mt-3 flex items-center gap-2 rounded-row bg-white/[0.06] py-1 pl-2 pr-1 text-[13px] text-muted">
             <ReplyIcon size={15} className="shrink-0" />
             <span className="min-w-0 flex-1 truncate">
               {t('chat.replyTo')} <span className="font-medium text-foreground">{users[replyTo.userId]?.name ?? '…'}</span>:{' '}
               {plainText(replyTo.content, users) || t('chat.attachmentLower')}
             </span>
-            <button onClick={() => setReplyingTo(id, null)} aria-label={t('chat.cancelReply')} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-white/10 hover:text-foreground">
+            <button disabled={!!sending} onClick={() => setReplyingTo(id, null)} aria-label={t('chat.cancelReply')} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-white/10 hover:text-foreground">
               <XIcon size={14} strokeWidth={2.5} />
             </button>
           </div>
         )}
         {hasPending && (
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 pt-4">
+          <div className="flex gap-2 overflow-x-auto px-3 pt-3">
             {pending.map((p) => (
-              <div key={p.key} className={`relative shrink-0 overflow-hidden bg-window ${p.preview ? 'h-24 w-24 rounded-[14px]' : 'flex h-24 w-44 flex-col justify-center gap-1 rounded-[18px] px-3'}`}>
+              <div key={p.key} className={`relative shrink-0 overflow-hidden bg-window ${p.preview ? 'h-24 w-24 rounded-card' : 'flex h-24 w-44 flex-col justify-center gap-1 rounded-compact px-3'}`}>
                 {p.preview ? (
                   <img src={p.preview} alt="" className={`h-full w-full object-cover transition-opacity ${p.upload ? '' : 'opacity-50'}`} />
                 ) : (
@@ -973,6 +1100,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
                 <button
                   type="button"
                   aria-label={t('chat.removeFile', { name: p.name })}
+                  disabled={!!sending}
                   onClick={() => remove(p)}
                   className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
                 >
@@ -982,55 +1110,70 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
             ))}
           </div>
         )}
-        <textarea
-          ref={ref}
-          rows={1}
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            setCaret(e.target.selectionStart ?? e.target.value.length);
-            sendTyping(id);
-          }}
-          onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
-          onKeyDown={(e) => {
-            if (showMentions && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+        <div className="flex min-h-12 min-w-0 items-end gap-2 p-1.5">
+          <RoundButton size="sm" tone="ghost" label={t('chat.attachFile')} isDisabled={!!sending} onPress={() => fileInput.current?.click()} className="rounded-row!">
+            <PlusIcon aria-hidden="true" />
+          </RoundButton>
+          <textarea
+            ref={ref}
+            rows={1}
+            value={text}
+            readOnly={!!sending}
+            aria-busy={!!sending || undefined}
+            onChange={(e) => {
+              if (sendDrafts.get(id)?.result) return;
+              setDismissedMention(null);
+              setText(e.target.value);
+              setCaret(e.target.selectionStart ?? e.target.value.length);
+              sendTyping(id);
+            }}
+            onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
+            onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing || sending) return;
+              if (showMentions && e.key === 'Escape') {
+                e.preventDefault();
+                setDismissedMention(text);
+                return;
+              }
+              if (showMentions && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                e.preventDefault();
+                setPick((i) => (i + (e.key === 'ArrowDown' ? 1 : options.length - 1)) % options.length);
+                return;
+              }
+              if (showMentions && (e.key === 'Enter' || e.key === 'Tab') && !e.shiftKey) {
+                e.preventDefault();
+                insertMention(activeOption);
+                return;
+              }
+              if (e.key === 'Escape' && replyId) {
+                setReplyingTo(id, null);
+                return;
+              }
+              if (e.key === 'ArrowUp' && !text && !hasPending) {
+                e.preventDefault();
+                editLast();
+                return;
+              }
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            onPaste={(e) => {
+              const files = Array.from(e.clipboardData.files);
+              if (files.length === 0) return;
               e.preventDefault();
-              setPick((i) => (i + (e.key === 'ArrowDown' ? 1 : options.length - 1)) % options.length);
-              return;
-            }
-            if (showMentions && (e.key === 'Enter' || e.key === 'Tab') && !e.shiftKey) {
-              e.preventDefault();
-              insertMention(options[pick]);
-              return;
-            }
-            if (e.key === 'Escape' && replyId) {
-              setReplyingTo(id, null);
-              return;
-            }
-            if (e.key === 'ArrowUp' && !text && !hasPending) {
-              e.preventDefault();
-              editLast();
-              return;
-            }
-            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              send();
-            }
-          }}
-          onPaste={(e) => {
-            const files = Array.from(e.clipboardData.files);
-            if (files.length === 0) return;
-            e.preventDefault();
-            addFiles(files);
-          }}
-          placeholder={placeholder}
-          aria-label={placeholder}
-          className="max-h-[220px] w-full resize-none bg-transparent py-3 text-[16px] leading-6 text-foreground outline-none placeholder:text-faint placeholder-shown:overflow-hidden placeholder-shown:text-ellipsis placeholder-shown:whitespace-nowrap"
-        />
+              addFiles(files);
+            }}
+            placeholder={placeholder}
+            aria-label={placeholder}
+            className="max-h-[220px] min-w-0 flex-1 resize-none bg-transparent py-1.5 text-[16px] leading-6 text-foreground outline-none placeholder:text-faint placeholder-shown:overflow-hidden placeholder-shown:text-ellipsis placeholder-shown:whitespace-nowrap"
+          />
+          <RoundButton size="sm" tone={canSend ? 'accent' : 'ghost'} label={t('chat.send')} isDisabled={!canSend} onPress={send} className="rounded-row!">
+            <ArrowUpIcon aria-hidden="true" />
+          </RoundButton>
+        </div>
       </div>
-      <RoundButton size={isMobile ? 'md' : 'lg'} tone={canSend ? 'accent' : 'plain'} label={t('chat.send')} isDisabled={!canSend} onPress={send} className="max-md:mb-1">
-        <ArrowUpIcon strokeWidth={2.5} />
-      </RoundButton>
     </div>
   );
 }

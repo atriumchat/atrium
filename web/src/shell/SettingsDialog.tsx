@@ -9,8 +9,9 @@ import { VoiceSettings } from '../voice/VoiceSettings';
 import { ServerSettings } from './ServerSettings';
 import { RolesSettings } from './RolesSettings';
 import { AtriumMark } from '../ui/Logo';
+import { focusReducedMotionDialog } from '../ui/Dialog';
 import { Row, Rows, Secondary } from '../ui/settings';
-import { LogoutIcon, MicIcon, RefreshIcon, ShieldIcon, UserIcon } from '../ui/icons';
+import { LogoutIcon, MicIcon, RefreshIcon, ShieldIcon, UserIcon, XIcon } from '../ui/icons';
 
 export type SettingsPage = 'account' | 'voice' | 'server' | 'roles' | 'app';
 
@@ -27,7 +28,7 @@ export function useSettingsPages() {
     { id: 'voice', label: t('settings.page.voice'), icon: <MicIcon size={18} />, content: <VoiceSettings /> },
   ];
   // The server's icon and name: the admin's alone, the server refuses anyone else.
-  if (isAdmin) pages.push({ id: 'server', label: t('settings.page.server'), icon: <AtriumMark size={18} />, content: <ServerSettings /> });
+  if (isAdmin) pages.push({ id: 'server', label: t('settings.page.server'), icon: <AtriumMark size={18} filled />, content: <ServerSettings /> });
   if (manageRoles) pages.push({ id: 'roles', label: t('settings.page.roles'), icon: <ShieldIcon size={18} />, content: <RolesSettings /> });
   if (desktop?.update) pages.push({ id: 'app', label: t('settings.page.app'), icon: <RefreshIcon size={18} />, content: <AppSettings /> });
   return pages;
@@ -59,11 +60,11 @@ export function SettingsDialog({ onClose, start = 'account' }: { onClose: () => 
   const open = pages.find((p) => p.id === page) ?? pages[0];
 
   return (
-    <Modal.Backdrop isOpen onOpenChange={(o) => !o && onClose()}>
+    <Modal.Backdrop ref={focusReducedMotionDialog} isOpen onOpenChange={(o) => !o && onClose()}>
       <Modal.Container size="lg" placement="center">
         {/* The avatar's ring and anything else drawn in the overlay tone follows the window's tone here. */}
         <Modal.Dialog aria-label={t('settings.title')} className="h-[min(720px,88vh)] max-w-[880px] overflow-hidden border border-edge p-0 [--overlay:var(--app-window)]">
-          <Modal.CloseTrigger className="z-10" />
+          <Modal.CloseTrigger aria-label={t('common.close')} className="z-10"><XIcon size={16} /></Modal.CloseTrigger>
           <div className="flex h-full">
             <nav className="flex w-60 shrink-0 flex-col gap-0.5 border-r border-edge p-3">
               <h2 className="px-3 pb-2 pt-2 text-[13px] font-medium text-muted">{t('settings.title')}</h2>
@@ -86,7 +87,7 @@ export function SettingsDialog({ onClose, start = 'account' }: { onClose: () => 
                 {t('settings.logout')}
               </button>
             </nav>
-            <div className="min-w-0 flex-1 overflow-y-auto px-10 pb-10 pt-8">
+            <div key={open.id} className="min-w-0 flex-1 overflow-y-auto px-10 pb-10 pt-8">
               <h2 className="text-[21px] font-medium leading-tight tracking-[-0.01em]">{open.label}</h2>
               {open.content}
             </div>

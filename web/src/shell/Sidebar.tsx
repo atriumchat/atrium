@@ -1,5 +1,6 @@
-import { useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
+import { useRef, useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
 import { Dropdown, Label } from '@heroui/react';
+import { ChatBubbleLeftIcon } from '@heroicons/react/24/solid';
 import { InviteButton } from '../people/Invites';
 import { ListHead } from './ListHead';
 import { CallPill, FaceStack } from './CallPill';
@@ -17,15 +18,13 @@ import { ChannelMenu, InviteToRoom } from './ChannelMenu';
 import { RoundButton, VolumeSlider } from '../ui/ui';
 import { EmptyState } from '../ui/Illustrations';
 import { UserPlusIcon } from '../ui/icons';
-import { BellSlashIcon, BubbleIcon, ChevronDownIcon, DotsIcon, HashIcon, HeadphonesSlashIcon, LockIcon, MicSlashIcon, PencilIcon, PlusIcon, SpeakerIcon, TrashIcon, VideoIcon } from '../ui/icons';
+import { BellSlashIcon, ChevronDownIcon, DotsIcon, HashIcon, HeadphonesSlashIcon, LockIcon, MicSlashIcon, PencilIcon, PlusIcon, SpeakerIcon, TrashIcon, VideoIcon } from '../ui/icons';
 
 export function Sidebar() {
   const { t } = useT();
   const channels = useStore((s) => s.channels);
   const categories = useStore((s) => s.categories);
   const serverName = useStore((s) => s.serverName);
-  const people = useStore((s) => Object.keys(s.users).length);
-  const online = useStore((s) => s.online.length);
   const [filter, setFilter] = useState('');
   const query = filter.trim().toLowerCase();
   const visible = query ? channels.filter((c) => c.name.toLowerCase().includes(query)) : channels;
@@ -43,7 +42,6 @@ export function Sidebar() {
     <aside className="flex min-h-0 min-w-0 flex-1 flex-col">
       <ListHead
         title={serverName}
-        sub={`${t('shell.list.people', { n: people })} · ${t('shell.list.online', { n: online })}`}
         action={<InviteButton />}
         search={filter}
         onSearch={setFilter}
@@ -182,22 +180,43 @@ function Draggable({ channel, drag, children }: { channel: Channel; drag: Drag |
   );
 }
 
+function useNameSubmission(fallback: string) {
+  const submitting = useRef(false);
+  const [busy, setBusy] = useState(false);
+
+  async function save(action: () => Promise<void>) {
+    if (submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    try {
+      await action();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : fallback);
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
+  }
+
+  return { busy, save };
+}
+
 function Section({ title, kind, children }: { title: string; kind: Channel['kind']; children: ReactNode }) {
   const { t } = useT();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
   const canManage = useStore((s) => s.canManageChannels);
+  const { busy, save } = useNameSubmission(t('shell.sidebar.createFailed'));
 
-  async function submit(e: FormEvent) {
+  function submit(e: FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return setAdding(false);
-    try {
-      useStore.setState({ channels: await api.createChannel(name, kind) });
+    const value = name.trim();
+    if (!value) return setAdding(false);
+    void save(async () => {
+      setChannels(await api.createChannel(value, kind));
       setName('');
       setAdding(false);
-    } catch (err) {
-      showError(err instanceof Error ? err.message : t('shell.sidebar.createFailed'));
-    }
+    });
   }
 
   return (
@@ -209,6 +228,7 @@ function Section({ title, kind, children }: { title: string; kind: Channel['kind
             size="sm"
             tone="ghost"
             label={kind === 'text' ? t('shell.sidebar.createText') : t('shell.sidebar.createVoice')}
+            isDisabled={busy}
             onPress={() => setAdding((v) => !v)}
             className="h-7 w-7 min-w-7 [&_svg]:size-4"
           >
@@ -219,14 +239,15 @@ function Section({ title, kind, children }: { title: string; kind: Channel['kind
         )}
       </div>
       {adding && (
-        <form onSubmit={submit} className="pb-2">
+        <form onSubmit={submit} aria-busy={busy || undefined} className="pb-2">
           <input
             autoFocus
             value={name}
+            readOnly={busy}
             maxLength={32}
             onChange={(e) => setName(e.target.value)}
             onBlur={() => !name && setAdding(false)}
-            onKeyDown={(e) => e.key === 'Escape' && setAdding(false)}
+            onKeyDown={(e) => e.key === 'Escape' && !busy && setAdding(false)}
             placeholder={kind === 'text' ? t('shell.sidebar.nameChannel') : t('shell.sidebar.nameRoom')}
             aria-label={kind === 'text' ? t('shell.sidebar.nameTextChannel') : t('shell.sidebar.nameVoiceRoom')}
             className="h-10 w-full rounded-full bg-default px-4 text-[15px] outline-none placeholder:text-faint focus:ring-2 focus:ring-focus"
@@ -259,6 +280,7 @@ function CategorySection({ category, children }: { category: Category; children:
   const [adding, setAdding] = useState<Channel['kind'] | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState('');
+  const { busy, save } = useNameSubmission(t('shell.sidebar.createFailed'));
 
   function fold() {
     const next = !folded;
@@ -271,18 +293,21 @@ function CategorySection({ category, children }: { category: Category; children:
     }
   }
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    const value = name.trim();
-    try {
-      if (renaming && value) useStore.setState({ categories: await api.renameCategory(category.id, value) });
-      if (adding && value) setChannels(await api.createChannel(value, adding, category.id));
-    } catch (err) {
-      showError(err instanceof Error ? err.message : t('shell.sidebar.createFailed'));
-    }
+  function closeForm() {
     setName('');
     setAdding(null);
     setRenaming(false);
+  }
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    const value = name.trim();
+    if (!value) return closeForm();
+    void save(async () => {
+      if (renaming) useStore.setState({ categories: await api.renameCategory(category.id, value) });
+      else if (adding) setChannels(await api.createChannel(value, adding, category.id));
+      closeForm();
+    });
   }
 
   async function remove() {
@@ -303,7 +328,7 @@ function CategorySection({ category, children }: { category: Category; children:
         </button>
         {canManage ? (
           <Dropdown>
-            <Dropdown.Trigger aria-label={t('shell.category.actions', { name: category.name })} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted outline-none hover:bg-white/[0.06] hover:text-foreground data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus">
+            <Dropdown.Trigger isDisabled={busy} aria-label={t('shell.category.actions', { name: category.name })} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted outline-none hover:bg-white/[0.06] hover:text-foreground data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus">
               <DotsIcon size={16} />
             </Dropdown.Trigger>
             <Dropdown.Popover placement="bottom end" className="min-w-56">
@@ -348,21 +373,15 @@ function CategorySection({ category, children }: { category: Category; children:
         )}
       </div>
       {(adding || renaming) && (
-        <form onSubmit={submit} className="pb-2">
+        <form onSubmit={submit} aria-busy={busy || undefined} className="pb-2">
           <input
             autoFocus
             value={name}
+            readOnly={busy}
             maxLength={32}
             onChange={(e) => setName(e.target.value)}
-            onBlur={() => {
-              setAdding(null);
-              setRenaming(false);
-            }}
-            onKeyDown={(e) => {
-              if (e.key !== 'Escape') return;
-              setAdding(null);
-              setRenaming(false);
-            }}
+            onBlur={() => !name && closeForm()}
+            onKeyDown={(e) => e.key === 'Escape' && !busy && closeForm()}
             placeholder={renaming ? t('shell.category.name') : adding === 'text' ? t('shell.sidebar.nameChannel') : t('shell.sidebar.nameRoom')}
             aria-label={renaming ? t('shell.category.name') : adding === 'text' ? t('shell.sidebar.nameTextChannel') : t('shell.sidebar.nameVoiceRoom')}
             className="h-10 w-full rounded-full bg-default px-4 text-[15px] outline-none placeholder:text-faint focus:ring-2 focus:ring-focus"
@@ -379,29 +398,33 @@ function NewCategory() {
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
+  const { busy, save } = useNameSubmission(t('shell.menu.failed'));
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    const value = name.trim();
+  function closeForm() {
     setOpen(false);
     setName('');
-    if (!value) return;
-    try {
+  }
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    const value = name.trim();
+    if (!value) return closeForm();
+    void save(async () => {
       useStore.setState({ categories: await api.createCategory(value) });
-    } catch (err) {
-      showError(err instanceof Error ? err.message : t('shell.menu.failed'));
-    }
+      closeForm();
+    });
   }
 
   return open ? (
-    <form onSubmit={submit} className="pt-4">
+    <form onSubmit={submit} aria-busy={busy || undefined} className="pt-4">
       <input
         autoFocus
         value={name}
+        readOnly={busy}
         maxLength={32}
         onChange={(e) => setName(e.target.value)}
-        onBlur={() => !name && setOpen(false)}
-        onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
+        onBlur={() => !name && closeForm()}
+        onKeyDown={(e) => e.key === 'Escape' && !busy && closeForm()}
         placeholder={t('shell.category.name')}
         aria-label={t('shell.category.name')}
         className="h-10 w-full rounded-full bg-default px-4 text-[15px] outline-none placeholder:text-faint focus:ring-2 focus:ring-focus"
@@ -421,7 +444,7 @@ function NewCategory() {
 
 /** A pill row: 40px, plain 18px icon, 16px label; the open one gets the graphite fill, a new one is bold. */
 function itemClass(active: boolean, strong = false) {
-  return `flex h-10 w-full items-center gap-2.5 rounded-full px-4 text-left text-[16px] transition-colors max-md:h-11 ${
+  return `flex h-10 w-full items-center gap-2.5 rounded-full px-4 text-left text-[16px] md:rounded-compact transition-colors max-md:h-11 ${
     active ? 'bg-default font-medium text-foreground' : strong ? 'font-semibold text-foreground hover:bg-white/[0.04]' : 'font-medium text-muted hover:bg-white/[0.04] hover:text-foreground'
   }`;
 }
@@ -441,8 +464,6 @@ function RowMenu({ channelId, top = 'top-5' }: { channelId: string; top?: string
 }
 
 const ROW_MENU_ROOM = 'md:group-hover:pr-9';
-// A voice room's row has two buttons on hover: its chat and "…".
-const ROW_TWO_BUTTONS_ROOM = 'md:group-hover:pr-[72px]';
 
 function TextItem({ channel }: { channel: Channel }) {
   const { t } = useT();
@@ -499,65 +520,69 @@ function VoiceItem({ channel }: { channel: Channel }) {
   const members = voiceMembers(voiceState, channel.id);
   const lit = active && !isMobile;
   const names = members.map((m) => users[m.userId]?.name ?? '…').join(', ');
-  // The room's chat: a white dot for new messages there, as on a text channel.
-  const unread = useStore((s) => (s.unread[channel.id] ?? 0) > 0 && !s.mutedChannels.includes(channel.id) && !(active && s.voiceChatOpen));
+  const chatOpen = useStore((s) => s.mode === 'server' && active && s.voiceChatOpen);
+  const mentioned = useStore((s) => (s.mentions[channel.id] ?? 0) > 0);
+  const unread = useStore((s) => (s.unread[channel.id] ?? 0) > 0 && !s.mutedChannels.includes(channel.id));
+  const chatLabel = t(!chatOpen && (mentioned || unread) ? 'shell.sidebar.roomChatUnread' : 'shell.sidebar.roomChat', { name: channel.name });
   const twoLines = members.length > 0 && !connectedHere;
   const top = twoLines ? 'top-[18px]' : 'top-5';
   const [inviting, setInviting] = useState(false);
 
   return (
-    <div className="group relative">
-      {/* A click joins on a computer; on a phone it opens the room first, with a Join button, like Discord's app. */}
-      <button
-        onClick={() => (isMobile ? selectChannel(channel.id) : joinVoice(channel.id))}
-        className={`flex w-full items-center gap-2.5 rounded-[18px] px-4 text-left transition-colors ${twoLines ? 'py-2' : 'h-10 max-md:h-11'} ${ROW_TWO_BUTTONS_ROOM} ${
-          lit || connectedHere ? 'bg-default text-foreground' : members.length ? 'text-foreground hover:bg-white/[0.04]' : 'text-muted hover:bg-white/[0.04] hover:text-foreground'
-        }`}
-      >
-        <SpeakerIcon size={18} className={`shrink-0 ${connectedHere ? 'text-success' : 'opacity-60'}`} />
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5">
-            <span className="min-w-0 truncate text-[16px] font-medium leading-5">{channel.name}</span>
-            {channel.private && <PrivateMark />}
-          </span>
-          {members.length > 0 && !connectedHere && (
-            <span className="mt-1.5 flex items-center gap-2">
-              <FaceStack users={members.map((m) => users[m.userId])} ringBg={lit || connectedHere ? 'var(--default)' : 'var(--app-side)'} />
-              <span className="min-w-0 truncate text-[13px] text-muted">
-                {names}
-              </span>
+    <div>
+      <div className="group group/voice-row relative">
+        {/* A click joins on a computer; on a phone it opens the room first, with a Join button, like Discord's app. */}
+        <button
+          onClick={() => (isMobile ? selectChannel(channel.id) : joinVoice(channel.id))}
+          className={`flex w-full items-center gap-2.5 rounded-compact px-4 text-left transition-colors ${twoLines ? 'py-2' : 'h-10 max-md:h-11'} md:pr-[72px] ${
+            lit || connectedHere ? 'bg-default text-foreground' : members.length ? 'text-foreground hover:bg-white/[0.04]' : 'text-muted hover:bg-white/[0.04] hover:text-foreground'
+          }`}
+        >
+          <SpeakerIcon size={18} className={`shrink-0 ${connectedHere ? 'text-success' : 'opacity-60'}`} />
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-1.5">
+              <span className="min-w-0 truncate text-[16px] font-medium leading-5">{channel.name}</span>
+              {channel.private && <PrivateMark />}
             </span>
+            {members.length > 0 && !connectedHere && (
+              <span className="mt-1.5 flex items-center gap-2">
+                <FaceStack users={members.map((m) => users[m.userId])} ringBg={lit || connectedHere ? 'var(--default)' : 'var(--app-side)'} />
+                <span className="min-w-0 truncate text-[13px] text-muted">
+                  {names}
+                </span>
+              </span>
+            )}
+          </span>
+          {!chatOpen && (mentioned || unread) && <span aria-hidden className={`size-2 shrink-0 rounded-full ${mentioned ? 'bg-danger' : 'bg-foreground'}`} />}
+          {connectedHere ? (
+            <CallPill>
+              <CallDuration />
+            </CallPill>
+          ) : (
+            members.length > 0 && <CallPill>{members.length}</CallPill>
           )}
-        </span>
-        {unread && <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-foreground md:group-hover:hidden" />}
-        {connectedHere ? (
-          <CallPill>
-            <CallDuration />
-          </CallPill>
-        ) : (
-          members.length > 0 && <CallPill>{members.length}</CallPill>
-        )}
-      </button>
-      {/* The room's chat without joining, as Discord's bubble on a voice channel. On a phone it's in the room's header. */}
-      <button
-        type="button"
-        aria-label={t('voice.chat.open')}
-        title={t('voice.chat.open')}
-        onClick={() => {
-          selectChannel(channel.id);
-          setVoiceChat(true);
-        }}
-        className={`absolute right-10 ${top} flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted opacity-0 outline-none transition-colors hover:bg-default hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-focus group-hover:opacity-100 max-md:hidden`}
-      >
-        <BubbleIcon size={16} />
-      </button>
-      <RowMenu channelId={channel.id} top={top} />
+        </button>
+        {/* The room's chat without joining, as Discord's bubble on a voice channel. On a phone it's in the room's header. */}
+        <button
+          type="button"
+          aria-label={chatLabel}
+          title={chatLabel}
+          onClick={() => {
+            selectChannel(channel.id);
+            setVoiceChat(true);
+          }}
+          className={`absolute right-10 z-10 ${top} flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full outline-none opacity-0 transition-[opacity,background-color,color] group-hover/voice-row:opacity-100 motion-reduce:transition-none focus-visible:opacity-100 hover:bg-white/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus max-md:hidden [@media(hover:none)]:opacity-100 ${chatOpen ? 'bg-white/10 text-foreground' : 'text-muted'}`}
+        >
+          <ChatBubbleLeftIcon className="size-4" aria-hidden="true" />
+        </button>
+        <RowMenu channelId={channel.id} top={top} />
+      </div>
       {connectedHere && members.length > 0 && (
         <ul className="pb-1 pl-8 pt-1">
           {members.map((m) => (
             <VoiceMember key={m.userId} entry={m} />
           ))}
-          {members.length === 1 && (
+          {members.length === 1 && (!active || isMobile || chatOpen) && (
             <li>
               <button
                 type="button"

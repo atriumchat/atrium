@@ -20,7 +20,7 @@ export function RoomCard({ channelId }: { channelId: string }) {
 
   const tone = !room || people.length === 0 ? 'bg-default text-muted' : here ? 'bg-here text-here-ink' : 'bg-others text-others-ink';
   return (
-    <div className="mt-1 flex w-full max-w-[400px] items-center gap-3 rounded-[24px] bg-white/[0.06] p-3">
+    <div className="mt-1 flex w-full max-w-[400px] items-center gap-3 rounded-popover bg-white/[0.06] p-3">
       <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${tone}`}>
         <SpeakerIcon size={22} />
       </span>

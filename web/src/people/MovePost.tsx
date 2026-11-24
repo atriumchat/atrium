@@ -89,7 +89,7 @@ export function MovePostDialog({ serverName, serverIcon, link, onClose }: { serv
       </div>
       <div className="px-6 pt-4">
         {/* As big as the window lets it be, so the buttons stay on screen on a low laptop screen too. */}
-        <div className="mx-auto aspect-square w-full overflow-hidden rounded-[20px] bg-black" style={{ maxWidth: 'min(100%, 38vh)' }}>
+        <div className="mx-auto aspect-square w-full overflow-hidden rounded-panel bg-black" style={{ maxWidth: 'min(100%, 38vh)' }}>
           {picture && <img src={picture} alt="" className="h-full w-full" />}
         </div>
         <textarea
@@ -97,7 +97,7 @@ export function MovePostDialog({ serverName, serverIcon, link, onClose }: { serv
           onChange={(e) => setText(e.target.value)}
           rows={4}
           aria-label={t('people.move.title')}
-          className="mt-3 w-full resize-none rounded-[18px] bg-surface-tertiary px-4 py-2.5 text-[14px] leading-5 outline-none focus:ring-2 focus:ring-focus"
+          className="mt-3 w-full resize-none rounded-compact bg-surface-tertiary px-4 py-2.5 text-[14px] leading-5 outline-none focus:ring-2 focus:ring-focus"
         />
       </div>
     </Window>

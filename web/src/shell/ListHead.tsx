@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { SearchIcon } from '../ui/icons';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/solid';
 
 /**
  * The top of the left list on a computer: the place's name big and light (the Metro part of the look), a line under it,
@@ -8,7 +8,7 @@ import { SearchIcon } from '../ui/icons';
  */
 export function ListHead(props: {
   title: string;
-  sub: string;
+  sub?: string;
   action?: ReactNode;
   search: string;
   onSearch: (value: string) => void;
@@ -22,9 +22,9 @@ export function ListHead(props: {
         {props.title}
       </h1>
       {props.action && <div className="col-start-2 row-start-1">{props.action}</div>}
-      <p className="col-span-2 row-start-2 truncate text-[14px] text-muted max-md:hidden">{props.sub}</p>
-      <label className="col-span-2 row-start-3 -mx-3 mt-4 flex h-10 items-center gap-2.5 rounded-full bg-default px-4 text-faint focus-within:ring-2 focus-within:ring-focus max-md:col-span-1 max-md:row-start-1 max-md:mx-0 max-md:mt-0 max-md:h-12">
-        <SearchIcon size={16} />
+      {props.sub && <p className="col-span-2 row-start-2 truncate text-[14px] text-muted max-md:hidden">{props.sub}</p>}
+      <label className="col-span-2 row-start-3 -mx-3 mt-4 flex h-10 items-center gap-2.5 rounded-full bg-default px-4 md:rounded-control-sm md:pe-(--app-radius-control-sm) text-faint focus-within:ring-2 focus-within:ring-focus max-md:col-span-1 max-md:row-start-1 max-md:mx-0 max-md:mt-0 max-md:h-12">
+        <MagnifyingGlassIcon className="size-4 shrink-0" aria-hidden="true" />
         <input
           value={props.search}
           onChange={(e) => props.onSearch(e.target.value)}

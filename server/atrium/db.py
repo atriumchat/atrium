@@ -1,6 +1,7 @@
 """SQLite: the connection each thread keeps, the schema and its migrations."""
 
 import json
+import re
 import sqlite3
 import threading
 import time
@@ -109,6 +110,7 @@ def now_ms() -> int:
 
 
 _db = threading.local()
+_MESSAGE_LINK = re.compile(r"""https?://[^\s<]+[^\s<.,:;"')\]!?]""", re.IGNORECASE)
 
 
 def connect_db() -> sqlite3.Connection:
@@ -121,6 +123,7 @@ def connect_db() -> sqlite3.Connection:
     if conn is None:
         conn = sqlite3.connect(DB_PATH, timeout=5)
         conn.row_factory = sqlite3.Row
+        conn.create_function("message_has_link", 1, lambda text: bool(_MESSAGE_LINK.search(text)), deterministic=True)
         conn.execute("PRAGMA foreign_keys = ON")
         # With WAL this is still crash-safe; it only skips the fsync on every commit, which on a cheap VPS disk
         # costs milliseconds each, inside the event loop.
@@ -237,11 +240,29 @@ def migrate_roles(conn: sqlite3.Connection) -> None:
             )
 
 
+def init_message_search(conn: sqlite3.Connection) -> None:
+    """External-content indexes: legacy history is indexed once, edits and cascades stay in sync."""
+    for table in ("messages", "dm_messages"):
+        column = "dm_id" if table == "dm_messages" else "channel_id"
+        conn.execute(f"CREATE INDEX IF NOT EXISTS {table}_position ON {table}({column}, created_at, id)")
+        index = f"{table}_fts"
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE name = ?", (index,)).fetchone():
+            continue
+        conn.execute(f"CREATE VIRTUAL TABLE {index} USING fts5(content, content='{table}', content_rowid='rowid')")
+        remove = f"INSERT INTO {index}({index}, rowid, content) VALUES ('delete', old.rowid, old.content);"
+        insert = f"INSERT INTO {index}(rowid, content) VALUES (new.rowid, new.content);"
+        for event, statements in (("INSERT", insert), ("DELETE", remove), ("UPDATE OF content", remove + insert)):
+            conn.execute(f"CREATE TRIGGER {index}_{event.split()[0]} AFTER {event} ON {table} BEGIN {statements} END")
+        conn.execute(f"INSERT INTO {index}({index}) VALUES ('rebuild')")
+
+
 def init_db() -> None:
     migrate_dms()
     with connect_db() as conn:
         conn.execute("PRAGMA journal_mode = WAL")
         conn.executescript(SCHEMA)
+        conn.execute("BEGIN IMMEDIATE")
+        init_message_search(conn)
         if "deleted_at" not in {row[1] for row in conn.execute("PRAGMA table_info(channels)")}:
             # A deleted channel waits in the trash (messages and all) until it is brought back or the week is out.
             conn.execute("ALTER TABLE channels ADD COLUMN deleted_at INTEGER")
@@ -295,6 +316,18 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS reactions_message ON reactions(message_id);
             -- How far each person has read each channel or DM (the newest message time they've seen), so
             -- unread counts are the same on every device.
+            CREATE TABLE IF NOT EXISTS message_pins (
+              message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+              pinned_at INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS unread_markers (
+              user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              conversation_id TEXT NOT NULL,
+              message_id TEXT NOT NULL,
+              message_at INTEGER NOT NULL,
+              token TEXT NOT NULL,
+              PRIMARY KEY (user_id, conversation_id)
+            );
             CREATE TABLE IF NOT EXISTS read_states (
               user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
               conversation_id TEXT NOT NULL,

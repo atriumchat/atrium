@@ -73,7 +73,7 @@ export function UpdateBanner() {
 function Banner({ title, action, onAction, onDismiss }: { title: string; action: string; onAction: () => void; onDismiss?: () => void }) {
   const { t } = useT();
   return (
-    <div className="mx-2 mb-2 flex items-center gap-2.5 rounded-[14px] bg-accent/15 py-2 pl-3 pr-2">
+    <div className="mx-2 mb-2 flex items-center gap-2.5 rounded-card bg-accent/15 py-2 pl-3 pr-2">
       <DownloadIcon size={18} className="shrink-0 text-accent" />
       <span className="min-w-0 flex-1 text-[13px] font-medium leading-tight">{title}</span>
       <Button size="sm" onPress={onAction} className="h-8 shrink-0 rounded-full px-3 text-[13px]">

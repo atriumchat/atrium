@@ -11,6 +11,27 @@
   --app-window: var(--gx-page-wide);
   --app-side: var(--gx-page-wide);
   --app-edge: var(--gx-edge);
+  --app-island: #141417;
+  --app-right-panel-width: 320px;
+  --app-pane-inset: 12px;
+  --app-panel-inset: 16px;
+  --app-header-height: 72px;
+  --app-panel-header-height: 56px;
+  --app-header-control: 36px;
+  --app-call-dock-height: calc(var(--app-header-control) + 8px);
+  --app-corner-trim: 0px;
+  --app-radius-fine: calc(8px - var(--app-corner-trim));
+  --app-radius-tight: calc(10px - var(--app-corner-trim));
+  --app-radius-row: calc(12px - var(--app-corner-trim));
+  --app-radius-card: calc(14px - var(--app-corner-trim));
+  --app-radius-surface: calc(16px - var(--app-corner-trim));
+  --app-radius-compact: calc(18px - var(--app-corner-trim));
+  --app-radius-panel: calc(20px - var(--app-corner-trim));
+  --app-radius-popover: calc(24px - var(--app-corner-trim));
+  --app-radius-large: calc(28px - var(--app-corner-trim));
+  --app-radius-dialog: calc(32px - var(--app-corner-trim));
+  --app-radius-control-sm: var(--app-radius-panel);
+  --app-radius-control: var(--app-radius-popover);
   /* Rooms on the home screen: green is where you are, pink is somewhere to go. */
   --room-here: var(--gx-here);
   --room-here-ink: var(--gx-here-ink);
@@ -18,7 +39,84 @@
   --room-others-ink: var(--gx-others-ink);
 }
 
+@media (min-width: 768px) {
+  :root {
+    --app-corner-trim: 4px;
+    --app-pane-inset: 16px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --app-pane-inset: 24px;
+  }
+}
+
+@utility header-action {
+  @apply grid shrink-0 place-items-center rounded-row p-0 text-muted outline-none transition-colors;
+  width: var(--app-header-control);
+  height: var(--app-header-control);
+  min-width: var(--app-header-control);
+
+  & svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  &:hover,
+  &[aria-expanded="true"],
+  &[aria-pressed="true"] {
+    background: var(--default);
+    color: var(--foreground);
+  }
+
+  &:focus-visible,
+  &[data-focus-visible="true"] {
+    @apply ring-2 ring-inset ring-focus;
+  }
+}
+
+@utility call-control {
+  @apply grid shrink-0 place-items-center rounded-card p-0 text-foreground outline-none transition-colors;
+  width: var(--app-header-control);
+  height: var(--app-header-control);
+  min-width: var(--app-header-control);
+
+  &:focus-visible,
+  &[data-focus-visible="true"] {
+    @apply ring-2 ring-inset ring-focus;
+  }
+}
+
+@utility header-search {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 20px;
+
+  @container chat-header (min-width: 35rem) {
+    width: auto;
+    padding-inline: 12px var(--app-radius-control-sm);
+    border-radius: var(--app-radius-control-sm);
+    background: var(--default);
+  }
+}
+
 @theme inline {
+  --radius-fine: var(--app-radius-fine);
+  --radius-tight: var(--app-radius-tight);
+  --radius-row: var(--app-radius-row);
+  --radius-card: var(--app-radius-card);
+  --radius-surface: var(--app-radius-surface);
+  --radius-compact: var(--app-radius-compact);
+  --radius-panel: var(--app-radius-panel);
+  --radius-popover: var(--app-radius-popover);
+  --radius-large: var(--app-radius-large);
+  --radius-control-sm: var(--app-radius-control-sm);
+  --radius-control: var(--app-radius-control);
+  --color-island: var(--app-island);
   --color-window: var(--app-window);
   --color-side: var(--app-side);
   --color-edge: var(--app-edge);
@@ -130,15 +228,15 @@ body {
   }
 }
 
-/*
- * Concentric corners, as Apple builds them: an inner radius is the outer radius minus the gap between the
- * two edges, so corners run parallel. Popovers and menus: 24 outside, 8 of padding, 16 on the items, whose
- * text sits 20 from the edge so nothing feels pressed into the curve. Panels are 20 (see Shell): list rows
- * 16 at 4, your card 14 at 8, call tiles 16.
- */
+/* Popover items sit 8px inside the surface and use its radius minus that inset. */
 .popover,
-.dropdown__popover {
-  border-radius: 24px;
+.dropdown__popover,
+.select__popover {
+  border-radius: var(--app-radius-popover);
+}
+.modal__dialog,
+.alert-dialog__dialog {
+  border-radius: var(--app-radius-dialog);
 }
 .dropdown__menu,
 .menu {
@@ -148,7 +246,7 @@ body {
 .menu-item {
   min-height: 36px;
   padding: 8px 12px;
-  border-radius: 16px;
+  border-radius: var(--app-radius-surface);
 }
 .dropdown__menu [data-slot="separator"],
 .menu [data-slot="separator"] {

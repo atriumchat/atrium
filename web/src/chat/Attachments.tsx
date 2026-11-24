@@ -61,7 +61,7 @@ function MediaFile({ file, kind }: { file: Attachment; kind: 'video' | 'audio' }
           playsInline
           onError={() => setFailed(true)}
           onContextMenu={open(file)}
-          className="max-h-[360px] w-full max-w-[420px] rounded-[12px] bg-black [color-scheme:dark]"
+          className="max-h-[360px] w-full max-w-[420px] rounded-row bg-black [color-scheme:dark]"
         />
         {menu}
       </>
@@ -69,7 +69,7 @@ function MediaFile({ file, kind }: { file: Attachment; kind: 'video' | 'audio' }
   }
   return (
     <>
-      <div onContextMenu={open(file)} className="flex w-full max-w-[420px] flex-col gap-2 rounded-[20px] bg-default px-4 py-3">
+      <div onContextMenu={open(file)} className="flex w-full max-w-[420px] flex-col gap-2 rounded-panel bg-default px-4 py-3">
         <span className="flex min-w-0 items-baseline gap-2">
           <span className="min-w-0 flex-1 truncate text-[14px] text-foreground">{file.name}</span>
           <span className="shrink-0 text-[12px] text-muted">{fileSize(file.size)}</span>
@@ -129,7 +129,7 @@ function MessageImages({ attachments }: { attachments: Attachment[] }) {
               onClick={() => setOpen(a)}
               onContextMenu={openMenu(a)}
               aria-label={t('chat.attach.openImage')}
-              className="max-w-full cursor-zoom-in overflow-hidden rounded-[12px] bg-default outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="max-w-full cursor-zoom-in overflow-hidden rounded-row bg-default outline-none focus-visible:ring-2 focus-visible:ring-accent"
               style={{ width, aspectRatio: `${width} / ${height}` }}
             >
               {/* The small preview in the chat; the full picture only in the lightbox. */}
@@ -170,7 +170,7 @@ function Lightbox({ image, onClose, onContextMenu }: { image: Attachment; onClos
       >
         <XIcon size={20} />
       </button>
-      <img src={image.url} alt="" onContextMenu={onContextMenu} className="max-h-[calc(100vh-96px)] max-w-full rounded-[8px] object-contain" />
+      <img src={image.url} alt="" onContextMenu={onContextMenu} className="max-h-[calc(100vh-96px)] max-w-full rounded-fine object-contain" />
       <a
         href={image.url}
         target="_blank"

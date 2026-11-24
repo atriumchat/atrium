@@ -97,8 +97,7 @@ export function voiceSlice(): VoiceSlice {
 }
 
 /**
- * You, in the room you're joining, before the server has heard of it: the list shows you the moment you
- * click instead of a second later. The server's own list replaces this once it arrives.
+ * Local presence after LiveKit connects, until the server publishes its room list.
  */
 export function selfEntry(channelId: string): VoiceEntry | null {
   const { me, muted, deafened } = get();

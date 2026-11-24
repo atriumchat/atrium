@@ -45,7 +45,7 @@ export function YouTab() {
   return (
     <div className="flex min-h-full flex-1 flex-col overflow-y-auto px-4 pb-6 pt-2">
       {/* Your photo, blurred, behind the top of the card: the same banner others see on your profile. */}
-      <div className="relative h-[120px] shrink-0 overflow-hidden rounded-[24px] bg-surface-tertiary">
+      <div className="relative h-[120px] shrink-0 overflow-hidden rounded-popover bg-surface-tertiary">
         {me.avatarUrl && <img src={me.avatarUrl} alt="" className="h-full w-full scale-150 object-cover opacity-70 blur-2xl" />}
         <button type="button" onClick={toSettings} aria-label={t('shell.you.settings')} className="absolute right-2.5 top-2.5 flex h-10 w-10 items-center justify-center rounded-full bg-black/45 transition-transform duration-150 active:scale-95">
           <GearIcon size={20} />
@@ -55,7 +55,7 @@ export function YouTab() {
         <Avatar user={me} size={92} online status={status} ringBg="var(--app-window)" />
       </div>
 
-      <div className="mt-3 flex flex-col gap-3 rounded-[20px] bg-default p-4">
+      <div className="mt-3 flex flex-col gap-3 rounded-panel bg-default p-4">
         <h2 className="truncate text-[26px] font-bold leading-8">{me.name}</h2>
         {custom && (
           <div className="flex items-center gap-3 rounded-2xl bg-white/[0.05] py-2.5 pl-3.5 pr-2">
@@ -81,7 +81,7 @@ export function YouTab() {
         </div>
       </div>
 
-      <div className="mt-3 overflow-hidden rounded-[20px] bg-default">
+      <div className="mt-3 overflow-hidden rounded-panel bg-default">
         <button type="button" onClick={() => setPage('bio')} className="block w-full px-4 py-3 text-left active:bg-white/[0.05]">
           <span className="block text-[14px] text-muted">{t('people.profile.about')}</span>
           <span className={`mt-0.5 block whitespace-pre-wrap break-words text-[17px] leading-[23px] ${me.bio ? '' : 'text-muted'}`}>{me.bio || t('shell.you.bioPlaceholder')}</span>
@@ -308,7 +308,7 @@ function FriendsRow() {
   const incoming = friends.filter((f) => f.status === 'incoming').length;
   const faces = friends.filter((f) => f.status === 'friend').map((f) => f.userId).sort((a, b) => Number(online.includes(b)) - Number(online.includes(a))).slice(0, 5);
   return (
-    <button type="button" onClick={openFriends} className="mt-3 flex min-h-[60px] w-full items-center gap-3 rounded-[20px] bg-default px-4 text-left active:bg-white/[0.05]">
+    <button type="button" onClick={openFriends} className="mt-3 flex min-h-[60px] w-full items-center gap-3 rounded-panel bg-default px-4 text-left active:bg-white/[0.05]">
       <span className="flex-1 text-[17px] font-medium">{t('shell.you.friends')}</span>
       {incoming > 0 && <Badge count={incoming} />}
       <span className="flex -space-x-2.5">

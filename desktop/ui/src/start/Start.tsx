@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FlowPrimary, FlowProvider, FlowShell, FlowStep, LineField, RadioRow } from '@atrium/ui-web';
-import { lang, t } from '../i18n';
-import { LangButton as GlobeButton } from '../LangButton';
+import { lang as initialLang, switchLang, t } from '../i18n';
+import { LangButton } from '../LangButton';
 
 /**
  * The desktop app's first window. It opens on a welcome (the app's icon as on the site, its ticks lighting up round it,
@@ -19,18 +19,13 @@ const first = Boolean(params.get('first'));
 const placeholder = params.get('placeholder') || 'https://app.example.com';
 
 /** The main process's side (address-preload.js); opened in a browser for design work there's none. */
-const bridge = (window as unknown as { atriumAddress?: AddressBridge }).atriumAddress ?? {
-  save: async (url: string) => (url.startsWith('https://') ? new Promise<never>(() => undefined) : t('address.needHttps')),
-  setup: async () => undefined,
-  language: async (choice: 'ru' | 'en') => {
-    location.search = new URLSearchParams({ ...Object.fromEntries(params), lang: choice }).toString();
-  },
-};
+const bridge = (window as unknown as { atriumAddress?: AddressBridge }).atriumAddress;
 type AddressBridge = {
-  /** An error in the app's words, or never (the app restarts on success). */
+  /** Returns an error in the app's current language if the address could not be used. */
   save(url: string, opts?: { signIn?: boolean }): Promise<string | undefined>;
   setup(): Promise<void>;
   language(choice: 'ru' | 'en'): Promise<void>;
+  onLanguage(callback: (choice: 'ru' | 'en') => void): () => void;
 };
 
 export function Start() {
@@ -40,8 +35,23 @@ export function Start() {
   const [value, setValue] = useState(first ? '' : (params.get('current') ?? ''));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const saving = useRef(false);
+  const [lang, setLang] = useState(initialLang);
   // Which way the last move went: a step forward slides in, a step back fades in (flow.css, .flow-swap).
   const [backward, setBackward] = useState(params.get('step') === 'choose');
+
+  function changeLanguage(choice: 'ru' | 'en') {
+    switchLang(choice);
+    setLang(choice);
+    setError(null);
+  }
+
+  useEffect(() => bridge?.onLanguage(changeLanguage), []);
+
+  const globe = <LangButton lang={lang} onSwitch={(other) => {
+    if (bridge) void bridge.language(other).catch(() => undefined);
+    else changeLanguage(other);
+  }} />;
 
   function go(next: Step, isBack = false) {
     setError(null);
@@ -49,14 +59,25 @@ export function Start() {
     setBackward(isBack);
     setStep(next);
   }
-  const back = first ? () => go('choose', true) : undefined;
+  const back = first && !busy ? () => go('choose', true) : undefined;
 
   async function save(signIn: boolean) {
+    if (saving.current) return;
+    saving.current = true;
     setBusy(true);
     setError(null);
-    const problem = await bridge.save(value.trim(), { signIn });
-    setBusy(false);
-    if (problem) setError(problem);
+    try {
+      const address = value.trim();
+      const problem = bridge
+        ? await bridge.save(address, { signIn })
+        : address.startsWith('https://') ? undefined : t('address.needHttps');
+      if (problem) setError(problem);
+    } catch {
+      setError(t('address.saveFailed'));
+    } finally {
+      saving.current = false;
+      setBusy(false);
+    }
   }
 
   function screen() {
@@ -66,7 +87,7 @@ export function Start() {
           <FlowStep
             title="Atrium"
             sub={t('start.tagline')}
-            onSubmit={() => (way === 'own' ? void bridge.setup() : go(way))}
+            onSubmit={() => (way === 'own' ? void bridge?.setup() : go(way))}
             actions={<FlowPrimary type="submit">{t('start.next')}</FlowPrimary>}
           >
             <div role="radiogroup">
@@ -85,7 +106,7 @@ export function Start() {
             onSubmit={() => value.trim() && void save(true)}
             actions={<FlowPrimary type="submit" busy={busy} disabled={!value.trim()}>{t('address.open')}</FlowPrimary>}
           >
-            <LineField label={t('start.addressField')} value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} autoFocus autoCapitalize="off" spellCheck={false} />
+            <LineField label={t('start.addressField')} value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} autoFocus readOnly={busy} autoCapitalize="off" spellCheck={false} />
           </FlowStep>
         );
       case 'invite':
@@ -97,7 +118,7 @@ export function Start() {
             onSubmit={() => value.trim() && void save(false)}
             actions={<FlowPrimary type="submit" busy={busy} disabled={!value.trim()}>{t('address.open')}</FlowPrimary>}
           >
-            <LineField label={t('start.inviteField')} value={value} onChange={(e) => setValue(e.target.value)} placeholder={`${placeholder}/?invite=…`} autoFocus autoCapitalize="off" spellCheck={false} />
+            <LineField label={t('start.inviteField')} value={value} onChange={(e) => setValue(e.target.value)} placeholder={`${placeholder}/?invite=…`} autoFocus readOnly={busy} autoCapitalize="off" spellCheck={false} />
           </FlowStep>
         );
       case 'move':
@@ -109,7 +130,7 @@ export function Start() {
             onSubmit={() => value.trim() && void save(false)}
             actions={<FlowPrimary type="submit" busy={busy} disabled={!value.trim()}>{t('address.save')}</FlowPrimary>}
           >
-            <LineField label={t('start.addressField')} value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} autoFocus autoCapitalize="off" spellCheck={false} />
+            <LineField label={t('start.addressField')} value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} autoFocus readOnly={busy} autoCapitalize="off" spellCheck={false} />
           </FlowStep>
         );
     }
@@ -120,7 +141,7 @@ export function Start() {
     return (
       <>
         <div className="flow-corner">
-          <LangButton />
+          {globe}
         </div>
         <Welcome onStart={() => setStep('choose')} />
       </>
@@ -130,18 +151,13 @@ export function Start() {
   // No scale here: there's nothing long to measure, so the ruler stays empty.
   return (
     <FlowProvider labels={{ back: t('start.back') }}>
-      <FlowShell fill={0} corner={<LangButton />}>
+      <FlowShell fill={0} corner={globe}>
         <div key={step} className={backward ? 'flow-swap back-in' : 'flow-swap'}>
           {screen()}
         </div>
       </FlowShell>
     </FlowProvider>
   );
-}
-
-/** The globe: the main process switches the language and this window reloads in it (nothing is typed here yet to lose). */
-function LangButton() {
-  return <GlobeButton lang={lang} onSwitch={(other) => void bridge.language(other)} />;
 }
 
 /** The welcome: the white tile with the mark inside a ring of ticks that light up one by one, then the words rise. */

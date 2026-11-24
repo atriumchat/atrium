@@ -4,6 +4,11 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('atriumDesktop', {
   platform: process.platform,
+  onScreenChosen: (callback) => {
+    const listener = (_event, name) => callback(String(name));
+    ipcRenderer.on('screen:chosen', listener);
+    return () => ipcRenderer.removeListener('screen:chosen', listener);
+  },
   /** Someone is calling: bring the window up, bounce/flash, show a system notification. */
   incomingCall: (title, body) => ipcRenderer.send('call:incoming', { title: String(title), body: String(body) }),
   /** Answered, declined or stopped ringing. */

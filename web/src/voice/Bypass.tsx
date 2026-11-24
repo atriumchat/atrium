@@ -4,7 +4,7 @@ import { useStore } from '../store';
 import { setBypass } from './voice';
 import { useBadConnection, type CallStats } from './stats';
 import { SignalIcon, XIcon } from '../ui/icons';
-import { useT } from '../i18n';
+import { localeOf, useT } from '../i18n';
 
 const QUALITY = {
   good: { color: 'text-success', label: 'voice.quality.good' },
@@ -13,10 +13,12 @@ const QUALITY = {
   unknown: { color: 'text-success', label: 'voice.quality.unknown' },
 } as const;
 
-/** The signal bars, coloured by how the call is going; a click shows the ping and the bypass switch, as in Discord. */
+/** The signal bars open the call's connection measurements and the Anti-lag switch. */
 export function CallQuality({ stats, connected }: { stats: CallStats | null; connected: boolean }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const quality = QUALITY[stats?.quality ?? 'unknown'];
+  const { lossIn, lossOut } = connected && stats ? stats : {};
+  const percent = (value: number) => new Intl.NumberFormat(localeOf(lang), { style: 'percent', maximumFractionDigits: 1 }).format(value / 100);
   return (
     <Popover>
       <Popover.Trigger
@@ -32,6 +34,26 @@ export function CallQuality({ stats, connected }: { stats: CallStats | null; con
             <span className="text-[15px] font-medium tabular-nums">{stats?.rtt !== undefined ? t('voice.ms', { value: stats.rtt }) : '—'}</span>
           </div>
           <p className={`text-[13px] ${connected ? quality.color : 'text-warning'}`}>{connected ? t(quality.label) : t('voice.quality.connecting')}</p>
+          {(lossIn !== undefined || lossOut !== undefined) && (
+            <div className="mt-3 border-t-[0.5px] border-separator pt-3">
+              <h3 className="text-[14px] font-medium">{t('voice.quality.loss')}</h3>
+              <dl className="mt-1 space-y-0.5 text-[13px]">
+                {lossIn !== undefined && (
+                  <div className="flex justify-between gap-3">
+                    <dt>{t('voice.quality.lossIn')}</dt>
+                    <dd className="tabular-nums">{percent(lossIn)}</dd>
+                  </div>
+                )}
+                {lossOut !== undefined && (
+                  <div className="flex justify-between gap-3">
+                    <dt>{t('voice.quality.lossOut')}</dt>
+                    <dd className="tabular-nums">{percent(lossOut)}</dd>
+                  </div>
+                )}
+              </dl>
+              <p className="mt-1 text-[13px] leading-snug text-muted">{t('voice.quality.lossHint')}</p>
+            </div>
+          )}
           <div className="mt-3 border-t-[0.5px] border-separator pt-3">
             <BypassSwitch />
           </div>
@@ -87,7 +109,7 @@ export function BypassHint({ stats }: { stats: CallStats | null }) {
   const [busy, setBusy] = useState(false);
   if (!bad || on || dismissedFor === joinedAt) return null;
   return (
-    <div className="mt-2 flex items-center gap-2 rounded-[14px] bg-danger/10 py-1.5 pl-3 pr-1.5">
+    <div className="mt-2 flex items-center gap-2 rounded-card bg-danger/10 py-1.5 pl-3 pr-1.5">
       <span className="min-w-0 flex-1 text-[13px] leading-snug text-danger">{t('voice.quality.bad')}</span>
       <Button
         size="sm"

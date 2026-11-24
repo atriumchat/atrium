@@ -16,5 +16,10 @@ p.with_name('voice.regression.ts').write_text(p.read_text()+'\nexport function _
 p=Path('web/src/socket.ts')
 p.with_name('socket.regression.ts').write_text(p.read_text()+'\nexport const __catchUp = catchUp;\n')
 PY
-echo 'Open http://127.0.0.1:5190/regression-harness.html and click Run checks.'
+echo 'Open the browser checks in a temporary browser profile:'
+echo '  http://127.0.0.1:5190/regression-harness.html — Run checks'
+echo '  http://127.0.0.1:5190/tests/chat-regressions.html — Run checks / Run browser focus checks'
+echo '  http://127.0.0.1:5190/tests/quick-switch-regressions.html — Run checks'
+echo '  http://127.0.0.1:5190/tests/message-search-regressions.html — Run checks'
+echo '  http://127.0.0.1:5190/tests/voice-regressions.html — runs on opening'
 (cd web && npm run dev -- --host 127.0.0.1 --strictPort)

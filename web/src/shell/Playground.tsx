@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { localeOf, useT, type Key } from '../i18n';
 import { BubbleCloud, BubblePair, BubblePeanut, type BubblePerson } from '../voice/Bubbles';
-import { CallControls } from '../voice/VoiceView';
+import { CallControls } from '../voice/CallControls';
 import { ART, EmptyState, LineArt, SignInArt, type ArtName } from '../ui/Illustrations';
 import { WhereToUse, type Platform } from '../account/WhereToUse';
 
@@ -89,7 +89,7 @@ export function ArtPlayground() {
   const { t } = useT();
   const [platform, setPlatform] = useState<Platform>('mac');
   const [scale, setScale] = useState(() => Number(new URLSearchParams(location.search).get('scale')) || 3);
-  const frame = 'flex flex-col overflow-hidden rounded-[24px] border-[0.5px] border-edge';
+  const frame = 'flex flex-col overflow-hidden rounded-popover border-[0.5px] border-edge';
   return (
     <div className="flex-1 overflow-y-auto p-6">
       <div className="flex items-center gap-3">

@@ -8,7 +8,9 @@ import { desktop } from '../desktop';
 import { startUpdateChecks } from '../updates';
 import { firstRunNetCheck } from '../voice/netcheck';
 import { warmUpHistory } from '../chat/history';
+import { MessageSearchProvider } from '../chat/MessageSearch';
 import { Sidebar } from './Sidebar';
+import { ConversationPanels } from './ServerMembers';
 import { HomeSidebar } from './HomeSidebar';
 import { HomeFilledIcon, HomeIcon } from '../ui/icons';
 import { DownloadRailButton } from './Downloads';
@@ -23,6 +25,7 @@ import { TitleBar } from './TitleBar';
 import { UpdateBanner } from './UpdateBanner';
 import { InviteBanner, prefetchInvite } from '../people/Invites';
 import { ArtPlayground, Playground } from './Playground';
+import { QuickSwitch, QuickSwitchButton } from './QuickSwitch';
 
 // Desktop app: clicking a message notification opens that conversation.
 desktop?.onOpenConversation((id) => openDm(id));
@@ -31,7 +34,22 @@ startUpdateChecks();
 export function Shell() {
   const room = useStore((s) => s.room);
   const deafened = useStore((s) => s.deafened);
+  const accountId = useStore((s) => s.me?.id);
   const isMobile = useIsMobile();
+  const [switchOpen, setSwitchOpen] = useState(false);
+
+  useEffect(() => {
+    function openSwitcher(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.repeat || event.isComposing || event.altKey || event.shiftKey || event.metaKey === event.ctrlKey) return;
+      if (event.key.toLowerCase() !== 'k' && event.code !== 'KeyK') return;
+      // Settings, message search and other modal dialogs keep their own focus.
+      if (document.querySelector('[aria-modal="true"], [data-slot="modal-dialog"], [data-slot="drawer-dialog"], [data-slot="alert-dialog-dialog"]')) return;
+      event.preventDefault();
+      setSwitchOpen(true);
+    }
+    window.addEventListener('keydown', openSwitcher);
+    return () => window.removeEventListener('keydown', openSwitcher);
+  }, []);
 
   useEffect(() => {
     useStore.setState({ isMobile });
@@ -81,7 +99,10 @@ export function Shell() {
   return (
     <RoomContext.Provider value={room ?? undefined}>
       {room && <RoomAudioRenderer muted={deafened} />}
-      {isMobile ? <MobileShell /> : <DesktopShell />}
+      <MessageSearchProvider key={accountId}>
+        {isMobile ? <MobileShell /> : <DesktopShell onQuickSwitch={() => setSwitchOpen(true)} />}
+      </MessageSearchProvider>
+      {switchOpen && <QuickSwitch onClose={() => setSwitchOpen(false)} />}
       <GroupPicker />
       <IncomingCall />
       <CallRinger />
@@ -93,17 +114,17 @@ export function Shell() {
  * Full-bleed black window: the left column (server rail + channel or DM list, your card underneath) sits
  * straight on it, and the content is one near-black card with a hairline edge.
  */
-function DesktopShell() {
+function DesktopShell({ onQuickSwitch }: { onQuickSwitch: () => void }) {
   const mode = useStore((s) => s.mode);
   const playground = usePlayground();
   // Three panels on black with an 8px gap: the rail, the list with your card at its foot, and the content.
-  // Modest 20px corners, no edge line; everything inside is concentric to them.
-  const panel = 'overflow-hidden rounded-[20px] bg-window';
+  // Shared panel corners, no edge line; everything inside is concentric to them.
+  const panel = 'overflow-hidden rounded-panel bg-window';
   return (
     <div className="flex h-full gap-2 bg-background p-2 [html[data-desktop]_&]:pt-0">
       {desktop && <TitleBar />}
-      <ServerRail className={`${panel} w-[72px] shrink-0`} />
-      <div className={`${panel} flex w-[320px] shrink-0 flex-col pb-2`}>
+      <ServerRail className={`${panel} w-16 shrink-0 lg:w-[72px]`} onQuickSwitch={onQuickSwitch} />
+      <div className={`${panel} flex w-[304px] shrink-0 lg:w-[320px] flex-col pb-2`}>
         {/* Both lists stay mounted; switching home ↔ server only shows the other, so nothing reloads. */}
         <div className={mode === 'home' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
           <HomeSidebar />
@@ -120,8 +141,12 @@ function DesktopShell() {
         )}
         <UserPanel />
       </div>
-      <main className={`${panel} flex min-w-0 flex-1 flex-col`}>
-        {playground === 'art' ? <ArtPlayground /> : playground ? <Playground /> : mode === 'home' ? <HomeContent /> : <ServerContent />}
+      <main className={`${panel} flex min-w-0 flex-1`}>
+        <ConversationPanels enabled={mode === 'server' && !playground}>
+          <div className="flex min-w-0 flex-1 flex-col">
+            {playground === 'art' ? <ArtPlayground /> : playground ? <Playground /> : mode === 'home' ? <HomeContent /> : <ServerContent />}
+          </div>
+        </ConversationPanels>
       </main>
     </div>
   );
@@ -143,7 +168,7 @@ function usePlayground() {
   return on;
 }
 
-function ServerRail({ className }: { className: string }) {
+function ServerRail({ className, onQuickSwitch }: { className: string; onQuickSwitch: () => void }) {
   const { t } = useT();
   const serverName = useStore((s) => s.serverName);
   const serverIcon = useStore((s) => s.serverIcon);
@@ -168,10 +193,11 @@ function ServerRail({ className }: { className: string }) {
           <span
             className={`flex h-12 w-12 items-center justify-center ${mode === 'server' ? 'bg-white text-black' : 'bg-default group-hover:bg-[#28282d]'} ${railShape(mode === 'server')}`}
           >
-            <AtriumMark size={27} filled={mode === 'server'} />
+            <AtriumMark size={27} filled />
           </span>
         )}
       </RailItem>
+      <QuickSwitchButton onPress={onQuickSwitch} />
       {/* In a browser: get the app, at the foot of the rail as in Discord. */}
       {whereToUseNeeded() && (
         <div className="mt-auto pb-3">
@@ -192,15 +218,19 @@ function RailItem(props: { label: string; active: boolean; badge?: number; onPre
         className={`absolute left-0 top-1/2 w-1 -translate-y-1/2 rounded-r-full bg-foreground transition-[height] duration-200 ease-out ${props.active ? 'h-10' : 'h-0 group-hover/rail:h-5'}`}
       />
       <Tooltip delay={0} closeDelay={0}>
-        <Tooltip.Trigger>
-          <button aria-label={props.label} aria-current={props.active || undefined} onClick={props.onPress} className="group relative rounded-full outline-none">
-            {props.children}
-            {!!props.badge && (
-              <span className="absolute -bottom-0.5 -right-0.5 min-w-5 rounded-full bg-danger px-1 text-center text-[11px] font-bold leading-5 text-white ring-[3px] ring-[var(--app-side)]">
-                {props.badge > 99 ? '99+' : props.badge}
-              </span>
-            )}
-          </button>
+        <Tooltip.Trigger<'button'>
+          render={(attributes) => <button {...attributes} />}
+          aria-label={props.label}
+          aria-current={props.active || undefined}
+          onClick={props.onPress}
+          className="group relative rounded-full focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          {props.children}
+          {!!props.badge && (
+            <span className="absolute -bottom-0.5 -right-0.5 min-w-5 rounded-full bg-danger px-1 text-center text-[11px] font-bold leading-5 text-white ring-[3px] ring-[var(--app-side)]">
+              {props.badge > 99 ? '99+' : props.badge}
+            </span>
+          )}
         </Tooltip.Trigger>
         <Tooltip.Content placement="right">{props.label}</Tooltip.Content>
       </Tooltip>

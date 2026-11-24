@@ -9,8 +9,9 @@ import { Avatar } from '../ui/Avatar';
 import type { Channel } from '../types';
 import { ConfirmDialog, Dialog } from '../ui/Dialog';
 import { EmptyState } from '../ui/Illustrations';
-import { BellIcon, BellSlashIcon, CheckIcon, DotsIcon, FolderIcon, LockIcon, PencilIcon, SearchIcon, TrashIcon, UserPlusIcon } from '../ui/icons';
+import { BellIcon, BellSlashIcon, CheckIcon, FolderIcon, LockIcon, PencilIcon, SearchIcon, TrashIcon, UserPlusIcon } from '../ui/icons';
 import { ChannelAccessDialog } from './ChannelAccess';
+import { EllipsisHorizontalIcon } from '@heroicons/react/24/solid';
 import { CopyButton } from '../ui/CopyButton';
 import { useMyInvite } from '../people/Invites';
 import { inviteLink } from '../people/invite';
@@ -71,9 +72,9 @@ export function ChannelMenu({ channelId, className = '' }: { channelId: string; 
       <Dropdown>
         <Dropdown.Trigger
           aria-label={isText ? t('shell.menu.channelActionsNamed', { name: channel.name }) : t('shell.menu.roomActionsNamed', { name: channel.name })}
-          className={`flex shrink-0 items-center justify-center rounded-full outline-none transition-colors hover:bg-default data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus ${className || 'h-10 w-10 text-foreground'}`}
+          className={className ? `flex shrink-0 items-center justify-center rounded-full outline-none transition-colors hover:bg-default data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus ${className}` : "header-action"}
         >
-          <DotsIcon size={20} />
+          <EllipsisHorizontalIcon className="size-5" aria-hidden="true" />
         </Dropdown.Trigger>
         <Dropdown.Popover placement="bottom end" className="min-w-60">
           <Dropdown.Menu aria-label={isText ? t('shell.menu.channelActions') : t('shell.menu.roomActions')} onAction={(key) => run(key as Action)}>
@@ -155,7 +156,7 @@ export function InviteToRoom({ channel, onClose }: { channel: Channel; onClose: 
         </Button>
       }
     >
-      <label className="mb-2 flex h-10 items-center gap-2 rounded-[12px] bg-default px-3 text-muted focus-within:ring-2 focus-within:ring-focus">
+      <label className="mb-2 flex h-10 items-center gap-2 rounded-row bg-default px-3 text-muted focus-within:ring-2 focus-within:ring-focus">
         <SearchIcon size={16} />
         <input
           autoFocus
@@ -177,7 +178,7 @@ export function InviteToRoom({ channel, onClose }: { channel: Channel; onClose: 
           {candidates.map((u) => {
             const done = sent.includes(u.id);
             return (
-              <li key={u.id} className="flex h-12 items-center gap-3 rounded-[12px] px-2">
+              <li key={u.id} className="flex h-12 items-center gap-3 rounded-row px-2">
                 <Avatar user={u} size={32} ringBg="var(--overlay)" />
                 <span className="min-w-0 flex-1 truncate text-[16px]">{u.name}</span>
                 <Button
@@ -197,7 +198,7 @@ export function InviteToRoom({ channel, onClose }: { channel: Channel; onClose: 
       )}
       <div className="mt-3 border-t border-white/[0.07] pt-4">
         <span className="mb-2 block text-[13px] text-muted">{t('shell.menu.inviteLink')}</span>
-        <div className="flex h-[46px] items-center gap-1 rounded-[12px] border border-white/[0.07] bg-white/[0.03] pl-3.5 pr-1.5">
+        <div className="flex h-[46px] items-center gap-1 rounded-row border border-white/[0.07] bg-white/[0.03] pl-3.5 pr-1.5">
           <span className={`min-w-0 flex-1 truncate text-[14px] ${full ? 'text-faint' : ''}`}>{mine ? inviteLink(mine.code).replace(/^https?:\/\//, '') : ''}</span>
           <CopyButton text={link} />
         </div>

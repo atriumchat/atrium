@@ -14,9 +14,9 @@ import { CheckIcon, ChevronRightIcon } from './icons';
  */
 // 16px on the phone: iOS zooms into any field with smaller text when it gets the focus.
 export const field =
-  'block h-[46px] w-full rounded-[12px] border border-white/[0.07] bg-white/[0.03] px-3.5 text-[15px] outline-none transition-colors placeholder:text-faint focus:border-white/40 max-md:text-[16px]';
+  'block h-[46px] w-full rounded-row border border-white/[0.07] bg-white/[0.03] px-3.5 text-[15px] outline-none md:px-(--app-radius-row) transition-colors placeholder:text-faint focus:border-white/40 max-md:text-[16px]';
 export const fieldArea =
-  'block w-full resize-none rounded-[12px] border border-white/[0.07] bg-white/[0.03] px-3.5 py-2.5 text-[14px] outline-none transition-colors placeholder:text-faint focus:border-white/40 max-md:text-[16px]';
+  'block w-full resize-none rounded-row border border-white/[0.07] bg-white/[0.03] px-3.5 py-2.5 text-[14px] outline-none md:px-(--app-radius-row) transition-colors placeholder:text-faint focus:border-white/40 max-md:text-[16px]';
 export const fieldLabel = 'mb-2 block text-[13px] text-muted';
 
 type ButtonProps = ComponentProps<typeof Button>;
@@ -26,7 +26,7 @@ export function Primary({ className = '', ...props }: ButtonProps) {
   return (
     <Button
       {...props}
-      className={`h-[42px] rounded-full px-5 text-[14px] font-medium [--button-bg:#f2f2f4] [--button-bg-hover:white] [--button-fg:#0c0c0e] disabled:opacity-100 disabled:[--button-bg:var(--default)] disabled:[--button-fg:var(--field-placeholder)] max-md:h-12 max-md:w-full max-md:text-[16px] ${className}`}
+      className={`h-[42px] rounded-full px-5 md:rounded-control-sm md:px-(--app-radius-control-sm) text-[14px] font-medium [--button-bg:#f2f2f4] [--button-bg-hover:white] [--button-fg:#0c0c0e] disabled:opacity-100 disabled:[--button-bg:var(--default)] disabled:[--button-fg:var(--field-placeholder)] max-md:h-12 max-md:w-full max-md:text-[16px] ${className}`}
     />
   );
 }
@@ -37,7 +37,7 @@ export function Secondary({ className = '', ...props }: ButtonProps) {
     <Button
       variant="tertiary"
       {...props}
-      className={`h-[34px] shrink-0 rounded-full px-3.5 text-[13px] font-medium max-md:h-10 max-md:px-4 max-md:text-[14px] [--button-bg-hover:rgb(255_255_255/0.13)] [--button-bg:rgb(255_255_255/0.08)] ${className}`}
+      className={`h-[34px] shrink-0 rounded-full px-3.5 text-[13px] md:rounded-card md:px-(--app-radius-card) font-medium max-md:h-10 max-md:px-4 max-md:text-[14px] [--button-bg-hover:rgb(255_255_255/0.13)] [--button-bg:rgb(255_255_255/0.08)] ${className}`}
     />
   );
 }
@@ -62,7 +62,7 @@ export function Rows({ title, children, className = '' }: { title?: string; chil
   return (
     <section className={className}>
       {title && <h3 className="mb-2 px-4 text-[13px] text-muted md:hidden">{title}</h3>}
-      <div className="grid grid-cols-[minmax(0,1fr)] md:border-t md:border-white/[0.07] max-md:overflow-hidden max-md:rounded-[20px] max-md:bg-default [&>*:last-child_.row-line]:border-b-0">
+      <div className="grid grid-cols-[minmax(0,1fr)] md:border-t md:border-white/[0.07] max-md:overflow-hidden max-md:rounded-panel max-md:bg-default [&>*:last-child_.row-line]:border-b-0">
         {children}
       </div>
     </section>

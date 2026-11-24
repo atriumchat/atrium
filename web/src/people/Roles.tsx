@@ -40,7 +40,7 @@ export function topOf(user: User | undefined, roles: Role[]): number {
 function Tick({ checked, disabled, onToggle, children }: { checked: boolean; disabled?: boolean; onToggle: () => void; children: ReactNode }) {
   return (
     <label
-      className={`flex h-11 items-center gap-3 rounded-[12px] px-2 text-[15px] ${disabled ? 'opacity-40' : 'cursor-pointer hover:bg-white/[0.04]'}`}
+      className={`flex h-11 items-center gap-3 rounded-row px-2 text-[15px] ${disabled ? 'opacity-40' : 'cursor-pointer hover:bg-white/[0.04]'}`}
     >
       <input type="checkbox" checked={checked} disabled={disabled} onChange={onToggle} className="h-4 w-4 shrink-0 accent-white" />
       {children}
@@ -98,7 +98,7 @@ export function PeopleChecklist({
   );
   return (
     <div className={className}>
-      <label className="mb-1 flex h-10 items-center gap-2 rounded-[12px] border border-white/[0.07] bg-white/[0.03] px-3 text-muted focus-within:border-white/40">
+      <label className="mb-1 flex h-10 items-center gap-2 rounded-row border border-white/[0.07] bg-white/[0.03] px-3 text-muted focus-within:border-white/40">
         <SearchIcon size={16} />
         <input
           value={filter}

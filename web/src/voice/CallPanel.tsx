@@ -14,8 +14,8 @@ import { BubblePair, BubblePeanut } from './Bubbles';
 import { DmAvatar } from '../ui/DmAvatar';
 import { CallDuration } from './CallDuration';
 import { useIsMobile } from '../hooks';
-import { CallControls, MediaStage, useLiveVideo } from './VoiceView';
-import { RoundButton } from '../ui/ui';
+import { MediaStage, useLiveVideo } from './VoiceView';
+import { CallControls } from './CallControls';
 import { PhoneDownIcon, PhoneIcon, SignalIcon, VideoIcon } from '../ui/icons';
 import { t as tr, useT } from '../i18n';
 
@@ -34,17 +34,13 @@ export function CallButtons({ dm }: { dm: Dm }) {
       <button
         onClick={() => joinVoice(dm.id)}
         aria-label={label}
-        className="mr-1 flex h-10 items-center gap-2 whitespace-nowrap rounded-full bg-[#f2f2f4] px-4 text-[15px] font-medium text-[#0c0c0e] transition-colors hover:bg-white max-md:hidden"
+        className="mr-1 hidden h-(--app-header-control) items-center gap-2 whitespace-nowrap rounded-control-sm bg-[#f2f2f4] px-(--app-radius-control-sm) text-[15px] font-medium text-[#0c0c0e] transition-colors hover:bg-white @min-[38rem]/chat-header:flex"
       >
         <PhoneIcon size={16} />
         {live ? t('chat.call.joinShort') : t('voice.call.start')}
       </button>
-      <RoundButton tone="ghost" label={label} onPress={() => joinVoice(dm.id)} className="md:hidden">
-        <PhoneIcon />
-      </RoundButton>
-      <RoundButton tone="ghost" label={t('voice.call.video')} onPress={() => joinVoice(dm.id, { video: true })}>
-        <VideoIcon />
-      </RoundButton>
+      <button type="button" className="header-action @min-[38rem]/chat-header:hidden!" aria-label={label} onClick={() => joinVoice(dm.id)}><PhoneIcon /></button>
+      <button type="button" className="header-action" aria-label={t('voice.call.video')} onClick={() => joinVoice(dm.id, { video: true })}><VideoIcon /></button>
     </>
   );
 }
@@ -78,15 +74,8 @@ function LiveCall({ dm, call }: { dm: Dm; call: CallState | undefined }) {
   // only for video. Waiting for an answer stays bubbles: they show who's being rung.
   const tiles = media.length > 0 || (!isMobile && !alone);
 
-  return (
-    <div className={`flex flex-col ${tiles ? (media.length > 0 ? 'h-[min(66vh,600px)] pt-4' : 'h-[min(50vh,440px)] pt-4') : ''}`}>
-      {tiles ? (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <MediaStage />
-        </div>
-      ) : (
-        <CallBubbles dm={dm} call={call} live />
-      )}
+  const controls = (viewActions?: ReactNode) => (
+    <>
       {/* Status sits right above the controls, Discord-style: signal bars + what's going on. */}
       <div className="flex items-center justify-center gap-3 pt-3 text-[13px]">
         <CallStatus tone={alone && !ringing ? 'idle' : alone ? 'ringing' : 'live'}>
@@ -98,11 +87,20 @@ function LiveCall({ dm, call }: { dm: Dm; call: CallState | undefined }) {
           </button>
         )}
       </div>
+      <CallControls viewActions={viewActions} />
+    </>
+  );
+
+  return (
+    <div className={`flex flex-col ${tiles ? (media.length > 0 ? 'h-[min(66vh,600px)] pt-4' : 'h-[min(50vh,440px)] pt-4') : ''}`}>
+      <MediaStage
+        fallback={tiles ? undefined : <CallBubbles dm={dm} call={call} live />}
+        renderControls={controls}
+      />
       <StartAudio
         label={t('voice.audio.enable')}
         className="absolute left-1/2 top-2 -translate-x-1/2 rounded-full bg-accent px-5 py-2 text-[14px] font-medium text-accent-foreground"
       />
-      <CallControls className="pt-3" />
     </div>
   );
 }
@@ -188,7 +186,7 @@ export function IncomingCall() {
       <div
         role="alertdialog"
         aria-label={t('voice.call.incoming')}
-        className="flex w-full max-w-[320px] flex-col items-center rounded-[28px] bg-surface px-6 pb-7 pt-9 text-center shadow-2xl max-md:bg-transparent max-md:shadow-none"
+        className="flex w-full max-w-[320px] flex-col items-center rounded-large bg-surface px-6 pb-7 pt-9 text-center shadow-2xl max-md:bg-transparent max-md:shadow-none"
       >
         <div className="call-ringing rounded-full">
           {group ? <DmAvatar dm={dm} size={104} ringBg="var(--surface)" /> : <Avatar user={caller} size={104} />}

@@ -87,7 +87,7 @@ function Card({ onEdit }: { onEdit: () => void }) {
         {me.bio && <p className="mt-0.5 line-clamp-3 whitespace-pre-wrap break-words text-[14px] leading-5 text-muted">{me.bio}</p>}
       </div>
       <div className="p-3 pt-4">
-        <div className="flex flex-col rounded-[12px] bg-white/[0.05] p-1">
+        <div className="flex flex-col rounded-row bg-white/[0.05] p-1">
           <Row icon={<PencilIcon size={16} />} onPress={onEdit}>
             {t('shell.me.edit')}
           </Row>
@@ -101,7 +101,7 @@ function Card({ onEdit }: { onEdit: () => void }) {
 
 function Row({ icon, children, onPress }: { icon: ReactNode; children: ReactNode; onPress?: () => void }) {
   return (
-    <button onClick={onPress} className="flex h-10 w-full items-center gap-3 rounded-[8px] px-3 text-left text-[14px] transition-colors hover:bg-white/[0.06]">
+    <button onClick={onPress} className="flex h-10 w-full items-center gap-3 rounded-fine px-3 text-left text-[14px] transition-colors hover:bg-white/[0.06]">
       <span className="flex w-4 shrink-0 justify-center text-muted">{icon}</span>
       {children}
     </button>
@@ -132,7 +132,7 @@ function StatusRow() {
 
   return (
     <Dropdown>
-      <Dropdown.Trigger className="flex h-10 w-full items-center gap-3 rounded-[8px] px-3 text-left text-[14px] outline-none transition-colors hover:bg-white/[0.06] data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus">
+      <Dropdown.Trigger className="flex h-10 w-full items-center gap-3 rounded-fine px-3 text-left text-[14px] outline-none transition-colors hover:bg-white/[0.06] data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus">
         <span className="flex w-4 shrink-0 justify-center">
           <StatusDot status={status} />
         </span>
@@ -199,7 +199,7 @@ function StatusBubble() {
   }
 
   return (
-    <div className="mb-3 flex min-w-0 flex-1 items-center rounded-[16px] bg-surface-tertiary px-3 py-2 text-[13px] leading-[18px]">
+    <div className="mb-3 flex min-w-0 flex-1 items-center rounded-surface bg-surface-tertiary px-3 py-2 text-[13px] leading-[18px]">
       {editing ? (
         <input
           ref={input}

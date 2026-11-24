@@ -1,6 +1,7 @@
 """Server channels and messages in general: how a message looks to the client, read marks, the inbox, channel admin."""
 
 import json
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, Query
@@ -66,6 +67,10 @@ def messages_out(rows: list[dict], table: str) -> list[dict]:
     if reply_ids:
         marks = ", ".join("?" * len(reply_ids))
         replies = {r["id"]: r for r in query(f"SELECT id, user_id, content, attachments FROM {table} WHERE id IN ({marks})", tuple(reply_ids))}
+    pinned = set()
+    if table == "messages" and rows:
+        ids = [r["id"] for r in rows]
+        pinned = {r["message_id"] for r in query(f"SELECT message_id FROM message_pins WHERE message_id IN ({','.join('?' for _ in ids)})", tuple(ids))}
     reactions = reactions_for([r["id"] for r in rows])
     out = []
     for r in rows:
@@ -77,6 +82,7 @@ def messages_out(rows: list[dict], table: str) -> list[dict]:
             "content": r["content"],
             "attachments": json.loads(r["attachments"]),
             "createdAt": r["created_at"],
+            "pinned": r["id"] in pinned,
             "editedAt": r.get("edited_at"),
             "reactions": reactions.get(r["id"], []),
             "mentions": mentions,
@@ -206,36 +212,90 @@ def read_marks(user: dict) -> dict[str, int]:
     return {r["conversation_id"]: r["read_at"] for r in query("SELECT conversation_id, read_at FROM read_states WHERE user_id = ?", (user["id"],))}
 
 
-def unread_counts(user: dict) -> tuple[dict[str, int], dict[str, int]]:
-    """Unread messages and unread mentions of this person (or of everyone) per channel and DM, capped at 99."""
+def unread_snapshot(user: dict) -> dict:
     marks = read_marks(user)
-    since = lambda conversation_id: marks.get(conversation_id, user["createdAt"])  # noqa: E731
-    mention = f"%<@{user['id']}>%"
-    unread, mentions = {}, {}
-    # Voice rooms count too: they have a chat of their own beside the call.
+    unread, mentions, first, manual = {}, {}, {}, {}
     conversations = [("messages", "channel_id", c["id"]) for c in channels_for(user["id"])]
     conversations += [("dm_messages", "dm_id", r["dm_id"]) for r in query("SELECT dm_id FROM dm_members WHERE user_id = ?", (user["id"],))]
     with connect_db() as conn:
-        for table, column, conversation_id in conversations:
-            row = conn.execute(
-                f"""SELECT COUNT(*) AS n,
-                           SUM(CASE WHEN content LIKE ? OR content LIKE '%<@all>%' THEN 1 ELSE 0 END) AS m
-                    FROM (SELECT content FROM {table} WHERE {column} = ? AND created_at > ? AND user_id != ? LIMIT ?)""",
-                (mention, conversation_id, since(conversation_id), user["id"], MAX_COUNT),
-            ).fetchone()
-            if row["n"]:
-                unread[conversation_id] = row["n"]
-            if row["m"]:
-                mentions[conversation_id] = row["m"]
-    return unread, mentions
+        markers = {r["conversation_id"]: r for r in conn.execute("SELECT * FROM unread_markers WHERE user_id = ?", (user["id"],))}
+        for table, column, cid in conversations:
+            marker = markers.get(cid)
+            if marker:
+                predicate = "(created_at, id) >= (?, ?) AND (user_id != ? OR id = ?)"
+                params = (marker["message_at"], marker["message_id"], user["id"], marker["message_id"])
+                manual[cid] = marker["token"]
+            else:
+                predicate = "created_at > ? AND user_id != ?"
+                params = (marks.get(cid, user["createdAt"]), user["id"])
+            rows = conn.execute(
+                f"SELECT id, content FROM {table} WHERE {column} = ? AND {predicate} ORDER BY created_at, id LIMIT ?",
+                (cid, *params, MAX_COUNT),
+            ).fetchall()
+            if rows:
+                first[cid] = rows[0]["id"]
+                unread[cid] = len(rows)
+                count = sum(f"<@{user['id']}>" in r["content"] or "<@all>" in r["content"] for r in rows)
+                if count:
+                    mentions[cid] = count
+    return {"unread": unread, "mentions": mentions, "firstUnread": first, "manualUnread": manual}
+
+
+@router.post("/api/messages/{message_id}/unread")
+async def mark_unread(message_id: str, user: dict = Depends(current_user)):
+    target = find_message(message_id)
+    if not target or not can_read_message(user["id"], *target):
+        raise ApiError(404, "noMessage", "Нет такого сообщения")
+    table, row = target
+    cid = row["dm_id"] if table == "dm_messages" else row["channel_id"]
+    if table == "messages":
+        channel_or_404(cid, user)
+    token = uuid.uuid4().hex
+    execute("""INSERT INTO unread_markers (user_id, conversation_id, message_id, message_at, token)
+               VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id, conversation_id) DO UPDATE SET
+               message_id=excluded.message_id, message_at=excluded.message_at, token=excluded.token""",
+            (user["id"], cid, message_id, row["created_at"], token))
+    snapshot = unread_snapshot(user)
+    event = {"conversationId": cid, "first": snapshot["firstUnread"].get(cid), "count": snapshot["unread"].get(cid, 0),
+             "mentions": snapshot["mentions"].get(cid, 0), "token": token}
+    await sio.emit("unread:marker", event, to=user_room(user["id"]))
+    return event
+
+
+@router.get("/api/channels/{channel_id}/pins")
+def list_pins(channel_id: str, user: dict = Depends(current_user)):
+    channel_or_404(channel_id, user)
+    return messages_out(query("""SELECT m.* FROM messages m JOIN message_pins p ON p.message_id = m.id
+                                 WHERE m.channel_id = ? ORDER BY p.pinned_at DESC, m.id""", (channel_id,)), "messages")
+
+
+class PinIn(BaseModel):
+    pinned: bool
+
+
+@router.put("/api/channels/{channel_id}/pins/{message_id}")
+async def set_pin(channel_id: str, message_id: str, body: PinIn, user: dict = Depends(current_user)):
+    channel_or_404(channel_id, user)
+    if not can(user, "manageMessages"):
+        raise ApiError(403, "noPermission", "Недостаточно прав")
+    if not query("SELECT 1 FROM messages WHERE channel_id = ? AND id = ?", (channel_id, message_id)):
+        raise ApiError(404, "noMessage", "Нет такого сообщения")
+    if body.pinned:
+        execute("INSERT OR IGNORE INTO message_pins SELECT id, ? FROM messages WHERE id = ? AND channel_id = ?",
+                (now_ms(), message_id, channel_id))
+    else:
+        execute("DELETE FROM message_pins WHERE message_id = ?", (message_id,))
+    await emit_channel("pins:changed", {"channelId": channel_id, "id": message_id, "pinned": body.pinned}, channel_id)
+    return {"ok": True}
 
 
 class ReadIn(BaseModel):
     conversationId: str = Field(max_length=64)
     at: int = Field(ge=0, le=MAX_TIME)
+    marker: str | None = Field(default=None, max_length=64)
 
 
-async def save_read(user: dict, conversation_id: str, at: int) -> bool:
+async def save_read(user: dict, conversation_id: str, at: int, marker: str | None = None) -> bool:
     """Read a channel or DM up to `at` (a message time); never goes backwards. Other tabs and devices hear of it."""
     readable = (
         query("SELECT 1 FROM channels WHERE id = ? AND deleted_at IS NULL", (conversation_id,)) and can_see_channel(user["id"], conversation_id)
@@ -243,19 +303,25 @@ async def save_read(user: dict, conversation_id: str, at: int) -> bool:
     if not readable:
         return False
     at = max(0, min(at, now_ms()))
-    execute(
-        """INSERT INTO read_states (user_id, conversation_id, read_at) VALUES (?, ?, ?)
-           ON CONFLICT (user_id, conversation_id) DO UPDATE SET read_at = MAX(read_at, excluded.read_at)""",
-        (user["id"], conversation_id, at),
-    )
-    await sio.emit("read:state", {"conversationId": conversation_id, "at": at}, to=user_room(user["id"]))
+    with connect_db() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        current = conn.execute("SELECT token FROM unread_markers WHERE user_id = ? AND conversation_id = ?", (user["id"], conversation_id)).fetchone()
+        if current and current["token"] != marker:
+            return True
+        if current:
+            conn.execute("DELETE FROM unread_markers WHERE user_id = ? AND conversation_id = ?", (user["id"], conversation_id))
+        conn.execute("""INSERT INTO read_states (user_id, conversation_id, read_at) VALUES (?, ?, ?)
+                        ON CONFLICT (user_id, conversation_id) DO UPDATE SET read_at = MAX(read_at, excluded.read_at)""",
+                     (user["id"], conversation_id, at))
+        conn.commit()
+    await sio.emit("read:state", {"conversationId": conversation_id, "at": at, "marker": marker}, to=user_room(user["id"]))
     return True
 
 
 @router.post("/api/read")
 async def mark_read(body: ReadIn, user: dict = Depends(current_user)):
     """The same as the socket's "read", for when the socket is down."""
-    if not await save_read(user, body.conversationId, body.at):
+    if not await save_read(user, body.conversationId, body.at, body.marker):
         raise ApiError(404, "noConversation", "Нет такого разговора")
     return {"ok": True}
 
@@ -296,6 +362,77 @@ def inbox(before: int | None = Query(None, ge=0, le=MAX_TIME), before_id: str = 
     for m in items[:40]:
         m["unread"] = m["createdAt"] > marks.get(m["channelId"], user["createdAt"])
     return items[:40]
+
+
+@router.get("/api/messages/{message_id}/context")
+def message_context(message_id: str, user: dict = Depends(current_user)):
+    target = find_message(message_id)
+    if not target or not can_read_message(user["id"], *target):
+        raise ApiError(404, "noMessage", "Нет такого сообщения")
+    table, row = target
+    column = "dm_id" if table == "dm_messages" else "channel_id"
+    if column == "channel_id":
+        channel_or_404(row[column], user)
+    anchor = (row[column], row["created_at"], row["id"])
+    # Two composite-index seeks, independent of the distance from the newest message.
+    rows = query(f"""SELECT * FROM (
+                       SELECT * FROM {table} WHERE {column} = ? AND (created_at, id) <= (?, ?)
+                       ORDER BY created_at DESC, id DESC LIMIT 21)
+                     UNION ALL SELECT * FROM (
+                       SELECT * FROM {table} WHERE {column} = ? AND (created_at, id) > (?, ?)
+                       ORDER BY created_at, id LIMIT 20)
+                     ORDER BY created_at, id""", anchor + anchor)
+    if not any(r["id"] == message_id for r in rows):
+        raise ApiError(404, "noMessage", "Нет такого сообщения")
+    return messages_out(rows, table)
+
+
+@router.get("/api/messages/search")
+def search_messages(q: str = Query("", max_length=256), author: str = Query("", max_length=64),
+                    conversation: str = Query("", max_length=64), file: bool = False, link: bool = False,
+                    before: int | None = Query(None, ge=0, le=MAX_TIME),
+                    before_id: str = Query("", alias="beforeId", max_length=64), user: dict = Depends(current_user)):
+    terms = re.findall(r"[^\W_]+", q, re.UNICODE)
+    if not (terms or author or conversation or file or link) or (q.strip() and not terms):
+        return []
+    match = " AND ".join(f'"{term}"*' for term in terms)
+    boundary, cursor = history_boundary(before, before_id, "m.")
+    hidden = sorted(hidden_channels(user["id"]))
+    rows = []
+    for table, column in (("messages", "channel_id"), ("dm_messages", "dm_id")):
+        where, params = [boundary], list(cursor)
+        if column == "channel_id":
+            join = "JOIN channels c ON c.id = m.channel_id"
+            where.append("c.deleted_at IS NULL")
+            if hidden:
+                where.append(f"c.id NOT IN ({', '.join('?' * len(hidden))})")
+                params.extend(hidden)
+        else:
+            join = "JOIN dm_members peers ON peers.dm_id = m.dm_id"
+            where.append("peers.user_id = ?")
+            params.append(user["id"])
+        if match:
+            where.append(f"m.rowid IN (SELECT rowid FROM {table}_fts WHERE {table}_fts MATCH ?)")
+            params.append(match)
+        if conversation:
+            where.append(f"m.{column} = ?")
+            params.append(conversation)
+        if author:
+            where.append("m.user_id = ?")
+            params.append(author)
+        if file:
+            where.append("json_array_length(m.attachments) > 0")
+        if link:
+            where.append("message_has_link(m.content)")
+        where.append("m.user_id NOT IN (SELECT blocked_id FROM blocks WHERE user_id = ?)")
+        params.append(user["id"])
+        rows.extend(query(
+            f"""SELECT m.id, m.{column} AS channelId, m.user_id AS userId, m.content,
+                       m.created_at AS createdAt, json_array_length(m.attachments) AS fileCount,
+                       {int(column == "dm_id")} AS dm
+                FROM {table} m {join} WHERE {' AND '.join(where)}
+                ORDER BY m.created_at DESC, m.id DESC LIMIT 40""", tuple(params)))
+    return sorted(rows, key=lambda row: (row["createdAt"], row["id"]), reverse=True)[:40]
 
 
 @router.get("/api/channels/{channel_id}/messages")

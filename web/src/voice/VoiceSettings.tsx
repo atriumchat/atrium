@@ -5,6 +5,7 @@ import { keyLabel, type NoiseMode } from '../prefs';
 import { desktop } from '../desktop';
 import { BypassSwitch } from './Bypass';
 import { ConnectionCheck } from './ConnectionCheck';
+import { VoiceDevices } from './VoiceDevices';
 import { ChoiceRow, Row, RowFrame, Rows, Secondary } from '../ui/settings';
 import { useT } from '../i18n';
 
@@ -16,6 +17,7 @@ export function VoiceSettings() {
 
   return (
     <Rows title={t('voice.settings.title')} className="mt-6">
+      <VoiceDevices />
       <NoiseRow />
       {/* In the browser the key only works while Atrium's window is open; the desktop app hears it from anywhere. */}
       <ChoiceRow<'voice' | 'ptt'>

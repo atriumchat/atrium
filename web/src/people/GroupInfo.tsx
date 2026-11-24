@@ -56,7 +56,7 @@ export function GroupInfo({ dm, children, onRename, onLeave }: { dm: Dm; childre
           </div>
           <div className="px-3 pb-3">
             <div className="mb-2 mt-5 px-3 text-[13px] text-muted">{t('people.group.membersOf', { n: dm.members.length, max: MAX_MEMBERS })}</div>
-            <div className="overflow-hidden rounded-[18px] bg-default">
+            <div className="overflow-hidden rounded-compact bg-default">
               {!full && (
                 <button type="button" onClick={add} className="flex min-h-[52px] w-full items-center gap-3 px-3.5 text-left hover:bg-white/[0.05]">
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-black">

@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atrium message search regressions</title>
+<div id="controls">
+  <h1>Atrium message search regressions</h1>
+  <button id="run" disabled>Run checks</button>
+  <pre id="output" aria-live="polite">Ready</pre>
+</div>
+<div id="fixture" style="height: min(650px, 100dvh)"></div>
+<script type="module">
+import { createElement as h } from 'react';
+import { createRoot } from 'react-dom/client';
+import { api } from '/src/api.ts';
+import { applyTokens } from '/src/applyTokens.ts';
+import { getChoice, setLang, t } from '/src/i18n/index.ts';
+import { Shell } from '/src/shell/Shell.tsx';
+import { initStore, resetStore, selectChannel, useStore } from '/src/store/index.ts';
+import '/src/index.css';
+
+applyTokens();
+const run = document.getElementById('run');
+const fixture = document.getElementById('fixture');
+const output = document.getElementById('output');
+const me = { id: 'me', name: 'Sofia Miller' };
+const alice = { id: 'alice', name: 'Alice Morgan' };
+const channel = { id: 'general', kind: 'text', name: 'General', position: 0 };
+const target = { id: 'planning', kind: 'text', name: 'Planning', position: 1 };
+const dm = { id: 'direct', kind: 'dm', userId: alice.id, name: '', members: [me.id, alice.id], ownerId: null, lastMessageAt: 0, preview: null };
+const first = { id: 'first', dm: 0, channelId: target.id, userId: alice.id, content: 'Launch notes and the final plan', createdAt: 1784806200000, fileCount: 1 };
+const second = { ...first, id: 'second', dm: 1, channelId: dm.id, content: 'Launch checklist for the team' };
+const third = { ...first, id: 'third', content: 'Launch schedule for the week' };
+const fourth = { ...second, id: 'fourth', content: 'Launch materials draft' };
+const localMessage = { ...first, id: 'local', channelId: channel.id, content: 'I’ll share the final launch notes once the team has reviewed the checklist.' };
+const messageFor = (hit) => ({ ...hit, attachments: [], reactions: [], mentions: [], mentionsAll: false, replyTo: null });
+
+const trigger = () => fixture.querySelector('[data-message-search-trigger]');
+const input = () => document.querySelector('[data-message-search-input]');
+const panel = () => document.querySelector('[data-message-search-panel]');
+const menu = () => fixture.querySelector('[role="dialog"][id$="-filters"]');
+const menuButton = (label) => [...menu()?.querySelectorAll('button') ?? []].find((button) => button.textContent.trim() === label);
+const option = (label) => [...menu()?.querySelectorAll('[role="option"]') ?? []].find((item) => item.textContent.trim() === label);
+const chip = (name) => [...menu()?.querySelectorAll('button') ?? []].find((button) =>
+  button.getAttribute('aria-label') === t('chat.search.removeFilter', { name }));
+const result = (hit) => [...panel()?.querySelectorAll('button') ?? []].find((button) => button.textContent.includes(hit.content));
+function check(condition, description) {
+  if (!condition) throw new Error(description);
+}
+async function waitFor(condition, description) {
+  for (let i = 0; i < 160; i++) {
+    const value = condition();
+    if (value) return value;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error('Timed out: ' + description);
+}
+function change(input, value) {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+function key(element, value, options = {}) {
+  return element.dispatchEvent(new KeyboardEvent('keydown', { key: value, bubbles: true, cancelable: true, ...options }));
+}
+
+function setup() {
+  const saved = { ...api };
+  const requests = [];
+  const searchHits = [first, second, third, fourth];
+  api.markRead = async () => ({ ok: true });
+  api.messages = api.dmMessages = async (id) => id === channel.id ? [messageFor(localMessage)] : [];
+  api.myInvite = async () => ({ code: 'FIXTURE', invited: [], limit: null });
+  api.checkToken = async () => { throw new Error('No network for fixture'); };
+  api.searchMessages = async (params) => {
+    requests.push(Object.fromEntries(params));
+    return searchHits.filter((hit) => !params.has('conversation') || params.get('conversation') === hit.channelId);
+  };
+  api.messageContext = async (id) => searchHits.filter((hit) => hit.id === id).map(messageFor);
+  initStore({
+    me, users: [me, alice], channels: [channel, target], serverName: 'Atrium Studio',
+    canManageChannels: false, mutedChannels: [], unread: {}, mentions: {}, blocked: [],
+  });
+  useStore.setState({ dms: [dm] });
+  selectChannel(channel.id);
+  const root = createRoot(fixture);
+  root.render(h(Shell));
+  return { requests, cleanup() { root.unmount(); resetStore(); Object.assign(api, saved); } };
+}
+
+run.onclick = async () => {
+  run.disabled = true;
+  document.body.dataset.result = 'running';
+  output.textContent = 'Running checks…';
+  const choice = getChoice();
+  setLang('en');
+  const { requests, cleanup } = setup();
+  try {
+    const desktop = matchMedia('(min-width: 768px)').matches;
+    const opener = await waitFor(trigger, 'search trigger');
+    opener.focus();
+    check(!key(opener, 'F', { ctrlKey: true, shiftKey: true }), 'Ctrl+Shift+F opens search');
+    await waitFor(() => input() && document.activeElement === input() && menu(), 'header input and quick filters');
+    check(!panel(), 'Opening the editor does not open results');
+    output.textContent += '\nPASS header search, shortcut and initial focus';
+
+    change(input(), ' launch ');
+    (await waitFor(() => menuButton(t('chat.search.filterAuthor')), 'author filter')).click();
+    (await waitFor(() => option(alice.name), 'author option')).click();
+    await waitFor(() => chip(alice.name), 'author chip');
+    (await waitFor(() => menuButton(t('chat.search.filterContent')), 'content filter')).click();
+    (await waitFor(() => option(t('chat.search.file')), 'file option')).click();
+    (await waitFor(() => menu()?.querySelector(`[aria-label="${t('common.back')}"]`), 'filter back button')).click();
+    await waitFor(() => chip(t('chat.search.file')), 'file chip');
+    check(requests.length === 0, 'Draft filters do not submit the search');
+    key(input(), 'Enter');
+    const row = await waitFor(() => result(first), 'matching first result');
+    const opened = panel();
+    check(desktop ? opened.tagName === 'ASIDE' : !!opened.closest('[role="dialog"]'), 'Correct results layout for viewport');
+    check(requests.at(-1).q === 'launch' && requests.at(-1).author === alice.id && requests.at(-1).file === 'true', 'Query, author and file filters submitted');
+    row.focus();
+    row.click();
+    await waitFor(() => document.getElementById('msg-first') && useStore.getState().selectedChannelId === target.id, 'first result opened in another channel');
+    if (desktop) {
+      check(panel() === opened && result(first) === row && document.activeElement === row, 'Results and focus retained on desktop');
+    } else {
+      await waitFor(() => !panel() && document.activeElement === trigger(), 'compact results close and focus returns');
+    }
+    trigger().click();
+    await waitFor(() => input()?.value === ' launch ' && chip(alice.name) && chip(t('chat.search.file')), 'query and active chips retained');
+    key(input(), 'Enter');
+    output.textContent += '\nPASS author and file filters, explicit submission and cross-channel jump';
+
+    const next = await waitFor(() => result(second), 'next matching result');
+    next.click();
+    await waitFor(() => document.getElementById('msg-second') && useStore.getState().homeView === dm.id, 'second result opened in a DM');
+    if (!desktop) await waitFor(() => !panel(), 'compact results close after second jump');
+    setLang('ru');
+    trigger().click();
+    await waitFor(() => input()?.getAttribute('aria-label') === t('chat.search.words') && menu(), 'Russian header labels');
+    check(input().value === ' launch ', 'Query retained across channel and DM');
+    input().focus();
+    key(input(), 'Escape');
+    await waitFor(() => !menu(), 'Escape closes the editor');
+    if (desktop) key(input(), 'Escape');
+    await waitFor(() => !panel() && !input() && document.activeElement === trigger(), 'Escape restores focus to the trigger');
+    output.textContent += '\nPASS DM jump, Russian labels and Escape focus';
+    document.body.dataset.result = 'pass';
+  } catch (error) {
+    document.body.dataset.result = 'fail';
+    output.textContent += '\nFAIL ' + error.stack;
+  } finally {
+    cleanup();
+    setLang(choice);
+    run.disabled = false;
+  }
+};
+
+if (new URLSearchParams(location.search).has('scene')) {
+  setLang('en');
+  document.getElementById('controls').hidden = true;
+  fixture.style.height = '100dvh';
+  setup();
+  const opener = await waitFor(trigger, 'search trigger');
+  opener.click();
+  const field = await waitFor(input, 'search input');
+  change(field, 'Launch');
+  await waitFor(() => menuButton(t('chat.search.runWords', { query: 'Launch' })), 'draft query');
+  key(field, 'Enter');
+  await waitFor(() => result(first), 'matching results');
+  document.body.dataset.result = 'scene';
+} else {
+  run.disabled = false;
+}
+</script>
+</html>

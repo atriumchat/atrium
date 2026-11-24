@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Atrium voice regression checks</title>
+<h1>Atrium voice regression checks</h1>
+<pre id="output">Running…</pre>
+<script type="module">
+import { Track } from 'livekit-client';
+import { api } from '/src/api.ts';
+import { useStore } from '/src/store/index.ts';
+import { applyMic, joinVoice, leaveVoice, toggleCamera, toggleScreenShare, switchScreenSource } from '/src/voice/voice.ts';
+import { runMicTest } from '/src/voice/micTest.ts';
+import { readStats } from '/src/voice/stats.ts';
+import * as soundboard from '/src/voice/soundboard.ts';
+const { initSoundboard, onSoundPlayed, onSoundStopped, previewSound, setSoundboard, stopPreview } = soundboard;
+
+const output = document.getElementById('output');
+const { getState: get, setState: set } = useStore;
+const turn = () => new Promise(resolve => setTimeout(resolve, 0));
+const assert = (condition, text) => { if (!condition) throw new Error(text); };
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+let passed = 0;
+let failed = 0;
+async function check(name, run) {
+  try {
+    await run();
+    output.textContent += '\nPASS ' + name;
+    passed++;
+  } catch (error) {
+    output.textContent += '\nFAIL ' + name + '\n' + error.stack;
+    failed++;
+  } finally {
+    await leaveVoice({ silent: true });
+    stopPreview();
+  }
+}
+
+const saved = { ...api };
+const originalFetch = window.fetch;
+const originalAudio = window.Audio;
+const originalAudioContext = window.AudioContext;
+const originalGetUserMedia = navigator.mediaDevices.getUserMedia;
+
+const voice = { id: 'voice-test', kind: 'voice', name: 'QA voice' };
+const peer = { id: 'peer' };
+const me = { id: 'me' };
+set({ me, users: { me, peer }, channels: [voice], muted: true, voicePrefs: { ptt: false, noise: 'browser' } });
+
+try {
+  await check('Mic test meters and plays a synthetic signal through the selected output until stopped', async () => {
+    const context = new AudioContext();
+    const tone = context.createOscillator();
+    const gain = context.createGain();
+    gain.gain.value = 0.05;
+    const capture = context.createMediaStreamDestination();
+    tone.connect(gain).connect(capture);
+    tone.start();
+    const track = capture.stream.getAudioTracks()[0];
+    const controller = new AbortController();
+    const meter = deferred();
+    let constraints;
+    let started = false;
+    let sink;
+    let player;
+    let outputTrack;
+    let timeout;
+    navigator.mediaDevices.getUserMedia = async (options) => { constraints = options; return capture.stream; };
+    window.Audio = class extends originalAudio {
+      constructor() {
+        super();
+        this.muted = true;
+        player = this;
+      }
+      async setSinkId(id) { sink = id; }
+      play() {
+        outputTrack = this.srcObject.getAudioTracks()[0];
+        return super.play();
+      }
+    };
+    try {
+      void context.resume();
+      const running = runMicTest({
+        inputId: 'synthetic-input',
+        outputId: 'synthetic-output',
+        signal: controller.signal,
+        onStarted: () => { started = true; },
+        onLevel: (value) => { if (value > 10) meter.resolve(); },
+      });
+      // Fail promptly if the graph is silent or the selected element fails to start.
+      await Promise.race([running, meter.promise, new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error('synthetic signal did not reach the meter')), 2500);
+      })]);
+      assert(started && !player.paused, 'selected audio element did not begin loopback');
+      assert(constraints.audio.deviceId.exact === 'synthetic-input', 'the selected input was not used');
+      assert(sink === 'synthetic-output', 'the selected output was not used');
+      assert(track.readyState === 'live' && outputTrack.readyState === 'live', 'the test stopped early');
+      controller.abort();
+      await running;
+      assert(track.readyState === 'ended' && outputTrack.readyState === 'ended', 'stop left a capture or output track active');
+      assert(player.paused && !player.srcObject, 'stop left playback connected');
+    } finally {
+      clearTimeout(timeout);
+      controller.abort();
+      navigator.mediaDevices.getUserMedia = originalGetUserMedia;
+      window.Audio = originalAudio;
+      track.stop();
+      await context.close();
+    }
+  });
+
+  await check('Cancel stops a late microphone stream without starting the meter or playback', async () => {
+    const capture = deferred();
+    const context = new AudioContext();
+    const stream = context.createMediaStreamDestination().stream;
+    const controller = new AbortController();
+    navigator.mediaDevices.getUserMedia = () => capture.promise;
+    try {
+      const pending = runMicTest({
+        inputId: 'default', outputId: 'default', signal: controller.signal,
+        onStarted: () => { throw new Error('started after cancellation'); }, onLevel: () => {},
+      });
+      controller.abort();
+      capture.resolve(stream);
+      const result = await pending.catch((err) => err);
+      assert(result === controller.signal.reason, 'a cancelled permission request completed the mic test');
+      assert(stream.getTracks().every((track) => track.readyState === 'ended'), 'late permission leaked a capture track');
+    } finally {
+      navigator.mediaDevices.getUserMedia = originalGetUserMedia;
+      await context.close();
+    }
+  });
+
+  await check('Packet loss skips new, reset and unsupported counters and stale receiver reports', async () => {
+    let inbound = [];
+    let outbound = [];
+    const stats = (list) => new Map(list.map((stat) => [stat.id, { kind: 'audio', timestamp: 20_000, ...stat }]));
+    const room = { engine: { pcManager: {
+      subscriber: { getStats: async () => stats(inbound) },
+      publisher: { getStats: async () => stats(outbound) },
+    } } };
+    const packets = (id, packetsReceived, packetsLost) => ({ id, type: 'inbound-rtp', packetsReceived, packetsLost });
+    inbound = [packets('valid', 100, 10), packets('reset', 100, 20)];
+    let result = await readStats(room, null);
+    assert(result.stats.lossIn === undefined && result.stats.lossOut === undefined, 'missing measurements displayed a loss value');
+    inbound = [packets('valid', 196, 14), packets('reset', 5, 0), packets('new', 1000, 0), packets('unsupported', 5, undefined)];
+    outbound = [
+      { id: 'mic', type: 'outbound-rtp', remoteId: 'receiver' },
+      { id: 'receiver', type: 'remote-inbound-rtp', fractionLost: 0.02, timestamp: 19_000 },
+      { id: 'screen-audio', type: 'outbound-rtp' },
+      { id: 'previous', type: 'remote-inbound-rtp', fractionLost: 0.4, timestamp: 1_000, localId: 'screen-audio' },
+    ];
+    result = await readStats(room, result.memory);
+    assert(result.stats.lossIn === 4 && result.stats.lossOut === 2, 'unrelated counters distorted reported loss');
+    inbound = [packets('valid', 200, 13), packets('unsupported', 10, undefined)];
+    outbound[1].fractionLost = undefined;
+    result = await readStats(room, result.memory);
+    assert(result.stats.lossIn === undefined && result.stats.lossOut === undefined, 'invalid counters produced a rate');
+  });
+
+  await check('An old failure cannot reset a new join to the same channel', async () => {
+    const firstToken = deferred();
+    const secondToken = deferred();
+    let requests = 0;
+    api.voiceToken = () => ++requests === 1 ? firstToken.promise : secondToken.promise;
+
+    const first = joinVoice(voice.id, { navigate: false });
+    await turn();
+    await leaveVoice({ silent: true });
+    const second = joinVoice(voice.id, { navigate: false });
+    await turn();
+    firstToken.reject(new Error('previous request failed'));
+    await first;
+    assert(get().voiceStatus === 'connecting', 'outdated failure reset the newer attempt');
+    secondToken.reject(new Error('current request failed'));
+    await second;
+    assert(get().voiceStatus === 'idle', 'current failure did not leave the connecting state');
+  });
+
+  await check('A pending join does not put me in the room list', async () => {
+    const token = deferred();
+    api.voiceToken = () => token.promise;
+    set({ voiceState: [{ userId: peer.id, channelId: voice.id, kind: 'channel' }] });
+
+    const attempt = joinVoice(voice.id, { navigate: false });
+    await turn();
+    const pending = get();
+    token.reject(new Error('test connection failure'));
+    await attempt;
+
+    assert(pending.voiceStatus === 'connecting', 'the join was not pending');
+    assert(pending.voiceState.length === 1 && pending.voiceState[0].userId === peer.id, 'pending join changed the room list');
+    assert(get().voiceStatus === 'idle', 'the failed join did not return to idle');
+  });
+
+  await check('Rapid duplicate joins request a token once', async () => {
+    const token = deferred();
+    let requests = 0;
+    api.voiceToken = () => { requests++; return token.promise; };
+    const first = joinVoice(voice.id, { navigate: false });
+    const second = joinVoice(voice.id, { navigate: false });
+    await turn();
+    token.reject(new Error('current request failed'));
+    await Promise.all([first, second]);
+    assert(requests === 1, 'issued ' + requests + ' token requests');
+  });
+
+  await check('PTT release wins against a delayed microphone publication', async () => {
+    const publish = deferred();
+    let micOn = false;
+    const room = {
+      disconnect: async () => {},
+      localParticipant: {
+        trackPublications: new Map(),
+        getTrackPublication: () => undefined,
+        setMicrophoneEnabled: async (enabled) => {
+          if (enabled) await publish.promise;
+          micOn = enabled;
+        },
+      },
+    };
+    set({ room, voiceChannelId: voice.id, voiceStatus: 'connected', muted: false, pttDown: true, voicePrefs: { ptt: true, noise: 'browser' } });
+    const press = applyMic();
+    set({ pttDown: false });
+    const release = applyMic();
+    publish.resolve();
+    await Promise.all([press, release]);
+    assert(!micOn, 'mic kept transmitting after key release');
+    set({ pttDown: true });
+    await leaveVoice({ silent: true });
+    assert(!get().pttDown, 'next call inherited held push-to-talk');
+  });
+
+  await check('A stale mic permission failure cannot mute another call', async () => {
+    const publish = deferred();
+    const old = { localParticipant: { setMicrophoneEnabled: () => publish.promise, isMicrophoneEnabled: false } };
+    const room = {
+      disconnect: async () => {},
+      localParticipant: { trackPublications: new Map(), getTrackPublication: () => undefined },
+    };
+    set({ room: old, voiceStatus: 'connected', voiceChannelId: voice.id, muted: false, voicePrefs: { ptt: false, noise: 'browser' } });
+    const update = applyMic();
+    set({ room });
+    publish.reject(new DOMException('denied', 'NotAllowedError'));
+    await update;
+    assert(!get().muted, 'stale permission rejection muted the new room');
+  });
+
+  await check('Repeated screen clicks open one picker and cancellation allows retry', async () => {
+    const picker = deferred();
+    let opened = 0;
+    const room = {
+      disconnect: async () => {},
+      localParticipant: {
+        trackPublications: new Map(),
+        getTrackPublication: () => undefined,
+        setScreenShareEnabled: () => { opened++; return picker.promise; },
+      },
+    };
+    set({ room, voiceChannelId: voice.id, voiceStatus: 'connected' });
+    const first = toggleScreenShare();
+    const second = toggleScreenShare();
+    picker.reject(new DOMException('cancelled', 'NotAllowedError'));
+    await Promise.all([first, second]);
+    assert(opened === 1, 'screen picker opened more than once');
+    await toggleScreenShare();
+    assert(opened === 2, 'screen picker could not be reopened');
+  });
+
+  await check('Changing a shared source preserves the old stream on cancel and discards late capture after leave', async () => {
+    const originalPicker = navigator.mediaDevices.getDisplayMedia;
+    function capture() { return document.createElement('canvas').captureStream(); }
+    const original = capture().getVideoTracks()[0];
+    const next = capture();
+    const late = capture();
+    const video = {
+      mediaStreamTrack: original,
+      async replaceTrack(track) { this.mediaStreamTrack.stop(); this.mediaStreamTrack = track; },
+    };
+    const room = {
+      disconnect: async () => {},
+      localParticipant: {
+        trackPublications: new Map(), isScreenShareEnabled: true,
+        getTrackPublication: source => source === Track.Source.ScreenShare ? { track: video, videoTrack: video } : undefined,
+      },
+    };
+    try {
+      set({ room, screenSharing: true, voiceStatus: 'connected', voiceChannelId: voice.id });
+      navigator.mediaDevices.getDisplayMedia = async () => { throw new DOMException('cancelled', 'NotAllowedError'); };
+      await switchScreenSource();
+      assert(video.mediaStreamTrack === original && original.readyState === 'live', 'cancellation stopped the old stream');
+      navigator.mediaDevices.getDisplayMedia = async () => next;
+      await switchScreenSource();
+      assert(video.mediaStreamTrack === next.getVideoTracks()[0] && original.readyState === 'ended', 'source did not change');
+      assert(get().room === room && get().voiceStatus === 'connected', 'source switch disturbed the call');
+      const picker = deferred();
+      navigator.mediaDevices.getDisplayMedia = () => picker.promise;
+      const switching = switchScreenSource();
+      await leaveVoice({ silent: true });
+      picker.resolve(late);
+      await switching;
+      assert(late.getVideoTracks()[0].readyState === 'ended', 'late capture remained live');
+    } finally {
+      navigator.mediaDevices.getDisplayMedia = originalPicker;
+      [original, ...next.getTracks(), ...late.getTracks()].forEach(track => track.stop());
+    }
+  });
+
+  await check('On/off/on while opening the camera only publishes the latest capture', async () => {
+    const opening = [deferred(), deferred()];
+    let captures = 0;
+    navigator.mediaDevices.getUserMedia = () => opening[captures++].promise;
+    const createStream = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 32;
+      return canvas.captureStream();
+    };
+    const firstCapture = createStream();
+    const currentCapture = createStream();
+    const published = [];
+    const publications = new Map();
+    const localParticipant = {
+      trackPublications: publications,
+      getTrackPublication: source => publications.get(source),
+      get isCameraEnabled() { return publications.has(Track.Source.Camera); },
+      async publishTrack(track) {
+        published.push(track.mediaStreamTrack);
+        publications.set(Track.Source.Camera, { track });
+      },
+      async unpublishTrack(track, stop) {
+        if (stop) track.stop();
+        publications.delete(Track.Source.Camera);
+      },
+    };
+    set({ room: { localParticipant, disconnect: async () => {} }, voiceChannelId: voice.id, voiceStatus: 'connected' });
+    const first = toggleCamera();
+    await turn();
+    const off = toggleCamera();
+    const latest = toggleCamera();
+    await turn();
+    opening[0].resolve(firstCapture);
+    opening[1].resolve(currentCapture);
+    await Promise.all([first, off, latest]);
+    assert(published.length === 1 && published[0] === currentCapture.getVideoTracks()[0], 'previous capture published after a newer click');
+    assert(firstCapture.getVideoTracks()[0].readyState === 'ended', 'stale capture was left open');
+    assert(get().cameraOn && !get().cameraPending, 'camera controls did not settle');
+    navigator.mediaDevices.getUserMedia = originalGetUserMedia;
+  });
+
+  const started = [];
+  class TestAudioContext {
+    state = 'running';
+    destination = {};
+    async decodeAudioData() { return { duration: 1 }; }
+    createGain() {
+      const gain = { value: 0, setTargetAtTime(value) { this.value = value; } };
+      return { gain, connect() {}, disconnect() {} };
+    }
+    createBufferSource() {
+      let gain;
+      return { connect(node) { gain = node; return node; }, disconnect() {}, start() { started.push(gain.gain.value); }, stop() {} };
+    }
+  }
+  const audios = [];
+  class TestAudio {
+    duration = 500;
+    currentTime = 0;
+    constructor() { audios.push(this); }
+    load() {}
+    pause() { this.paused = true; }
+    removeAttribute(property) { delete this[property]; }
+    async play() { this.played = true; }
+  }
+  window.AudioContext = TestAudioContext;
+  window.Audio = TestAudio;
+  const sound = { id: 'clip', userId: peer.id, name: 'Clip', emoji: '', durationMs: 1000, url: '/clip', volume: 1 };
+  initSoundboard();
+
+  await check('Stop/restart of the same loading preview plays once at the latest volume', async () => {
+    const bytes = deferred();
+    window.fetch = () => bytes.promise;
+    set({ soundboard: { volume: 1, muted: false, favorites: [] } });
+    previewSound(sound);
+    stopPreview();
+    const latest = previewSound(sound);
+    if (latest) latest.setVolume(0.3);
+    else soundboard.setPreviewVolume(0.3);
+    bytes.resolve({ arrayBuffer: async () => new ArrayBuffer(1) });
+    await turn();
+    assert(started.join(',') === '0.3', 'unexpected preview starts / volume: ' + started.join(','));
+  });
+
+  await check('New preview stops the old one immediately; old dialog cleanup leaves the new one', async () => {
+    const first = previewSound({ ...sound, durationMs: 11000, url: '/long-preview' });
+    const audio = audios.at(-1);
+    audio.oncanplay();
+    const waiting = deferred();
+    window.fetch = () => waiting.promise;
+    previewSound({ ...sound, id: 'new-preview', url: '/new-preview' });
+    assert(audio.paused && !audio.src, 'previous preview kept sounding during next download');
+    first?.stop();
+    assert(get().previewing === 'new-preview', 'old preview cleanup cleared a newer preview');
+    waiting.resolve({ arrayBuffer: async () => new ArrayBuffer(1) });
+  });
+
+  await check('A streamed preview is silenced and released at the four-minute cap', async () => {
+    let cap;
+    const schedule = window.setTimeout;
+    try {
+      window.setTimeout = (callback, delay, ...args) => {
+        if (delay >= 239000) cap = callback;
+        return schedule(callback, delay, ...args);
+      };
+      previewSound({ ...sound, durationMs: 500000, url: '/long-preview' });
+      const audio = audios.at(-1);
+      audio.oncanplay();
+      assert(audio.played && cap, 'stream did not schedule a time cap');
+      cap();
+      assert(audio.paused && !audio.src, 'stream still playing after its time cap');
+      assert(!get().previewing, 'preview remained active after cap');
+    } finally {
+      window.setTimeout = schedule;
+    }
+  });
+
+  await check('Hangup stops a preview whose controls just disappeared', async () => {
+    api.sounds = async () => [];
+    set({ room: { localParticipant: { trackPublications: new Map() }, disconnect: async () => {} }, voiceChannelId: voice.id, voiceStatus: 'connected' });
+    previewSound({ ...sound, durationMs: 11000, url: '/long-preview' });
+    const audio = audios.at(-1);
+    audio.oncanplay();
+    assert(audio.played, 'fixture preview did not start');
+    await leaveVoice({ silent: true });
+    assert(audio.paused && !audio.src, 'preview kept playing after leaving the call');
+    assert(!get().previewing, 'preview stayed active across calls');
+  });
+
+  await check('Events from other rooms are ignored; Stop releases a loading stream', async () => {
+    api.sounds = async () => [];
+    set({ room: { localParticipant: { trackPublications: new Map() }, disconnect: async () => {} }, voiceChannelId: voice.id, voiceStatus: 'connected' });
+    const event = { ...sound, soundId: sound.id, durationMs: 11000, playId: 'remote-1', channelId: voice.id };
+    const before = audios.length;
+    onSoundPlayed({ ...event, channelId: 'stale-room' });
+    assert(audios.length === before, 'late sound played in a different room');
+    onSoundPlayed(event);
+    const audio = audios.at(-1);
+    onSoundStopped({ userId: peer.id, channelId: 'stale-room' });
+    assert(audio.src, 'stop from a different room cancelled this room');
+    onSoundStopped(event);
+    assert(audio.paused && !audio.src, 'stop did not release a pending audio download');
+  });
+
+  await check('Local mute keeps access to Stop for a sound other participants still hear', async () => {
+    set({ room: { localParticipant: { trackPublications: new Map() }, disconnect: async () => {} }, voiceChannelId: voice.id, voiceStatus: 'connected' });
+    const event = { ...sound, userId: me.id, soundId: sound.id, durationMs: 11000, playId: 'mine-1', channelId: voice.id };
+    onSoundPlayed(event);
+    const audio = audios.at(-1);
+    setSoundboard({ muted: true });
+    assert(audio.paused && !audio.src, 'local mute did not silence the clip');
+    assert(get().myPlaying?.playId === 'mine-1', 'local mute hid Stop while peers could still hear it');
+    onSoundStopped(event);
+    assert(!get().myPlaying, 'server stop did not clear playback status');
+  });
+} finally {
+  Object.assign(api, saved);
+  window.fetch = originalFetch;
+  window.Audio = originalAudio;
+  window.AudioContext = originalAudioContext;
+  navigator.mediaDevices.getUserMedia = originalGetUserMedia;
+}
+output.textContent += '\n\nRESULT: ' + passed + ' passed, ' + failed + ' failed';
+document.body.dataset.result = failed ? 'fail' : 'pass';
+</script>
+</html>

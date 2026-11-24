@@ -48,7 +48,7 @@ function ResetLinkDialog({ name, link, onClose }: { name: string; link: string; 
       subtitle={t('account.resetLink.subtitle', { name })}
       onClose={onClose}
     >
-      <div className="flex items-center gap-1 rounded-[18px] bg-surface-tertiary py-1.5 pl-4 pr-1.5">
+      <div className="flex items-center gap-1 rounded-compact bg-surface-tertiary py-1.5 pl-4 pr-1.5">
         <p className="min-w-0 flex-1 select-all break-all py-1.5 font-mono text-[13px] leading-snug">{link}</p>
         <CopyButton text={link} />
       </div>

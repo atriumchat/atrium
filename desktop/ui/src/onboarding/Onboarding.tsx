@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { domainOk, emailOk, freeName, hostOk, jobFill, mailboxOf, MOCK_DOMAIN, nameOk, ownOnDesktop, pickTurn, RENT, rentServer, TASKS, type OwnDesktopStep as Step, type RentStage } from '@atrium/setup';
-import { Drum, FlowPrimary, FlowProvider, FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '@atrium/ui-web';
+import { Check, DocumentDuplicateIcon, Drum, EyeIcon, EyeSlashIcon, FlowPrimary, FlowProvider, FlowSecondary, FlowShell, FlowStep, KeptRow, LineField, RadioRow, TextAction } from '@atrium/ui-web';
 import type { DrumItem } from '@atrium/ui-common';
 import { lang as startLang, switchLang, t } from '../i18n';
 import { LangButton } from '../LangButton';
@@ -316,19 +316,7 @@ export function Onboarding() {
               trailing={
                 <button className="eye" type="button" aria-label={t('ob.showPassword')} aria-pressed={showPassword} onClick={() => setShowPassword((v) => !v)}>
                   {/* What the field shows now: an eye while the password is in sight, crossed out while it's hidden. */}
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    {showPassword ? (
-                      <>
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                        <circle cx="12" cy="12" r="3" />
-                      </>
-                    ) : (
-                      <>
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                        <path d="M1 1l22 22" />
-                      </>
-                    )}
-                  </svg>
+                  {showPassword ? <EyeIcon aria-hidden="true" /> : <EyeSlashIcon aria-hidden="true" />}
                 </button>
               }
             />
@@ -486,8 +474,6 @@ export function Onboarding() {
   );
 }
 
-const COPY = 'M8.5 8.5h12v12h-12zM15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5';
-const DONE = 'M5 12.5l4.5 4.5L19 7.5';
 
 /** The three A records a domain of one's own needs, each with its copy button. */
 function Records({ names, ip }: { names: string[]; ip: string }) {
@@ -506,9 +492,7 @@ function Records({ names, ip }: { names: string[]; ip: string }) {
           <span className="to">{ip}</span>
           {/* A round icon, not a word: a long name needs the row's width. */}
           <button className="icon" type="button" title={t('ob.copy')} aria-label={t('ob.copy')} onClick={() => void copy(name)}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d={copied === name ? DONE : COPY} />
-            </svg>
+            {copied === name ? <Check /> : <DocumentDuplicateIcon aria-hidden="true" />}
           </button>
         </div>
       ))}

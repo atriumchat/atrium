@@ -14,6 +14,7 @@ export type DesktopUpdate = {
 /** What the Atrium desktop app (desktop/preload.js) exposes to the page. In a normal browser it's undefined. */
 type DesktopBridge = {
   platform: string;
+  onScreenChosen?(callback: (name: string) => void): () => void;
   incomingCall(title: string, body: string): void;
   callHandled(): void;
   setBadge(count: number): void;

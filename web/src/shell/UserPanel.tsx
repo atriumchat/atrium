@@ -27,7 +27,7 @@ export function UserPanel() {
   const island = useRef<HTMLDivElement>(null);
   return (
     <div className="shrink-0 px-2">
-      <div ref={island} className="overflow-hidden rounded-[14px] bg-[#141417]">
+      <div ref={island} className="overflow-hidden rounded-card bg-island">
         <VoiceStatus />
         <MeRow island={island} />
       </div>
@@ -88,19 +88,17 @@ function VoiceStatus() {
 function WideButton(props: { label: string; on: boolean; disabled: boolean; onPress: () => void; children: ReactNode }) {
   return (
     <Tooltip delay={300} closeDelay={0}>
-      <Tooltip.Trigger>
-        <Button
-          fullWidth
-          variant="tertiary"
-          aria-label={props.label}
-          aria-pressed={props.on}
-          isDisabled={props.disabled}
-          onPress={props.onPress}
-          className={`h-10 rounded-full [&_svg]:size-5 ${props.on ? '[--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]' : ''}`}
-        >
-          {props.children}
-        </Button>
-      </Tooltip.Trigger>
+      <Button
+        fullWidth
+        variant="tertiary"
+        aria-label={props.label}
+        aria-pressed={props.on}
+        isDisabled={props.disabled}
+        onPress={props.onPress}
+        className={`h-10 rounded-full [&_svg]:size-5 ${props.on ? '[--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]' : ''}`}
+      >
+        {props.children}
+      </Button>
       <Tooltip.Content>{props.label}</Tooltip.Content>
     </Tooltip>
   );
@@ -156,21 +154,19 @@ function MeRow({ island }: { island: RefObject<HTMLDivElement | null> }) {
 /** Mic / headphones toggle with its device chevron, tinted red while muted — the Discord pairing. */
 function ToggleWithDevice(props: { active: boolean; label: string; onPress: () => void; device: ReactNode; children: ReactNode }) {
   return (
-    <div className={`flex items-center rounded-full ${props.active ? 'bg-danger/15 text-danger' : ''}`}>
+    <div className={`flex items-center rounded-full ${props.active ? 'bg-danger/15 text-danger-foreground' : ''}`}>
       <Tooltip delay={300} closeDelay={0}>
-        <Tooltip.Trigger>
-          <Button
-            isIconOnly
-            variant="ghost"
-            aria-label={props.label}
-            onPress={props.onPress}
-            className={`h-9 w-9 min-w-9 rounded-l-full rounded-r-none p-0 [&_svg]:size-5 ${
-              props.active ? '[--button-fg:var(--danger)] [--button-bg-hover:color-mix(in_oklab,var(--danger)_20%,transparent)]' : '[--button-fg:var(--muted)]'
-            }`}
-          >
-            {props.children}
-          </Button>
-        </Tooltip.Trigger>
+        <Button
+          isIconOnly
+          variant="ghost"
+          aria-label={props.label}
+          onPress={props.onPress}
+          className={`h-9 w-9 min-w-9 rounded-l-full rounded-r-none p-0 [&_svg]:size-5 ${
+            props.active ? '[--button-fg:var(--danger-foreground)] [--button-bg-hover:color-mix(in_oklab,var(--danger)_20%,transparent)]' : '[--button-fg:var(--muted)]'
+          }`}
+        >
+          {props.children}
+        </Button>
         <Tooltip.Content>{props.label}</Tooltip.Content>
       </Tooltip>
       {props.device}

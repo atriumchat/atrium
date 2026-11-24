@@ -136,7 +136,9 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .flow-swap,
-  .flow-swap.back-in {
+  .flow-swap.back-in,
+  .flow-ticks line.next,
+  .flow-ruler line.next {
     animation: none;
   }
 }
@@ -477,6 +479,14 @@
   border-right-color: transparent;
   border-radius: 50%;
   animation: flow-spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-drum ol,
+  .flow-drum li,
+  .flow-drum li span {
+    transition: none;
+  }
 }
 
 /* Laid along the window's bottom edge to edge, under the column. */

@@ -8,8 +8,8 @@ const NOTES = { window: t('picker.noWindows'), screen: t('picker.noScreens'), er
 
 // One list per tab. A card is made once and then only updated, so a refresh never moves what the pointer is on.
 const views = {
-  window: { grid: $('window'), tab: $('tab-window'), cards: new Map(), loaded: false, failed: false },
-  screen: { grid: $('screen'), tab: $('tab-screen'), cards: new Map(), loaded: false, failed: false },
+  window: { grid: $('window'), tab: $('tab-window'), cards: new Map(), loaded: false, failed: false, pending: null },
+  screen: { grid: $('screen'), tab: $('tab-screen'), cards: new Map(), loaded: false, failed: false, pending: null },
 };
 let kind = 'window';
 let selected = null; // the id of the chosen card, in the tab on view
@@ -20,6 +20,7 @@ function paint() {
   for (const [name, other] of Object.entries(views)) {
     other.grid.hidden = name !== kind;
     other.tab.setAttribute('aria-selected', String(name === kind));
+    other.tab.tabIndex = name === kind ? 0 : -1;
   }
   $('wait').hidden = view.loaded;
   $('note').hidden = !view.loaded || view.cards.size > 0;
@@ -59,6 +60,12 @@ function makeCard(id) {
   const name = document.createElement('span');
   label.append(icon, name);
   el.append(thumb, label);
+  el.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    if (event.key === 'Enter') confirm(id);
+    else select(id);
+  });
   el.addEventListener('click', () => select(id));
   el.addEventListener('dblclick', () => confirm(id));
   return { el, image, icon, name, thumb: null };
@@ -99,13 +106,20 @@ function show(which, sources) {
   }
 }
 
-async function load(which) {
-  const answer = await picker.list(which).catch(() => ({ error: true }));
+function load(which) {
   const view = views[which];
-  view.failed = Boolean(answer.error);
-  if (answer.sources) show(which, answer.sources);
-  view.loaded = true;
-  paint();
+  view.pending ??= picker.list(which)
+    .catch(() => ({ error: true }))
+    .then(({ error, sources }) => {
+      view.failed = Boolean(error);
+      show(which, sources ?? []);
+      view.loaded = true;
+      paint();
+    })
+    .finally(() => {
+      view.pending = null;
+    });
+  return view.pending;
 }
 
 function switchTo(which) {
@@ -113,7 +127,7 @@ function switchTo(which) {
   kind = which;
   select(null);
   paint();
-  if (!views[which].loaded) load(which);
+  void load(which);
 }
 
 // The next look starts REFRESH after the last answer, not on a fixed beat, so a slow capture never piles up.
@@ -141,18 +155,24 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') return picker.cancel();
   // A focused button keeps its own Enter and Space.
   if (event.target.closest('button')) return;
+  if (event.defaultPrevented) return;
   if (event.key === 'Enter') return confirm();
-  if (event.key.startsWith('Arrow')) {
+  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
     event.preventDefault();
     walk(event.key);
   }
-  if (event.key === ' ' && event.target.classList.contains('card')) {
-    event.preventDefault();
-    event.target.click();
-  }
 });
 
-for (const [name, view] of Object.entries(views)) view.tab.addEventListener('click', () => switchTo(name));
+for (const [name, view] of Object.entries(views)) {
+  view.tab.addEventListener('click', () => switchTo(name));
+  view.tab.addEventListener('keydown', (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 'window' : event.key === 'End' ? 'screen' : name === 'window' ? 'screen' : 'window';
+    switchTo(next);
+    views[next].tab.focus();
+  });
+}
 $('cancel').addEventListener('click', () => picker.cancel());
 $('show').addEventListener('click', () => confirm());
 $('sound').addEventListener('click', () => {

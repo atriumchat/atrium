@@ -47,7 +47,7 @@ export function RoomCards({ grid = false }: { grid?: boolean }) {
         <button
           onClick={() => (isMobile ? selectChannel(last.id) : joinVoice(last.id))}
           aria-label={t('people.who.joinRoom', { name: last.name })}
-          className="flex h-[52px] w-full items-center gap-3 rounded-[20px] bg-default px-4 text-left transition-[background-color,transform] duration-150 active:scale-[0.98] active:bg-[#28282d]"
+          className="flex h-[52px] w-full items-center gap-3 rounded-panel bg-default px-4 text-left transition-[background-color,transform] duration-150 active:scale-[0.98] active:bg-[#28282d]"
         >
           <HeadphonesIcon size={20} className="shrink-0 text-muted" />
           <span className="min-w-0 flex-1 truncate text-[16px] text-muted">{t('people.who.nobodyInVoice')}</span>
@@ -85,7 +85,7 @@ function RoomCard({ room, people, mine, single, onPress }: { room: Channel; peop
     <button
       onClick={onPress}
       aria-label={`${room.name}: ${names.join(', ')}`}
-      className={`flex min-h-24 shrink-0 snap-start items-center gap-3 rounded-[20px] bg-default p-3.5 text-left transition-[background-color,transform] duration-150 hover:bg-[#28282d] active:scale-[0.98] active:bg-[#28282d] ${single ? 'w-full' : 'w-[min(280px,72vw)]'}`}
+      className={`flex min-h-24 shrink-0 snap-start items-center gap-3 rounded-panel bg-default p-3.5 text-left transition-[background-color,transform] duration-150 hover:bg-[#28282d] active:scale-[0.98] active:bg-[#28282d] ${single ? 'w-full' : 'w-[min(280px,72vw)]'}`}
     >
       <span className="flex min-w-0 flex-1 flex-col gap-1.5">
         <span className="line-clamp-2 text-[16px] font-semibold leading-[21px]">{shown}</span>

@@ -6,6 +6,7 @@ const {
   BrowserWindow,
   Menu,
   clipboard,
+  dialog,
   Notification,
   Tray,
   ipcMain,
@@ -124,11 +125,15 @@ const fromAtrium = (url) => {
   }
 };
 
+function presentWindow(window) {
+  if (!window || window.isDestroyed()) return;
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
+}
+
 function showWindow() {
-  if (!win) return;
-  if (win.isMinimized()) win.restore();
-  win.show();
-  win.focus();
+  presentWindow(win);
 }
 
 /** The main window; `bounds` puts it where the window it takes over from stood (useServer), else in the middle. */
@@ -242,10 +247,11 @@ function setUpPermissions() {
       if (!fromAtrium(request.securityOrigin || request.frame?.url || '')) return callback(null);
       screenPicker
         .choose(win, { sound: process.platform === 'win32' || ownPickerForced })
-        .then((choice) =>
-          // Nothing chosen: the page's getDisplayMedia rejects.
-          callback(choice ? { video: choice.source, audio: choice.sound && process.platform === 'win32' ? 'loopback' : undefined } : null),
-        )
+        .then((choice) => {
+          if (!choice || !request.frame || !fromAtrium(request.frame.url)) return callback(null);
+          request.frame.send('screen:chosen', choice.name);
+          callback({ video: choice.source, audio: choice.sound && process.platform === 'win32' ? 'loopback' : undefined });
+        })
         .catch(() => callback(null));
     },
     { useSystemPicker: !ownPickerForced },
@@ -277,7 +283,7 @@ function updateTrayMenu() {
           ? { label: t('tray.updateChecking'), enabled: false }
           : update.status === 'downloading'
             ? { label: t('tray.updateDownloading', { percent: Math.round((update.progress ?? 0) * 100) }), enabled: false }
-            : { label: t('tray.updateCheck'), click: () => updater.check() };
+            : { label: t('tray.updateCheck'), enabled: updater.isAvailable(), click: checkFromTray };
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: t('tray.open'), click: showWindow },
@@ -316,6 +322,15 @@ function updateTrayMenu() {
   );
 }
 
+async function checkFromTray() {
+  const result = await updater.check();
+  if (result.status === 'latest') {
+    await dialog.showMessageBox({ type: 'info', title: 'Atrium', message: t('tray.updateLatest') });
+  } else if (result.status === 'error') {
+    await dialog.showMessageBox({ type: 'error', title: 'Atrium', message: t('tray.updateFailed'), detail: result.error });
+  }
+}
+
 /**
  * The language choice: 'ru', 'en' or null (follow the system). Kept in the config, applied at once to the tray, the
  * open windows and, from the tray, the Atrium page (which tells its own language setting through the bridge).
@@ -330,8 +345,8 @@ function setLanguage(choice, { fromPage }) {
   updateTrayMenu();
   addressWindow?.setTitle(firstRunAddress ? 'Atrium' : t('address.windowTitle'));
   setupWindow?.setTitle(t('setup.title'));
-  relocalize(addressWindow?.webContents);
-  // The setup window holds a half-made server's answers: it switches its words in place instead of reloading.
+  addressWindow?.webContents.send('address:language', i18n.getLang());
+  // The setup window keeps the answers already entered.
   setupWindow?.webContents.send('setup:language', i18n.getLang());
   screenPicker.relocalize();
   reachable.relocalize();
@@ -341,14 +356,6 @@ function setLanguage(choice, { fromPage }) {
       `window.dispatchEvent(new CustomEvent('atrium-language', { detail: ${JSON.stringify(choice)} }))`,
     ).catch(() => undefined);
   }
-}
-
-/** Reloads one of the app's own pages in the current language. */
-function relocalize(contents) {
-  if (!contents || contents.isDestroyed()) return;
-  const url = new URL(contents.getURL());
-  url.searchParams.set('lang', i18n.getLang());
-  contents.loadURL(url.href);
 }
 
 /** @type {BrowserWindow | null} */
@@ -436,7 +443,7 @@ function fadeIn(win, ms) {
 /** firstRun: no server address yet, so this window is the whole app; closing it quits. `show: false`: made hidden. */
 /** The first window; `bounds` opens it where another stood, `step` on one of its steps (back from "Your own server"). */
 function openAddressWindow({ firstRun = false, show = true, bounds = null, step = '' } = {}) {
-  if (addressWindow) return addressWindow.focus();
+  if (addressWindow) return presentWindow(addressWindow);
   firstRunAddress = firstRun;
   addressWindow = new BrowserWindow({
     ...FLOW_WINDOW,
@@ -483,7 +490,8 @@ function fromPage(event, page) {
 
 ipcMain.handle('address:save', async (event, value, opts) => {
   // Only the local address window may change where the app points.
-  if (!fromPage(event, 'start.html')) return t('address.denied');
+  const from = addressWindow;
+  if (!from || event.sender !== from.webContents || !fromPage(event, 'start.html')) return t('address.denied');
   let url;
   // "chat.example.com" is what people paste most; it means https.
   const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? value : `https://${value}`;
@@ -499,10 +507,12 @@ ipcMain.handle('address:save', async (event, value, opts) => {
   // "I have an account" opens on sign-in (the web's ?signin), not on the question it was just asked.
   const rest = url.pathname + url.search;
   const open = rest === '/' ? (opts?.signIn ? '/?signin' : null) : rest;
-  useServer(await appOrigin(url.origin), open, addressWindow);
+  const origin = await appOrigin(url.origin);
+  if (from !== addressWindow || from.isDestroyed()) return;
+  useServer(origin, open, from);
 });
 
-// The first window's globe: the same choice as the tray's Language menu; the window reloads in it.
+// The first window's globe changes the current language, as the tray's Language menu does.
 ipcMain.handle('address:language', (event, choice) => {
   if (!fromPage(event, 'start.html')) return;
   if (choice === 'ru' || choice === 'en') setLanguage(choice, { fromPage: false });
@@ -522,7 +532,7 @@ let addressWatch = null;
 
 /** `bounds`: where the first window was, so this one takes its place. */
 function openSetupWindow(bounds) {
-  if (setupWindow) return setupWindow.focus();
+  if (setupWindow) return presentWindow(setupWindow);
   setupWindow = new BrowserWindow({
     ...FLOW_WINDOW,
     ...bounds,

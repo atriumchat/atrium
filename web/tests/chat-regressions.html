@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Atrium chat and navigation regressions</title>
+<h1>Atrium chat and navigation regressions</h1>
+<style>[role=dialog] nav + div { height: 96px; overflow: auto; }</style>
+<button id="run" disabled>Run checks</button>
+<button id="run-browser" disabled>Run browser focus checks</button>
+<p id="browser-output" role="status"></p>
+<pre id="output" aria-live="polite">Ready</pre>
+<div id="fixture"></div>
+<script type="module">
+import { createElement as h, StrictMode, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { createRoot } from 'react-dom/client';
+import { App } from '/src/App.tsx';
+import { api, getToken, setToken } from '/src/api.ts';
+import { Login } from '/src/account/Login.tsx';
+import { ChatView } from '/src/chat/ChatView.tsx';
+import { ensureHistory } from '/src/chat/history.ts';
+import { GroupPicker } from '/src/people/GroupPicker.tsx';
+import { connectSocket, disconnectSocket, getSocket } from '/src/socket.ts';
+import { homeBadgeCount } from '/src/shell/Content.tsx';
+import { SettingsDialog } from '/src/shell/SettingsDialog.tsx';
+import { Sidebar } from '/src/shell/Sidebar.tsx';
+import { Shell } from '/src/shell/Shell.tsx';
+import { Window } from '/src/ui/Dialog.tsx';
+import { t } from '/src/i18n/index.ts';
+import { initStore, messageUser, openPicker, openServer, refreshDms, resetStore, setChannels, setEditing, useStore } from '/src/store/index.ts';
+
+const output = document.getElementById('output');
+const fixture = document.getElementById('fixture');
+const inviteFixture = { code: 'FIXTURE', invited: [], limit: null };
+const run = document.getElementById('run');
+const runBrowser = document.getElementById('run-browser');
+const browserOutput = document.getElementById('browser-output');
+const get = useStore.getState;
+const patch = (state) => flushSync(() => useStore.setState(state));
+const user = (id, name = id) => ({ id, name });
+const channel = { id: 'test-channel', name: 'Chat fixture', kind: 'text', position: 0 };
+const conversation = { id: channel.id, kind: 'channel', title: channel.name };
+const alice = user('alice', 'Alice'), bob = user('bob', 'Bob'), me = user('self');
+const dm = (u) => ({ id: 'dm-' + u.id, kind: 'dm', name: '', userId: u.id, members: [me.id, u.id], ownerId: null, lastMessageAt: 0, preview: null });
+const bootstrap = () => ({
+  me, users: [me, alice, bob], channels: [], serverName: 'Fixture', canManageChannels: false, mutedChannels: [],
+  unread: {}, mentions: {}, blocked: [],
+});
+const message = (id) => ({ id, channelId: channel.id, userId: me.id, createdAt: 1, content: id, attachments: [], reactions: [] });
+const deferred = () => {
+  let resolve, reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+};
+function equal(actual, expected) {
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(JSON.stringify({ actual, expected }));
+}
+async function waitFor(check, attempts = 100) {
+  for (let i = 0; i < attempts; i++) {
+    const result = check();
+    if (result) return result;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error('Timed out waiting for the expected state');
+}
+const findButton = (label) => [...fixture.querySelectorAll('button')].find((button) => button.textContent.trim() === label);
+function change(input, value) {
+  Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), 'value').set.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+function key(element, value, options = {}) {
+  return element.dispatchEvent(new KeyboardEvent('keydown', { key: value, bubbles: true, cancelable: true, ...options }));
+}
+function submit(form) {
+  form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+}
+
+let root, passed, failed;
+function mount(element) {
+  root = createRoot(fixture);
+  flushSync(() => root.render(element));
+}
+async function check(label, fn) {
+  const saved = { ...api };
+  const url = location.href;
+  try {
+    initStore(bootstrap());
+    api.markRead = async () => ({ ok: true });
+    api.myInvite = async () => inviteFixture;
+    await fn();
+    output.textContent += '\nPASS ' + label;
+    passed++;
+  } catch (error) {
+    output.textContent += '\nFAIL ' + label + ': ' + error.stack;
+    failed++;
+  } finally {
+    root?.unmount();
+    root = null;
+    Object.assign(api, saved);
+    disconnectSocket();
+    resetStore();
+    history.replaceState(null, '', url);
+  }
+}
+
+run.onclick = async () => {
+  run.disabled = runBrowser.disabled = true;
+  passed = failed = 0;
+  output.textContent = 'Running checks…';
+  const token = getToken();
+  const oldHasFocus = document.hasFocus;
+  document.hasFocus = () => true;
+  const historyDraftKey = 'atrium_draft:' + channel.id;
+  const priorDraft = sessionStorage.getItem(historyDraftKey);
+  sessionStorage.removeItem(historyDraftKey);
+  try {
+    await check('Failed warm-up surfaces in the open chat and retries without changing chats', async () => {
+      const response = deferred();
+      let requests = 0;
+      api.messages = () => {
+        requests++;
+        return requests === 1 ? response.promise : Promise.resolve([message('loaded after retry')]);
+      };
+      const warm = ensureHistory(channel.id, 'channel', { quiet: true });
+      mount(h(ChatView, { conversation }));
+      response.reject(new Error('fixture offline'));
+      await warm;
+      const retry = await waitFor(() => findButton(t('chat.retryHistory')));
+      equal(requests, 1);
+      retry.click();
+      await waitFor(() => fixture.textContent.includes('loaded after retry'));
+      equal(requests, 2);
+    });
+
+    await check('First visible text channel is selected when an empty server gains channels', async () => {
+      setChannels([{ ...channel, id: 'voice-room', kind: 'voice' }, channel]);
+      equal(get().selectedChannelId, channel.id);
+    });
+
+    await check('Returning to a focused server clears the open channel counter', async () => {
+      setChannels([channel]);
+      patch({ unread: { [channel.id]: 2 }, mentions: { [channel.id]: 1 } });
+      openServer();
+      equal([get().unread[channel.id], get().mentions[channel.id]], [0, 0]);
+    });
+
+    await check('An unseen DM still contributes to the home badge', async () => {
+      patch({ dms: [dm(alice)], homeView: dm(alice).id, unread: { [dm(alice).id]: 1 } });
+      equal(homeBadgeCount(get()), 1);
+    });
+
+    await check('The latest DM action wins when the older request completes last', async () => {
+      const first = deferred(), second = deferred();
+      api.openDm = (id) => id === alice.id ? first.promise : second.promise;
+      const openingAlice = messageUser(alice.id);
+      const openingBob = messageUser(bob.id);
+      second.resolve(dm(bob));
+      await openingBob;
+      first.resolve(dm(alice));
+      await openingAlice;
+      equal(get().homeView, dm(bob).id);
+      equal(get().dms.map((item) => item.id).sort(), [dm(alice).id, dm(bob).id]);
+    });
+
+    await check('A delayed DM action respects other navigation and survives an older DM list', async () => {
+      const request = deferred(), firstList = deferred();
+      api.openDm = () => request.promise;
+      let lists = 0;
+      api.dms = () => ++lists === 1 ? firstList.promise : Promise.resolve([dm(alice)]);
+      const refreshing = refreshDms();
+      const opening = messageUser(alice.id);
+      openServer();
+      request.resolve(dm(alice));
+      await opening;
+      firstList.resolve([]);
+      await refreshing;
+      equal([get().mode, get().dms.map((item) => item.id)], ['server', [dm(alice).id]]);
+    });
+
+    await check('Single-person picker retains its selection after a failed request', async () => {
+      patch({ friends: [{ userId: alice.id, status: 'friend' }] });
+      let requests = 0;
+      api.openDm = async () => {
+        if (++requests === 1) throw new Error('fixture offline');
+        return dm(alice);
+      };
+      openPicker({ mode: 'create' });
+      mount(h(GroupPicker));
+      const aliceButton = await waitFor(() => [...document.querySelectorAll('[role=dialog] button')].find((el) => el.textContent.trim().endsWith(alice.name)));
+      flushSync(() => aliceButton.click());
+      const action = await waitFor(() => [...document.querySelectorAll('[role=dialog] button')].find((el) => el.textContent.trim() === t('people.picker.openChat') && !el.disabled));
+      action.click();
+      await waitFor(() => requests === 1);
+      await waitFor(() => action.isConnected && action.getAttribute('aria-disabled') !== 'true');
+      equal(aliceButton.getAttribute('aria-pressed'), 'true');
+      action.click();
+      await waitFor(() => get().homeView === dm(alice).id && !get().picker);
+    });
+
+    await check('IME Enter leaves a mention unchanged, Escape dismisses, and click selects it', async () => {
+      patch({ hasMore: { [channel.id]: false } });
+      mount(h(ChatView, { conversation }));
+      const editor = fixture.querySelector('textarea');
+      equal(document.activeElement === editor, true);
+      flushSync(() => change(editor, '@Al'));
+      await waitFor(() => fixture.querySelector('[role=option]'));
+      flushSync(() => equal(key(editor, 'Enter', { isComposing: true }), true));
+      equal(editor.value, '@Al');
+      flushSync(() => equal(key(editor, 'Escape'), false));
+      equal(fixture.querySelector('[role=option]'), null);
+      flushSync(() => change(editor, '@Ali'));
+      await waitFor(() => fixture.querySelector('[role=option]'));
+      flushSync(() => fixture.querySelector('[role=option]').click());
+      equal(editor.value, '@Alice ');
+    });
+
+    await check('Pending send retains the draft and clears it on successful acknowledgment', async () => {
+      connectSocket('fixture', () => {});
+      const socket = getSocket();
+      socket.connected = true;
+      const response = deferred();
+      const sent = [];
+      socket.emitWithAck = (event, data) => {
+        if (event === 'message:send') sent.push(data.content);
+        return response.promise;
+      };
+      patch({ hasMore: { [channel.id]: false } });
+      mount(h(ChatView, { conversation }));
+      const editor = fixture.querySelector('textarea');
+      flushSync(() => change(editor, 'Keep this draft'));
+      flushSync(() => { key(editor, 'Enter'); key(editor, 'Enter'); });
+      equal([editor.value, editor.readOnly, sent], ['Keep this draft', true, ['Keep this draft']]);
+      response.resolve({ ok: true });
+      await waitFor(() => !editor.readOnly && !editor.value);
+      equal(sessionStorage.getItem(historyDraftKey), null);
+    });
+
+    await check('A failed send outside its chat restores text and uploaded files for retry', async () => {
+      connectSocket('fixture', () => {});
+      const socket = getSocket();
+      socket.connected = true;
+      const response = deferred();
+      const sent = [];
+      api.upload = async () => ({ id: 'upload-id', kind: 'file', url: '/fixture-file', width: 0, height: 0 });
+      socket.emitWithAck = (event, data) => {
+        if (event !== 'message:send') return Promise.resolve({ ok: true });
+        sent.push([data.content, data.attachments]);
+        return sent.length === 1 ? response.promise : Promise.resolve({ ok: true });
+      };
+      const other = { ...conversation, id: 'other-fixture-chat' };
+      patch({ hasMore: { [channel.id]: false, [other.id]: false } });
+      const renderChat = (current) => flushSync(() => root.render(h(ChatView, { key: current.id, conversation: current })));
+      mount(h(ChatView, { key: conversation.id, conversation }));
+      const editor = fixture.querySelector('textarea');
+      flushSync(() => change(editor, 'Text to retry'));
+      const filePicker = fixture.querySelector('input[type=file]');
+      const transfer = new DataTransfer();
+      transfer.items.add(new File(['fixture'], 'fixture.txt', { type: 'text/plain' }));
+      filePicker.files = transfer.files;
+      filePicker.dispatchEvent(new Event('change', { bubbles: true }));
+      await waitFor(() => !fixture.querySelector('button[aria-label="' + t('chat.send') + '"]').disabled);
+      flushSync(() => key(editor, 'Enter'));
+      await waitFor(() => sent.length === 1);
+      renderChat(other);
+      response.resolve({ ok: false, error: 'fixture offline' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      renderChat(conversation);
+      const reopened = fixture.querySelector('textarea');
+      equal([reopened.value, reopened.readOnly, fixture.textContent.includes('fixture.txt')], ['Text to retry', false, true]);
+      key(reopened, 'Enter');
+      await waitFor(() => !reopened.value && !fixture.textContent.includes('fixture.txt'));
+      equal(sent, [['Text to retry', ['upload-id']], ['Text to retry', ['upload-id']]]);
+    });
+
+    await check('A slow edit submits once and its success does not close a different editor', async () => {
+      connectSocket('fixture', () => {});
+      const socket = getSocket();
+      socket.connected = true;
+      const response = deferred();
+      const edits = [];
+      socket.emitWithAck = (event, data) => {
+        if (event === 'message:edit') edits.push(data);
+        return response.promise;
+      };
+      patch({ hasMore: { [channel.id]: false }, messages: { [channel.id]: [message('first'), message('second')] }, editingId: 'first' });
+      mount(h(ChatView, { conversation }));
+      const editor = fixture.querySelector('textarea[aria-label="' + t('chat.editMessage') + '"]');
+      flushSync(() => change(editor, 'new text'));
+      flushSync(() => { key(editor, 'Enter'); key(editor, 'Enter'); });
+      equal(edits.length, 1);
+      flushSync(() => setEditing('second'));
+      response.resolve({ ok: true });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      equal(get().editingId, 'second');
+    });
+
+    await check('Sign-in is single-flight and a failed form can be retried', async () => {
+      history.replaceState(null, '', location.pathname + '?signin');
+      const response = deferred();
+      let requests = 0, signedIn = 0;
+      api.login = () => {
+        if (++requests === 1) return response.promise;
+        return Promise.resolve({ token: 'fixture', user: me });
+      };
+      mount(h(Login, { onLoggedIn: () => signedIn++ }));
+      const form = fixture.querySelector('form');
+      flushSync(() => {
+        const [name, password] = form.querySelectorAll('input');
+        change(name, 'fixture');
+        change(password, 'test-password');
+      });
+      flushSync(() => { submit(form); submit(form); });
+      equal(requests, 1);
+      response.reject(new Error('fixture offline'));
+      await waitFor(() => form.textContent.includes('fixture offline'));
+      submit(form);
+      await waitFor(() => signedIn === 1);
+      equal(requests, 2);
+      setToken(token);
+    });
+
+    await check('Strict effects create only one guest session', async () => {
+      setToken(null);
+      let guests = 0;
+      api.setupStatus = async () => ({ needed: false, guest: true });
+      api.guest = () => { guests++; return new Promise(() => {}); };
+      mount(h(StrictMode, null, h(App)));
+      await waitFor(() => guests > 0);
+      equal(guests, 1);
+    });
+
+    await check('Channel creation sends a single request for repeat Enter', async () => {
+      patch({ canManageChannels: true });
+      const response = deferred();
+      let requests = 0;
+      api.createChannel = () => { requests++; return response.promise; };
+      mount(h(Sidebar));
+      fixture.querySelector('button[aria-label="' + t('shell.sidebar.createText') + '"]').click();
+      const input = await waitFor(() => fixture.querySelector('input[aria-label="' + t('shell.sidebar.nameTextChannel') + '"]'));
+      flushSync(() => change(input, channel.name));
+      flushSync(() => { submit(input.form); submit(input.form); });
+      equal(requests, 1);
+      response.resolve([channel]);
+      await waitFor(() => !input.isConnected);
+    });
+
+    await check('Creating the first text channel selects it from the POST response', async () => {
+      patch({ canManageChannels: true });
+      api.createChannel = async () => [channel];
+      mount(h(Sidebar));
+      fixture.querySelector('button[aria-label="' + t('shell.sidebar.createText') + '"]').click();
+      const input = await waitFor(() => fixture.querySelector('input[aria-label="' + t('shell.sidebar.nameTextChannel') + '"]'));
+      flushSync(() => change(input, channel.name));
+      submit(input.form);
+      await waitFor(() => get().channels.length);
+      equal(get().selectedChannelId, channel.id);
+    });
+
+    await check('New category retains its name and retries after an error', async () => {
+      patch({ canManageChannels: true });
+      const response = deferred();
+      const category = { id: 'test-category', name: 'New section', position: 0 };
+      const names = [];
+      api.createCategory = (name) => {
+        names.push(name);
+        return names.length === 1 ? response.promise : Promise.resolve([category]);
+      };
+      mount(h(Sidebar));
+      findButton(t('shell.category.new')).click();
+      const input = await waitFor(() => fixture.querySelector('input[aria-label="' + t('shell.category.name') + '"]'));
+      flushSync(() => change(input, category.name));
+      submit(input.form);
+      equal(names, [category.name]);
+      response.reject(new Error('fixture offline'));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      equal([input.isConnected, input.value, input.readOnly], [true, category.name, false]);
+      flushSync(() => { submit(input.form); submit(input.form); });
+      await waitFor(() => get().categories.length && !input.isConnected);
+      equal(names, [category.name, category.name]);
+    });
+
+    await check('Adding a channel inside a category keeps its name after an error and retries', async () => {
+      const category = { id: 'test-category', name: 'Known section', position: 0 };
+      patch({ canManageChannels: true, categories: [category] });
+      const response = deferred();
+      const calls = [];
+      api.createChannel = (...args) => {
+        calls.push(args);
+        return calls.length === 1 ? response.promise : Promise.resolve([{ ...channel, categoryId: category.id }]);
+      };
+      mount(h(Sidebar));
+      fixture.querySelector('button[aria-label="' + t('shell.category.actions', { name: category.name }) + '"]').click();
+      const menuItem = await waitFor(() => document.querySelector('[role="menuitem"][data-key="text"]'));
+      menuItem.click();
+      const input = await waitFor(() => fixture.querySelector('input[aria-label="' + t('shell.sidebar.nameTextChannel') + '"]'));
+      flushSync(() => change(input, channel.name));
+      submit(input.form);
+      equal(calls, [[channel.name, 'text', category.id]]);
+      response.reject(new Error('fixture offline'));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      equal([input.isConnected, input.value, input.readOnly], [true, channel.name, false]);
+      flushSync(() => { submit(input.form); submit(input.form); });
+      await waitFor(() => get().channels.length && !input.isConnected);
+      equal(calls, [[channel.name, 'text', category.id], [channel.name, 'text', category.id]]);
+    });
+
+    await check('Shell rail buttons and mic toggle each have one keyboard focus stop', async () => {
+      mount(h(Shell));
+      const controls = [get().serverName, t('shell.tab.home'), t('shell.call.micOff')];
+      for (const label of controls) {
+        const button = fixture.querySelector('button[aria-label="' + label + '"]');
+        const trigger = button?.closest('[data-slot="tooltip-trigger"]') ?? button;
+        if (!trigger) throw new Error('Missing button: ' + label);
+        const candidates = [trigger, ...trigger.querySelectorAll('button, [tabindex]')];
+        equal(candidates.filter((element) => element.tabIndex >= 0 && !element.disabled).map((element) => element.tagName), ['BUTTON']);
+      }
+    });
+
+    await check('Settings resets scroll when switching sections and closes by Escape', async () => {
+      let closed = 0;
+      mount(h(SettingsDialog, { onClose: () => closed++ }));
+      const dialog = await waitFor(() => document.querySelector('[role=dialog]'));
+      const panel = dialog.querySelector('nav + div');
+      panel.scrollTop = 60;
+      equal(panel.scrollTop > 0, true);
+      const voice = [...dialog.querySelectorAll('nav button')].find((button) => button.textContent.trim() === t('settings.page.voice'));
+      flushSync(() => voice.click());
+      equal(voice.getAttribute('aria-current'), 'page');
+      equal(dialog.querySelector('nav + div').scrollTop, 0);
+      voice.focus();
+      key(voice, 'Escape');
+      await waitFor(() => closed > 0);
+    });
+  } finally {
+    setToken(token);
+    document.hasFocus = oldHasFocus;
+    if (priorDraft === null) sessionStorage.removeItem(historyDraftKey);
+    else sessionStorage.setItem(historyDraftKey, priorDraft);
+    run.disabled = runBrowser.disabled = false;
+    output.textContent += '\n\nRESULT: ' + passed + ' passed, ' + failed + ' failed';
+  }
+};
+function WindowProbe() {
+  const [open, setOpen] = useState(false);
+  return h('div', null,
+    h('button', { type: 'button', id: 'open-focus-window', onClick: () => setOpen(true) }, 'Open test window'),
+    open && h(Window, { label: 'Focus test window', onClose: () => setOpen(false) }, h('p', null, 'Focus test')));
+}
+
+// Use a real browser's mouse and keyboard for these steps. Enable reduced motion before starting.
+runBrowser.onclick = async () => {
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    browserOutput.textContent = 'Enable reduced motion in your system or browser, then run this check again.';
+    return;
+  }
+  run.disabled = runBrowser.disabled = true;
+  const saved = { ...api };
+  const timerBeforeFocusSettles = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  try {
+    await import('/src/index.css');
+    initStore(bootstrap());
+    api.markRead = async () => ({ ok: true });
+    api.myInvite = async () => inviteFixture;
+    api.checkToken = async () => { throw new Error('No call backend for this fixture'); };
+    mount(h(Shell));
+    const server = fixture.querySelector('button[aria-label="' + get().serverName + '"]');
+    let clickedServer = false;
+    server.addEventListener('click', (event) => {
+      if (event.isTrusted && event.detail > 0) clickedServer = true;
+    });
+    browserOutput.textContent = 'Click the Fixture server button.';
+    await waitFor(() => clickedServer && get().mode === 'server', 3000);
+    const home = fixture.querySelector('button[aria-label="' + t('shell.tab.home') + '"]');
+    home.focus();
+    let pressedEnter = false;
+    home.addEventListener('keydown', (event) => {
+      if (event.isTrusted && event.key === 'Enter') pressedEnter = true;
+    });
+    browserOutput.textContent = 'Press Enter on the focused Home button.';
+    await waitFor(() => pressedEnter && get().mode === 'home', 3000);
+    flushSync(() => root.render(h(WindowProbe)));
+    const opener = fixture.querySelector('#open-focus-window');
+    opener.focus();
+    browserOutput.textContent = 'Press Enter on Open test window.';
+    const dialog = await waitFor(() => document.querySelector('[role=dialog][aria-label="Focus test window"]'), 3000);
+    await timerBeforeFocusSettles();
+    equal(dialog.contains(document.activeElement), true);
+    browserOutput.textContent = 'Press Escape to close the window.';
+    await waitFor(() => !dialog.isConnected, 3000);
+    await waitFor(() => document.activeElement === opener);
+    browserOutput.textContent = 'PASS browser navigation and reduced-motion window focus';
+  } catch (error) {
+    browserOutput.textContent = 'FAIL browser focus checks: ' + error.message;
+  } finally {
+    root?.unmount();
+    root = null;
+    Object.assign(api, saved);
+    resetStore();
+    run.disabled = runBrowser.disabled = false;
+  }
+};
+run.disabled = runBrowser.disabled = false;
+</script>

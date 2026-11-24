@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { FlowPrimary, FlowStep, TextAction } from '@atrium/ui-web';
 import { downloadKey, type NewKey } from './RecoveryKey';
 import { useT } from '../i18n';
+import { copyText } from '../ui/CopyButton';
 
 /**
  * The recovery key, shown once, in the flow look (as the phone's RecoveryKeyStep): big, to copy or download as a
@@ -11,18 +12,30 @@ import { useT } from '../i18n';
 export function KeyStep({ value, title, sub, error, onNext }: { value: NewKey; title: string; sub: string; error?: string | null; onNext: () => void }) {
   const { t } = useT();
   const [kept, setKept] = useState<'copied' | 'downloaded' | null>(null);
+  const [copyFailed, setCopyFailed] = useState(false);
 
   async function copy() {
-    await navigator.clipboard.writeText(value.key).catch(() => undefined);
-    setKept('copied');
+    try {
+      await copyText(value.key);
+      setKept('copied');
+      setCopyFailed(false);
+    } catch {
+      setCopyFailed(true);
+    }
+  }
+
+  function download() {
+    downloadKey(value);
+    setKept('downloaded');
+    setCopyFailed(false);
   }
 
   return (
-    <FlowStep title={title} sub={sub} error={error} onSubmit={() => kept && onNext()} actions={<FlowPrimary type="submit" disabled={!kept}>{t('setup.next')}</FlowPrimary>}>
+    <FlowStep title={title} sub={sub} error={copyFailed ? t('common.copy.failed') : error} onSubmit={() => kept && onNext()} actions={<FlowPrimary type="submit" disabled={!kept}>{t('setup.next')}</FlowPrimary>}>
       <p className="flow-big">{value.key}</p>
       <div className="flow-actions">
         <TextAction left onPress={() => void copy()}>{kept === 'copied' ? t('common.copy.done') : t('common.copy.label')}</TextAction>
-        <TextAction left onPress={() => (downloadKey(value), setKept('downloaded'))}>{kept === 'downloaded' ? t('setup.key.downloaded') : t('setup.key.download')}</TextAction>
+        <TextAction left onPress={download}>{kept === 'downloaded' ? t('setup.key.downloaded') : t('setup.key.download')}</TextAction>
       </div>
     </FlowStep>
   );

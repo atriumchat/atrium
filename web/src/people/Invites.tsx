@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@heroui/react';
+import { XMarkIcon } from '@heroicons/react/24/solid';
 import { api } from '../api';
 import { getSessionEpoch, showError, useStore } from '../store';
 import { useT } from '../i18n';
@@ -9,7 +10,7 @@ import { Avatar } from '../ui/Avatar';
 import { ConfirmDialog, Window } from '../ui/Dialog';
 import { Row, RowIcon } from '../ui/settings';
 import { CopyButton } from '../ui/CopyButton';
-import { CheckIcon, UserPlusIcon, XIcon } from '../ui/icons';
+import { CheckIcon, UserPlusIcon } from '../ui/icons';
 import { MovePostDialog } from './MovePost';
 
 const BANNER_HIDDEN = 'atrium_invite_banner_hidden';
@@ -65,7 +66,6 @@ export function useMyInvite(enabled = true) {
  */
 export function InviteBanner() {
   const { t } = useT();
-  const users = useStore((s) => s.users);
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(() => {
     try {
@@ -90,37 +90,33 @@ export function InviteBanner() {
     }
   }
 
-  // Who came by your link, as faces and a count; the places left only when the link has a limit.
   const joined = invite.invited.length;
   const status = [joined > 0 ? t('people.invite.bannerJoined', { n: joined }) : t('people.invite.bannerNobody'), left === null ? null : t('people.invite.bannerLeft', { n: left })]
     .filter(Boolean)
     .join(' · ');
 
   return (
-    <div className="mb-2 rounded-[24px] bg-default p-4">
-      <div className="flex items-center gap-2">
-        <span className="min-w-0 flex-1 truncate text-[15px] font-medium">{t('people.invite.title')}</span>
-        <button
-          onClick={close}
-          aria-label={t('people.invite.hide')}
-          className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted hover:bg-white/10 hover:text-foreground"
-        >
-          <XIcon size={14} />
-        </button>
+    <div className="relative mb-2 flex items-center gap-2 rounded-card bg-island py-2.5 pl-3 pr-9">
+      <div className="min-w-0 flex-1">
+        <h2 className="text-sm font-medium leading-5">{t('people.invite.title')}</h2>
+        <p className="mt-0.5 text-xs leading-4 text-muted">{status}</p>
       </div>
-      <div className="mt-3 flex items-center gap-2.5">
-        {joined > 0 && (
-          <span className="flex shrink-0 -space-x-2">
-            {invite.invited.slice(0, 3).map((id) => (
-              <Avatar key={id} user={users[id]} size={28} ringBg="var(--default)" />
-            ))}
-          </span>
-        )}
-        <span className="min-w-0 flex-1 truncate text-[13px] text-muted">{status}</span>
-        <Button onPress={() => setOpen(true)} className="h-9 shrink-0 whitespace-nowrap rounded-full px-4 text-[14px] [--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]">
-          {t('people.invite.button')}
-        </Button>
-      </div>
+      <Button
+        variant="tertiary"
+        size="sm"
+        onPress={() => setOpen(true)}
+        className="h-8 shrink-0 whitespace-nowrap rounded-row px-(--app-radius-row) text-xs"
+      >
+        {t('people.invite.button')}
+      </Button>
+      <button
+        type="button"
+        onClick={close}
+        aria-label={t('people.invite.hide')}
+        className="absolute right-1.5 top-1.5 grid size-7 place-items-center rounded-full text-muted outline-none hover:bg-white/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus"
+      >
+        <XMarkIcon className="size-3.5" aria-hidden="true" />
+      </button>
       {open && <InviteDialog onClose={() => setOpen(false)} />}
     </div>
   );

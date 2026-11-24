@@ -24,7 +24,7 @@ async function answers(url) {
   }
 }
 
-/** The window being kept open: { contents, cover, origin, show, retry }. */
+/** The one active navigation and its offline cover. */
 let current = null;
 
 /**
@@ -33,15 +33,20 @@ let current = null;
  * and the page goes away.
  */
 function open(win, url) {
-  const origin = new URL(url).origin;
+  current?.dispose();
+  const contents = win.webContents;
+  const { origin, host } = new URL(url);
   let target = url;
-  let cover = null; // the page, a view of its own so it has its own bridge
   let failed = false; // the load in progress failed
   let busy = false;
   let timer = null;
+  const navigation = { contents, cover: null, origin, show, retry, dispose };
+  const active = () => current === navigation && !win.isDestroyed();
+  const load = () => win.loadURL(target).catch(() => undefined); // did-fail-load handles errors
 
   const fit = () => {
-    if (!cover || win.isDestroyed()) return;
+    const { cover } = navigation;
+    if (!cover || !active()) return;
     const [width, height] = win.getContentSize();
     cover.setBounds({ x: 0, y: 0, width, height });
   };
@@ -49,63 +54,85 @@ function open(win, url) {
     clearTimeout(timer);
     timer = setTimeout(retry, EVERY);
   };
-  const show = (from) => {
-    if (win.isDestroyed()) return;
-    if (from?.startsWith(origin)) target = from;
-    if (!cover) {
-      cover = new WebContentsView({
+  function show(from) {
+    if (!active()) return;
+    if (from && URL.parse(from)?.origin === origin) target = from;
+    if (!navigation.cover) {
+      const cover = new WebContentsView({
         webPreferences: { preload: path.join(__dirname, 'unreachable-preload.js'), contextIsolation: true, sandbox: true },
       });
+      navigation.cover = cover;
       cover.setBackgroundColor('#0b0b0d');
       win.contentView.addChildView(cover);
       fit();
-      cover.webContents.loadFile(path.join(__dirname, 'unreachable.html'), { query: { lang: i18n.getLang(), host: new URL(url).host } });
-      current.cover = cover;
+      cover.webContents
+        .loadFile(path.join(__dirname, 'unreachable.html'), { query: { lang: i18n.getLang(), host } })
+        .catch(() => undefined);
     }
     later();
-  };
+  }
   const hide = () => {
     clearTimeout(timer);
+    const { cover } = navigation;
     if (!cover) return;
+    navigation.cover = null;
     if (!win.isDestroyed()) win.contentView.removeChildView(cover);
-    cover.webContents.close();
-    cover = current.cover = null;
+    if (!cover.webContents.isDestroyed()) cover.webContents.close();
   };
   async function retry() {
+    if (busy || !active()) return;
     clearTimeout(timer);
-    if (busy || win.isDestroyed()) return;
     busy = true;
-    const up = await answers(target);
-    busy = false;
-    if (win.isDestroyed()) return;
-    if (up) win.loadURL(target);
-    else later();
+    try {
+      const up = await answers(target);
+      if (!active() || !navigation.cover) return;
+      if (up) await load();
+      else later();
+    } finally {
+      busy = false;
+    }
   }
 
-  current = { contents: win.webContents, cover, origin, show, retry };
-  win.on('resize', fit);
-  win.on('closed', () => {
-    clearTimeout(timer);
+  function dispose() {
     current = null;
-  });
-  win.webContents.on('did-start-loading', () => (failed = false));
-  win.webContents.on('did-fail-load', (_event, code, _description, from, isMainFrame) => {
+    hide();
+    win.removeListener('resize', fit);
+    win.removeListener('closed', dispose);
+    contents.removeListener('did-start-loading', onStart);
+    contents.removeListener('did-fail-load', onFail);
+    contents.removeListener('did-navigate', onNavigate);
+    contents.removeListener('did-finish-load', onFinish);
+  }
+  const onStart = () => (failed = false);
+  const onFail = (_event, code, _description, from, isMainFrame) => {
     // -3: a load that another one replaced or the person stopped.
     if (!isMainFrame || code === -3) return;
     failed = true;
     show(from);
-  });
-  win.webContents.on('did-finish-load', () => {
+  };
+  const onNavigate = (_event, url, status) => {
+    if (status < 500) return;
+    failed = true;
+    show(url);
+  };
+  const onFinish = () => {
     if (!failed) hide();
-  });
-  win.loadURL(url);
+  };
+  current = navigation;
+  win.on('resize', fit);
+  win.once('closed', dispose);
+  contents.on('did-start-loading', onStart);
+  contents.on('did-fail-load', onFail);
+  contents.on('did-navigate', onNavigate);
+  contents.on('did-finish-load', onFinish);
+  void load();
 }
 
 // A certificate that doesn't check out is refused as it always was; the window just says so.
 app.on('certificate-error', (event, contents, url, _error, _certificate, callback) => {
   event.preventDefault();
   callback(false);
-  if (current?.contents === contents && url.startsWith(current.origin)) current.show(url);
+  if (current?.contents === contents && URL.parse(url)?.origin === current.origin) current.show();
 });
 
 // "Retry" on the page.
@@ -117,9 +144,10 @@ ipcMain.handle('unreachable:retry', async (event) => {
 function relocalize() {
   const contents = current?.cover?.webContents;
   if (!contents || contents.isDestroyed()) return;
-  const url = new URL(contents.getURL());
+  const url = URL.parse(contents.getURL());
+  if (!url) return;
   url.searchParams.set('lang', i18n.getLang());
-  contents.loadURL(url.href);
+  contents.loadURL(url.href).catch(() => undefined);
 }
 
 module.exports = { answers, open, relocalize };

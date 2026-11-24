@@ -117,7 +117,7 @@ export function ProfileCard({ userId, onClose }: { userId: string; onClose: () =
           <FriendTile userId={userId} name={user.name} disabled={blocked} />
         </div>
 
-        <div className="overflow-hidden rounded-[18px] bg-default">
+        <div className="overflow-hidden rounded-compact bg-default">
           <Fact label={t('people.profile.about')}>
             <span className={`whitespace-pre-wrap break-words ${user.bio ? '' : 'text-muted'}`}>{user.bio || t('people.profile.noBio')}</span>
           </Fact>
@@ -155,7 +155,7 @@ export function ProfileCard({ userId, onClose }: { userId: string; onClose: () =
           )}
         </div>
 
-        <div className="overflow-hidden rounded-[18px] bg-default">
+        <div className="overflow-hidden rounded-compact bg-default">
           <BlockButton userId={userId} name={user.name} />
           {canRemove && <ServerActions user={user} />}
         </div>
@@ -483,7 +483,7 @@ export function BioEditor({ initial, className }: { initial: string; className?:
         rows={3}
         placeholder={t('people.profile.bioPlaceholder')}
         aria-label={t('people.profile.about')}
-        className={className ?? 'w-full resize-none rounded-[18px] bg-surface-tertiary px-4 py-2.5 text-[14px] outline-none placeholder:text-faint focus:ring-2 focus:ring-focus'}
+        className={className ?? 'w-full resize-none rounded-compact bg-surface-tertiary px-4 py-2.5 text-[14px] outline-none placeholder:text-faint focus:ring-2 focus:ring-focus'}
       />
       {changed && (
         <Button size="sm" isPending={saving} onPress={save} className="mt-1.5 rounded-full">

@@ -227,7 +227,7 @@ function highlight(code: string, lang: string): ReactNode[] {
 
 function CodeBlock({ code, lang }: { code: string; lang: string }) {
   return (
-    <pre className="my-1 max-w-full overflow-x-auto rounded-[14px] border-[0.5px] border-white/10 bg-black/50 px-4 py-3 font-mono text-[13.5px] leading-[1.55] text-foreground/90">
+    <pre className="my-1 max-w-full overflow-x-auto rounded-card border-[0.5px] border-white/10 bg-black/50 px-4 py-3 font-mono text-[13.5px] leading-[1.55] text-foreground/90">
       {lang && <div className="pb-1 text-[11px] text-faint">{lang}</div>}
       <code>{highlight(code, lang)}</code>
     </pre>

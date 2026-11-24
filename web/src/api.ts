@@ -72,7 +72,17 @@ function historyQuery(before?: number, beforeId?: string) {
   return `?${params}`;
 }
 
+export type SearchHit = Pick<Message, 'id' | 'channelId' | 'userId' | 'content' | 'createdAt'> & { dm: number; fileCount: number };
+
+export type UnreadMarker = { conversationId: string; first: string | null; token: string; count: number; mentions: number };
+
 export const api = {
+  markUnread: (id: string) => request<UnreadMarker>(`/api/messages/${encodeURIComponent(id)}/unread`, post()),
+  pins: (channel: string) => request<Message[]>(`/api/channels/${encodeURIComponent(channel)}/pins`),
+  setPin: (channel: string, id: string, pinned: boolean) => request<{ok: boolean}>(`/api/channels/${encodeURIComponent(channel)}/pins/${encodeURIComponent(id)}`, {method: 'PUT', body: JSON.stringify({ pinned })}),
+  messageContext: (id: string) => request<Message[]>(`/api/messages/${encodeURIComponent(id)}/context`),
+  searchMessages: (params: URLSearchParams, signal: AbortSignal) =>
+    request<SearchHit[]>(`/api/messages/search?${params}`, { signal }),
   register: (invite: string, name: string, password: string) => request<Session>('/api/register', post({ invite, name, password })),
   login: (name: string, password: string) => request<Session>('/api/login', post({ name, password })),
   /** A public demo's way in (GUEST_MODE on the server): an account made on the spot, no form. */
@@ -166,7 +176,7 @@ export const api = {
   earlyAccess: () => request<EarlyAccess>('/api/server/early-access'),
   setEarlyAccess: (enabled: boolean) => request<EarlyAccess>('/api/server/early-access', { method: 'PUT', body: JSON.stringify({ enabled }) }),
   checkToken: () => request<{ token: string; url: string }>('/api/check-token', { ...post(), signal: AbortSignal.timeout(15_000) }),
-  markRead: (conversationId: string, at: number) => request<{ ok: boolean }>('/api/read', post({ conversationId, at })),
+  markRead: (conversationId: string, at: number, marker?: string) => request<{ ok: boolean }>('/api/read', post({ conversationId, at, marker })),
   inbox: (before?: number, beforeId?: string) => request<InboxItem[]>(`/api/inbox${historyQuery(before, beforeId)}`),
   callQuality: (report: Record<string, unknown>) => request<{ ok: boolean }>('/api/call-quality', { ...post(report), signal: AbortSignal.timeout(5000) }),
   voiceToken: (channelId: string) => request<{ token: string; url: string }>('/api/voice-token', post({ channelId })),

@@ -1,7 +1,7 @@
 import { api } from '../api';
 import { t } from '../i18n';
 import { playSoundboard, stopSoundboard } from '../socket';
-import { saveSoundboard, showError, useStore, voiceMembers, type SoundboardSettings } from '../store';
+import { getSessionEpoch, saveSoundboard, showError, useStore, voiceMembers, type SoundboardSettings } from '../store';
 import type { Sound, SoundPatch } from '../types';
 import { getPreferredDevice } from './devices';
 
@@ -177,10 +177,10 @@ function endPlay(play: Play) {
  * Silence every call sound sounding right here (the server still plays them for the rest of the call) and forget
  * which ones were mine. A preview is the listener's own and stays: muting the soundboard doesn't end it.
  */
-export function stopCallSounds() {
-  for (const play of [...playing]) if (play !== preview) play.stop();
+export function stopCallSounds({ clearOwn = true } = {}) {
+  for (const play of [...playing]) if (play !== preview?.play) play.stop();
   latestPlay.clear();
-  if (get().myPlaying) set({ myPlaying: null });
+  if (clearOwn && get().myPlaying) set({ myPlaying: null });
 }
 
 /** A short clip from its decoded buffer, through the shared context. */
@@ -196,6 +196,8 @@ function playBuffer(buffer: AudioBuffer, base: number, userId: string, onEnded?:
   const finish = () => {
     if (done) return;
     done = true;
+    source.disconnect();
+    gain.disconnect();
     endPlay(play);
     onEnded?.();
   };
@@ -205,15 +207,8 @@ function playBuffer(buffer: AudioBuffer, base: number, userId: string, onEnded?:
     // A short ramp: a jump in gain clicks.
     refresh: () => gain.gain.setTargetAtTime(level(play.base), context.currentTime, 0.015),
     stop: () => {
-      if (!started) {
-        finish();
-        return;
-      }
-      try {
-        source.stop();
-      } catch {
-        finish();
-      }
+      if (started && !done) source.stop();
+      finish();
     },
   };
   source.onended = finish;
@@ -233,7 +228,7 @@ function playBuffer(buffer: AudioBuffer, base: number, userId: string, onEnded?:
 }
 
 /** A long clip, streamed: seek to where the call is by now so everyone stays roughly together, cut off at 4 minutes. */
-function playLong(url: string, base: number, arrived: number, userId: string, onEnded?: () => void, current: () => boolean = () => true): Play {
+function playLong(url: string, base: number, arrived: number | null, userId: string, onEnded?: () => void): Play {
   const audio = new Audio();
   audio.preload = 'auto';
   audio.volume = level(base);
@@ -248,6 +243,11 @@ function playLong(url: string, base: number, arrived: number, userId: string, on
     if (done) return;
     done = true;
     if (timer) clearTimeout(timer);
+    audio.onended = audio.onerror = audio.oncanplay = null;
+    audio.pause();
+    audio.removeAttribute('src');
+    // Dropping the attribute alone leaves the loaded stream alive; load() releases the decoder and the download.
+    audio.load();
     endPlay(play);
     onEnded?.();
   };
@@ -257,43 +257,37 @@ function playLong(url: string, base: number, arrived: number, userId: string, on
     refresh: () => {
       audio.volume = level(play.base);
     },
-    stop: () => {
-      audio.pause();
-      audio.removeAttribute('src');
-      // Dropping the attribute alone leaves the loaded stream alive; load() releases the decoder and the download.
-      audio.load();
-      finish();
-    },
+    stop: finish,
   };
   audio.onended = finish;
   audio.onerror = finish;
   audio.oncanplay = () => {
     audio.oncanplay = null;
     if (done) return;
-    // Replaced by a newer sound of theirs, or stopped, while it was still loading.
-    if (!current()) {
-      finish();
-      return;
-    }
-    const elapsed = (Date.now() - arrived) / 1000;
+    if (timer) clearTimeout(timer);
+    const elapsed = arrived === null ? 0 : (Date.now() - arrived) / 1000;
     // Already past the end (a slow network, a replayed event, past the 4 minutes): don't start it at all.
     if (elapsed >= MAX_LONG_SECONDS || elapsed >= audio.duration) {
       finish();
       return;
     }
-    audio.currentTime = elapsed;
-    startPlay(play);
-    timer = setTimeout(finish, Math.max(0, MAX_LONG_SECONDS - elapsed) * 1000);
+    if (elapsed > 0) audio.currentTime = elapsed;
+    timer = setTimeout(finish, (MAX_LONG_SECONDS - elapsed) * 1000);
     void audio.play().catch(finish);
   };
+  startPlay(play);
+  // Release a stream that never reaches canplay, even if the browser never reports an error.
+  timer = setTimeout(finish, MAX_LONG_SECONDS * 1000);
   audio.load();
   return play;
 }
 
 /** Your clips, from the server. */
 export async function loadMySounds(): Promise<void> {
+  const epoch = getSessionEpoch();
   try {
-    set({ mySounds: await api.sounds() });
+    const sounds = await api.sounds();
+    if (getSessionEpoch() === epoch) set({ mySounds: sounds });
   } catch {
     // Offline or the server is busy: the soundboard just stays as it was.
   }
@@ -374,7 +368,7 @@ export function setSoundboard(patch: Partial<SoundboardSettings>) {
   saveSoundboard(next);
   if (patch.volume !== undefined) refreshLevels();
   // Muting is local and immediate: nothing of the soundboard should keep sounding.
-  if (next.muted) stopCallSounds();
+  if (next.muted) stopCallSounds({ clearOwn: false });
 }
 
 export function toggleFavorite(id: string) {
@@ -388,66 +382,60 @@ export async function playSound(sound: Sound): Promise<boolean> {
 }
 
 /**
- * "Stop": what you're listening to by yourself ends here and now; your sound in the call, if one plays, is stopped for
- * everyone (the server tells them with sound:stopped). Nothing goes to the server when there's no such sound.
+ * Stop your sound for everyone in the call. Local previews have their own stop button.
+ * Nothing goes to the server when no sound is playing for the call.
  */
 export async function stopMySounds(): Promise<boolean> {
-  stopPreview();
   if (!get().myPlaying) return true;
   return (await stopSoundboard()) !== null;
 }
 
-// The preview sounding right now: asking for another one stops it first, so previews never pile up.
-let preview: Play | null = null;
-
-function startPreview(play: Play) {
-  // The new one first: the old one's end then sees it's no longer current and leaves the stop state alone.
-  const old = preview;
-  preview = play;
-  if (old && old !== play) old.stop();
-}
-
-/** The clip you're listening to by yourself changes its own volume as the slider moves (the add/edit window's). */
-export function setPreviewVolume(volume: number) {
-  if (!preview) return;
-  preview.base = volume;
-  preview.refresh();
-}
+// One request owns the preview while the clip is loading and while it plays.
+let preview: { play: Play | null; volume: number } | null = null;
 
 /** Stop listening to a preview. */
 export function stopPreview() {
-  preview?.stop();
+  const previous = preview;
   preview = null;
-  set({ previewing: null });
+  previous?.play?.stop();
+  if (get().previewing !== null) set({ previewing: null });
 }
 
-/** Play a clip on this device only, ignoring mute: the sound picker's preview. Long clips stream like in a call. */
+/** Play a clip on this device only, ignoring mute. Returns controls scoped to this preview. */
 export function previewSound(sound: Sound) {
-  let play: Play | null = null;
-  // The tile shows a stop while this preview sounds; a newer preview or the end clears it.
+  stopPreview();
+  const request = { play: null as Play | null, volume: sound.volume };
+  preview = request;
+  set({ previewing: sound.id });
   const ended = () => {
-    if (preview !== play) return;
+    if (preview !== request) return;
     preview = null;
     set({ previewing: null });
   };
-  const start = (next: Play) => {
-    play = next;
-    startPreview(next);
-  };
-  set({ previewing: sound.id });
   if (isLong(sound.durationMs)) {
-    start(playLong(sound.url, sound.volume, Date.now(), '', ended));
-    return;
+    request.play = playLong(sound.url, request.volume, null, '', ended);
+  } else {
+    const cached = cachedBuffer(sound.url);
+    if (cached) request.play = playBuffer(cached, request.volume, '', ended);
+    else void loadBuffer(sound.url).then((buffer) => {
+      if (preview !== request) return;
+      if (buffer) request.play = playBuffer(buffer, request.volume, '', ended);
+      else ended();
+    });
   }
-  const cached = cachedBuffer(sound.url);
-  if (cached) {
-    start(playBuffer(cached, sound.volume, '', ended));
-    return;
-  }
-  void loadBuffer(sound.url).then((buffer) => {
-    if (buffer && get().previewing === sound.id) start(playBuffer(buffer, sound.volume, '', ended));
-    else if (!buffer && get().previewing === sound.id) set({ previewing: null });
-  });
+  return {
+    stop: () => {
+      if (preview === request) stopPreview();
+    },
+    setVolume: (volume: number) => {
+      if (preview !== request) return;
+      request.volume = volume;
+      if (request.play) {
+        request.play.base = volume;
+        request.play.refresh();
+      }
+    },
+  };
 }
 
 /** How long a clip is in ms, from the decoded cache: undefined for a long (streamed) clip or one not decoded yet. */
@@ -466,6 +454,7 @@ const latestPlay = new Map<string, string>();
 
 /** Someone played a clip (the sender included): show it on their tile and, unless muted or deafened, hear it. */
 export function onSoundPlayed(event: SoundPlayedEvent) {
+  if (!inCall(event.channelId)) return;
   set((s) => ({ soundPlays: { ...s.soundPlays, [event.userId]: Date.now() } }));
   // One sound per person at a time: a new one cuts off whatever they played before (other people's keep going),
   // including one still loading, which then never starts.
@@ -473,7 +462,7 @@ export function onSoundPlayed(event: SoundPlayedEvent) {
   latestPlay.set(event.userId, event.playId);
   const current = () => {
     const now = get();
-    return latestPlay.get(event.userId) === event.playId && !now.deafened && !now.soundboard.muted;
+    return inCall(event.channelId) && latestPlay.get(event.userId) === event.playId && !now.deafened && !now.soundboard.muted;
   };
   const mine = event.userId === get().me?.id;
   const at = Date.now();
@@ -488,7 +477,7 @@ export function onSoundPlayed(event: SoundPlayedEvent) {
   const { deafened, soundboard } = get();
   if (deafened || soundboard.muted) return;
   if (isLong(event.durationMs)) {
-    playLong(event.url, event.volume, at, event.userId, undefined, current);
+    playLong(event.url, event.volume, at, event.userId);
     return;
   }
   const cached = cachedBuffer(event.url);
@@ -498,14 +487,18 @@ export function onSoundPlayed(event: SoundPlayedEvent) {
   }
   void loadBuffer(event.url).then((buffer) => {
     if (!buffer || Date.now() - at > PLAY_DEADLINE || !current()) return;
-    const now = get();
-    if (now.deafened || now.soundboard.muted) return;
     playBuffer(buffer, event.volume, event.userId);
   });
 }
 
+function inCall(channelId: string) {
+  const now = get();
+  return now.voiceStatus === 'connected' && now.voiceChannelId === channelId;
+}
+
 /** The server stopped a user's clips (they asked, or they left): silence their plays here and drop your own state. */
 export function onSoundStopped(event: SoundStoppedEvent) {
+  if (!inCall(event.channelId)) return;
   latestPlay.delete(event.userId);
   for (const play of [...playing]) if (play.userId === event.userId) play.stop();
   if (get().me?.id === event.userId) set({ myPlaying: null });
@@ -527,14 +520,19 @@ function trackCall() {
     callId = null;
     // Out of the call: whatever of it was still sounding (a minute of someone's music) ends with it.
     stopCallSounds();
+    stopPreview();
     loadedUsers.clear();
     if (preloadTimer) clearTimeout(preloadTimer);
     preloadTimer = null;
     return;
   }
   if (voiceChannelId !== callId) {
-    if (callId) stopCallSounds();
+    const switched = callId !== null;
     callId = voiceChannelId;
+    if (switched) {
+      stopCallSounds();
+      stopPreview();
+    }
     loadedUsers.clear();
     void loadMySounds();
   }
@@ -575,6 +573,7 @@ export function initSoundboard() {
   useStore.subscribe(trackCall);
   // Deafening silences the soundboard at once, the way muting it does in setSoundboard.
   useStore.subscribe((s, prev) => {
-    if (!prev.deafened && s.deafened) stopCallSounds();
+    if (s.me?.id !== prev.me?.id) stopPreview();
+    if (!prev.deafened && s.deafened) stopCallSounds({ clearOwn: false });
   });
 }

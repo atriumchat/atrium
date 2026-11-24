@@ -26,36 +26,51 @@ export function setUserVolume(userId: string, volume: number) {
   if (participant) applyVolume(participant);
 }
 
-// Preferred microphone / output device, remembered across sessions.
+// Devices used by calls, remembered across sessions.
 export type AudioDeviceKind = 'audioinput' | 'audiooutput';
-const DEVICE_KEYS: Record<AudioDeviceKind, string> = { audioinput: 'hangout_mic', audiooutput: 'hangout_speaker' };
+export type DeviceKind = AudioDeviceKind | 'videoinput';
+const DEVICE_KEYS: Record<DeviceKind, string> = { audioinput: 'hangout_mic', audiooutput: 'hangout_speaker', videoinput: 'hangout_camera' };
 
-export function getPreferredDevice(kind: AudioDeviceKind): string | undefined {
+export function getPreferredDevice(kind: DeviceKind): string | undefined {
   try {
-    return localStorage.getItem(DEVICE_KEYS[kind]) ?? undefined;
+    const id = localStorage.getItem(DEVICE_KEYS[kind]);
+    return id && id !== 'default' ? id : undefined;
   } catch {
     return undefined;
   }
 }
 
-export async function listDevices(kind: AudioDeviceKind): Promise<MediaDeviceInfo[]> {
+export async function listDevices(kind: DeviceKind, requestPermissions = true): Promise<MediaDeviceInfo[]> {
   try {
-    return await Room.getLocalDevices(kind);
+    return await Room.getLocalDevices(kind, requestPermissions);
   } catch {
     return [];
   }
 }
 
-export async function setPreferredDevice(kind: AudioDeviceKind, deviceId: string) {
+export async function setPreferredDevice(kind: DeviceKind, deviceId: string) {
+  const system = deviceId === 'default';
+  const { room } = get();
+  if (kind === 'videoinput' && room) {
+    try {
+      if (!await room.switchActiveDevice(kind, deviceId, !system)) {
+        showError(t('voice.err.device'));
+        return;
+      }
+    } catch {
+      showError(t('voice.err.device'));
+      return;
+    }
+  }
   try {
-    localStorage.setItem(DEVICE_KEYS[kind], deviceId);
+    if (system) localStorage.removeItem(DEVICE_KEYS[kind]);
+    else localStorage.setItem(DEVICE_KEYS[kind], deviceId);
   } catch {
     // Not persisted, but still applied to the current call below.
   }
-  const { room } = get();
-  if (!room) return;
+  if (!room || kind === 'videoinput') return;
   try {
-    await room.switchActiveDevice(kind, deviceId);
+    await room.switchActiveDevice(kind, system && kind === 'audiooutput' ? '' : deviceId, !system);
   } catch {
     showError(t('voice.err.device'));
   }

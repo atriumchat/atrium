@@ -4,7 +4,7 @@ import { api, setToken } from './api';
 import { desktop } from './desktop';
 import { errorText, t } from './i18n';
 import {
-  addUser,
+  applyUnreadMarker, forgetUnreadMarker, addUser,
   getSessionEpoch,
   initStore,
   dmTitle,
@@ -17,7 +17,6 @@ import {
   removeMessage,
   refreshDms,
   refreshFriends,
-  selfEntry,
   setChannels,
   showError,
   useStore,
@@ -51,6 +50,7 @@ function latestAt(conversationId: string) {
 }
 
 function sendRead(conversationId: string, at: number) {
+  if (useStore.getState().manualUnread[conversationId]) return;
   if ((sentRead[conversationId] ?? 0) >= at) return;
   queuedRead[conversationId] = Math.max(queuedRead[conversationId] ?? 0, at);
   if (readTimers[conversationId]) return;
@@ -96,7 +96,7 @@ useStore.subscribe((s, prev) => {
 /** The window is back in front: what's on screen has now been read. */
 function readOpenConversation() {
   const open = openConversationId();
-  if (!open || !pageActive()) return;
+  if (!open || !pageActive() || useStore.getState().manualUnread[open]) return;
   // Clearing the count sends the mark (above); with nothing counted, just catch the mark up.
   if (useStore.getState().unread[open]) useStore.setState((s) => ({ unread: { ...s.unread, [open]: 0 } }));
   else sendRead(open, latestAt(open));
@@ -285,7 +285,16 @@ export function connectSocket(token: string, onUnauthorized: () => void) {
   });
 
   // Read on another tab or device.
-  socket.on('read:state', ({ conversationId, at }: { conversationId: string; at: number }) => {
+  socket.on('unread:marker', applyUnreadMarker);
+  socket.on('pins:changed', ({ channelId, id, pinned }: {channelId: string; id: string; pinned: boolean}) => {
+    patchMessage(channelId, id, {pinned});
+    window.dispatchEvent(new CustomEvent('atrium:pins', {detail: channelId}));
+  });
+  socket.on('read:state', ({ conversationId, at, marker }: { conversationId: string; at: number; marker?: string }) => {
+    const state = useStore.getState();
+    if (state.manualUnread[conversationId] && state.manualUnread[conversationId] !== marker) return;
+    if (marker) forgetUnreadMarker(conversationId, marker);
+    if (state.messages[conversationId]?.some(m => m.createdAt > at && m.userId !== state.me?.id)) return;
     sentRead[conversationId] = Math.max(sentRead[conversationId] ?? 0, at);
     useStore.setState((s) => ({ unread: { ...s.unread, [conversationId]: 0 }, mentions: { ...s.mentions, [conversationId]: 0 } }));
   });
@@ -294,7 +303,28 @@ export function connectSocket(token: string, onUnauthorized: () => void) {
     useStore.setState({ myStatus: status, myStatusText: text, myStatusUntil: until ?? null }),
   );
   socket.on('message:updated', (message: Message) => patchMessage(message.channelId, message.id, message));
-  socket.on('message:deleted', ({ id, channelId }: { id: string; channelId: string }) => removeMessage(channelId, id));
+  socket.on('message:deleted', ({ id, channelId }: { id: string; channelId: string }) => {
+    const state = useStore.getState();
+    removeMessage(channelId, id);
+    if (state.firstUnread[channelId] === id) {
+      const epoch = getSessionEpoch();
+      void api.bootstrap().then(data => {
+        const current = useStore.getState();
+        if (epoch !== getSessionEpoch() || current.firstUnread[channelId] !== id ||
+            current.manualUnread[channelId] !== state.manualUnread[channelId]) return;
+        const firstUnread = {...current.firstUnread};
+        const next = data.firstUnread?.[channelId];
+        if (next) firstUnread[channelId] = next;
+        else delete firstUnread[channelId];
+        serverCounts = true;
+        try {
+          useStore.setState({ firstUnread, unread: {...current.unread, [channelId]: data.unread[channelId] ?? 0},
+            mentions: {...current.mentions, [channelId]: data.mentions[channelId] ?? 0} });
+        } finally { serverCounts = false; }
+      }).catch(() => undefined);
+    }
+    window.dispatchEvent(new CustomEvent('atrium:pins', {detail: channelId}));
+  });
   socket.on('message:reactions', ({ id, channelId, reactions }: { id: string; channelId: string; reactions: Reaction[] }) =>
     patchMessage(channelId, id, { reactions }),
   );
@@ -309,10 +339,7 @@ export function connectSocket(token: string, onUnauthorized: () => void) {
       if ([...after].some((id) => !before.has(id))) playSound('join');
       else if ([...before].some((id) => !after.has(id))) playSound('leave');
     }
-    // Still connecting: keep showing yourself in the room until the server's list has you.
-    const self = voiceChannelId && voiceStatus === 'connecting' ? selfEntry(voiceChannelId) : null;
-    const mine = self && !entries.some((e) => e.userId === self.userId && e.channelId === self.channelId);
-    useStore.setState({ voiceState: mine ? [...entries, self] : entries });
+    useStore.setState({ voiceState: entries });
   });
 
   // You joined from another tab or device: the server moved you there, this one hangs up.

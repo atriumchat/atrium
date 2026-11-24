@@ -30,22 +30,27 @@ function nameScreens(sources) {
   return ordered.map((source, index) => ({ source, name: ordered.length === 1 ? i18n.t('picker.wholeScreen') : i18n.t('picker.screenN', { n: index + 1 }) }));
 }
 
-async function list(kind) {
+function clearOffered(kind) {
+  for (const [id, entry] of offered) if (entry.kind === kind) offered.delete(id);
+}
+
+async function list(window, kind) {
   const found = await desktopCapturer.getSources({
     types: [kind],
     thumbnailSize: THUMBNAIL,
     // Only Windows hands out the icons; elsewhere the cards go without.
     fetchWindowIcons: kind === 'window',
   });
-  const own = picker?.getMediaSourceId();
+  if (window !== picker || window.isDestroyed()) return [];
+  const own = window.getMediaSourceId();
   const named =
     kind === 'screen'
       ? nameScreens(found)
       : // A window that can't be drawn (minimized, or the system won't say) is no use to pick, and neither is one without a title.
         found.filter((source) => source.id !== own && source.name && !source.thumbnail.isEmpty()).map((source) => ({ source, name: source.name }));
-  for (const [id, entry] of offered) if (entry.kind === kind) offered.delete(id);
+  clearOffered(kind);
   return named.map(({ source, name }) => {
-    offered.set(source.id, { kind, source });
+    offered.set(source.id, { kind, source, name });
     return {
       id: source.id,
       name,
@@ -57,9 +62,11 @@ async function list(kind) {
 
 ipcMain.handle('picker:list', async (event, kind) => {
   if (!fromPicker(event) || (kind !== 'window' && kind !== 'screen')) return { error: true };
+  const window = picker;
   try {
-    return { sources: await list(kind) };
+    return { sources: await list(window, kind) };
   } catch {
+    if (window === picker) clearOffered(kind);
     return { error: true };
   }
 });
@@ -67,7 +74,7 @@ ipcMain.handle('picker:list', async (event, kind) => {
 ipcMain.on('picker:choose', (event, id, sound) => {
   if (!fromPicker(event)) return;
   const entry = offered.get(id);
-  if (entry) settle?.({ source: entry.source, sound: sound === true });
+  if (entry) settle?.({ source: entry.source, name: entry.name, sound: sound === true });
 });
 
 ipcMain.on('picker:cancel', (event) => {
@@ -80,7 +87,7 @@ function choose(parent, { sound }) {
   return new Promise((resolve) => {
     // A sheet on the Atrium window; with no window to hold it (hidden to the tray), a window of its own.
     const modal = Boolean(parent) && !parent.isDestroyed() && parent.isVisible() && !parent.isMinimized();
-    picker = new BrowserWindow({
+    const window = new BrowserWindow({
       ...(modal ? { parent, modal: true } : {}),
       width: 720,
       height: 560,
@@ -95,20 +102,24 @@ function choose(parent, { sound }) {
       autoHideMenuBar: true,
       webPreferences: { preload: path.join(__dirname, 'picker-preload.js'), contextIsolation: true, sandbox: true },
     });
-    picker.removeMenu();
-    picker.loadFile(path.join(__dirname, 'picker.html'), { query: { lang: i18n.getLang(), sound: sound ? '1' : '' } });
-    picker.once('ready-to-show', () => picker?.show());
+    picker = window;
+    window.removeMenu();
+    window.once('ready-to-show', () => window.show());
     settle = (answer) => {
       settle = null;
       resolve(answer);
-      picker?.close();
+      if (!window.isDestroyed()) window.close();
     };
     // Closed some other way (the window's own close button, the main window going away): a cancel.
-    picker.on('closed', () => {
+    window.once('closed', () => {
       picker = null;
       offered.clear();
       settle?.(null);
     });
+    window.loadFile(path.join(__dirname, 'picker.html'), { query: { lang: i18n.getLang(), sound: sound ? '1' : '' } })
+      .catch(() => {
+        if (!window.isDestroyed()) window.close();
+      });
   });
 }
 
@@ -116,9 +127,10 @@ function choose(parent, { sound }) {
 function relocalize() {
   if (!picker) return;
   picker.setTitle(i18n.t('picker.title'));
-  const url = new URL(picker.webContents.getURL());
+  const url = URL.parse(picker.webContents.getURL());
+  if (!url) return;
   url.searchParams.set('lang', i18n.getLang());
-  picker.webContents.loadURL(url.href);
+  picker.webContents.loadURL(url.href).catch(() => undefined);
 }
 
 module.exports = { choose, relocalize };

@@ -96,3 +96,11 @@
   --radius: 1rem;
   --field-radius: 999px;
 }
+
+@media (min-width: 768px) {
+  .dark,
+  [data-theme="dark"] {
+    --radius: var(--app-radius-surface);
+    --field-radius: var(--app-radius-row);
+  }
+}

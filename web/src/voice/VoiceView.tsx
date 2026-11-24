@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Popover, Spinner } from '@heroui/react';
+import { ArrowsPointingInIcon, ArrowsPointingOutIcon, ChatBubbleLeftIcon, SpeakerWaveIcon } from '@heroicons/react/24/solid';
 import { StartAudio, useIsSpeaking, useParticipants, useTracks, VideoTrack } from '@livekit/components-react';
 import type { TrackReference } from '@livekit/components-react';
 import { RemoteParticipant, Track, type Participant } from 'livekit-client';
-import { setVoiceChat, useStore, voiceMembers } from '../store';
-import { ChatView } from '../chat/ChatView';
-import { canShareScreen, joinVoice, leaveVoice, toggleCamera, toggleDeafen, toggleMute, toggleScreenShare } from './voice';
+import { setVoiceChat, showError, useStore, voiceMembers } from '../store';
+import { joinVoice, toggleMute } from './voice';
 import { useIsMobile } from '../hooks';
 import type { Channel } from '../types';
 import { Avatar } from '../ui/Avatar';
@@ -14,89 +14,87 @@ import { CallDuration } from './CallDuration';
 import { ChannelHeader, HeaderIcon } from '../shell/ChannelHeader';
 import { ChannelMenu } from '../shell/ChannelMenu';
 import { RoundButton, VolumeSlider } from '../ui/ui';
-import { DeviceMenu } from '../shell/SettingsMenu';
 import { FaceStack } from '../shell/CallPill';
 import { useTileGrid } from './tileGrid';
 import { LineArt } from '../ui/Illustrations';
 import {
-  BubbleIcon,
-  ExpandIcon,
-  HeadphonesIcon,
   HeadphonesSlashIcon,
   MicIcon,
   MicSlashIcon,
-  PhoneDownIcon,
   ScreenIcon,
-  SpeakerIcon,
   VideoIcon,
-  VideoSlashIcon,
   XIcon,
 } from '../ui/icons';
 import { useT } from '../i18n';
-import { SoundboardButton, SoundPlayedMark } from './SoundPad';
+import { CallBarButton, CallControls } from './CallControls';
+import { RoomChat } from './RoomChat';
+import { StreamWindow } from './StreamWindow';
+import { SoundPlayedMark } from './SoundPad';
 
 export function VoiceView({ channel }: { channel: Channel }) {
   const { t } = useT();
+  const isMobile = useIsMobile();
   const myChannel = useStore((s) => s.voiceChannelId);
   const status = useStore((s) => s.voiceStatus);
   const room = useStore((s) => s.room);
   const live = myChannel === channel.id && status === 'connected' && room !== null;
+  const connecting = myChannel === channel.id && status === 'connecting';
   const chatOpen = useStore((s) => s.voiceChatOpen);
   const unread = useStore((s) => (s.unread[channel.id] ?? 0) > 0);
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
+    <div className={`relative flex min-h-0 flex-1 flex-col ${chatOpen ? 'max-md:[&>header]:invisible' : ''}`}>
       <ChannelHeader
-        bare
+        compactTitle
         leading={
-          <HeaderIcon>
-            <SpeakerIcon />
+          <HeaderIcon compact>
+            <SpeakerWaveIcon />
           </HeaderIcon>
         }
         title={channel.name}
         actions={
           <span className="relative">
-            <RoundButton label={chatOpen ? t('voice.chat.close') : t('voice.chat.open')} tone={chatOpen ? 'on' : 'plain'} onPress={() => setVoiceChat(!chatOpen)}>
-              <BubbleIcon />
-            </RoundButton>
+            <button
+              id={`room-chat-trigger-${channel.id}`}
+              type="button"
+              className="header-action"
+              aria-label={t(chatOpen ? 'voice.chat.close' : 'voice.chat.open')}
+              title={t(chatOpen ? 'voice.chat.close' : 'voice.chat.open')}
+              aria-pressed={chatOpen}
+              aria-controls={chatOpen ? `room-chat-${channel.id}` : undefined}
+              onClick={() => setVoiceChat(!chatOpen)}
+            >
+              <ChatBubbleLeftIcon aria-hidden="true" />
+            </button>
             {unread && !chatOpen && <span aria-hidden className="pointer-events-none absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-[var(--app-window)]" />}
           </span>
         }
-        menu={<ChannelMenu channelId={channel.id} />}
+        menu={isMobile ? <ChannelMenu channelId={channel.id} /> : undefined}
         subtitle={
           live ? (
-            <span className="tabular-nums">
-              {t('voice.call.ongoing')} · <CallDuration />
+            <span className="inline-flex items-center gap-1.5 tabular-nums" title={t('voice.call.ongoing')}>
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-success" />
+              <span className="sr-only">{t('voice.call.ongoing')} </span>
+              <CallDuration />
             </span>
           ) : undefined
         }
       />
-      <div className="flex min-h-0 flex-1">
-        <div className="flex min-w-0 flex-1 flex-col">
-          {live ? <ConnectedStage channelId={channel.id} /> : <JoinPrompt channel={channel} connecting={myChannel === channel.id && status === 'connecting'} />}
-        </div>
-        {chatOpen && <RoomChat channel={channel} />}
+      <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${chatOpen ? 'max-md:invisible' : ''}`}>
+        {connecting ? <JoiningStage /> : live ? <ConnectedStage channel={channel} /> : <JoinPrompt channel={channel} />}
       </div>
+      {isMobile && chatOpen && <RoomChat channel={channel} layout="cover" />}
     </div>
   );
 }
 
-/**
- * The room's own chat beside the call, as in Discord: links and pictures while you talk. A column on the right on a
- * computer; on a phone it covers the room, with the call going on under it.
- */
-function RoomChat({ channel }: { channel: Channel }) {
+function JoiningStage() {
   const { t } = useT();
   return (
-    <aside className="flex w-[360px] shrink-0 flex-col border-l border-white/[0.06] max-md:absolute max-md:inset-0 max-md:z-30 max-md:w-auto max-md:border-l-0 max-md:bg-[var(--app-window)]">
-      <header className="flex h-14 shrink-0 items-center gap-2 pl-5 pr-3">
-        <h3 className="min-w-0 flex-1 truncate text-[20px] font-light tracking-[-0.3px]">{t('voice.chat.title')}</h3>
-        <RoundButton size="sm" tone="ghost" label={t('voice.chat.close')} onPress={() => setVoiceChat(false)}>
-          <XIcon />
-        </RoundButton>
-      </header>
-      <ChatView key={channel.id} conversation={{ id: channel.id, kind: 'channel', title: channel.name }} room />
-    </aside>
+    <div role="status" className="flex flex-1 items-center justify-center gap-3 px-4 text-sm text-muted">
+      <Spinner aria-hidden="true" size="sm" color="current" />
+      <span>{t('voice.call.connecting')}</span>
+    </div>
   );
 }
 
@@ -104,7 +102,7 @@ function RoomChat({ channel }: { channel: Channel }) {
  * Before you're in (as in the native app): the faces of who's there, their names, a line when someone shows their
  * screen, the list of people; at the bottom the mic you'll come in with and a big green Join.
  */
-function JoinPrompt({ channel, connecting }: { channel: Channel; connecting: boolean }) {
+function JoinPrompt({ channel }: { channel: Channel }) {
   const { t } = useT();
   const voiceState = useStore((s) => s.voiceState);
   const users = useStore((s) => s.users);
@@ -135,10 +133,9 @@ function JoinPrompt({ channel, connecting }: { channel: Channel; connecting: boo
           <button
             type="button"
             onClick={() => joinVoice(channel.id)}
-            disabled={connecting}
-            className="mt-6 flex h-11 min-w-40 items-center justify-center whitespace-nowrap rounded-full bg-[#f2f2f4] px-6 text-[15px] font-semibold text-[#0c0c0e] transition-[background-color,transform] duration-150 hover:bg-white active:scale-[0.98] disabled:opacity-80 max-md:hidden"
+            className="mt-6 flex h-11 min-w-40 items-center justify-center whitespace-nowrap rounded-control bg-[#f2f2f4] px-(--app-radius-control) text-[15px] font-semibold text-[#0c0c0e] transition-[background-color,transform] duration-150 hover:bg-white active:scale-[0.98] disabled:opacity-80 max-md:hidden"
           >
-            {connecting ? <Spinner size="sm" color="current" /> : t('voice.room.joinVoice')}
+            {t('voice.room.joinVoice')}
           </button>
         </div>
         {sharing && (
@@ -148,7 +145,7 @@ function JoinPrompt({ channel, connecting }: { channel: Channel; connecting: boo
           </div>
         )}
         {members.length > 0 && (
-          <div className="mx-auto mt-5 w-full max-w-md overflow-hidden rounded-[20px] bg-default">
+          <div className="mx-auto mt-5 w-full max-w-md overflow-hidden rounded-panel bg-default">
             {members.map((m, i) => (
               <div key={m.userId}>
                 {i > 0 && <div className="ml-[62px] h-px bg-white/[0.08]" />}
@@ -178,10 +175,9 @@ function JoinPrompt({ channel, connecting }: { channel: Channel; connecting: boo
           <button
             type="button"
             onClick={() => joinVoice(channel.id)}
-            disabled={connecting}
             className="flex h-14 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[#f2f2f4] text-[17px] font-semibold text-[#0c0c0e] transition-[background-color,transform] duration-150 hover:bg-white active:scale-[0.98] disabled:opacity-80"
           >
-            {connecting ? <Spinner size="sm" color="current" /> : t('voice.room.joinVoice')}
+            {t('voice.room.joinVoice')}
           </button>
         </div>
       </div>
@@ -210,24 +206,28 @@ export function useLiveVideo(sources: Track.Source[]) {
  * The call we're in. On a computer everyone is a tile (MediaStage), voice or not; on a phone, bubbles while it's just
  * voice, tiles once someone turns on a camera or shares.
  */
-function ConnectedStage({ channelId }: { channelId: string }) {
+function ConnectedStage({ channel }: { channel: Channel }) {
   const { t } = useT();
   const isMobile = useIsMobile();
   const media = useLiveVideo([Track.Source.Camera, Track.Source.ScreenShare]);
   const cameraPending = useStore((s) => s.cameraPending);
   const voiceState = useStore((s) => s.voiceState);
   const speaking = useStore((s) => s.speaking);
-  const people = voiceMembers(voiceState, channelId).map((m) => ({ id: m.userId, muted: m.muted, deafened: m.deafened }));
+  const people = voiceMembers(voiceState, channel.id).map((m) => ({ id: m.userId, muted: m.muted, deafened: m.deafened }));
   const bubbles = isMobile && !(media.length > 0 || cameraPending);
+  const controls = (viewActions?: ReactNode) => (
+    <CallControls channel={channel} viewActions={viewActions} className="max-md:pb-[max(20px,env(safe-area-inset-bottom))]" />
+  );
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
-      {bubbles ? <BubbleCloud people={people} speaking={speaking} live /> : <MediaStage />}
+      <MediaStage
+        fallback={bubbles ? <BubbleCloud people={people} speaking={speaking} live /> : undefined}
+        renderControls={controls}
+      />
       <StartAudio
         label={t('voice.audio.enable')}
         className="absolute left-1/2 top-2 -translate-x-1/2 rounded-full bg-accent px-5 py-2 text-[14px] font-medium text-accent-foreground"
       />
-      {/* Full-screen voice room on a phone: keep the buttons clear of the home indicator. */}
-      <CallControls className="max-md:pb-[max(20px,env(safe-area-inset-bottom))]" />
     </div>
   );
 }
@@ -238,7 +238,10 @@ function ConnectedStage({ channelId }: { channelId: string }) {
  * the side. Cameras come first, then whoever is talking. A screen share takes the middle with everyone in a strip
  * under it. Needs the LiveKit room context.
  */
-export function MediaStage() {
+export function MediaStage({ fallback, renderControls }: {
+  fallback?: ReactNode;
+  renderControls: (viewActions?: ReactNode) => ReactNode;
+}) {
   const { t } = useT();
   const participants = useParticipants();
   const screens = useLiveVideo([Track.Source.ScreenShare]);
@@ -248,6 +251,7 @@ export function MediaStage() {
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const [side, setSide] = useState(false);
   const [area, setArea] = useState<HTMLDivElement | null>(null);
+  const stage = useRef<HTMLDivElement>(null);
   const focused = screens.find((s) => trackKey(s) === focusKey) ?? screens[0];
   const cameraOf = new Map(cameras.map((c) => [c.participant.identity, c]));
   const fit = useTileGrid(area, focused ? 0 : participants.length);
@@ -257,58 +261,81 @@ export function MediaStage() {
   const ordered = overflow ? [...participants].sort((a, b) => rank(b) - rank(a)) : participants;
   const shown = overflow ? ordered.slice(0, Math.max(1, fit.fits - 1)) : ordered;
   const hidden = ordered.slice(shown.length);
+  const cameraParticipant = shown.find((participant) => !participant.isLocal && cameraOf.has(participant.identity))
+    ?? shown.find((participant) => cameraOf.has(participant.identity));
+  const viewTrack = focused ?? (cameraParticipant && cameraOf.get(cameraParticipant.identity));
+  const handleFullscreen = (exit = false) => {
+    const action = exit ? document.exitFullscreen() : stage.current?.requestFullscreen();
+    void action?.catch(() => showError(t('voice.stream.windowError')));
+  };
+  const viewActions = viewTrack && (
+    <>
+      <StreamWindow key={trackKey(viewTrack)} stage={stage} trackRef={viewTrack} />
+      {document.fullscreenEnabled && (
+        <CallBarButton label={t('voice.stream.fullscreen')} onPress={() => handleFullscreen()}><ArrowsPointingOutIcon /></CallBarButton>
+      )}
+    </>
+  );
 
   return (
-    <div className="flex min-h-0 flex-1">
-      <div className="flex min-w-0 flex-1 flex-col">
-        {focused ? (
-          <>
-            <div className="min-h-0 flex-1 px-6">
-              <ScreenStage trackRef={focused} />
-            </div>
-            {/* Everyone else in a strip under it, scrolled sideways when it's longer than the window. */}
-            <div className="no-scrollbar flex shrink-0 justify-center gap-2 overflow-x-auto px-6 pt-2">
-              {screens.length > 1 &&
-                screens.map((s) => (
-                  <button
-                    key={trackKey(s)}
-                    onClick={() => setFocusKey(trackKey(s))}
-                    aria-label={t('voice.stream.show')}
-                    className={`h-[90px] w-[160px] shrink-0 overflow-hidden rounded-[12px] bg-black ${trackKey(s) === trackKey(focused) ? 'ring-2 ring-inset ring-white' : ''}`}
-                  >
-                    <VideoTrack trackRef={s} className="h-full w-full object-cover" />
-                  </button>
-                ))}
-              {participants.map((p) => (
-                <div key={p.identity} className="h-[90px] w-[160px] shrink-0">
-                  <Tile participant={p} camera={cameraOf.get(p.identity)} height={90} />
+    <>
+      {fallback ?? (
+        <div ref={stage} className="group/media relative flex min-h-0 flex-1 bg-window">
+          <div className="flex min-w-0 flex-1 flex-col">
+            {focused ? (
+              <>
+                <div className="min-h-0 flex-1 px-(--app-pane-inset)">
+                  <ScreenStage trackRef={focused} />
                 </div>
-              ))}
-            </div>
-          </>
-        ) : (
-          <div ref={setArea} className="flex min-h-0 flex-1 flex-wrap content-center justify-center gap-2 px-6">
-            {shown.map((p) => (
-              <div key={p.identity} className="shrink-0" style={{ width: fit.tileW, height: fit.tileH }}>
-                <Tile participant={p} camera={cameraOf.get(p.identity)} height={fit.tileH} />
+                {/* Everyone else in a strip under it, scrolled sideways when it's longer than the window. */}
+                <div className="no-scrollbar flex shrink-0 justify-center gap-2 overflow-x-auto px-(--app-pane-inset) pt-2">
+                  {screens.length > 1 &&
+                    screens.map((s) => (
+                      <button
+                        key={trackKey(s)}
+                        onClick={() => setFocusKey(trackKey(s))}
+                        aria-label={t('voice.stream.show')}
+                        className={`h-[90px] w-[160px] shrink-0 overflow-hidden rounded-row bg-black ${trackKey(s) === trackKey(focused) ? 'ring-2 ring-inset ring-white' : ''}`}
+                      >
+                        <VideoTrack trackRef={s} className="h-full w-full object-cover" />
+                      </button>
+                    ))}
+                  {participants.map((p) => (
+                    <div key={p.identity} className="h-[90px] w-[160px] shrink-0">
+                      <Tile participant={p} camera={cameraOf.get(p.identity)} height={90} />
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div ref={setArea} className="flex min-h-0 flex-1 flex-wrap content-center justify-center gap-2 px-(--app-pane-inset)">
+                {shown.map((p) => (
+                  <div key={p.identity} className="shrink-0" style={{ width: fit.tileW, height: fit.tileH }}>
+                    <Tile participant={p} camera={cameraOf.get(p.identity)} height={fit.tileH} />
+                  </div>
+                ))}
+                {hidden.length > 0 && (
+                  <button
+                    onClick={() => setSide(true)}
+                    aria-label={t('voice.people.open')}
+                    className="flex shrink-0 flex-col items-center justify-center gap-3 rounded-surface bg-[#18181b] text-foreground transition-colors hover:bg-default"
+                    style={{ width: fit.tileW, height: fit.tileH }}
+                  >
+                    <FaceStack users={hidden.map((p) => users[p.identity])} ringBg="#18181b" size={Math.round(Math.min(56, Math.max(24, fit.tileH * 0.22)))} />
+                    <span className={`font-medium ${fit.tileH < 120 ? 'text-[13px]' : 'text-[16px]'}`}>+{hidden.length}</span>
+                  </button>
+                )}
               </div>
-            ))}
-            {hidden.length > 0 && (
-              <button
-                onClick={() => setSide(true)}
-                aria-label={t('voice.people.open')}
-                className="flex shrink-0 flex-col items-center justify-center gap-3 rounded-[16px] bg-[#18181b] text-foreground transition-colors hover:bg-default"
-                style={{ width: fit.tileW, height: fit.tileH }}
-              >
-                <FaceStack users={hidden.map((p) => users[p.identity])} ringBg="#18181b" size={Math.round(Math.min(56, Math.max(24, fit.tileH * 0.22)))} />
-                <span className={`font-medium ${fit.tileH < 120 ? 'text-[13px]' : 'text-[16px]'}`}>+{hidden.length}</span>
-              </button>
             )}
           </div>
-        )}
-      </div>
-      {side && <CallPeople participants={ordered} onClose={() => setSide(false)} />}
-    </div>
+          {side && <CallPeople participants={ordered} onClose={() => setSide(false)} />}
+          <div className="absolute right-3 top-3 z-10 hidden group-[:fullscreen]/media:block">
+            <CallBarButton label={t('voice.stream.exitFullscreen')} onPress={() => handleFullscreen(true)}><ArrowsPointingInIcon /></CallBarButton>
+          </div>
+        </div>
+      )}
+      {renderControls(fallback ? undefined : viewActions)}
+    </>
   );
 }
 
@@ -355,23 +382,14 @@ function CallPeople({ participants, onClose }: { participants: Participant[]; on
 
 function ScreenStage({ trackRef }: { trackRef: TrackReference }) {
   const { t } = useT();
-  const ref = useRef<HTMLDivElement>(null);
   const user = useStore((s) => s.users[trackRef.participant.identity]);
   return (
-    <div ref={ref} className="group relative flex h-full w-full items-center justify-center overflow-hidden rounded-[16px] bg-black">
+    <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-surface bg-black">
       <VideoTrack trackRef={trackRef} className="h-full w-full object-contain" />
-      <div className="absolute left-3 top-3 flex items-center gap-2 rounded-[8px] bg-black/60 px-2.5 py-1 text-[13px] font-medium text-white">
+      <div className="absolute left-3 top-3 flex items-center gap-2 rounded-fine bg-black/60 px-2.5 py-1 text-[13px] font-medium text-white">
         <span className="rounded-[4px] bg-danger px-1 text-[11px] font-bold uppercase leading-4">{t('voice.stream.live')}</span>
         {user?.name ?? trackRef.participant.name}
       </div>
-      <RoundButton
-        label={t('voice.stream.fullscreen')}
-        placement="left"
-        onPress={() => ref.current?.requestFullscreen()}
-        className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 data-[focus-visible=true]:opacity-100"
-      >
-        <ExpandIcon />
-      </RoundButton>
     </div>
   );
 }
@@ -405,7 +423,7 @@ function Tile({ participant, camera, height }: { participant: Participant; camer
   const small = height < 120;
 
   const tile = (
-    <div className={`relative flex h-full w-full items-center justify-center overflow-hidden rounded-[16px] ${pending || camera ? 'bg-black' : 'bg-[#18181b]'}`}>
+    <div className={`relative flex h-full w-full items-center justify-center overflow-hidden rounded-surface ${pending || camera ? 'bg-black' : 'bg-[#18181b]'}`}>
       {pending ? (
         preview ? <DeviceVideo track={preview} /> : <Spinner size={small ? 'sm' : 'md'} color="current" className="text-white/60" />
       ) : camera ? (
@@ -415,7 +433,7 @@ function Tile({ participant, camera, height }: { participant: Participant; camer
       ) : (
         <Avatar user={user} size={Math.round(Math.min(128, Math.max(28, height * 0.4)))} ringBg="transparent" />
       )}
-      <div className={`pointer-events-none absolute inset-0 rounded-[16px] ${speaking ? 'ring-2 ring-inset ring-white' : ''}`} />
+      <div className={`pointer-events-none absolute inset-0 rounded-surface ${speaking ? 'ring-2 ring-inset ring-white' : ''}`} />
       <SoundPlayedMark
         userId={participant.identity}
         size={small ? 12 : 14}
@@ -439,7 +457,7 @@ function Tile({ participant, camera, height }: { participant: Participant; camer
   if (!(participant instanceof RemoteParticipant)) return tile;
   return (
     <Popover>
-      <Popover.Trigger aria-label={t('voice.volume', { name })} className="block h-full w-full cursor-pointer rounded-[16px] outline-none">
+      <Popover.Trigger aria-label={t('voice.volume', { name })} className="block h-full w-full cursor-pointer rounded-surface outline-none">
         {tile}
       </Popover.Trigger>
       <Popover.Content placement="bottom" className="w-64">
@@ -448,90 +466,5 @@ function Tile({ participant, camera, height }: { participant: Participant; camer
         </Popover.Dialog>
       </Popover.Content>
     </Popover>
-  );
-}
-
-/**
- * Call controls at the bottom of the call screen, as in Webex: each button says what it is, mic and sound have the
- * device choice glued on, leaving is red and apart. Switched from the usual (muted, camera on) a button turns white;
- * narrower than all the labels, the labels go and the icons stay (a label never wraps).
- */
-export function CallControls({ className = '' }: { className?: string }) {
-  const { t } = useT();
-  const muted = useStore((s) => s.muted);
-  const deafened = useStore((s) => s.deafened);
-  const cameraOn = useStore((s) => s.cameraOn);
-  const screenSharing = useStore((s) => s.screenSharing);
-  const micOff = muted || deafened;
-
-  return (
-    <div className={`@container flex shrink-0 items-center justify-center gap-2 px-6 py-5 ${className}`}>
-      <ControlButton
-        on={micOff}
-        alert={micOff}
-        label={micOff ? t('voice.mic.unmute') : t('voice.mic.mute')}
-        text={t('voice.controls.mic')}
-        onPress={toggleMute}
-        icon={micOff ? <MicSlashIcon size={18} /> : <MicIcon size={18} />}
-        device={<DeviceMenu kind="audioinput" label={t('shell.call.pickMic')} className={DEVICE_CHEVRON(micOff)} />}
-      />
-      <ControlButton
-        on={deafened}
-        alert={deafened}
-        label={deafened ? t('voice.deafen.off') : t('voice.deafen.on')}
-        text={t('voice.controls.sound')}
-        onPress={toggleDeafen}
-        icon={deafened ? <HeadphonesSlashIcon size={18} /> : <HeadphonesIcon size={18} />}
-        device={<DeviceMenu kind="audiooutput" label={t('shell.call.pickOutput')} className={DEVICE_CHEVRON(deafened)} />}
-      />
-      <ControlButton
-        on={cameraOn}
-        label={cameraOn ? t('voice.camera.off') : t('voice.camera.on')}
-        text={t('voice.controls.camera')}
-        onPress={toggleCamera}
-        icon={cameraOn ? <VideoIcon size={18} /> : <VideoSlashIcon size={18} />}
-      />
-      {canShareScreen && (
-        <ControlButton
-          on={screenSharing}
-          label={screenSharing ? t('voice.screen.stop') : t('voice.screen.start')}
-          text={t('voice.controls.screen')}
-          onPress={toggleScreenShare}
-          icon={<ScreenIcon size={18} />}
-        />
-      )}
-      <SoundboardButton look="control" />
-      <button
-        aria-label={t('voice.leave')}
-        title={t('voice.leave')}
-        onClick={() => leaveVoice()}
-        className="ml-2 flex h-11 items-center gap-2 whitespace-nowrap rounded-full bg-danger px-4 text-[15px] font-medium text-white transition-[filter] hover:brightness-110 @[640px]:px-5"
-      >
-        <PhoneDownIcon size={18} />
-        <span className="hidden @[640px]:inline">{t('voice.controls.leave')}</span>
-      </button>
-    </div>
-  );
-}
-
-const CONTROL = (on: boolean) => (on ? 'bg-white text-black' : 'bg-default text-foreground hover:bg-[#28282d]');
-const DEVICE_CHEVRON = (on: boolean) =>
-  `ml-px flex h-11 items-center rounded-r-full pl-1.5 pr-2.5 outline-none transition-colors data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus ${CONTROL(on)}`;
-
-/** One labelled call button; `device` glues the device choice (a chevron) to its right. */
-function ControlButton(props: { on: boolean; alert?: boolean; label: string; text: string; onPress: () => void; icon: ReactNode; device?: ReactNode }) {
-  return (
-    <span className="flex h-11 items-stretch">
-      <button
-        aria-label={props.label}
-        title={props.label}
-        onClick={props.onPress}
-        className={`flex items-center gap-2 whitespace-nowrap px-3.5 text-[15px] font-medium transition-colors @[640px]:px-4 ${CONTROL(props.on)} ${props.device ? 'rounded-l-full' : 'rounded-full'}`}
-      >
-        <span className={props.alert ? 'text-danger' : ''}>{props.icon}</span>
-        <span className="hidden @[640px]:inline">{props.text}</span>
-      </button>
-      {props.device}
-    </span>
   );
 }

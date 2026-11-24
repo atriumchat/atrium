@@ -64,36 +64,81 @@ export function pathOf(list: Stat[]): { path?: CallPath; rtt?: number } {
   return { rtt, path: local.candidateType === 'host' ? 'direct' : local.protocol === 'tcp' ? 'tcp' : 'udp' };
 }
 
+type PacketCounters = { lost: number; received: number };
+
 /** Counters from the previous sample, to turn totals into rates. */
-export type StatsMemory = { at: number; bytesIn: number; bytesOut: number; lostIn: number; gotIn: number };
+export type StatsMemory = { at: number; bytesIn: number; bytesOut: number; inbound: Map<string, PacketCounters> };
+
+function audioStats(list: Stat[], type: string) {
+  return list.filter((s) => s.type === type && (s.kind ?? s.mediaType) === 'audio');
+}
+
+function inboundCounters(list: Stat[]) {
+  const result = new Map<string, PacketCounters>();
+  for (const { id, packetsLost, packetsReceived } of list) {
+    if (typeof packetsLost === 'number' && Number.isSafeInteger(packetsLost) &&
+        typeof packetsReceived === 'number' && Number.isSafeInteger(packetsReceived) && packetsReceived >= 0) {
+      result.set(id, { lost: packetsLost, received: packetsReceived });
+    }
+  }
+  return result;
+}
+
+function incomingLoss(current: Map<string, PacketCounters>, previous: Map<string, PacketCounters>) {
+  let lost = 0;
+  let received = 0;
+  for (const [id, counters] of current) {
+    const before = previous.get(id);
+    if (!before || counters.lost < before.lost || counters.received < before.received) continue;
+    lost += counters.lost - before.lost;
+    received += counters.received - before.received;
+  }
+  return lost + received > 0 ? Math.round((lost / (lost + received)) * 1000) / 10 : undefined;
+}
+
+const MAX_REPORT_AGE_MS = 10_000;
+
+function outgoingLoss(outbound: Stat[], remote: Stat[]) {
+  const loss: number[] = [];
+  const byId = new Map(remote.map((s) => [s.id, s]));
+  const byLocal = new Map(remote.map((s) => [s.localId, s]));
+  for (const stream of outbound) {
+    const report = byId.get(stream.remoteId as string) ?? byLocal.get(stream.id);
+    if (!report) continue;
+    // A remote inbound stat is timestamped when the server's receiver report arrives.
+    const age = stream.timestamp - report.timestamp;
+    const fraction = report.fractionLost;
+    if (age >= 0 && age <= MAX_REPORT_AGE_MS && typeof fraction === 'number' && fraction >= 0 && fraction <= 1) {
+      loss.push(fraction);
+    }
+  }
+  return loss.length > 0 ? Math.round(Math.max(...loss) * 1000) / 10 : undefined;
+}
 
 export async function readStats(room: Room, prev: StatsMemory | null): Promise<{ stats: CallStats; memory: StatsMemory }> {
   const { pub, sub } = transports(room);
   const [pubList, subList] = await Promise.all([collect(pub), collect(sub)]);
   const { path, rtt } = pathOf(subList.length ? subList : pubList);
-  const sum = (list: Stat[], type: string, field: string) =>
-    list.filter((s) => s.type === type && s.kind === 'audio').reduce((n, s) => n + (Number(s[field]) || 0), 0);
+  const inbound = audioStats(sub ? subList : pubList, 'inbound-rtp');
+  const outbound = audioStats(pubList, 'outbound-rtp');
+  const sum = (list: Stat[], field: string) => list.reduce((n, s) => n + (Number(s[field]) || 0), 0);
 
   const now = performance.now();
   const memory: StatsMemory = {
     at: now,
-    bytesIn: sum(subList, 'inbound-rtp', 'bytesReceived'),
-    bytesOut: sum(pubList, 'outbound-rtp', 'bytesSent'),
-    lostIn: sum(subList, 'inbound-rtp', 'packetsLost'),
-    gotIn: sum(subList, 'inbound-rtp', 'packetsReceived'),
+    bytesIn: sum(inbound, 'bytesReceived'),
+    bytesOut: sum(outbound, 'bytesSent'),
+    inbound: inboundCounters(inbound),
   };
   const stats: CallStats = { path, rtt, quality: 'unknown' };
   if (prev) {
     const seconds = (now - prev.at) / 1000;
     stats.kbpsIn = Math.round(((memory.bytesIn - prev.bytesIn) * 8) / 1000 / seconds);
     stats.kbpsOut = Math.round(((memory.bytesOut - prev.bytesOut) * 8) / 1000 / seconds);
-    const lost = memory.lostIn - prev.lostIn;
-    const got = memory.gotIn - prev.gotIn;
-    if (lost + got > 0) stats.lossIn = Math.round((lost / (lost + got)) * 1000) / 10;
+    stats.lossIn = incomingLoss(memory.inbound, prev.inbound);
   }
-  const remote = pubList.filter((s) => s.type === 'remote-inbound-rtp' && s.kind === 'audio');
-  if (remote.length) stats.lossOut = Math.round(Math.max(...remote.map((s) => Number(s.fractionLost) || 0)) * 1000) / 10;
-  const jitters = subList.filter((s) => s.type === 'inbound-rtp' && s.kind === 'audio').map((s) => Number(s.jitter) || 0);
+  stats.lossOut = outgoingLoss(outbound, audioStats(pubList, 'remote-inbound-rtp'));
+  const jitters = inbound.map((s) => Number(s.jitter) || 0);
   if (jitters.length) stats.jitter = Math.round(Math.max(...jitters) * 1000);
 
   const loss = Math.max(stats.lossIn ?? 0, stats.lossOut ?? 0);
@@ -136,7 +181,10 @@ function syncPoller() {
   polled = want;
   if (!want) return;
   const mine = generation;
+  let inFlight = false;
   const tick = async () => {
+    if (inFlight) return;
+    inFlight = true;
     try {
       const r = await readStats(want, memory);
       if (mine !== generation) return;
@@ -144,7 +192,11 @@ function syncPoller() {
       measured = want;
       publish(r.stats);
     } catch {
-      // Stats are best-effort; the next tick tries again.
+      if (mine !== generation) return;
+      memory = null;
+      publish(null);
+    } finally {
+      inFlight = false;
     }
   };
   void tick();

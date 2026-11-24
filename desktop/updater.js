@@ -308,9 +308,13 @@ async function checkNow() {
   set(readyState());
 }
 
+function isAvailable() {
+  return app.isPackaged && Boolean(manifestUrl);
+}
+
 /** Looks for an update now (no-op while one is already being looked for or downloaded). */
 function check() {
-  if (!app.isPackaged || installing || !manifestUrl) return Promise.resolve(state);
+  if (!isAvailable() || installing) return Promise.resolve(state);
   running ??= checkNow()
     // A failed check doesn't hide an update that's already waiting.
     .catch((e) => set(ready ? readyState() : { status: 'error', error: e instanceof Error ? e.message : String(e) }))
@@ -386,11 +390,11 @@ function installOnQuit() {
 function init(options) {
   manifestUrl = options.manifestUrl;
   onChange = options.onChange;
-  if (!app.isPackaged) return;
+  if (!isAvailable()) return;
   // Known at once, no need to wait for the first check: the page shows it from the start.
   if (!releaseKey()) set(noKey());
   setTimeout(check, 15_000);
   setInterval(check, CHECK_EVERY);
 }
 
-module.exports = { init, check, install, installOnQuit, getState: () => state, verifyManifest, pickUpdate };
+module.exports = { init, isAvailable, check, install, installOnQuit, getState: () => state, verifyManifest, pickUpdate };

@@ -82,6 +82,7 @@ export type ReplyRef = { id: string; userId: string; content: string; attachment
 export type Upload = Attachment & { id: string };
 
 export type Message = {
+  pinned?: boolean;
   id: string;
   /** Text channel id, or DM id when `dm` is true. */
   channelId: string;
@@ -150,6 +151,8 @@ export type Bootstrap = {
   permissions?: Permission[];
   mutedChannels: string[];
   /** Unread messages and unread mentions of you, per channel and DM, from the server's read marks. */
+  firstUnread?: Record<string, string>;
+  manualUnread?: Record<string, string>;
   unread: Record<string, number>;
   mentions: Record<string, number>;
   /** People you blocked. */

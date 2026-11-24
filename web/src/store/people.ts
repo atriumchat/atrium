@@ -2,7 +2,7 @@ import { api } from '../api';
 import { t } from '../i18n';
 import type { Dm, Friend, User } from '../types';
 import { get, getSessionEpoch, set, showError } from './core';
-import { isHomePage, openDm } from './shell';
+import { getNavigationRevision, isHomePage, openDm } from './shell';
 
 /** Everyone else: users, friends, DMs and groups, who's online. */
 export type PeopleSlice = {
@@ -26,21 +26,30 @@ export function peopleSlice(): PeopleSlice {
   };
 }
 
-/** Open (creating if needed) the DM with a user and switch to it. */
-export async function messageUser(userId: string) {
+let messageUserRequest = 0;
+let dmRefreshRequest = 0;
+let dmRevision = 0;
+
+/** Open (creating if needed) the DM with a user and switch to it if the request is still current. */
+export async function messageUser(userId: string, stillWanted: () => boolean = () => true) {
   const epoch = getSessionEpoch();
+  const request = ++messageUserRequest;
+  const navigation = getNavigationRevision();
+  const current = () => epoch === getSessionEpoch() && request === messageUserRequest && navigation === getNavigationRevision() && stillWanted();
   try {
     const dm = await api.openDm(userId);
     if (epoch !== getSessionEpoch()) return;
-    set((s) => ({ dms: [dm, ...s.dms.filter((d) => d.id !== dm.id)] }));
+    addDm(dm);
+    if (!current()) return;
     openDm(dm.id);
     return dm;
   } catch (e) {
-    showError(e instanceof Error ? e.message : t('common.openDmFailed'));
+    if (current()) showError(e instanceof Error ? e.message : t('common.openDmFailed'));
   }
 }
 
 export function addDm(dm: Dm) {
+  dmRevision++;
   set((s) => ({ dms: [dm, ...s.dms.filter((d) => d.id !== dm.id)].sort((a, b) => b.lastMessageAt - a.lastMessageAt) }));
 }
 
@@ -54,11 +63,14 @@ export async function refreshFriends() {
   }
 }
 
-export async function refreshDms() {
+export async function refreshDms(): Promise<void> {
   const epoch = getSessionEpoch();
+  const request = ++dmRefreshRequest;
+  const revision = dmRevision;
   try {
     const dms = await api.dms();
-    if (epoch !== getSessionEpoch()) return;
+    if (epoch !== getSessionEpoch() || request !== dmRefreshRequest) return;
+    if (revision !== dmRevision) return refreshDms();
     const ids = new Set(dms.map((d) => d.id));
     set((s) => ({
       dms,

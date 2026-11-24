@@ -154,7 +154,7 @@ function IconRow() {
   return (
     <>
       <input ref={input} type="file" accept="image/*" hidden onChange={(e) => pick(e.target.files?.[0])} />
-      <Row icon={<ServerMark icon={icon} size={34} />} title={t('settings.server.icon')} value={icon ? t('settings.server.iconCustom') : t('settings.server.iconDefault')}>
+      <Row icon={<ServerMark icon={icon} size={34} filled />} title={t('settings.server.icon')} value={icon ? t('settings.server.iconCustom') : t('settings.server.iconDefault')}>
         {icon && (
           <Quiet disabled={busy} onClick={() => run(async () => apply(await api.deleteServerIcon()))}>
             {t('settings.server.remove')}
@@ -187,7 +187,7 @@ function IconRow() {
             image={picked.image}
             crop={picked.crop}
             onChange={(crop) => setPicked({ ...picked, crop })}
-            className="h-60 rounded-[12px] border border-white/[0.07] bg-black max-md:mt-2"
+            className="h-60 rounded-row border border-white/[0.07] bg-black max-md:mt-2"
           />
         )}
       </SubPage>

@@ -161,7 +161,7 @@ function Rail({ mode, onMode }: { mode: Mode; onMode: (m: Mode) => void }) {
       </RailItem>
       <span className="my-0.5 h-px w-8 bg-white/10" />
       <RailItem label="Подвал" active={mode === 'server'} onPress={() => onMode('server')}>
-        <AtriumMark size={28} filled={mode === 'server'} />
+        <AtriumMark size={28} filled />
       </RailItem>
       <RailItem label="Добавить сервер" active={false} onPress={() => undefined} quiet>
         <PlusIcon size={22} />

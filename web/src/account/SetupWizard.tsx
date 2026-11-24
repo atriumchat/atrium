@@ -3,6 +3,7 @@ import { api, setToken } from '../api';
 import { useT } from '../i18n';
 import { inviteLink } from '../people/invite';
 import { AtriumMark } from '../ui/Logo';
+import { copyText } from '../ui/CopyButton';
 import { IconCropper, centred, cropToBlob, cropToUrl, loadImage, type Crop } from '../ui/IconCropper';
 import { KeyStep } from './KeyStep';
 import type { DiscordPreview } from '../types';
@@ -237,14 +238,20 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
     try {
       await navigator.share({ title: name, url: link });
       setLinkSent('shared');
+      setError('');
     } catch {
       // The sheet was closed: nothing sent.
     }
   }
 
   async function copyLink() {
-    await navigator.clipboard.writeText(link).catch(() => undefined);
-    setLinkSent((sent) => sent ?? 'copied');
+    try {
+      await copyText(link);
+      setLinkSent((sent) => sent ?? 'copied');
+      setError('');
+    } catch {
+      setError(t('common.copy.failed'));
+    }
   }
 
   /* ---------- the steps ---------- */
@@ -422,7 +429,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             }
           >
             <p className="flow-big" style={{ fontSize: 22, lineHeight: '28px', letterSpacing: 0 }}>{link.replace(/^https?:\/\//, '') || t('setup.invite.loading')}</p>
-            {canShare ? <TextAction left onPress={() => void copyLink()}>{linkSent === 'copied' ? t('common.copy.done') : t('common.copy.label')}</TextAction> : null}
+            {canShare && link ? <TextAction left onPress={() => void copyLink()}>{linkSent === 'copied' ? t('common.copy.done') : t('common.copy.label')}</TextAction> : null}
             {link ? <TextAction left onPress={() => setPosting(true)}>{t('people.move.button')}</TextAction> : null}
             {posting ? <MovePostDialog serverName={name} serverIcon={preview} link={link} onClose={() => setPosting(false)} /> : null}
           </FlowStep>
