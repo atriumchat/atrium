@@ -81,9 +81,9 @@ export const shell = {
   'shell.header.back': 'Назад',
   'shell.header.onlineLabel': 'В сети: {n}',
   'shell.header.onlineCount': '{n} в сети',
-  'shell.header.members': 'Участники сервера',
-  'shell.header.onlineGroup': 'В сети — {n}',
-  'shell.header.offlineGroup': 'Не в сети — {n}',
+  'shell.header.members': 'Участники',
+  'shell.header.onlineGroup': 'В сети {n}',
+  'shell.header.offlineGroup': 'Не в сети {n}',
   'shell.header.inRoom': 'В комнате «{room}»',
 
   'shell.menu.markRead': 'Отметить прочитанным',

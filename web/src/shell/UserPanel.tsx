@@ -154,7 +154,7 @@ function MeRow({ island }: { island: RefObject<HTMLDivElement | null> }) {
 /** Mic / headphones toggle with its device chevron, tinted red while muted — the Discord pairing. */
 function ToggleWithDevice(props: { active: boolean; label: string; onPress: () => void; device: ReactNode; children: ReactNode }) {
   return (
-    <div className={`flex items-center rounded-full ${props.active ? 'bg-danger/15 text-danger-foreground' : ''}`}>
+    <div className={`flex items-center rounded-full ${props.active ? 'bg-danger/15 text-danger' : ''}`}>
       <Tooltip delay={300} closeDelay={0}>
         <Button
           isIconOnly
@@ -162,7 +162,7 @@ function ToggleWithDevice(props: { active: boolean; label: string; onPress: () =
           aria-label={props.label}
           onPress={props.onPress}
           className={`h-9 w-9 min-w-9 rounded-l-full rounded-r-none p-0 [&_svg]:size-5 ${
-            props.active ? '[--button-fg:var(--danger-foreground)] [--button-bg-hover:color-mix(in_oklab,var(--danger)_20%,transparent)]' : '[--button-fg:var(--muted)]'
+            props.active ? '[--button-fg:var(--danger)] [--button-bg-hover:color-mix(in_oklab,var(--danger)_20%,transparent)]' : '[--button-fg:var(--muted)]'
           }`}
         >
           {props.children}

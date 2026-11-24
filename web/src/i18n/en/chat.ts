@@ -53,6 +53,7 @@ export const chat = {
   'chat.attach.openBrowser': 'Open in browser',
   'chat.attach.openImage': 'Open image',
   'chat.attach.openTab': 'Open in new tab',
+  'chat.attach.volume': 'Volume',
   'chat.attach.save': 'Save',
   'chat.attach.saveImage': 'Save image',
   'chat.attachFile': 'Attach file',

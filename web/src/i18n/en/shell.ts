@@ -81,9 +81,9 @@ export const shell = {
   'shell.header.back': 'Back',
   'shell.header.onlineLabel': 'Online: {n}',
   'shell.header.onlineCount': '{n} online',
-  'shell.header.members': 'Server members',
-  'shell.header.onlineGroup': 'Online — {n}',
-  'shell.header.offlineGroup': 'Offline — {n}',
+  'shell.header.members': 'Members',
+  'shell.header.onlineGroup': 'Online {n}',
+  'shell.header.offlineGroup': 'Offline {n}',
   'shell.header.inRoom': 'In room “{room}”',
 
   'shell.menu.markRead': 'Mark as read',

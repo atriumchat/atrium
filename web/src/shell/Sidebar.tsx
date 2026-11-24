@@ -18,7 +18,7 @@ import { ChannelMenu, InviteToRoom } from './ChannelMenu';
 import { RoundButton, VolumeSlider } from '../ui/ui';
 import { EmptyState } from '../ui/Illustrations';
 import { UserPlusIcon } from '../ui/icons';
-import { BellSlashIcon, ChevronDownIcon, DotsIcon, HashIcon, HeadphonesSlashIcon, LockIcon, MicSlashIcon, PencilIcon, PlusIcon, SpeakerIcon, TrashIcon, VideoIcon } from '../ui/icons';
+import { BellSlashIcon, ChevronDownIcon, DotsIcon, HashIcon, HashLockIcon, HeadphonesSlashIcon, MicSlashIcon, PencilIcon, PlusIcon, SpeakerIcon, SpeakerLockIcon, TrashIcon, VideoIcon } from '../ui/icons';
 
 export function Sidebar() {
   const { t } = useT();
@@ -489,9 +489,9 @@ function TextItem({ channel }: { channel: Channel }) {
         className={`${itemClass(active, showUnread || showMentions)} ${ROW_MENU_ROOM} ${muted && !active && !showMentions ? 'opacity-45' : ''}`}
         aria-label={label}
       >
-        <HashIcon size={18} className="shrink-0 opacity-60" />
+        {channel.private ? <HashLockIcon size={18} className="shrink-0 opacity-60" /> : <HashIcon size={18} className="shrink-0 opacity-60" />}
         <span className="min-w-0 flex-1 truncate">{channel.name}</span>
-        {channel.private && <PrivateMark />}
+        {channel.private && <PrivateText />}
         {muted && !showMentions && <BellSlashIcon size={14} className="shrink-0 md:group-hover:hidden" />}
         {showMentions ? (
           <span className="min-w-5 rounded-full bg-danger px-1.5 text-center text-[11px] font-medium leading-5 text-white md:group-hover:hidden">
@@ -527,6 +527,8 @@ function VoiceItem({ channel }: { channel: Channel }) {
   const twoLines = members.length > 0 && !connectedHere;
   const top = twoLines ? 'top-[18px]' : 'top-5';
   const [inviting, setInviting] = useState(false);
+  // Invite and the chat are buttons of their own; the menu is left with rename, access and delete, for admins only.
+  const hasMenu = useStore((s) => s.canManageChannels);
 
   return (
     <div>
@@ -534,15 +536,17 @@ function VoiceItem({ channel }: { channel: Channel }) {
         {/* A click joins on a computer; on a phone it opens the room first, with a Join button, like Discord's app. */}
         <button
           onClick={() => (isMobile ? selectChannel(channel.id) : joinVoice(channel.id))}
-          className={`flex w-full items-center gap-2.5 rounded-compact px-4 text-left transition-colors ${twoLines ? 'py-2' : 'h-10 max-md:h-11'} md:pr-[72px] ${
+          className={`flex w-full items-center gap-2.5 rounded-compact px-4 text-left transition-colors ${twoLines ? 'py-2' : 'h-10 max-md:h-11'} pr-4 ${hasMenu ? 'group-hover:pr-[104px] [@media(hover:none)]:pr-[104px]' : 'group-hover:pr-[72px] [@media(hover:none)]:pr-[72px]'} ${
             lit || connectedHere ? 'bg-default text-foreground' : members.length ? 'text-foreground hover:bg-white/[0.04]' : 'text-muted hover:bg-white/[0.04] hover:text-foreground'
           }`}
         >
-          <SpeakerIcon size={18} className={`shrink-0 ${connectedHere ? 'text-success' : 'opacity-60'}`} />
+          {channel.private
+            ? <SpeakerLockIcon size={18} className={`shrink-0 ${connectedHere ? 'text-success' : 'opacity-60'}`} />
+            : <SpeakerIcon size={18} className={`shrink-0 ${connectedHere ? 'text-success' : 'opacity-60'}`} />}
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-1.5">
               <span className="min-w-0 truncate text-[16px] font-medium leading-5">{channel.name}</span>
-              {channel.private && <PrivateMark />}
+              {channel.private && <PrivateText />}
             </span>
             {members.length > 0 && !connectedHere && (
               <span className="mt-1.5 flex items-center gap-2">
@@ -554,48 +558,65 @@ function VoiceItem({ channel }: { channel: Channel }) {
             )}
           </span>
           {!chatOpen && (mentioned || unread) && <span aria-hidden className={`size-2 shrink-0 rounded-full ${mentioned ? 'bg-danger' : 'bg-foreground'}`} />}
+          {/* Discord's right edge: the running time in green (no pill) when you're in the room, the headcount otherwise.
+              Both give way to the row's buttons on hover. */}
           {connectedHere ? (
-            <CallPill>
+            <span className="ml-auto shrink-0 text-[13px] font-medium tabular-nums text-success group-hover:hidden [@media(hover:none)]:hidden">
               <CallDuration />
-            </CallPill>
+            </span>
           ) : (
-            members.length > 0 && <CallPill>{members.length}</CallPill>
+            members.length > 0 && (
+              <span className="ml-auto shrink-0 group-hover:hidden [@media(hover:none)]:hidden">
+                <CallPill>{members.length}</CallPill>
+              </span>
+            )
           )}
         </button>
-        {/* The room's chat without joining, as Discord's bubble on a voice channel. On a phone it's in the room's header. */}
+        {/* Discord's floating row buttons, in place of the time or headcount: invite, the room's chat, then the menu. */}
         <button
-          type="button"
-          aria-label={chatLabel}
-          title={chatLabel}
-          onClick={() => {
-            selectChannel(channel.id);
-            setVoiceChat(true);
-          }}
-          className={`absolute right-10 z-10 ${top} flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full outline-none opacity-0 transition-[opacity,background-color,color] group-hover/voice-row:opacity-100 motion-reduce:transition-none focus-visible:opacity-100 hover:bg-white/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus max-md:hidden [@media(hover:none)]:opacity-100 ${chatOpen ? 'bg-white/10 text-foreground' : 'text-muted'}`}
-        >
-          <ChatBubbleLeftIcon className="size-4" aria-hidden="true" />
-        </button>
-        <RowMenu channelId={channel.id} top={top} />
+            type="button"
+            aria-label={t('shell.menu.inviteToRoom')}
+            title={t('shell.menu.inviteToRoom')}
+            onClick={() => setInviting(true)}
+            className={`absolute ${hasMenu ? 'right-[68px]' : 'right-10'} z-10 ${top} flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted outline-none opacity-0 transition-[opacity,background-color,color] group-hover/voice-row:opacity-100 motion-reduce:transition-none focus-visible:opacity-100 hover:bg-white/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus [@media(hover:none)]:opacity-100`}
+          >
+            <UserPlusIcon className="size-4" aria-hidden="true" />
+          </button>
+        <button
+            type="button"
+            aria-label={chatLabel}
+            title={chatLabel}
+            onClick={() => {
+              if (active && chatOpen) {
+                setVoiceChat(false);
+                return;
+              }
+              selectChannel(channel.id);
+              setVoiceChat(true);
+            }}
+            className={`absolute ${hasMenu ? 'right-10' : 'right-2'} z-10 ${top} flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full outline-none opacity-0 transition-[opacity,background-color,color] group-hover/voice-row:opacity-100 motion-reduce:transition-none focus-visible:opacity-100 hover:bg-white/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus [@media(hover:none)]:opacity-100 ${chatOpen ? 'bg-white/10 text-foreground' : 'text-muted'}`}
+          >
+            <ChatBubbleLeftIcon className="size-4" aria-hidden="true" />
+          </button>
+        {hasMenu && <RowMenu channelId={channel.id} top={top} />}
       </div>
-      {connectedHere && members.length > 0 && (
+      {connectedHere && (
         <ul className="pb-1 pl-8 pt-1">
           {members.map((m) => (
             <VoiceMember key={m.userId} entry={m} />
           ))}
-          {members.length === 1 && (!active || isMobile || chatOpen) && (
-            <li>
-              <button
-                type="button"
-                onClick={() => setInviting(true)}
-                className="flex h-8 w-full items-center gap-2 rounded-full px-1.5 text-left text-muted outline-none transition-colors hover:bg-default/50 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus"
-              >
-                <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full border border-dashed border-white/25">
-                  <UserPlusIcon size={13} />
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[15px]">{t('shell.menu.inviteToRoom')}</span>
-              </button>
-            </li>
-          )}
+          <li>
+            <button
+              type="button"
+              onClick={() => setInviting(true)}
+              className="flex h-8 w-full items-center gap-2 rounded-full px-1.5 text-left text-muted outline-none transition-colors hover:bg-default/50 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full border border-dashed border-white/25">
+                <UserPlusIcon size={13} />
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[15px]">{t('shell.menu.inviteToRoom')}</span>
+            </button>
+          </li>
         </ul>
       )}
       {inviting && <InviteToRoom channel={channel} onClose={() => setInviting(false)} />}
@@ -603,15 +624,10 @@ function VoiceItem({ channel }: { channel: Channel }) {
   );
 }
 
-/** A private channel's lock after its name. */
-function PrivateMark() {
+/** A private channel says so to screen readers; the lock itself sits on the channel's glyph. */
+function PrivateText() {
   const { t } = useT();
-  return (
-    <>
-      <LockIcon size={14} className="shrink-0 opacity-60" />
-      <span className="sr-only">{t('shell.private')}</span>
-    </>
-  );
+  return <span className="sr-only">{t('shell.private')}</span>;
 }
 
 /** Person under a voice room, Discord-style. Click someone else in your room to set their volume. */

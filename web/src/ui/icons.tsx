@@ -37,11 +37,16 @@ function locked(Icon: Glyph) {
         <defs>
           <mask id={id}>
             <rect width="24" height="24" fill="white" />
-            <rect x="12" width="12" height="14" rx="2.5" fill="black" />
+            {/* The cut-out around the lock: a rounded corner, so the glyph keeps its shape instead of being sliced. */}
+            <rect x="10" y="9.5" width="15" height="15" rx="5.5" fill="black" />
           </mask>
         </defs>
-        <g mask={`url(#${id})`}><Icon style={{ width: 24, height: 24 }} /></g>
-        <Solid.LockClosedIcon x="12" y="1" style={{ width: 12, height: 12 }} />
+        <g mask={`url(#${id})`}>
+          <g transform="translate(0.5 0.5) scale(0.88)"><Icon style={{ width: 24, height: 24 }} /></g>
+        </g>
+        {/* The lock, drawn by hand: a heroicon this small loses its shape. */}
+        <path d="M14.3 17.2v-1.9a3.2 3.2 0 0 1 6.4 0v1.9" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        <rect x="12.1" y="17" width="10.8" height="6.9" rx="1.8" />
       </svg>
     );
   };

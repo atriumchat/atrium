@@ -34,7 +34,7 @@ export function CallBarButton({ label, onPress, children, pressed, alert, end }:
   const tone = end
     ? 'size-(--app-call-dock-height)! min-w-(--app-call-dock-height)! rounded-panel! bg-danger text-danger-foreground [--button-fg:var(--danger-foreground)] [--button-bg:var(--danger)] [--button-bg-hover:var(--danger)] hover:brightness-110'
     : alert
-      ? 'bg-danger/15 text-danger-foreground [--button-fg:var(--danger-foreground)] [--button-bg:transparent] [--button-bg-hover:color-mix(in_srgb,var(--danger)_22%,transparent)]'
+      ? 'bg-danger/15 text-danger [--button-fg:var(--danger)] [--button-bg:transparent] [--button-bg-hover:color-mix(in_srgb,var(--danger)_22%,transparent)]'
       : pressed ? 'bg-white/15 [--button-bg:transparent] hover:bg-white/20' : neutral;
 
   return (

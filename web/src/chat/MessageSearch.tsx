@@ -271,6 +271,8 @@ export function MessageSearchPanel() {
   if (!search?.open || isMobile) return null;
   return <SidePanel
     layout={search.wide ? 'docked' : 'responsive'}
+    kind="search"
+    onClose={() => search.close()}
     id={search.panelId}
     title={t('chat.search.title')}
     data-message-search-panel=""

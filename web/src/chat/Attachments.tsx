@@ -1,8 +1,9 @@
-import { useEffect, useState, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { Label, Popover, Slider } from '@heroui/react';
 import { t, useT } from '../i18n';
 import type { Attachment } from '../types';
-import { DownloadIcon, XIcon } from '../ui/icons';
+import { DownloadIcon, SpeakerIcon, SpeakerSlashIcon, XIcon } from '../ui/icons';
 import { useAttachmentMenu } from './AttachmentMenu';
 
 const SINGLE_MAX_W = 420;
@@ -49,7 +50,13 @@ function playable(name = ''): 'video' | 'audio' | null {
  */
 function MediaFile({ file, kind }: { file: Attachment; kind: 'video' | 'audio' }) {
   const [failed, setFailed] = useState(false);
+  const [volume, setVolume] = useState(loadMediaVolume);
+  const audio = useRef<HTMLAudioElement>(null);
   const { open, menu } = useAttachmentMenu();
+  // The browser's own player has no volume slider in Safari, and one laid out inside the card pushes it out of shape.
+  useEffect(() => {
+    if (audio.current) audio.current.volume = volume;
+  }, [volume]);
   if (failed) return <FileCard file={file} />;
   if (kind === 'video') {
     return (
@@ -67,17 +74,80 @@ function MediaFile({ file, kind }: { file: Attachment; kind: 'video' | 'audio' }
       </>
     );
   }
+  const changeVolume = (value: number) => {
+    setVolume(value);
+    saveMediaVolume(value);
+  };
   return (
     <>
       <div onContextMenu={open(file)} className="flex w-full max-w-[420px] flex-col gap-2 rounded-panel bg-default px-4 py-3">
-        <span className="flex min-w-0 items-baseline gap-2">
+        <span className="flex min-w-0 items-center gap-2">
           <span className="min-w-0 flex-1 truncate text-[14px] text-foreground">{file.name}</span>
           <span className="shrink-0 text-[12px] text-muted">{fileSize(file.size)}</span>
+          <MediaVolume volume={volume} onChange={changeVolume} />
         </span>
-        <audio src={file.url} controls preload="metadata" onError={() => setFailed(true)} className="h-9 w-full [color-scheme:dark]" />
+        <audio ref={audio} src={file.url} controls preload="metadata" onError={() => setFailed(true)} className="h-9 w-full [color-scheme:dark]" />
       </div>
       {menu}
     </>
+  );
+}
+
+const MEDIA_VOLUME_KEY = 'atrium_media_volume';
+
+function loadMediaVolume() {
+  try {
+    const raw = localStorage.getItem(MEDIA_VOLUME_KEY);
+    // No saved value means full volume: Number(null) is 0, which used to start every player muted.
+    if (raw === null || raw === '') return 1;
+    const saved = Number(raw);
+    return Number.isFinite(saved) ? Math.min(1, Math.max(0, saved)) : 1;
+  } catch {
+    return 1;
+  }
+}
+
+function saveMediaVolume(value: number) {
+  try {
+    localStorage.setItem(MEDIA_VOLUME_KEY, String(value));
+  } catch {
+    // Not remembered; still applied to this player.
+  }
+}
+
+/** The speaker in the file's header: a popover with the player's volume, kept out of the player's own layout. */
+function MediaVolume({ volume, onChange }: { volume: number; onChange: (value: number) => void }) {
+  const { t } = useT();
+  const label = t('chat.attach.volume');
+  return (
+    <Popover>
+      <Popover.Trigger
+        aria-label={label}
+        className={`flex size-7 shrink-0 items-center justify-center rounded-full outline-none transition-colors hover:bg-white/[0.08] hover:text-foreground aria-expanded:bg-white/[0.08] aria-expanded:text-foreground data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus ${volume === 0 ? 'text-foreground' : 'text-muted'}`}
+      >
+        {volume === 0 ? <SpeakerSlashIcon size={16} /> : <SpeakerIcon size={16} />}
+      </Popover.Trigger>
+      <Popover.Content placement="bottom end" className="w-56">
+        <Popover.Dialog aria-label={label} className="flex flex-col gap-4 p-4 outline-none">
+          <Slider
+            value={volume}
+            onChange={(value) => onChange(Array.isArray(value) ? value[0] : value)}
+            minValue={0}
+            maxValue={1}
+            step={0.01}
+            formatOptions={{ style: 'percent' }}
+            className="w-full"
+          >
+            <Label>{label}</Label>
+            <Slider.Output />
+            <Slider.Track>
+              <Slider.Fill />
+              <Slider.Thumb />
+            </Slider.Track>
+          </Slider>
+        </Popover.Dialog>
+      </Popover.Content>
+    </Popover>
   );
 }
 

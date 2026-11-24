@@ -12,7 +12,9 @@
   --app-side: var(--gx-page-wide);
   --app-edge: var(--gx-edge);
   --app-island: #141417;
-  --app-right-panel-width: 320px;
+  --app-members-width: 280px;
+  --app-room-chat-width: 360px;
+  --app-search-width: 420px;
   --app-pane-inset: 12px;
   --app-panel-inset: 16px;
   --app-header-height: 72px;

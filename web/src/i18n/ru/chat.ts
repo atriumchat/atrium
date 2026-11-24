@@ -49,6 +49,7 @@ export const chat = {
   'chat.attach.openBrowser': 'Открыть в браузере',
   'chat.attach.openImage': 'Открыть картинку',
   'chat.attach.openTab': 'Открыть в новой вкладке',
+  'chat.attach.volume': 'Громкость',
   'chat.attach.save': 'Сохранить',
   'chat.attach.saveImage': 'Сохранить картинку',
   'chat.attachFile': 'Прикрепить файл',

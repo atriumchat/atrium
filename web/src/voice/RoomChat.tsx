@@ -20,6 +20,8 @@ export function RoomChat({ channel, layout }: { channel: Channel; layout: SidePa
       id={`room-chat-${channel.id}`}
       title={t('voice.chat.title')}
       layout={layout}
+      kind="chat"
+      onClose={layout === 'cover' ? undefined : close}
       actions={
         <>
           <PinsButton channel={channel.id} />

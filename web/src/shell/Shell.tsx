@@ -141,8 +141,8 @@ function DesktopShell({ onQuickSwitch }: { onQuickSwitch: () => void }) {
         )}
         <UserPanel />
       </div>
-      <main className={`${panel} flex min-w-0 flex-1`}>
-        <ConversationPanels enabled={mode === 'server' && !playground}>
+      <main className="flex min-w-0 flex-1">
+        <ConversationPanels enabled={mode === 'server' && !playground} panelClassName={panel}>
           <div className="flex min-w-0 flex-1 flex-col">
             {playground === 'art' ? <ArtPlayground /> : playground ? <Playground /> : mode === 'home' ? <HomeContent /> : <ServerContent />}
           </div>

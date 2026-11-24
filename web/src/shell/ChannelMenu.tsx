@@ -9,7 +9,7 @@ import { Avatar } from '../ui/Avatar';
 import type { Channel } from '../types';
 import { ConfirmDialog, Dialog } from '../ui/Dialog';
 import { EmptyState } from '../ui/Illustrations';
-import { BellIcon, BellSlashIcon, CheckIcon, FolderIcon, LockIcon, PencilIcon, SearchIcon, TrashIcon, UserPlusIcon } from '../ui/icons';
+import { BellIcon, BellSlashIcon, CheckIcon, FolderIcon, LockIcon, PencilIcon, SearchIcon, TrashIcon } from '../ui/icons';
 import { ChannelAccessDialog } from './ChannelAccess';
 import { EllipsisHorizontalIcon } from '@heroicons/react/24/solid';
 import { CopyButton } from '../ui/CopyButton';
@@ -57,7 +57,6 @@ export function ChannelMenu({ channelId, className = '' }: { channelId: string; 
         <Item key="mute" id="mute" label={t('shell.menu.mute')} icon={<BellSlashIcon size={16} />} />
       ),
     );
-  if (!isText) personal.push(<Item key="invite" id="invite" label={t('shell.menu.inviteToRoom')} icon={<UserPlusIcon size={16} />} />);
 
   const admin: ReactNode[] = [];
   if (canManage) {

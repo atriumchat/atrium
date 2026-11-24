@@ -1,60 +1,107 @@
 import { createContext, useContext, useId, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { UsersIcon } from '@heroicons/react/24/solid';
+import { UsersIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import { MessageSearchPanel, useMessageSearch } from '../chat/MessageSearch';
 import { localeOf, useT } from '../i18n';
 import { UserProfile } from '../people/UserProfile';
-import { setVoiceChat, useStore } from '../store';
+import { nameColor, useStore } from '../store';
 import { Avatar } from '../ui/Avatar';
 import { RoomChat } from '../voice/RoomChat';
 import { SidePanel } from './SidePanel';
 
 const MembersContext = createContext<{
   id: string;
+  kind: 'members';
   open: boolean;
   toggle: () => void;
   trigger: RefObject<HTMLButtonElement | null>;
 } | null>(null);
 
-export function ConversationPanels({ children, enabled }: { children: ReactNode; enabled: boolean }) {
+const MEMBERS_KEY = 'atrium_members_open';
+
+function loadMembersOpen() {
+  try {
+    const saved = localStorage.getItem(MEMBERS_KEY);
+    if (saved === '0' || saved === '1') return saved === '1';
+  } catch {
+    // Storage unavailable: fall back to the window width.
+  }
+  return typeof window !== 'undefined' && window.matchMedia('(min-width: 72rem)').matches;
+}
+
+/**
+ * The right slot, one at a time: a text channel holds the member list, a voice room holds its chat. The slot follows
+ * the channel, so the two never fight: there is no member list in a voice room and no room chat in a text channel.
+ */
+export function ConversationPanels({ children, enabled, panelClassName = 'overflow-hidden rounded-panel bg-window' }: { children: ReactNode; enabled: boolean; panelClassName?: string }) {
   const { t } = useT();
   const search = useMessageSearch();
-  const roomChat = useStore((s) => enabled && s.voiceChatOpen
-    ? s.channels.find((channel) => channel.id === s.selectedChannelId && channel.kind === 'voice')
-    : undefined);
-  const [dockOpen, setDockOpen] = useState(true);
-  const [overlayOpen, setOverlayOpen] = useState(false);
+  const channels = useStore((s) => s.channels);
+  const selectedId = useStore((s) => s.selectedChannelId);
+  const chatOpen = useStore((s) => s.voiceChatOpen);
+  const [membersOpen, setMembersOpen] = useState(loadMembersOpen);
   const id = useId();
   const opener = useRef<HTMLButtonElement | null>(null);
   const wide = search?.wide ?? false;
   const layout = wide ? 'docked' : 'responsive';
-  const open = enabled && !search?.open && !roomChat && (wide ? dockOpen : overlayOpen);
-  const setOpen = wide ? setDockOpen : setOverlayOpen;
+
+  const selected = channels.find((channel) => channel.id === selectedId);
+  const textChannel = enabled && selected?.kind === 'text' ? selected : undefined;
+  const voiceChannel = enabled && selected?.kind === 'voice' ? selected : undefined;
+  const showMembers = !!textChannel && membersOpen && !search?.open;
+  const showChat = !!voiceChannel && chatOpen && !search?.open;
+
+  const toggleMembers = () => {
+    search?.dismiss();
+    setMembersOpen((current) => {
+      try {
+        localStorage.setItem(MEMBERS_KEY, current ? '0' : '1');
+      } catch {
+        // Not remembered; still applied for this session.
+      }
+      return !current;
+    });
+  };
 
   return (
-    <MembersContext.Provider value={enabled ? {
+    <MembersContext.Provider value={textChannel ? {
       id,
-      open,
+      kind: 'members',
+      open: showMembers,
       trigger: opener,
-      toggle: () => {
-        search?.dismiss();
-        if (roomChat) setVoiceChat(false);
-        setOpen(!open);
-      },
+      toggle: toggleMembers,
     } : null}>
-      <div className="relative flex min-w-0 flex-1">
-        {children}
+      <div className="relative flex min-w-0 flex-1 gap-2">
+        <div className={`${panelClassName} flex min-w-0 flex-1`}>{children}</div>
         <MessageSearchPanel />
-        {roomChat && !search?.open && <RoomChat channel={roomChat} layout={layout} />}
-        {open && (
+        {showChat && voiceChannel && <RoomChat channel={voiceChannel} layout={layout} />}
+        {showMembers && (
           <SidePanel
             id={id}
             title={t('shell.header.members')}
             layout={layout}
+            kind="members"
+            onClose={() => {
+              setMembersOpen(false);
+              opener.current?.focus();
+            }}
+            actions={
+              <button
+                type="button"
+                className="header-action rounded-full"
+                aria-label={t('common.close')}
+                onClick={() => {
+                  setMembersOpen(false);
+                  opener.current?.focus();
+                }}
+              >
+                <XMarkIcon aria-hidden="true" />
+              </button>
+            }
             onKeyDown={(event) => {
               if (event.key !== 'Escape' || event.defaultPrevented || event.nativeEvent.isComposing) return;
               if (!(event.target instanceof Node) || !event.currentTarget.contains(event.target)) return;
               event.stopPropagation();
-              setOpen(false);
+              setMembersOpen(false);
               opener.current?.focus();
             }}
           >
@@ -91,6 +138,7 @@ export function MembersButton() {
 export function MemberGroups() {
   const { t, lang } = useT();
   const users = useStore((s) => s.users);
+  const roles = useStore((s) => s.roles);
   const online = useStore((s) => s.online);
   const voiceState = useStore((s) => s.voiceState);
   const channels = useStore((s) => s.channels);
@@ -107,6 +155,7 @@ export function MemberGroups() {
       <h3 className="px-2 pb-1 pt-2 text-xs font-medium text-muted">{t(group.key, { n: group.list.length })}</h3>
       <ul>
         {group.list.map((user) => {
+          const color = nameColor(user, roles);
           const voice = group.online && voiceState.find((entry) => entry.userId === user.id);
           const room = voice && channels.find((channel) => channel.id === voice.channelId)?.name;
           return (
@@ -118,7 +167,7 @@ export function MemberGroups() {
               >
                 <Avatar user={user} size={32} online={group.online} ringBg="var(--app-window)" />
                 <span className="min-w-0">
-                  <span className="block truncate text-sm">{user.name}</span>
+                  <span className="block truncate text-sm" style={color ? { color } : undefined}>{user.name}</span>
                   {room && <span className="block truncate text-xs text-success">{t('shell.header.inRoom', { room })}</span>}
                 </span>
               </UserProfile>

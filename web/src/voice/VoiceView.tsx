@@ -46,6 +46,7 @@ export function VoiceView({ channel }: { channel: Channel }) {
     <div className={`relative flex min-h-0 flex-1 flex-col ${chatOpen ? 'max-md:[&>header]:invisible' : ''}`}>
       <ChannelHeader
         compactTitle
+        showOnline={false}
         leading={
           <HeaderIcon compact>
             <SpeakerWaveIcon />
@@ -57,7 +58,7 @@ export function VoiceView({ channel }: { channel: Channel }) {
             <button
               id={`room-chat-trigger-${channel.id}`}
               type="button"
-              className="header-action"
+              className="grid size-9 shrink-0 place-items-center rounded-full bg-default text-muted outline-none transition-colors hover:bg-surface-tertiary hover:text-foreground aria-pressed:bg-white/[0.12] aria-pressed:text-foreground focus-visible:ring-2 focus-visible:ring-focus [&_svg]:size-5"
               aria-label={t(chatOpen ? 'voice.chat.close' : 'voice.chat.open')}
               title={t(chatOpen ? 'voice.chat.close' : 'voice.chat.open')}
               aria-pressed={chatOpen}

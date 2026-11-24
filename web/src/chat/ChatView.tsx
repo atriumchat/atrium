@@ -500,7 +500,7 @@ function OngoingCall() {
   );
 }
 
-const QUICK_REACTIONS = ['👍', '❤️', '😂', '🔥'];
+const QUICK_REACTIONS = ['👍', '❤️', '😂'];
 
 /**
  * Messages from someone you blocked stay folded into one quiet line, unless you open them. Memoised: a new
@@ -546,7 +546,7 @@ function MessageBody({ message, startsGroup }: { message: Message; startsGroup: 
   return (
     <div
       id={`msg-${message.id}`}
-      className={`group relative rounded-surface pl-[60px] pr-2 transition-colors ${showHeader ? 'mt-4 pb-0.5 pt-0.5' : 'py-0.5'} ${
+      className={`group @container/message relative rounded-fine pl-[60px] pr-2 transition-colors ${showHeader ? 'mt-4 pb-0.5 pt-0.5' : 'py-0.5'} ${
         'hover:bg-white/[0.03]'
       } ${editing ? 'bg-white/[0.03]' : ''}`}
     >
@@ -679,33 +679,37 @@ function Reactions({ message, meId }: { message: Message; meId: string | undefin
   );
 }
 
-/** Hover bar at the message's top right: quick reactions, any emoji, reply, edit, delete. */
+/**
+ * Hover bar at the message's top right, as small as Discord's: three quick reactions (dropped when the panel is
+ * narrow, where they would cover the avatar), any emoji, reply, the tools, edit and delete.
+ */
 function MessageActions(props: { message: Message; onReact: (emoji: string) => void; onReply: () => void; onEdit?: () => void; onDelete?: (e?: { shiftKey?: boolean }) => void }) {
   const { t } = useT();
-  const btn = 'flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/10 hover:text-foreground';
+  const btn = 'flex h-7 w-7 items-center justify-center rounded-[6px] text-muted transition-colors hover:bg-white/10 hover:text-foreground [&_svg]:size-[18px]';
+  const narrow = '@max-[34rem]/message:hidden';
   return (
-    <div className="absolute -top-4 right-3 z-10 hidden items-center gap-0.5 rounded-full border-[0.5px] border-white/10 bg-default p-0.5 shadow-[0_6px_20px_rgba(0,0,0,.45)] group-hover:flex group-focus-within:flex has-[[aria-expanded=true]]:flex">
+    <div className="absolute -top-4 right-2 z-10 hidden items-center gap-px rounded-fine border-[0.5px] border-white/10 bg-default p-0.5 shadow-[0_4px_12px_rgba(0,0,0,.35)] group-hover:flex group-focus-within:flex has-[[aria-expanded=true]]:flex">
       {QUICK_REACTIONS.map((e) => (
-        <button key={e} onClick={() => props.onReact(e)} aria-label={t('chat.reaction', { emoji: e })} className={`${btn} text-[17px]`}>
+        <button key={e} onClick={() => props.onReact(e)} aria-label={t('chat.reaction', { emoji: e })} className={`${btn} ${narrow} text-[16px]`}>
           {e}
         </button>
       ))}
       <EmojiPicker label={t('chat.moreReactions')} onPick={props.onReact} className={btn}>
         <SmileIcon size={18} />
       </EmojiPicker>
-      <span className="mx-0.5 h-5 w-px bg-white/10" />
+      <span className={`mx-0.5 h-4 w-px bg-white/10 ${narrow}`} />
       <button onClick={props.onReply} aria-label={t('chat.reply')} title={t('chat.reply')} className={btn}>
         <ReplyIcon size={18} />
       </button>
       <MessageTools message={props.message} className={btn}/>
       {props.onEdit && (
         <button onClick={props.onEdit} aria-label={t('chat.edit')} title={t('chat.edit')} className={btn}>
-          <PencilIcon size={17} />
+          <PencilIcon size={16} />
         </button>
       )}
       {props.onDelete && (
         <button onClick={(e) => props.onDelete!(e)} aria-label={t('chat.delete')} title={t('chat.deleteHint')} className={`${btn} hover:text-danger`}>
-          <TrashIcon size={17} />
+          <TrashIcon size={16} />
         </button>
       )}
     </div>
