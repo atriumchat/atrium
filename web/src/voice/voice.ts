@@ -3,7 +3,7 @@ import { api } from '../api';
 import { getSocket, movedText } from '../socket';
 import { getSessionEpoch, isDmId, openDm, selectChannel, selfEntry, showError, useStore } from '../store';
 import { playSound } from './sounds';
-import { applyNoise, micTrack, suspendNoise } from './noise';
+import { applyNoise, callCaptureOptions, closeNoise, micTrack, noiseModeChanged, primeNoise } from './noise';
 import { applyVolume, getPreferredDevice } from './devices';
 import { savePrefs, type VoicePrefs } from '../prefs';
 import { desktop } from '../desktop';
@@ -72,7 +72,7 @@ export async function applyMic() {
   micUpdates.set(room, update);
   await update;
   if (get().room !== room) return;
-  if (micWanted()) await applyNoise();
+  if (micTrack()) await applyNoise();
 }
 
 async function updateMic(room: Room) {
@@ -93,7 +93,7 @@ async function updateMic(room: Room) {
 
 async function updateMicTrack(room: Room, live: boolean) {
   try {
-    await room.localParticipant.setMicrophoneEnabled(live);
+    await room.localParticipant.setMicrophoneEnabled(live, live ? callCaptureOptions() : undefined);
   } catch (e) {
     if (get().room !== room || micWanted() !== live) return;
     // Only a mic that really didn't come on counts as muted: a publish can time out on a slow network after the
@@ -117,22 +117,9 @@ export async function setVoicePrefs(patch: Partial<VoicePrefs>) {
   const prefs = { ...before, ...patch };
   set({ voicePrefs: prefs, pttDown: false });
   savePrefs(prefs);
-  const track = micTrack();
-  if (track && patch.noise && patch.noise !== before.noise) {
-    // The browser's own suppression is a capture setting: re-open the mic with it on or off (off under RNNoise,
-    // which does the job itself). A processor here is RNNoise on its way out: dropped first, not rebuilt on a new mic.
-    try {
-      if (track.getProcessor()) await track.stopProcessor();
-      await track.restartTrack({
-        noiseSuppression: prefs.noise === 'browser',
-        echoCancellation: true,
-        autoGainControl: true,
-        deviceId: getPreferredDevice('audioinput'),
-      });
-    } catch (e) {
-      showError(t('voice.err.micFailed', { error: e instanceof Error ? e.message : String(e) }));
-    }
-  }
+  // The mode change is applied to the live microphone by applyNoise below: it knows which capture settings the
+  // chosen mode needs and whether RNNoise has to be put on or taken off.
+  if (patch.noise !== undefined && patch.noise !== before.noise) noiseModeChanged();
   await applyMic();
   await applyNoise();
 }
@@ -143,7 +130,7 @@ let joiningRoom: Room | null = null;
 function resetVoice() {
   reporter?.drop();
   reporter = null;
-  suspendNoise();
+  closeNoise();
   // Gone from the room's list at once, not when the server's next update comes round.
   const { me, voiceChannelId } = get();
   get().cameraPreview?.stop();
@@ -192,16 +179,12 @@ export async function joinVoice(channelId: string, { video = false, navigate = t
   if (!reconnect && current.voiceChannelId === channelId && current.voiceStatus !== 'idle') return;
   const epoch = getSessionEpoch();
   const leaving = leaveVoice({ silent: true });
+  // Inside the click that joins: the context and the model start loading now, not after the first push-to-talk.
+  primeNoise(true);
   const room = new Room({
     adaptiveStream: true,
     dynacast: true,
-    audioCaptureDefaults: {
-      echoCancellation: true,
-      // RNNoise does the job itself when it's on; doubling up only muffles the voice.
-      noiseSuppression: get().voicePrefs.noise === 'browser',
-      autoGainControl: true,
-      deviceId: getPreferredDevice('audioinput'),
-    },
+    audioCaptureDefaults: callCaptureOptions(),
     audioOutput: { deviceId: getPreferredDevice('audiooutput') },
     // Throttled networks and a 1-CPU server: the camera at about 540p / 800 kbps is plenty for faces.
     videoCaptureDefaults: { resolution: VideoPresets.h540.resolution, deviceId: getPreferredDevice('videoinput') },
@@ -220,7 +203,10 @@ export async function joinVoice(channelId: string, { video = false, navigate = t
       if (get().room === room) set({ speaking: speakers.map((p) => p.identity) });
     })
     .on(RoomEvent.ParticipantConnected, applyVolume)
-    .on(RoomEvent.LocalTrackPublished, () => syncLocalMedia(room))
+    .on(RoomEvent.LocalTrackPublished, (publication) => {
+      syncLocalMedia(room);
+      if (publication.source === Track.Source.Microphone) void applyNoise();
+    })
     .on(RoomEvent.LocalTrackUnpublished, () => syncLocalMedia(room))
     .on(RoomEvent.Disconnected, (reason) => {
       // Only an unexpected drop lands here: leaveVoice() detaches the room from the store first.

@@ -23,6 +23,13 @@ export const useStore = create<State>(() => ({
 let sessionEpoch = 0;
 export const getSessionEpoch = () => sessionEpoch;
 
+/** Things outside the store that must let go when the store is reset (a sign-out): the call, the noise context. */
+const resetHandlers = new Set<() => void>();
+export function onStoreReset(handler: () => void) {
+  resetHandlers.add(handler);
+  return () => resetHandlers.delete(handler);
+}
+
 export function resetStore() {
   sessionEpoch++;
   const room = useStore.getState().room;
@@ -30,6 +37,7 @@ export function resetStore() {
   void room?.disconnect().catch(() => {});
   const { isMobile, siteUpdate, desktopUpdate, voicePrefs } = useStore.getState();
   useStore.setState({ ...shellSlice(), ...accountSlice(), ...peopleSlice(), ...chatSlice(), ...voiceSlice(), isMobile, siteUpdate, desktopUpdate, voicePrefs });
+  resetHandlers.forEach((handler) => handler());
 }
 
 export function set(partial: Partial<State> | ((state: State) => Partial<State>)) {

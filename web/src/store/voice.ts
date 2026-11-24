@@ -1,5 +1,6 @@
 import type { Room } from 'livekit-client';
 import { loadPrefs, type VoicePrefs } from '../prefs';
+import type { NoiseReason } from '../voice/suppressor';
 import type { CallState, Sound, VoiceEntry } from '../types';
 import { get } from './core';
 import { isDmId } from './people';
@@ -68,6 +69,9 @@ export type VoiceSlice = {
   myPlaying: { soundId: string; playId: string; at: number; duration: number } | null;
   /** The sound you're listening to by yourself (the picker's preview), until it ends or you stop it. */
   previewing: string | null;
+  /** How "Strong" is doing in this call: starting, on, or fallen back to the browser's own suppression. */
+  noiseState: 'idle' | 'starting' | 'on' | 'fallback';
+  noiseReason: NoiseReason | null;
 };
 
 export function voiceSlice(): VoiceSlice {
@@ -93,6 +97,8 @@ export function voiceSlice(): VoiceSlice {
     soundPlays: {},
     myPlaying: null,
     previewing: null,
+    noiseState: 'idle',
+    noiseReason: null,
   };
 }
 

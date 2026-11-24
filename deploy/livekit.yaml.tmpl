@@ -24,6 +24,14 @@ turn:
 room:
   # A server for friends: a room bigger than this is a mistake or abuse, and every extra person costs the one CPU.
   max_participants: 25
+# The speaking ring follows the audio level LiveKit measures, not the browser's meter. The stock 35 (about −35 dBov)
+# misses a quiet voice and soft room noise; 45 with a shorter window lights the ring for a normal speaking voice.
+# ActiveLevel is 0-127, where 0 is loudest, so a higher number means more sensitive.
+audio:
+  active_level: 45
+  min_percentile: 25
+  update_interval: 300
+  smooth_intervals: 2
 keys:
   {{LIVEKIT_API_KEY}}: {{LIVEKIT_API_SECRET}}
 logging:

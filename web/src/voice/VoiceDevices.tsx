@@ -15,6 +15,7 @@ const ERROR: Record<MicTestError, Key> = {
   capture: 'voice.micTest.captureError',
   output: 'voice.micTest.outputError',
   play: 'voice.micTest.playError',
+  noise: 'voice.micTest.noiseError',
 };
 
 type DeviceLists = Record<AudioDeviceKind, MediaDeviceInfo[]>;
@@ -25,6 +26,7 @@ type MediaDevicesWithOutput = MediaDevices & { selectAudioOutput?: () => Promise
 export function VoiceDevices() {
   const { t } = useT();
   const callActive = useStore((s) => s.voiceStatus !== 'idle');
+  const noise = useStore((s) => s.voicePrefs.noise);
   const [input, setInput] = useState(() => getPreferredDevice('audioinput') ?? 'default');
   const [output, setOutput] = useState(() => getPreferredDevice('audiooutput') ?? 'default');
   const [devices, setDevices] = useState<DeviceLists>({ audioinput: [], audiooutput: [] });
@@ -106,6 +108,7 @@ export function VoiceDevices() {
       await runMicTest({
         inputId: input,
         outputId: canSelectOutput ? output : 'default',
+        noise,
         signal: controller.signal,
         onStarted: () => {
           setPhase('running');
@@ -122,6 +125,20 @@ export function VoiceDevices() {
       if (operation.current === controller) operation.current = null;
     }
   };
+
+  // Switching the noise mode while the test runs restarts it, so the difference is heard, not remembered.
+  const startRef = useRef(start);
+  useEffect(() => {
+    startRef.current = start;
+  });
+  const noiseRef = useRef(noise);
+  useEffect(() => {
+    if (noiseRef.current === noise) return;
+    noiseRef.current = noise;
+    if (!operation.current) return;
+    cancel();
+    void startRef.current();
+  }, [noise, cancel]);
 
   const button: Record<Phase, Key> = {
     idle: 'voice.micTest.start',

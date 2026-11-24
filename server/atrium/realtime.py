@@ -643,6 +643,12 @@ class CallQualityIn(BaseModel):
     rtt: float | None = None
     lossOut: float | None = None
     screenAudio: bool = False
+    # Noise suppression: off / browser / strong / fallback, the engine when strong, why it fell back, and how much
+    # it measured. Words only, no audio and no device names.
+    noise: str = ""
+    noiseEngine: str = ""
+    noiseReason: str = ""
+    noiseAtt: float | None = None
 
 
 def _num(value: float | None, top: float, unit: str) -> str:
@@ -661,12 +667,16 @@ def call_quality(body: CallQualityIn, user: dict = Depends(current_user)):
     # The transport is free text from the browser: only a short word like "relay/turn-tls" gets into the log.
     transport = body.transport if re.fullmatch(r"[a-z0-9/-]{1,24}", body.transport) else "?"
     when = "leave" if body.when == "leave" else "tick"
+    noise = body.noise if re.fullmatch(r"[a-z]{1,16}", body.noise) else "?"
+    engine = body.noiseEngine if re.fullmatch(r"[a-z]{1,16}", body.noiseEngine) else "-"
+    reason = body.noiseReason if re.fullmatch(r"[a-z]{1,16}", body.noiseReason) else "-"
     print(
         f"call quality: user={user['id']} room={body.channelId} at={when} transport={transport}"
         f" loss_in={_num(body.lossIn, 100, '%')} loss_in_worst={_num(body.lossInWorst, 100, '%')}"
         f" jitter_in={_num(body.jitter, 10000, 'ms')} jitter_in_worst={_num(body.jitterWorst, 10000, 'ms')}"
         f" rtt={_num(body.rtt, 60000, 'ms')} loss_out={_num(body.lossOut, 100, '%')}"
-        f" screen_audio={'yes' if body.screenAudio else 'no'}",
+        f" screen_audio={'yes' if body.screenAudio else 'no'}"
+        f" noise={noise}/{engine}/{reason}/{_num(body.noiseAtt, 120, 'dB')}",
         flush=True,
     )
     return {"ok": True}

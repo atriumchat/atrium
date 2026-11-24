@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useStore } from '../store';
 import { setVoicePrefs } from './voice';
 import { keyLabel, type NoiseMode } from '../prefs';
@@ -8,6 +8,7 @@ import { ConnectionCheck } from './ConnectionCheck';
 import { VoiceDevices } from './VoiceDevices';
 import { ChoiceRow, Row, RowFrame, Rows, Secondary } from '../ui/settings';
 import { useT } from '../i18n';
+import { STRONG_ENABLED } from './suppressor';
 
 /** The "Voice" page of the settings, for this device: noise suppression, push-to-talk, the bypass, a check. */
 export function VoiceSettings() {
@@ -68,16 +69,24 @@ export function CallsGroup({ className = '' }: { className?: string }) {
 function NoiseRow() {
   const { t } = useT();
   const noise = useStore((s) => s.voicePrefs.noise);
+  const failed = useStore((s) => s.noiseState === 'fallback');
+  const options: [NoiseMode, string, ReactNode?][] = [
+    ['off', t('voice.noise.off'), t('voice.noise.offHint')],
+    ['browser', t('voice.noise.browser'), t('voice.noise.browserHint')],
+    ...(STRONG_ENABLED
+      ? [[
+          'rnnoise',
+          t('voice.noise.rnnoise'),
+          failed && noise === 'rnnoise' ? <span className="text-danger">{t('voice.noise.failed')}</span> : t('voice.noise.rnnoiseHint'),
+        ] as [NoiseMode, string, ReactNode]]
+      : []),
+  ];
   return (
     <ChoiceRow<NoiseMode>
       title={t('voice.noise.title')}
-      value={noise}
+      value={noise === 'rnnoise' && !STRONG_ENABLED ? 'browser' : noise}
       onChange={(value) => setVoicePrefs({ noise: value })}
-      options={[
-        ['off', t('voice.noise.off'), t('voice.noise.offHint')],
-        ['browser', t('voice.noise.browser'), t('voice.noise.browserHint')],
-        ['rnnoise', t('voice.noise.rnnoise'), t('voice.noise.rnnoiseHint')],
-      ]}
+      options={options}
     />
   );
 }

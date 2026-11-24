@@ -1,6 +1,7 @@
 import type { Room } from 'livekit-client';
 import { Track } from 'livekit-client';
 import { api } from '../api';
+import { noiseReport } from './noise';
 import { collect, pathOf, transports, type Stat } from './stats';
 
 /**
@@ -28,6 +29,8 @@ export function startQualityReports(room: Room, channelId: string): QualityRepor
   const before = new Map<string, Counters>();
 
   async function send(when: 'tick' | 'leave') {
+    // Read before the awaits: leaving closes the noise session, and its report would then read as "no measurement".
+    const noise = noiseReport();
     const { pub, sub } = transports(room);
     const [pubList, subList] = await Promise.all([collect(pub), collect(sub)]);
     const inbound = subList.filter((s) => s.type === 'inbound-rtp' && s.kind === 'audio');
@@ -58,6 +61,7 @@ export function startQualityReports(room: Room, channelId: string): QualityRepor
       rtt,
       lossOut: remote.length ? round(Math.max(...remote.map((s) => Number(s.fractionLost) || 0)) * 100) : undefined,
       screenAudio,
+      ...noise,
     });
   }
 
