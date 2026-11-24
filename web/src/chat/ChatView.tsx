@@ -688,7 +688,7 @@ function MessageActions(props: { message: Message; onReact: (emoji: string) => v
   const btn = 'flex h-7 w-7 items-center justify-center rounded-[6px] text-muted transition-colors hover:bg-white/10 hover:text-foreground [&_svg]:size-[18px]';
   const narrow = '@max-[34rem]/message:hidden';
   return (
-    <div className="absolute -top-4 right-2 z-10 hidden items-center gap-px rounded-fine border-[0.5px] border-white/10 bg-default p-0.5 shadow-[0_4px_12px_rgba(0,0,0,.35)] group-hover:flex group-focus-within:flex has-[[aria-expanded=true]]:flex">
+    <div className="absolute -top-4 right-2 z-10 hidden items-center gap-px rounded-fine border-[0.5px] border-white/10 bg-default p-0.5 shadow-[0_4px_12px_rgba(0,0,0,.35)] group-hover:flex group-has-[button:focus-visible]:flex has-[[aria-expanded=true]]:flex">
       {QUICK_REACTIONS.map((e) => (
         <button key={e} onClick={() => props.onReact(e)} aria-label={t('chat.reaction', { emoji: e })} className={`${btn} ${narrow} text-[16px]`}>
           {e}
