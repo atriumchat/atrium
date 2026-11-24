@@ -13,7 +13,8 @@ export function TitleBar() {
         <AtriumMark size={14} filled />
         Atrium
       </span>
-      <div className="desktop-titlebar-end absolute top-1/2 -translate-y-1/2">
+      {/* The inbox is two buttons (unread, then notifications): in a row, not stacked past the strip. */}
+      <div className="desktop-titlebar-end absolute top-1/2 flex -translate-y-1/2 items-center gap-0.5">
         <InboxButton compact />
       </div>
     </div>
