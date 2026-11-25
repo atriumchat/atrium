@@ -509,7 +509,8 @@ function Tile({ participant, camera, height, onSelect }: {
   return (
     <div
       className={`group relative flex h-full w-full items-center justify-center overflow-hidden rounded-surface ${pending || camera ? 'bg-black' : 'bg-[#18181b]'} ${handleClick ? 'cursor-pointer' : ''}`}
-      onClick={handleClick}
+      // The volume popover is portalled but its clicks still bubble here through React: only the tile itself counts.
+      onClick={handleClick ? (e) => { if (e.currentTarget.contains(e.target as Node)) handleClick(); } : undefined}
       onContextMenu={remote ? (e) => { e.preventDefault(); setVolumeOpen(true); } : undefined}
     >
       {pending ? (
