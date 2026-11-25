@@ -37,6 +37,18 @@ const RATE = 48_000;
 const SELF_TEST_MS = 4_000;
 const SELF_TEST_AMPLITUDE = 0.03; // ≈ −35 dBFS: loud enough for the worklet to pass through, quiet in headphones
 
+/**
+ * What sits after the model in "Strong": the model takes some of the voice's energy with the noise, so the output
+ * comes back thin and quiet. Everything here is for the owner to tune by ear in one place — the microphone check in
+ * Settings plays this same chain.
+ */
+const STRONG_POST = {
+  highpass: { frequency: 80, q: 0.7 }, // rumble and desk bumps below the voice
+  compressor: { threshold: -28, knee: 8, ratio: 4, attack: 0.004, release: 0.18 },
+  makeupDb: 10, // ≈ 3.16×, bringing the compressed voice back up
+  limiter: { threshold: -2, knee: 0, ratio: 20, attack: 0.001, release: 0.08 }, // nothing clipped on the way out
+} as const;
+
 const ENGINES = {
   rnnoise: {
     processor: '@sapphi-red/web-noise-suppressor/rnnoise',
@@ -238,6 +250,36 @@ export async function buildSuppressor(ctx: AudioContext, engine: Engine = STRONG
     throw new NoiseFailure('worklet', e);
   }
 
+  // After the model: rumble out, level evened, voice brought back up, peaks caught before the call hears them.
+  const highpass = ctx.createBiquadFilter();
+  highpass.type = 'highpass';
+  highpass.frequency.value = STRONG_POST.highpass.frequency;
+  highpass.Q.value = STRONG_POST.highpass.q;
+
+  const compressor = ctx.createDynamicsCompressor();
+  compressor.threshold.value = STRONG_POST.compressor.threshold;
+  compressor.knee.value = STRONG_POST.compressor.knee;
+  compressor.ratio.value = STRONG_POST.compressor.ratio;
+  compressor.attack.value = STRONG_POST.compressor.attack;
+  compressor.release.value = STRONG_POST.compressor.release;
+
+  const makeup = ctx.createGain();
+  makeup.gain.value = 10 ** (STRONG_POST.makeupDb / 20);
+
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = STRONG_POST.limiter.threshold;
+  limiter.knee.value = STRONG_POST.limiter.knee;
+  limiter.ratio.value = STRONG_POST.limiter.ratio;
+  limiter.attack.value = STRONG_POST.limiter.attack;
+  limiter.release.value = STRONG_POST.limiter.release;
+
+  const post = [highpass, compressor, makeup, limiter];
+  for (const part of post) {
+    part.channelCount = 1;
+    part.channelCountMode = 'explicit';
+    part.channelInterpretation = 'speakers';
+  }
+
   const suppressor: Suppressor = {
     engine,
     ctx,
@@ -250,6 +292,7 @@ export async function buildSuppressor(ctx: AudioContext, engine: Engine = STRONG
     dispose() {
       input.disconnect();
       node.disconnect();
+      for (const part of post) part.disconnect();
       output.disconnect();
       suppressor.meterIn.dispose();
       suppressor.meterOut.dispose();
@@ -266,7 +309,7 @@ export async function buildSuppressor(ctx: AudioContext, engine: Engine = STRONG
     suppressor.failure = 'worklet';
   };
 
-  input.connect(node).connect(output);
+  input.connect(node).connect(highpass).connect(compressor).connect(makeup).connect(limiter).connect(output);
 
   // The proof: white noise in, sound out. A worklet whose WASM failed stays at zero forever, and nothing else in
   // the app could tell that apart from a quiet room.
