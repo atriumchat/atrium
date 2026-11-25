@@ -361,7 +361,10 @@ async function screenOperation(switchSource: boolean) {
         if (!current()) return;
         await video.replaceTrack(next, false);
         if (chosenName) screenNames.set(next, chosenName);
-        if (sound && current()) {
+        if (sound && sound.readyState === 'ended') {
+          // macOS without the system-audio permission hands out a dead track: say so and publish nothing.
+          showError(t('voice.err.shareSound'));
+        } else if (sound && current()) {
           await participant.publishTrack(sound, { source: Track.Source.ScreenShareAudio });
           publishedSound = current();
           if (!publishedSound) await participant.unpublishTrack(sound);
@@ -385,6 +388,13 @@ async function screenOperation(switchSource: boolean) {
       );
       const track = room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track?.mediaStreamTrack;
       if (enable && track && chosenName) screenNames.set(track, chosenName);
+      const sound = enable ? room.localParticipant.getTrackPublication(Track.Source.ScreenShareAudio)?.track : undefined;
+      if (sound && sound.mediaStreamTrack.readyState === 'ended') {
+        // A dead audio track (macOS without the system-audio permission): drop it and say why.
+        showError(t('voice.err.shareSound'));
+        await room.localParticipant.unpublishTrack(sound);
+        sound.stop();
+      }
     }
   } catch (e) {
     // Closing the screen picker throws NotAllowedError; that's a cancel, not an error. The desktop app's own picker

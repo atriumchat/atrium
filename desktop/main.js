@@ -238,23 +238,24 @@ function setUpPermissions() {
     return allowed.has(permission) && fromAtrium(requestingOrigin);
   });
 
-  // Screen sharing: the system picker where the OS has one (macOS); everywhere else Atrium's own (screen-picker.js),
-  // with the computer's sound as a switch on Windows. Only Atrium itself may ask. ATRIUM_PICKER=1 (development)
-  // turns the system picker off to try Atrium's on a Mac.
-  const ownPickerForced = Boolean(devEnv('ATRIUM_PICKER'));
+  // Screen sharing goes through Atrium's own picker (screen-picker.js) on every platform Electron runs on: it is
+  // the only one with the "Sound" switch. System audio is offered on Windows and, from macOS 14.2, on macOS (a
+  // CoreAudio tap), so the system picker (macOS 15+) stays off — it is only for a platform with no picker of ours.
+  const ownPicker = ['darwin', 'win32', 'linux'].includes(process.platform);
+  const shareSound = process.platform === 'win32' || process.platform === 'darwin';
   session.defaultSession.setDisplayMediaRequestHandler(
     (request, callback) => {
       if (!fromAtrium(request.securityOrigin || request.frame?.url || '')) return callback(null);
       screenPicker
-        .choose(win, { sound: process.platform === 'win32' || ownPickerForced })
+        .choose(win, { sound: shareSound })
         .then((choice) => {
           if (!choice || !request.frame || !fromAtrium(request.frame.url)) return callback(null);
           request.frame.send('screen:chosen', choice.name);
-          callback({ video: choice.source, audio: choice.sound && process.platform === 'win32' ? 'loopback' : undefined });
+          callback({ video: choice.source, audio: choice.sound && shareSound ? 'loopback' : undefined });
         })
         .catch(() => callback(null));
     },
-    { useSystemPicker: !ownPickerForced },
+    { useSystemPicker: !ownPicker },
   );
 }
 

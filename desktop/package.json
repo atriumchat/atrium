@@ -75,7 +75,8 @@
       "icon": "build/icon.png",
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Atrium uses the microphone for calls.",
-        "NSCameraUsageDescription": "Atrium uses the camera for video calls."
+        "NSCameraUsageDescription": "Atrium uses the camera for video calls.",
+        "NSAudioCaptureUsageDescription": "Atrium shares your computer's sound when you share your screen."
       },
       "identity": "-",
       "hardenedRuntime": false

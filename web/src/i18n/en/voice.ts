@@ -136,6 +136,7 @@ export const voice = {
   'voice.err.lost': 'Voice connection lost',
   'voice.err.connect': 'Could not connect to voice: {error}',
   'voice.err.share': 'Could not start screen share: {error}',
+  'voice.err.shareSound': 'No access to computer sound: System Settings → Privacy → Screen & System Audio Recording',
   'voice.err.camera': 'Camera access blocked',
   'voice.err.noise': "Strong noise suppression isn't working ({error}). Switched to standard",
   'voice.err.device': 'Could not switch device',
