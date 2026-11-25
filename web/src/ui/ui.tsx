@@ -55,7 +55,7 @@ export function RoundButton(props: {
   );
 }
 
-/** Per-person playback volume, 0–100%. */
+/** Per-person playback volume, 0–200%. */
 export function VolumeSlider({ userId, name }: { userId: string; name: string }) {
   const { t } = useT();
   const [value, setValue] = useState(() => getUserVolume(userId));
@@ -68,7 +68,7 @@ export function VolumeSlider({ userId, name }: { userId: string; name: string })
         setUserVolume(userId, next);
       }}
       minValue={0}
-      maxValue={1}
+      maxValue={2}
       step={0.01}
       formatOptions={{ style: 'percent' }}
       className="w-full"

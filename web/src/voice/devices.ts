@@ -6,7 +6,7 @@ import { t } from '../i18n';
 
 const get = useStore.getState;
 
-// Per-person volume (0..1), kept for the session so it survives reconnects and channel switches.
+// Per-person volume (0..2), kept for the session so it survives reconnects and channel switches.
 const userVolumes = new Map<string, number>();
 
 export function applyVolume(participant: RemoteParticipant) {

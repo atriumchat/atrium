@@ -184,6 +184,8 @@ export async function joinVoice(channelId: string, { video = false, navigate = t
   const room = new Room({
     adaptiveStream: true,
     dynacast: true,
+    // Per-person volume goes up to 200%: only through a GainNode, as HTMLMediaElement.volume caps at 1.
+    webAudioMix: true,
     audioCaptureDefaults: callCaptureOptions(),
     audioOutput: { deviceId: getPreferredDevice('audiooutput') },
     // Throttled networks and a 1-CPU server: the camera at about 540p / 800 kbps is plenty for faces.
