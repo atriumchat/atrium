@@ -140,9 +140,9 @@ async function decodeUrl(url: string): Promise<AudioBuffer | null> {
   }
 }
 
-/** Long clips (over 10 s) stream; short ones and old ones with no length are decoded. */
+/** Long clips (over 10 s) stream, and so do ones whose length is unknown (0): decoding a whole file to find out is worse. */
 function isLong(durationMs: number): boolean {
-  return durationMs > LONG_LIMIT_MS;
+  return durationMs === 0 || durationMs > LONG_LIMIT_MS;
 }
 
 /**
@@ -186,6 +186,7 @@ export function stopCallSounds({ clearOwn = true } = {}) {
 /** A short clip from its decoded buffer, through the shared context. */
 function playBuffer(buffer: AudioBuffer, base: number, userId: string, onEnded?: () => void): Play {
   const context = audioCtx();
+  const durationMs = Math.round(buffer.duration * 1000);
   const gain = context.createGain();
   gain.gain.value = level(base);
   const source = context.createBufferSource();
@@ -196,6 +197,7 @@ function playBuffer(buffer: AudioBuffer, base: number, userId: string, onEnded?:
   const finish = () => {
     if (done) return;
     done = true;
+    console.info('[soundboard] buffer end', { userId, durationMs });
     source.disconnect();
     gain.disconnect();
     endPlay(play);
@@ -213,6 +215,7 @@ function playBuffer(buffer: AudioBuffer, base: number, userId: string, onEnded?:
   };
   source.onended = finish;
   startPlay(play);
+  console.info('[soundboard] buffer start', { userId, durationMs });
   void (async () => {
     await ensureRunning(context);
     await applySink(context);
@@ -242,6 +245,7 @@ function playLong(url: string, base: number, arrived: number | null, userId: str
   const finish = () => {
     if (done) return;
     done = true;
+    console.info('[soundboard] long end', { url, userId });
     if (timer) clearTimeout(timer);
     audio.onended = audio.onerror = audio.oncanplay = null;
     audio.pause();
@@ -276,6 +280,7 @@ function playLong(url: string, base: number, arrived: number | null, userId: str
     void audio.play().catch(finish);
   };
   startPlay(play);
+  console.info('[soundboard] long start', { url, userId });
   // Release a stream that never reaches canplay, even if the browser never reports an error.
   timer = setTimeout(finish, MAX_LONG_SECONDS * 1000);
   audio.load();
@@ -386,7 +391,8 @@ export async function playSound(sound: Sound): Promise<boolean> {
  * Nothing goes to the server when no sound is playing for the call.
  */
 export async function stopMySounds(): Promise<boolean> {
-  if (!get().myPlaying) return true;
+  const me = get().me?.id;
+  if (!get().myPlaying && !playing.some((play) => play.userId === me)) return true;
   return (await stopSoundboard()) !== null;
 }
 
@@ -407,8 +413,10 @@ export function previewSound(sound: Sound) {
   const request = { play: null as Play | null, volume: sound.volume };
   preview = request;
   set({ previewing: sound.id });
+  console.info('[soundboard] preview start', { soundId: sound.id, url: sound.url, durationMs: sound.durationMs });
   const ended = () => {
     if (preview !== request) return;
+    console.info('[soundboard] preview end', { soundId: sound.id, url: sound.url });
     preview = null;
     set({ previewing: null });
   };
@@ -455,6 +463,7 @@ const latestPlay = new Map<string, string>();
 /** Someone played a clip (the sender included): show it on their tile and, unless muted or deafened, hear it. */
 export function onSoundPlayed(event: SoundPlayedEvent) {
   if (!inCall(event.channelId)) return;
+  console.info('[soundboard] played', { soundId: event.soundId, userId: event.userId, durationMs: event.durationMs });
   set((s) => ({ soundPlays: { ...s.soundPlays, [event.userId]: Date.now() } }));
   // One sound per person at a time: a new one cuts off whatever they played before (other people's keep going),
   // including one still loading, which then never starts.
@@ -466,28 +475,34 @@ export function onSoundPlayed(event: SoundPlayedEvent) {
   };
   const mine = event.userId === get().me?.id;
   const at = Date.now();
+  const { deafened, soundboard } = get();
+  const hear = !deafened && !soundboard.muted;
   // Playing for the call replaces listening by yourself: never both at once.
   if (mine) stopPreview();
   // Your own clip sounds for the call whether or not you hear it yourself, so its state (the fill, the stop button)
-  // follows its length, not your speakers.
+  // follows the sound itself: the real end when you hear it, a long timer as a safety net, and its own length when
+  // the soundboard is muted or you're deafened.
   if (mine) {
     set({ myPlaying: { soundId: event.soundId, playId: event.playId, at, duration: event.durationMs } });
-    setTimeout(() => clearMyPlay(event.playId), Math.min(event.durationMs || MY_PLAY_FALLBACK, MAX_LONG_SECONDS * 1000));
+    setTimeout(
+      () => clearMyPlay(event.playId),
+      hear ? MAX_LONG_SECONDS * 1000 : Math.min(event.durationMs || MY_PLAY_FALLBACK, MAX_LONG_SECONDS * 1000),
+    );
   }
-  const { deafened, soundboard } = get();
-  if (deafened || soundboard.muted) return;
+  if (!hear) return;
+  const endMine = mine ? () => clearMyPlay(event.playId) : undefined;
   if (isLong(event.durationMs)) {
-    playLong(event.url, event.volume, at, event.userId);
+    playLong(event.url, event.volume, at, event.userId, endMine);
     return;
   }
   const cached = cachedBuffer(event.url);
   if (cached) {
-    playBuffer(cached, event.volume, event.userId);
+    playBuffer(cached, event.volume, event.userId, endMine);
     return;
   }
   void loadBuffer(event.url).then((buffer) => {
     if (!buffer || Date.now() - at > PLAY_DEADLINE || !current()) return;
-    playBuffer(buffer, event.volume, event.userId);
+    playBuffer(buffer, event.volume, event.userId, endMine);
   });
 }
 

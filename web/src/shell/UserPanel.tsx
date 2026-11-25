@@ -79,7 +79,7 @@ function VoiceStatus() {
         >
           <ScreenIcon />
         </WideButton>
-        <SoundboardButton look="panel" disabled={!connected} />
+        <SoundboardButton look="panel" stopsPlayback disabled={!connected} />
       </div>
     </div>
   );
