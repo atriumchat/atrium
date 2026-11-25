@@ -252,7 +252,11 @@ export function MediaStage({ fallback, renderControls }: {
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const [side, setSide] = useState(false);
   const [area, setArea] = useState<HTMLDivElement | null>(null);
+  const [full, setFull] = useState(!!document.fullscreenElement);
+  const [controlsVisible, setControlsVisible] = useState(true);
   const stage = useRef<HTMLDivElement>(null);
+  const overPanel = useRef(false);
+  const hideTimer = useRef<number | null>(null);
   const focused = screens.find((s) => trackKey(s) === focusKey) ?? screens[0];
   const cameraOf = new Map(cameras.map((c) => [c.participant.identity, c]));
   const fit = useTileGrid(area, focused ? 0 : participants.length);
@@ -266,22 +270,66 @@ export function MediaStage({ fallback, renderControls }: {
     ?? shown.find((participant) => cameraOf.has(participant.identity));
   const viewTrack = focused ?? (cameraParticipant && cameraOf.get(cameraParticipant.identity));
   const handleFullscreen = (exit = false) => {
-    const action = exit ? document.exitFullscreen() : stage.current?.requestFullscreen();
+    const action = exit ? document.exitFullscreen() : document.documentElement.requestFullscreen();
     void action?.catch(() => showError(t('voice.stream.windowError')));
   };
+  // In full screen the panel and the cursor step aside after a couple of quiet seconds; an open popup keeps them.
+  const wake = () => {
+    setControlsVisible(true);
+    if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+    hideTimer.current = window.setTimeout(() => {
+      hideTimer.current = null;
+      if (overPanel.current || document.querySelector('[role="dialog"], [role="menu"], [data-slot="dropdown-popover"]')) {
+        wake();
+        return;
+      }
+      setControlsVisible(false);
+    }, 2500);
+  };
+
+  useEffect(() => {
+    const onChange = () => setFull(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  useEffect(() => {
+    if (!full) {
+      setControlsVisible(true);
+      overPanel.current = false;
+      return;
+    }
+    wake();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [full]);
+
+  useEffect(() => () => {
+    if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+  }, []);
+
   const viewActions = viewTrack && (
     <>
       <StreamWindow key={trackKey(viewTrack)} stage={stage} trackRef={viewTrack} />
       {document.fullscreenEnabled && (
-        <CallBarButton label={t('voice.stream.fullscreen')} onPress={() => handleFullscreen()}><ArrowsPointingOutIcon /></CallBarButton>
+        <CallBarButton
+          label={t(full ? 'voice.stream.exitFullscreen' : 'voice.stream.fullscreen')}
+          onPress={() => handleFullscreen(full)}
+        >
+          {full ? <ArrowsPointingInIcon /> : <ArrowsPointingOutIcon />}
+        </CallBarButton>
       )}
     </>
   );
 
   return (
-    <>
+    <div
+      className={full ? `fixed inset-0 z-[40] flex flex-col bg-window ${controlsVisible ? '' : 'cursor-none'}` : 'contents'}
+      onMouseMove={full ? wake : undefined}
+      onPointerDown={full ? wake : undefined}
+      onKeyDown={full ? wake : undefined}
+    >
       {fallback ?? (
-        <div ref={stage} className="group/media relative flex min-h-0 flex-1 bg-window">
+        <div ref={stage} className="relative flex min-h-0 flex-1 bg-window">
           <div className="flex min-w-0 flex-1 flex-col">
             {focused ? (
               <>
@@ -330,13 +378,16 @@ export function MediaStage({ fallback, renderControls }: {
             )}
           </div>
           {side && <CallPeople participants={ordered} onClose={() => setSide(false)} />}
-          <div className="absolute right-3 top-3 z-10 hidden group-[:fullscreen]/media:block">
-            <CallBarButton label={t('voice.stream.exitFullscreen')} onPress={() => handleFullscreen(true)}><ArrowsPointingInIcon /></CallBarButton>
-          </div>
         </div>
       )}
-      {renderControls(fallback ? undefined : viewActions)}
-    </>
+      <div
+        className={full ? `absolute inset-x-0 bottom-0 transition-opacity duration-200 ${controlsVisible ? '' : 'pointer-events-none opacity-0'}` : 'contents'}
+        onPointerEnter={full ? () => { overPanel.current = true; } : undefined}
+        onPointerLeave={full ? () => { overPanel.current = false; } : undefined}
+      >
+        {renderControls(fallback ? undefined : viewActions)}
+      </div>
+    </div>
   );
 }
 
