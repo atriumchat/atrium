@@ -827,7 +827,7 @@ function TypingLine({ channelId, onVisibilityChange }: { channelId: string; onVi
 type ComposerHandle = { addFiles: (files: File[]) => void };
 
 /** An attached picture or file: shown at once, sendable once the upload has finished. */
-type PendingFile = { key: string; name: string; size: number; preview?: string; upload?: Upload };
+type PendingFile = { key: string; name: string; size: number; image?: boolean; preview?: string; upload?: Upload };
 
 type MentionOption = { id: string; label: string; user?: User };
 
@@ -839,6 +839,11 @@ useStore.subscribe((state, previous) => {
 
 function revokePreview(file: PendingFile) {
   if (file.preview?.startsWith('blob:')) URL.revokeObjectURL(file.preview);
+}
+
+/** iPhone photos: browsers report no type for them, so the extension is what says it's a picture. */
+function isHeic(file: File) {
+  return file.type === 'image/heic' || file.type === 'image/heif' || /\.(heic|heif)$/i.test(file.name);
 }
 
 /*
@@ -972,8 +977,11 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
     if (accepted.length < files.length) showError(t('chat.maxAttachments', { n: MAX_ATTACHMENTS }));
     for (const file of accepted) {
       const key = crypto.randomUUID();
-      const preview = file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined;
-      setPending((list) => [...list, { key, name: file.name, size: file.size, preview }]);
+      const heic = isHeic(file);
+      const image = file.type.startsWith('image/') || heic;
+      // Neither Chrome nor Electron can show HEIC: no local blob, the server's WebP comes back after the upload.
+      const preview = image && !heic ? URL.createObjectURL(file) : undefined;
+      setPending((list) => [...list, { key, name: file.name, size: file.size, image, preview }]);
       api.upload(file).then(
         (upload) => setPending((list) => list.map((p) => (p.key === key ? { ...p, upload } : p))),
         (e) => {
@@ -1085,33 +1093,36 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
         )}
         {hasPending && (
           <div className="flex gap-2 overflow-x-auto px-3 pt-3">
-            {pending.map((p) => (
-              <div key={p.key} className={`relative shrink-0 overflow-hidden bg-window ${p.preview ? 'h-24 w-24 rounded-card' : 'flex h-24 w-44 flex-col justify-center gap-1 rounded-compact px-3'}`}>
-                {p.preview ? (
-                  <img src={p.preview} alt="" className={`h-full w-full object-cover transition-opacity ${p.upload ? '' : 'opacity-50'}`} />
-                ) : (
-                  <>
-                    <PaperclipIcon size={18} className="text-muted" />
-                    <span className="truncate text-[13px] text-foreground">{p.name}</span>
-                    <span className="text-[12px] text-faint">{fileSize(p.size)}</span>
-                  </>
-                )}
-                {!p.upload && (
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-                    <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                  </span>
-                )}
-                <button
-                  type="button"
-                  aria-label={t('chat.removeFile', { name: p.name })}
-                  disabled={!!sending}
-                  onClick={() => remove(p)}
-                  className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
-                >
-                  <XIcon size={14} strokeWidth={3} />
-                </button>
-              </div>
-            ))}
+            {pending.map((p) => {
+              const preview = p.preview ?? (p.image && p.upload ? (p.upload.previewUrl ?? p.upload.url) : undefined);
+              return (
+                <div key={p.key} className={`relative shrink-0 overflow-hidden bg-window ${p.image ? 'h-24 w-24 rounded-card' : 'flex h-24 w-44 flex-col justify-center gap-1 rounded-compact px-3'}`}>
+                  {preview ? (
+                    <img src={preview} alt="" className={`h-full w-full object-cover transition-opacity ${p.upload ? '' : 'opacity-50'}`} />
+                  ) : !p.image ? (
+                    <>
+                      <PaperclipIcon size={18} className="text-muted" />
+                      <span className="truncate text-[13px] text-foreground">{p.name}</span>
+                      <span className="text-[12px] text-faint">{fileSize(p.size)}</span>
+                    </>
+                  ) : null}
+                  {!p.upload && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/30">
+                      <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    aria-label={t('chat.removeFile', { name: p.name })}
+                    disabled={!!sending}
+                    onClick={() => remove(p)}
+                    className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                  >
+                    <XIcon size={14} strokeWidth={3} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
         <div className="flex min-h-12 min-w-0 items-end gap-2 p-1.5">

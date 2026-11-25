@@ -11,3 +11,6 @@ python-socketio==5.17.0
 python-engineio==4.14.0
 PyJWT==2.10.1
 Pillow==12.3.0
+# iPhone photos are HEIC and Pillow has no HEIF reader of its own: without one such a photo is kept as a plain file
+# with no preview. The read-only build from the pillow-heif authors, so no x265 encoder to ship.
+pi-heif==1.4.0

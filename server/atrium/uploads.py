@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from PIL import Image, ImageOps, ImageSequence, UnidentifiedImageError
+from pi_heif import register_heif_opener
 
 from .config import (
     ANIMATION_MAX_SIDE,
@@ -37,6 +38,7 @@ from .media import remove_media_files
 
 
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
+register_heif_opener()  # teaches Pillow to open HEIC/HEIF (iPhone photos), for avatars and chat pictures alike
 
 router = APIRouter()
 
@@ -209,6 +211,9 @@ async def upload_file_or_image(request: Request, name: str = "", user: dict = De
         raise ApiError(400, "emptyFile", "Пустой файл")
     check_upload_room(user["id"], len(data))
     content_type = request.headers.get("content-type", "")
+    # iPhones hand HEIC photos over with no type at all, or a generic one: the extension is the only clue.
+    if content_type in ("", "application/octet-stream") and name.lower().endswith((".heic", ".heif")):
+        content_type = "image/heic"
     if content_type.startswith("image/") and content_type != "image/svg+xml" and len(data) <= MAX_IMAGE_UPLOAD:
         try:
             # Decoding a big photo takes a while; keep it off the event loop that also runs chat and presence.

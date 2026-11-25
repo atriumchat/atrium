@@ -96,7 +96,8 @@ export const api = {
     request<Upload>(`/api/uploads?name=${encodeURIComponent(file.name)}`, {
       method: 'POST',
       body: file,
-      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      // Browsers report no type for HEIC: without one the server keeps the photo as a plain file.
+      headers: { 'Content-Type': file.type || (/\.(heic|heif)$/i.test(file.name) ? 'image/heic' : 'application/octet-stream') },
     }),
   friends: () => request<Friend[]>('/api/friends'),
   addFriend: (name: string) => request<Friend[]>('/api/friends', post({ name })),
