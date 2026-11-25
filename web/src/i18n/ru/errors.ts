@@ -87,6 +87,7 @@ export const errors = {
   'err.memberAbove': 'Этот участник не ниже вас',
   'err.rolesChanged': 'Список ролей изменился',
   'err.badSound': 'Звук не подходит',
+  'err.badSegment': 'Неверный отрезок',
   'err.soundTooBig': 'Звук больше 512 КБ',
   'err.tooManySounds': 'Не больше {n} звуков',
   'err.noSound': 'Нет такого звука',

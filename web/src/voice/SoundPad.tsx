@@ -59,10 +59,18 @@ const PLAYED_FOR = 2500;
 /** Clips longer than this show their length on the pill. */
 const LONG_MS = 10_000;
 const MAX_MS = 240_000;
+/** A segment of a track is never shorter than this. */
+const MIN_SEGMENT = 500;
 
 function clock(ms: number) {
   const s = Math.round(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** м:сс.д, for the segment's two marks: tenths matter when a track is cut by ear. */
+function clockTenths(ms: number) {
+  const tenths = Math.round(ms / 100);
+  return `${Math.floor(tenths / 600)}:${String(Math.floor((tenths % 600) / 10)).padStart(2, "0")}.${tenths % 10}`;
 }
 
 type DialogState =
@@ -88,14 +96,23 @@ const BUTTON_ENABLED =
 export function SoundboardButton({
   look,
   disabled = false,
+  stopsPlayback = false,
 }: {
   look: keyof typeof BUTTON;
   disabled?: boolean;
+  /** The panel's button: while your own clip is sounding it is a stop, not a way into the panel. */
+  stopsPlayback?: boolean;
 }) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const [dialog, setDialog] = useState<DialogState>(null);
   const label = t("voice.soundboard.label");
+  const playingId = useStore((s) =>
+    stopsPlayback ? s.myPlaying?.soundId ?? null : null,
+  );
+  const playingName = useStore((s) =>
+    playingId ? s.mySounds.find((x) => x.id === playingId)?.name ?? "" : "",
+  );
 
   useEffect(() => {
     if (open) return () => stopPreview();
@@ -106,9 +123,25 @@ export function SoundboardButton({
     setOpen(false);
     setDialog(next);
   }
-  function hide() {
+  /** A saved clip closes the window for good; cancel, the cross and Esc bring the panel back. */
+  function hide(reopen = true) {
     setDialog(null);
-    setOpen(true);
+    if (reopen) setOpen(true);
+  }
+
+  if (playingId) {
+    const stop = t("voice.soundboard.stopForCall", { name: playingName });
+    return (
+      <button
+        type="button"
+        aria-label={stop}
+        title={stop}
+        onClick={() => void stopMySounds()}
+        className={`${BUTTON[look]} ${BUTTON_ENABLED}`}
+      >
+        <StopIcon size={20} />
+      </button>
+    );
   }
 
   const face = <SoundboardIcon size={20} />;
@@ -157,9 +190,15 @@ export function SoundboardButton({
   return (
     <>
       {trigger}
-      {dialog?.kind === "add" && <SoundDialog onClose={hide} />}
+      {dialog?.kind === "add" && (
+        <SoundDialog onClose={hide} onSaved={() => hide(false)} />
+      )}
       {dialog?.kind === "edit" && (
-        <SoundDialog sound={dialog.sound} onClose={hide} />
+        <SoundDialog
+          sound={dialog.sound}
+          onClose={hide}
+          onSaved={() => hide(false)}
+        />
       )}
       {dialog?.kind === "delete" && (
         <ConfirmDialog
@@ -210,7 +249,7 @@ function Panel({
   const sections: { id: SectionId; title: string }[] = [];
   if (favorite.length > 0)
     sections.push({ id: "favorites", title: t("voice.soundboard.favorites") });
-  if (shown.length > 0 || canAdd)
+  if (shown.length > 0)
     sections.push({ id: "mine", title: t("voice.soundboard.mine") });
   const active = sections.some((s) => s.id === current)
     ? current
@@ -300,6 +339,16 @@ function Panel({
           </button>
         )}
         <VolumeButton />
+        <button
+          type="button"
+          aria-label={t("voice.soundboard.add")}
+          title={t("voice.soundboard.add")}
+          disabled={!canAdd}
+          onClick={onAdd}
+          className="flex size-10 shrink-0 items-center justify-center rounded-row text-muted outline-none transition-colors hover:bg-white/[0.08] hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40"
+        >
+          <PlusIcon size={18} />
+        </button>
       </div>
       <div className="flex">
         {sections.length > 0 && (
@@ -352,18 +401,6 @@ function Panel({
               }}
             >
               {s.id === "favorites" ? favorite.map(tile) : shown.map(tile)}
-              {s.id === "mine" && canAdd && (
-                <button
-                  type="button"
-                  onClick={onAdd}
-                  className="flex h-10 w-full items-center justify-center gap-1.5 rounded-row border border-dashed border-white/20 px-2 text-[13px] text-muted outline-none transition-colors hover:border-white/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus"
-                >
-                  <PlusIcon size={14} className="shrink-0" />
-                  <span className="min-w-0 text-center leading-tight">
-                    {t("voice.soundboard.add")}
-                  </span>
-                </button>
-              )}
             </Section>
           ))}
         </div>
@@ -519,7 +556,14 @@ function SoundTile({
           render={(props) => <button {...props} />}
           type="button"
           aria-label={broadcast}
-          onClick={() => {
+          onClick={(e) => {
+            e.currentTarget.blur();
+            console.info("[soundboard] tile", {
+              soundId: sound.id,
+              userId: sound.userId,
+              durationMs: sound.durationMs,
+              how: e.detail === 0 ? "key" : "click",
+            });
             if (playing) void stopMySounds();
             else {
               stopPreview();
@@ -613,15 +657,20 @@ function MenuItem({
 function SoundDialog({
   sound,
   onClose,
+  onSaved,
 }: {
   sound?: Sound;
   onClose: () => void;
+  /** Saved: the window closes for good, unlike cancel, the cross or Esc. */
+  onSaved?: () => void;
 }) {
   const { t } = useT();
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [fileMs, setFileMs] = useState<number | null>(null);
+  /** The part of the picked file that will be kept, in ms (start, end). */
+  const [segment, setSegment] = useState<[number, number]>([0, 0]);
   const [name, setName] = useState(sound?.name ?? "");
   const [named, setNamed] = useState(false);
   const [emoji, setEmoji] = useState(sound?.emoji ?? "");
@@ -649,6 +698,26 @@ function SoundDialog({
   const label = name.trim();
   const ready =
     !!label && !busy && (sound ? true : !!file && !fileError && !checking);
+  const maxSegment = fileMs ?? 0;
+  const chosen = segment[1] > segment[0] ? { fromMs: segment[0], toMs: segment[1] } : undefined;
+
+  /** The segment keeps its limits: the other handle follows when one is pulled past them. */
+  function moveSegment(value: number | number[]) {
+    const next = Array.isArray(value) ? value : [value, segment[1]];
+    const movedStart = next[0] !== segment[0];
+    let [from, to] = next;
+    if (to - from > MAX_MS) {
+      if (movedStart) to = from + MAX_MS;
+      else from = to - MAX_MS;
+    }
+    if (to - from < MIN_SEGMENT) {
+      if (movedStart) to = from + MIN_SEGMENT;
+      else from = to - MIN_SEGMENT;
+    }
+    from = Math.max(0, Math.min(from, Math.max(0, maxSegment - MIN_SEGMENT)));
+    to = Math.min(maxSegment, Math.max(to, from + Math.min(MIN_SEGMENT, maxSegment)));
+    setSegment([from, to]);
+  }
 
   async function pick(e: ChangeEvent<HTMLInputElement>) {
     const picked = e.target.files?.[0];
@@ -659,6 +728,7 @@ function SoundDialog({
     setFile(picked);
     setFileError(null);
     setFileMs(null);
+    setSegment([0, 0]);
     setChecking(true);
     if (!named) setName(picked.name.replace(/\.[^.]*$/, "").slice(0, MAX_NAME));
     const problem = await checkSoundFile(picked);
@@ -667,6 +737,7 @@ function SoundDialog({
     if (id !== checkId.current) return;
     setFileError(problem);
     setFileMs(ms);
+    setSegment([0, Math.min(ms ?? 0, MAX_MS)]);
     setChecking(false);
   }
 
@@ -680,17 +751,20 @@ function SoundDialog({
       if (local.current) URL.revokeObjectURL(local.current.url);
       local.current = { file, url: URL.createObjectURL(file) };
     }
-    listened.current = previewSound({
-      id: "",
-      userId: "",
-      name,
-      emoji,
-      volume,
-      createdAt: 0,
-      // Unknown length: stream it like a long clip rather than decode a whole file in memory.
-      durationMs: fileMs || LONG_MS + 1,
-      url: local.current.url,
-    });
+    listened.current = previewSound(
+      {
+        id: "",
+        userId: "",
+        name,
+        emoji,
+        volume,
+        createdAt: 0,
+        // Unknown length: stream it like a long clip rather than decode a whole file in memory.
+        durationMs: fileMs || LONG_MS + 1,
+        url: local.current.url,
+      },
+      chosen,
+    );
   }
 
   async function submit() {
@@ -699,8 +773,8 @@ function SoundDialog({
     setBusy(true);
     const ok = sound
       ? await editSound(sound.id, { name: label, emoji, volume })
-      : !!file && (await addSound(file, label, emoji, volume));
-    if (ok) onClose();
+      : !!file && (await addSound(file, label, emoji, volume, chosen));
+    if (ok) (onSaved ?? onClose)();
     else setBusy(false);
   }
 
@@ -752,10 +826,25 @@ function SoundDialog({
             >
               {fileError ?? t("voice.soundboard.limits")}
             </p>
-            {!fileError && fileMs !== null && fileMs > MAX_MS && (
-              <p className="mt-1 text-[13px] text-muted">
-                {t("voice.soundboard.trimmed")}
-              </p>
+            {!fileError && fileMs !== null && fileMs > 0 && (
+              <Slider
+                value={segment}
+                onChange={moveSegment}
+                minValue={0}
+                maxValue={fileMs}
+                step={100}
+                className="mt-4 w-full"
+              >
+                <Label>{t("voice.soundboard.segment")}</Label>
+                <Slider.Output className="text-[13px] tabular-nums text-muted">
+                  {clockTenths(segment[0])} – {clockTenths(segment[1])}
+                </Slider.Output>
+                <Slider.Track>
+                  <Slider.Fill />
+                  <Slider.Thumb index={0} />
+                  <Slider.Thumb index={1} />
+                </Slider.Track>
+              </Slider>
             )}
             <input
               ref={input}

@@ -190,7 +190,7 @@ export const voice = {
   'voice.soundboard.pick': 'Выбрать файл',
   'voice.soundboard.noFile': 'Файл не выбран',
   'voice.soundboard.limits': 'До 50 МБ, до 4 минут',
-  'voice.soundboard.trimmed': 'Останутся первые 4 минуты',
+  'voice.soundboard.segment': 'Отрезок',
   'voice.soundboard.stop': 'Остановить',
   'voice.soundboard.name': 'Название',
   'voice.soundboard.emoji': 'Эмодзи',

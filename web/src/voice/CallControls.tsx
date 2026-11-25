@@ -15,9 +15,10 @@ import type { Channel } from '../types';
 import { InviteToRoom } from '../shell/ChannelMenu';
 import { DeviceMenu } from '../shell/SettingsMenu';
 import { SettingsDialog } from '../shell/SettingsDialog';
-import { HeadphonesIcon, HeadphonesSlashIcon, MicIcon, MicSlashIcon } from '../ui/icons';
+import { HeadphonesIcon, HeadphonesSlashIcon, MicIcon, MicSlashIcon, StopIcon } from '../ui/icons';
 import type { DeviceKind } from './devices';
 import { SoundboardButton } from './SoundPad';
+import { stopMySounds } from './soundboard';
 import { canShareScreen, leaveVoice, screenSource, switchScreenSource, toggleCamera, toggleDeafen, toggleMute, toggleScreenShare } from './voice';
 
 const item = 'call-control @max-[23rem]:w-8 @max-[23rem]:min-w-8 [&_svg]:size-5';
@@ -82,6 +83,8 @@ export function CallControls({ className = '', channel, viewActions }: {
   const cameraPending = useStore((s) => s.cameraPending);
   const screenSharing = useStore((s) => s.screenSharing);
   const source = useStore((s) => s.screenSharing ? screenSource(s.room) : '');
+  const myPlaying = useStore((s) => s.myPlaying);
+  const mySounds = useStore((s) => s.mySounds);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -112,6 +115,7 @@ export function CallControls({ className = '', channel, viewActions }: {
     </DeviceControl>
   );
   const screenLabel = t(screenSharing ? 'voice.screen.stop' : 'voice.screen.start');
+  const playingName = myPlaying ? mySounds.find((x) => x.id === myPlaying.soundId)?.name ?? '' : '';
   const openVoiceSettings = () => {
     setMoreOpen(false);
     setSettingsOpen(true);
@@ -147,6 +151,11 @@ export function CallControls({ className = '', channel, viewActions }: {
                 </DeviceControl>
               </div>
               <div role="group" aria-label={t('voice.controls.actions')} className="flex shrink-0 items-center gap-0.5 border-l border-separator pl-2">
+                {myPlaying && (
+                  <CallBarButton label={t('voice.soundboard.stopForCall', { name: playingName })} onPress={() => void stopMySounds()}>
+                    <StopIcon />
+                  </CallBarButton>
+                )}
                 {!compact && canShareScreen && (
                   <CallBarButton label={screenLabel} pressed={screenSharing} onPress={toggleScreenShare}>
                     <ComputerDesktopIcon />

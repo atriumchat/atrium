@@ -194,7 +194,7 @@ export const voice = {
   'voice.soundboard.pick': 'Choose file',
   'voice.soundboard.noFile': 'No file chosen',
   'voice.soundboard.limits': 'Up to 50 MB, up to 4 minutes',
-  'voice.soundboard.trimmed': 'Only the first 4 minutes are kept',
+  'voice.soundboard.segment': 'Segment',
   'voice.soundboard.stop': 'Stop',
   'voice.soundboard.name': 'Name',
   'voice.soundboard.emoji': 'Emoji',

@@ -51,11 +51,12 @@ def probe_channels(path):
 
 @pytest.fixture(scope="session")
 def audio():
-    """A second of mono mp3 and wav, and seventy seconds of stereo mp3 to be cut down."""
+    """A second of mono mp3 and wav, seventy seconds of stereo mp3 to be cut down, and five seconds to pick a part of."""
     return {
         "mp3": make_audio("sine=frequency=440:duration=1", "mp3"),
         "wav": make_audio("sine=frequency=330:duration=1", "wav"),
         "long": make_audio("sine=frequency=220:duration=250", "mp3", "-ac", "2"),
+        "five": make_audio("sine=frequency=550:duration=5", "mp3"),
     }
 
 
@@ -109,12 +110,16 @@ def server(tmp_path, monkeypatch):
         yield client, people, emits
 
 
-def upload(client, session, data, name="Sound", emoji="", volume=None):
+def upload(client, session, data, name="Sound", emoji="", volume=None, start=None, end=None):
     params = {"name": name}
     if emoji:
         params["emoji"] = emoji
     if volume is not None:
         params["volume"] = volume
+    if start is not None:
+        params["start"] = start
+    if end is not None:
+        params["end"] = end
     return client.post("/api/sounds", params=params, content=data, headers=bearer(session))
 
 
@@ -180,6 +185,33 @@ def test_a_source_longer_than_four_minutes_is_trimmed(server, audio):
     assert 239_000 <= sound["durationMs"] <= 241_000
     stored = sounds.SOUND_DIR / f"{sound['id']}.ogg"
     assert probe_channels(stored) == 2, "a stereo source is kept stereo at 128 kbit/s"
+
+
+def test_a_picked_segment_is_what_is_kept(server, audio):
+    client, people, _ = server
+    sound = upload(client, people["admin"], audio["five"], name="Part", start=1000, end=3000).json()
+    assert abs(sound["durationMs"] - 2000) < 150
+    assert sound["trimmed"] is True
+    stored = sounds.SOUND_DIR / f"{sound['id']}.ogg"
+    assert stored.is_file()
+
+
+def test_a_segment_that_makes_no_sense_is_refused(server, audio):
+    client, people, _ = server
+    admin = people["admin"]
+    backward = upload(client, admin, audio["five"], name="Back", start=3000, end=1000)
+    assert backward.status_code == 400 and backward.json()["code"] == "badSegment"
+    empty = upload(client, admin, audio["five"], name="Empty", start=2000, end=2000)
+    assert empty.status_code == 400 and empty.json()["code"] == "badSegment"
+    too_long = upload(client, admin, audio["five"], name="Long", start=0, end=240_001)
+    assert too_long.status_code == 400 and too_long.json()["code"] == "badSegment"
+
+
+def test_a_segment_at_the_end_of_a_track_is_kept(server, audio):
+    client, people, _ = server
+    sound = upload(client, people["admin"], audio["five"], name="Tail", start=4000, end=5000).json()
+    assert abs(sound["durationMs"] - 1000) < 200
+    assert sound["trimmed"] is True
 
 
 def test_a_volume_that_is_not_a_number_becomes_full(server, audio):
