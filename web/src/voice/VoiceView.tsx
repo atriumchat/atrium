@@ -252,8 +252,14 @@ export function MediaStage({ fallback, renderControls }: {
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const [side, setSide] = useState(false);
   const [area, setArea] = useState<HTMLDivElement | null>(null);
+  const [full, setFull] = useState(!!document.fullscreenElement);
+  const [controlsVisible, setControlsVisible] = useState(true);
   const stage = useRef<HTMLDivElement>(null);
-  const focused = screens.find((s) => trackKey(s) === focusKey) ?? screens[0];
+  const overPanel = useRef(false);
+  const hideTimer = useRef<number | null>(null);
+  // A screen share or a camera can be brought up big; the first screen share is the default.
+  const pinnable = [...screens, ...cameras];
+  const focused = pinnable.find((x) => trackKey(x) === focusKey) ?? screens[0];
   const cameraOf = new Map(cameras.map((c) => [c.participant.identity, c]));
   const fit = useTileGrid(area, focused ? 0 : participants.length);
   // Only when they don't all fit does the order matter: cameras first, then talking, the rest as they came.
@@ -265,56 +271,112 @@ export function MediaStage({ fallback, renderControls }: {
   const cameraParticipant = shown.find((participant) => !participant.isLocal && cameraOf.has(participant.identity))
     ?? shown.find((participant) => cameraOf.has(participant.identity));
   const viewTrack = focused ?? (cameraParticipant && cameraOf.get(cameraParticipant.identity));
+  // A click on what's already big goes back to the grid (or stays on the first screen share when there is one).
+  const focusOn = (track: TrackReference) =>
+    setFocusKey(focused && trackKey(track) === trackKey(focused) ? null : trackKey(track));
   const handleFullscreen = (exit = false) => {
-    const action = exit ? document.exitFullscreen() : stage.current?.requestFullscreen();
+    const action = exit ? document.exitFullscreen() : document.documentElement.requestFullscreen();
     void action?.catch(() => showError(t('voice.stream.windowError')));
   };
+  // In full screen the panel and the cursor step aside after a couple of quiet seconds; an open popup keeps them.
+  const wake = () => {
+    setControlsVisible(true);
+    if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+    hideTimer.current = window.setTimeout(() => {
+      hideTimer.current = null;
+      if (overPanel.current || document.querySelector('[role="dialog"], [role="menu"], [data-slot="dropdown-popover"]')) {
+        wake();
+        return;
+      }
+      setControlsVisible(false);
+    }, 2500);
+  };
+
+  useEffect(() => {
+    const onChange = () => setFull(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  useEffect(() => {
+    if (!full) {
+      setControlsVisible(true);
+      overPanel.current = false;
+      return;
+    }
+    wake();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [full]);
+
+  useEffect(() => () => {
+    if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+  }, []);
+
   const viewActions = viewTrack && (
     <>
       <StreamWindow key={trackKey(viewTrack)} stage={stage} trackRef={viewTrack} />
       {document.fullscreenEnabled && (
-        <CallBarButton label={t('voice.stream.fullscreen')} onPress={() => handleFullscreen()}><ArrowsPointingOutIcon /></CallBarButton>
+        <CallBarButton
+          label={t(full ? 'voice.stream.exitFullscreen' : 'voice.stream.fullscreen')}
+          onPress={() => handleFullscreen(full)}
+        >
+          {full ? <ArrowsPointingInIcon /> : <ArrowsPointingOutIcon />}
+        </CallBarButton>
       )}
     </>
   );
 
   return (
-    <>
+    <div
+      className={full ? `fixed inset-0 z-[40] flex flex-col bg-window ${controlsVisible ? '' : 'cursor-none'}` : 'contents'}
+      onMouseMove={full ? wake : undefined}
+      onPointerDown={full ? wake : undefined}
+      onKeyDown={full ? wake : undefined}
+    >
       {fallback ?? (
-        <div ref={stage} className="group/media relative flex min-h-0 flex-1 bg-window">
+        <div ref={stage} className="relative flex min-h-0 flex-1 bg-window">
           <div className="flex min-w-0 flex-1 flex-col">
             {focused ? (
               <>
                 <div className="min-h-0 flex-1 px-(--app-pane-inset)">
                   <ScreenStage trackRef={focused} />
                 </div>
-                {/* Everyone else in a strip under it, scrolled sideways when it's longer than the window. */}
+                {/* Every screen share, then everyone: a click on a thumbnail brings that track up, the big one carries a ring. */}
                 <div className="no-scrollbar flex shrink-0 justify-center gap-2 overflow-x-auto px-(--app-pane-inset) pt-2">
-                  {screens.length > 1 &&
-                    screens.map((s) => (
-                      <button
-                        key={trackKey(s)}
-                        onClick={() => setFocusKey(trackKey(s))}
-                        aria-label={t('voice.stream.show')}
-                        className={`h-[90px] w-[160px] shrink-0 overflow-hidden rounded-row bg-black ${trackKey(s) === trackKey(focused) ? 'ring-2 ring-inset ring-white' : ''}`}
-                      >
-                        <VideoTrack trackRef={s} className="h-full w-full object-cover" />
-                      </button>
-                    ))}
-                  {participants.map((p) => (
-                    <div key={p.identity} className="h-[90px] w-[160px] shrink-0">
-                      <Tile participant={p} camera={cameraOf.get(p.identity)} height={90} />
-                    </div>
+                  {screens.map((s) => (
+                    <button
+                      key={trackKey(s)}
+                      onClick={() => focusOn(s)}
+                      aria-label={t('voice.stream.show')}
+                      className={`h-[90px] w-[160px] shrink-0 overflow-hidden rounded-row bg-black ${focused && trackKey(s) === trackKey(focused) ? 'ring-2 ring-inset ring-white' : ''}`}
+                    >
+                      <VideoTrack trackRef={s} className="h-full w-full object-cover" />
+                    </button>
                   ))}
+                  {participants.map((p) => {
+                    const camera = cameraOf.get(p.identity);
+                    const isFocused = !!camera && !!focused && trackKey(camera) === trackKey(focused);
+                    return (
+                      <div
+                        key={p.identity}
+                        className={`h-[90px] w-[160px] shrink-0 rounded-surface ${isFocused ? 'ring-2 ring-inset ring-white' : ''}`}
+                      >
+                        <Tile participant={p} camera={camera} height={90} onSelect={camera ? () => focusOn(camera) : undefined} />
+                      </div>
+                    );
+                  })}
                 </div>
               </>
             ) : (
               <div ref={setArea} className="flex min-h-0 flex-1 flex-wrap content-center justify-center gap-2 px-(--app-pane-inset)">
-                {shown.map((p) => (
-                  <div key={p.identity} className="shrink-0" style={{ width: fit.tileW, height: fit.tileH }}>
-                    <Tile participant={p} camera={cameraOf.get(p.identity)} height={fit.tileH} />
-                  </div>
-                ))}
+                {shown.map((p) => {
+                  const camera = cameraOf.get(p.identity);
+                  return (
+                    <div key={p.identity} className="shrink-0" style={{ width: fit.tileW, height: fit.tileH }}>
+                      <Tile participant={p} camera={camera} height={fit.tileH} onSelect={camera ? () => focusOn(camera) : undefined} />
+                    </div>
+                  );
+                })}
                 {hidden.length > 0 && (
                   <button
                     onClick={() => setSide(true)}
@@ -330,13 +392,16 @@ export function MediaStage({ fallback, renderControls }: {
             )}
           </div>
           {side && <CallPeople participants={ordered} onClose={() => setSide(false)} />}
-          <div className="absolute right-3 top-3 z-10 hidden group-[:fullscreen]/media:block">
-            <CallBarButton label={t('voice.stream.exitFullscreen')} onPress={() => handleFullscreen(true)}><ArrowsPointingInIcon /></CallBarButton>
-          </div>
         </div>
       )}
-      {renderControls(fallback ? undefined : viewActions)}
-    </>
+      <div
+        className={full ? `absolute inset-x-0 bottom-0 transition-opacity duration-200 ${controlsVisible ? '' : 'pointer-events-none opacity-0'}` : 'contents'}
+        onPointerEnter={full ? () => { overPanel.current = true; } : undefined}
+        onPointerLeave={full ? () => { overPanel.current = false; } : undefined}
+      >
+        {renderControls(fallback ? undefined : viewActions)}
+      </div>
+    </div>
   );
 }
 
@@ -384,11 +449,16 @@ function CallPeople({ participants, onClose }: { participants: Participant[]; on
 function ScreenStage({ trackRef }: { trackRef: TrackReference }) {
   const { t } = useT();
   const user = useStore((s) => s.users[trackRef.participant.identity]);
+  // A camera is not a broadcast: no tag, and your own frame stays mirrored like the tile.
+  const camera = trackRef.source === Track.Source.Camera;
   return (
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-surface bg-black">
-      <VideoTrack trackRef={trackRef} className="h-full w-full object-contain" />
+      <VideoTrack
+        trackRef={trackRef}
+        className={`h-full w-full object-contain ${camera && trackRef.participant.isLocal ? '-scale-x-100' : ''}`}
+      />
       <div className="absolute left-3 top-3 flex items-center gap-2 rounded-fine bg-black/60 px-2.5 py-1 text-[13px] font-medium text-white">
-        <span className="rounded-[4px] bg-danger px-1 text-[11px] font-bold uppercase leading-4">{t('voice.stream.live')}</span>
+        {!camera && <span className="rounded-[4px] bg-danger px-1 text-[11px] font-bold uppercase leading-4">{t('voice.stream.live')}</span>}
         {user?.name ?? trackRef.participant.name}
       </div>
     </div>
@@ -407,24 +477,42 @@ function DeviceVideo({ track }: { track: MediaStreamTrack }) {
 /**
  * A person's tile: one plain fill with their face sized to the tile (about 40% of its height), or their camera; whoever
  * talks gets a white stroke on the inside of the edge; the name, with the mic, in a tag at the foot. A tap on someone
- * else's tile sets their volume.
+ * else's tile sets their volume; their camera, when they have one, comes up big instead, and the volume moves to the
+ * speaker button or the right-click.
  */
-function Tile({ participant, camera, height }: { participant: Participant; camera?: TrackReference; height: number }) {
+function Tile({ participant, camera, height, onSelect }: {
+  participant: Participant;
+  camera?: TrackReference;
+  height: number;
+  onSelect?: () => void;
+}) {
   const { t } = useT();
   const speaking = useIsSpeaking(participant);
   const user = useStore((s) => s.users[participant.identity]);
   const entry = useStore((s) =>
     (s.calls[s.voiceChannelId ?? '']?.participants ?? s.voiceState).find((e) => e.userId === participant.identity),
   );
+  const [volumeOpen, setVolumeOpen] = useState(false);
   const name = user?.name ?? participant.name ?? '';
   const label = `${name}${participant.isLocal ? ` ${t('voice.you')}` : ''}`;
   // Your camera on its way: straight from the device, or a dark tile until the device opens.
   const pending = useStore((s) => s.cameraPending) && participant.isLocal && !camera;
   const preview = useStore((s) => s.cameraPreview);
   const small = height < 120;
+  const remote = participant instanceof RemoteParticipant;
+  const handleClick = onSelect ?? (remote ? () => setVolumeOpen(true) : undefined);
+  // The speaker button owns the corner; the sound mark steps aside so the two never sit on top of each other.
+  const markPlace = remote
+    ? (small ? 'right-8 top-1.5 size-5' : 'right-11 top-2.5 size-7')
+    : (small ? 'right-1.5 top-1.5 size-5' : 'right-2.5 top-2.5 size-7');
 
-  const tile = (
-    <div className={`relative flex h-full w-full items-center justify-center overflow-hidden rounded-surface ${pending || camera ? 'bg-black' : 'bg-[#18181b]'}`}>
+  return (
+    <div
+      className={`group relative flex h-full w-full items-center justify-center overflow-hidden rounded-surface ${pending || camera ? 'bg-black' : 'bg-[#18181b]'} ${handleClick ? 'cursor-pointer' : ''}`}
+      // The volume popover is portalled but its clicks still bubble here through React: only the tile itself counts.
+      onClick={handleClick ? (e) => { if (e.currentTarget.contains(e.target as Node)) handleClick(); } : undefined}
+      onContextMenu={remote ? (e) => { e.preventDefault(); setVolumeOpen(true); } : undefined}
+    >
       {pending ? (
         preview ? <DeviceVideo track={preview} /> : <Spinner size={small ? 'sm' : 'md'} color="current" className="text-white/60" />
       ) : camera ? (
@@ -438,7 +526,7 @@ function Tile({ participant, camera, height }: { participant: Participant; camer
       <SoundPlayedMark
         userId={participant.identity}
         size={small ? 12 : 14}
-        className={`absolute items-center justify-center rounded-full bg-black/55 text-white ${small ? 'right-1.5 top-1.5 size-5' : 'right-2.5 top-2.5 size-7'}`}
+        className={`absolute items-center justify-center rounded-full bg-black/55 text-white ${markPlace}`}
       />
       <div
         className={`absolute flex max-w-[calc(100%-16px)] items-center gap-1.5 rounded-full bg-black/55 font-medium text-white ${small ? 'bottom-1.5 left-1.5 px-2 py-0.5 text-[12px]' : 'bottom-2.5 left-2.5 px-2.5 py-1 text-[13px]'}`}
@@ -452,20 +540,22 @@ function Tile({ participant, camera, height }: { participant: Participant; camer
         )}
         <span className="min-w-0 truncate">{label}</span>
       </div>
+      {remote && (
+        <Popover isOpen={volumeOpen} onOpenChange={setVolumeOpen}>
+          <Popover.Trigger
+            aria-label={t('voice.volume', { name })}
+            onClick={(e) => e.stopPropagation()}
+            className={`absolute z-10 grid shrink-0 place-items-center rounded-full bg-black/55 text-white outline-none transition-opacity ${volumeOpen ? '' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'} ${small ? 'right-1.5 top-1.5 size-5' : 'right-2.5 top-2.5 size-7'}`}
+          >
+            <SpeakerWaveIcon className={small ? 'size-3' : 'size-3.5'} aria-hidden="true" />
+          </Popover.Trigger>
+          <Popover.Content placement="bottom end" className="w-64">
+            <Popover.Dialog className="p-5">
+              <VolumeSlider userId={participant.identity} name={name} />
+            </Popover.Dialog>
+          </Popover.Content>
+        </Popover>
+      )}
     </div>
-  );
-
-  if (!(participant instanceof RemoteParticipant)) return tile;
-  return (
-    <Popover>
-      <Popover.Trigger aria-label={t('voice.volume', { name })} className="block h-full w-full cursor-pointer rounded-surface outline-none">
-        {tile}
-      </Popover.Trigger>
-      <Popover.Content placement="bottom" className="w-64">
-        <Popover.Dialog className="p-5">
-          <VolumeSlider userId={participant.identity} name={name} />
-        </Popover.Dialog>
-      </Popover.Content>
-    </Popover>
   );
 }
