@@ -530,7 +530,11 @@ export function onSoundPlayed(event: SoundPlayedEvent) {
     return;
   }
   void loadBuffer(event.url).then((buffer) => {
-    if (!buffer || Date.now() - at > PLAY_DEADLINE || !current()) return;
+    if (!buffer || Date.now() - at > PLAY_DEADLINE || !current()) {
+      // Never started here, but it still plays for the call: the stop button follows the clip's length instead.
+      if (endMine) setTimeout(endMine, Math.max(0, (event.durationMs || MY_PLAY_FALLBACK) - (Date.now() - at)));
+      return;
+    }
     playBuffer(buffer, event.volume, event.userId, endMine);
   });
 }
