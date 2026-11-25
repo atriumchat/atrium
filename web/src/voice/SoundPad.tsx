@@ -59,10 +59,18 @@ const PLAYED_FOR = 2500;
 /** Clips longer than this show their length on the pill. */
 const LONG_MS = 10_000;
 const MAX_MS = 240_000;
+/** A segment of a track is never shorter than this. */
+const MIN_SEGMENT = 500;
 
 function clock(ms: number) {
   const s = Math.round(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** м:сс.д, for the segment's two marks: tenths matter when a track is cut by ear. */
+function clockTenths(ms: number) {
+  const tenths = Math.round(ms / 100);
+  return `${Math.floor(tenths / 600)}:${String(Math.floor((tenths % 600) / 10)).padStart(2, "0")}.${tenths % 10}`;
 }
 
 type DialogState =
@@ -661,6 +669,8 @@ function SoundDialog({
   const [fileError, setFileError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [fileMs, setFileMs] = useState<number | null>(null);
+  /** The part of the picked file that will be kept, in ms (start, end). */
+  const [segment, setSegment] = useState<[number, number]>([0, 0]);
   const [name, setName] = useState(sound?.name ?? "");
   const [named, setNamed] = useState(false);
   const [emoji, setEmoji] = useState(sound?.emoji ?? "");
@@ -688,6 +698,26 @@ function SoundDialog({
   const label = name.trim();
   const ready =
     !!label && !busy && (sound ? true : !!file && !fileError && !checking);
+  const maxSegment = fileMs ?? 0;
+  const chosen = segment[1] > segment[0] ? { fromMs: segment[0], toMs: segment[1] } : undefined;
+
+  /** The segment keeps its limits: the other handle follows when one is pulled past them. */
+  function moveSegment(value: number | number[]) {
+    const next = Array.isArray(value) ? value : [value, segment[1]];
+    const movedStart = next[0] !== segment[0];
+    let [from, to] = next;
+    if (to - from > MAX_MS) {
+      if (movedStart) to = from + MAX_MS;
+      else from = to - MAX_MS;
+    }
+    if (to - from < MIN_SEGMENT) {
+      if (movedStart) to = from + MIN_SEGMENT;
+      else from = to - MIN_SEGMENT;
+    }
+    from = Math.max(0, Math.min(from, Math.max(0, maxSegment - MIN_SEGMENT)));
+    to = Math.min(maxSegment, Math.max(to, from + Math.min(MIN_SEGMENT, maxSegment)));
+    setSegment([from, to]);
+  }
 
   async function pick(e: ChangeEvent<HTMLInputElement>) {
     const picked = e.target.files?.[0];
@@ -698,6 +728,7 @@ function SoundDialog({
     setFile(picked);
     setFileError(null);
     setFileMs(null);
+    setSegment([0, 0]);
     setChecking(true);
     if (!named) setName(picked.name.replace(/\.[^.]*$/, "").slice(0, MAX_NAME));
     const problem = await checkSoundFile(picked);
@@ -706,6 +737,7 @@ function SoundDialog({
     if (id !== checkId.current) return;
     setFileError(problem);
     setFileMs(ms);
+    setSegment([0, Math.min(ms ?? 0, MAX_MS)]);
     setChecking(false);
   }
 
@@ -719,17 +751,20 @@ function SoundDialog({
       if (local.current) URL.revokeObjectURL(local.current.url);
       local.current = { file, url: URL.createObjectURL(file) };
     }
-    listened.current = previewSound({
-      id: "",
-      userId: "",
-      name,
-      emoji,
-      volume,
-      createdAt: 0,
-      // Unknown length: stream it like a long clip rather than decode a whole file in memory.
-      durationMs: fileMs || LONG_MS + 1,
-      url: local.current.url,
-    });
+    listened.current = previewSound(
+      {
+        id: "",
+        userId: "",
+        name,
+        emoji,
+        volume,
+        createdAt: 0,
+        // Unknown length: stream it like a long clip rather than decode a whole file in memory.
+        durationMs: fileMs || LONG_MS + 1,
+        url: local.current.url,
+      },
+      chosen,
+    );
   }
 
   async function submit() {
@@ -738,7 +773,7 @@ function SoundDialog({
     setBusy(true);
     const ok = sound
       ? await editSound(sound.id, { name: label, emoji, volume })
-      : !!file && (await addSound(file, label, emoji, volume));
+      : !!file && (await addSound(file, label, emoji, volume, chosen));
     if (ok) (onSaved ?? onClose)();
     else setBusy(false);
   }
@@ -791,10 +826,25 @@ function SoundDialog({
             >
               {fileError ?? t("voice.soundboard.limits")}
             </p>
-            {!fileError && fileMs !== null && fileMs > MAX_MS && (
-              <p className="mt-1 text-[13px] text-muted">
-                {t("voice.soundboard.trimmed")}
-              </p>
+            {!fileError && fileMs !== null && fileMs > 0 && (
+              <Slider
+                value={segment}
+                onChange={moveSegment}
+                minValue={0}
+                maxValue={fileMs}
+                step={100}
+                className="mt-4 w-full"
+              >
+                <Label>{t("voice.soundboard.segment")}</Label>
+                <Slider.Output className="text-[13px] tabular-nums text-muted">
+                  {clockTenths(segment[0])} – {clockTenths(segment[1])}
+                </Slider.Output>
+                <Slider.Track>
+                  <Slider.Fill />
+                  <Slider.Thumb index={0} />
+                  <Slider.Thumb index={1} />
+                </Slider.Track>
+              </Slider>
             )}
             <input
               ref={input}

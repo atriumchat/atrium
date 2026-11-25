@@ -152,6 +152,9 @@ function isLong(durationMs: number): boolean {
  */
 type Play = { userId: string; stop: () => void; base: number; refresh: () => void };
 
+/** The part of a clip to sound, in ms from its start; absent means all of it. */
+type Range = { fromMs: number; toMs: number };
+
 /** What's heard: the clip's own volume times the master one, kept within 0..1. */
 const level = (base: number) => Math.max(0, Math.min(1, get().soundboard.volume * base));
 
@@ -183,8 +186,14 @@ export function stopCallSounds({ clearOwn = true } = {}) {
   if (clearOwn && get().myPlaying) set({ myPlaying: null });
 }
 
-/** A short clip from its decoded buffer, through the shared context. */
-function playBuffer(buffer: AudioBuffer, base: number, userId: string, onEnded?: () => void): Play {
+/** A short clip from its decoded buffer, through the shared context; `range` keeps only its chosen part. */
+function playBuffer(
+  buffer: AudioBuffer,
+  base: number,
+  userId: string,
+  onEnded?: () => void,
+  range?: Range,
+): Play {
   const context = audioCtx();
   const durationMs = Math.round(buffer.duration * 1000);
   const gain = context.createGain();
@@ -222,7 +231,7 @@ function playBuffer(buffer: AudioBuffer, base: number, userId: string, onEnded?:
     if (done) return;
     started = true;
     try {
-      source.start();
+      source.start(0, (range?.fromMs ?? 0) / 1000, range ? (range.toMs - range.fromMs) / 1000 : undefined);
     } catch {
       finish();
     }
@@ -231,7 +240,14 @@ function playBuffer(buffer: AudioBuffer, base: number, userId: string, onEnded?:
 }
 
 /** A long clip, streamed: seek to where the call is by now so everyone stays roughly together, cut off at 4 minutes. */
-function playLong(url: string, base: number, arrived: number | null, userId: string, onEnded?: () => void): Play {
+function playLong(
+  url: string,
+  base: number,
+  arrived: number | null,
+  userId: string,
+  onEnded?: () => void,
+  range?: Range,
+): Play {
   const audio = new Audio();
   audio.preload = 'auto';
   audio.volume = level(base);
@@ -269,6 +285,13 @@ function playLong(url: string, base: number, arrived: number | null, userId: str
     audio.oncanplay = null;
     if (done) return;
     if (timer) clearTimeout(timer);
+    // A chosen part of the clip: start where it begins and stop where it ends.
+    if (range) {
+      audio.currentTime = range.fromMs / 1000;
+      timer = setTimeout(finish, Math.max(0, range.toMs - range.fromMs));
+      void audio.play().catch(finish);
+      return;
+    }
     const elapsed = arrived === null ? 0 : (Date.now() - arrived) / 1000;
     // Already past the end (a slow network, a replayed event, past the 4 minutes): don't start it at all.
     if (elapsed >= MAX_LONG_SECONDS || elapsed >= audio.duration) {
@@ -332,9 +355,15 @@ export function soundFileDuration(file: File): Promise<number | null> {
   return readDuration(file);
 }
 
-export async function addSound(file: File, name: string, emoji: string, volume: number): Promise<boolean> {
+export async function addSound(
+  file: File,
+  name: string,
+  emoji: string,
+  volume: number,
+  range?: Range,
+): Promise<boolean> {
   try {
-    const sound = await api.uploadSound(file, name, emoji, volume);
+    const sound = await api.uploadSound(file, name, emoji, volume, range?.fromMs, range?.toMs);
     set((s) => ({ mySounds: [...s.mySounds, sound] }));
     return true;
   } catch (e) {
@@ -407,8 +436,8 @@ export function stopPreview() {
   if (get().previewing !== null) set({ previewing: null });
 }
 
-/** Play a clip on this device only, ignoring mute. Returns controls scoped to this preview. */
-export function previewSound(sound: Sound) {
+/** Play a clip on this device only, ignoring mute; `range` plays just the chosen part. Returns controls scoped to this preview. */
+export function previewSound(sound: Sound, range?: Range) {
   stopPreview();
   const request = { play: null as Play | null, volume: sound.volume };
   preview = request;
@@ -421,13 +450,13 @@ export function previewSound(sound: Sound) {
     set({ previewing: null });
   };
   if (isLong(sound.durationMs)) {
-    request.play = playLong(sound.url, request.volume, null, '', ended);
+    request.play = playLong(sound.url, request.volume, null, '', ended, range);
   } else {
     const cached = cachedBuffer(sound.url);
-    if (cached) request.play = playBuffer(cached, request.volume, '', ended);
+    if (cached) request.play = playBuffer(cached, request.volume, '', ended, range);
     else void loadBuffer(sound.url).then((buffer) => {
       if (preview !== request) return;
-      if (buffer) request.play = playBuffer(buffer, request.volume, '', ended);
+      if (buffer) request.play = playBuffer(buffer, request.volume, '', ended, range);
       else ended();
     });
   }

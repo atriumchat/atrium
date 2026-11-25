@@ -91,6 +91,7 @@ export const errors = {
   'err.memberAbove': 'This member isn\'t below you',
   'err.rolesChanged': 'Roles changed, try again',
   'err.badSound': 'That sound won\'t do',
+  'err.badSegment': 'That segment won\'t do',
   'err.soundTooBig': 'Sound is over 512 KB',
   'err.tooManySounds': 'Up to {n} sounds',
   'err.noSound': 'Sound not found',

@@ -51,7 +51,7 @@ SOUND_DEMUXERS = {"mp3": "mp3", "ogg": "ogg", "wav": "wav", "flac": "flac", "m4a
 # A sound's file never changes (edits touch only the row), so a browser may keep it for good.
 SOUND_HEADERS = {"Cache-Control": "private, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff"}
 
-# Every upload is transcoded to Opus in Ogg; the source is cut to the first 4 minutes.
+# Every upload is transcoded to Opus in Ogg; by default a source is cut to its first 4 minutes.
 TRANSCODE_SECONDS = MAX_SOUND_MS // 1000
 TRANSCODE_TIMEOUT = 30
 TRANSCODE_MEMORY = 768 * 1024 * 1024
@@ -92,19 +92,25 @@ def probe_audio(path, demuxer: str) -> tuple[int, float]:
     return channels, seconds
 
 
-def transcode(source, target, kind: str) -> tuple[int, int, bool]:
-    """Turn one upload into <id>.ogg with ffmpeg; (stored bytes, milliseconds, trimmed). Raises if it can't.
+def transcode(source, target, kind: str, start_ms: int = 0, end_ms: int = 0) -> tuple[int, int, bool]:
+    """Turn one upload (or the part the person picked) into <id>.ogg with ffmpeg; (stored bytes, milliseconds, trimmed).
+    Raises if it can't.
 
     The channel count decides the bitrate: stereo at 128 kbit/s, mono at 64, and surround is downmixed to stereo. The
-    length comes from the file we just wrote, never from the client; a source past MAX_SOUND_MS is cut by ffmpeg's -t.
+    length comes from the file we just wrote, never from the client. `start_ms`/`end_ms` choose the part to keep;
+    without an end the clip is cut at MAX_SOUND_MS after its start, as it always was.
     """
     demuxer = SOUND_DEMUXERS[kind]
     channels, source_seconds = probe_audio(source, demuxer)
     stereo = channels >= 2
+    start = start_ms / 1000
+    length = (end_ms - start_ms) / 1000 if end_ms > start_ms else TRANSCODE_SECONDS
     command = [
         FFMPEG, "-nostdin", "-hide_banner", "-loglevel", "error", "-protocol_whitelist", "file",
+        # Seeking before the input reads straight to the point; at zero it would only slow the read.
+        *(["-ss", str(start)] if start > 0 else []),
         "-f", demuxer, "-i", str(source),
-        "-map", "0:a:0", "-vn", "-sn", "-dn", "-map_metadata", "-1", "-t", str(TRANSCODE_SECONDS),
+        "-map", "0:a:0", "-vn", "-sn", "-dn", "-map_metadata", "-1", "-t", str(length),
         "-c:a", "libopus", "-b:a", "128k" if stereo else "64k", "-vbr", "on", "-application", "audio",
         "-ar", "48000", "-ac", "2" if stereo else "1",
         "-f", "ogg", str(target),
@@ -113,8 +119,12 @@ def transcode(source, target, kind: str) -> tuple[int, int, bool]:
         raise ValueError("ffmpeg could not transcode the file")
     _, stored_seconds = probe_audio(target, "ogg")
     duration_ms = round(stored_seconds * 1000)
-    # A source longer than the cut: ffprobe knows, or, if it didn't say, a stored file that hit the ceiling.
-    trimmed = source_seconds > TRANSCODE_SECONDS if source_seconds > 0 else duration_ms >= MAX_SOUND_MS
+    # Something of the source was left out: a part before the start or after the end. ffprobe knows the source's
+    # length, or, if it didn't say, a stored file that filled the window we asked for.
+    if source_seconds > 0:
+        trimmed = start > 0 or source_seconds > start + length
+    else:
+        trimmed = start > 0 or duration_ms >= round(length * 1000)
     return target.stat().st_size, duration_ms, trimmed
 
 
@@ -213,10 +223,23 @@ def get_sounds(user: dict = Depends(current_user)):
 
 
 @router.post("/api/sounds")
-async def add_sound(request: Request, name: str = "", emoji: str = "", volume: float = 1, user: dict = Depends(current_user)):
-    """Raw bytes in the body (like /api/uploads): mp3, ogg, wav, m4a, flac or webm; kept as Opus in Ogg, first 4 minutes only."""
+async def add_sound(
+    request: Request,
+    name: str = "",
+    emoji: str = "",
+    volume: float = 1,
+    start: int = 0,
+    end: int = 0,
+    user: dict = Depends(current_user),
+):
+    """Raw bytes in the body (like /api/uploads): mp3, ogg, wav, m4a, flac or webm; kept as Opus in Ogg, first 4 minutes only.
+
+    `start`/`end` (ms) keep just the part the person picked; without them the first 4 minutes are kept.
+    """
     if int(request.headers.get("content-length") or 0) > MAX_SOUND_UPLOAD:
         raise ApiError(413, "soundTooBig", "Файл больше 50 МБ")
+    if start < 0 or (end and (end <= start or end - start > MAX_SOUND_MS)):
+        raise ApiError(400, "badSegment", "Неверный отрезок")
     data = await request.body()
     if not data:
         raise ApiError(400, "emptyFile", "Пустой файл")
@@ -239,7 +262,7 @@ async def add_sound(request: Request, name: str = "", emoji: str = "", volume: f
     await run_in_threadpool(source.write_bytes, data)
     try:
         async with TRANSCODES:
-            size, duration_ms, trimmed = await run_in_threadpool(transcode, source, target, kind)
+            size, duration_ms, trimmed = await run_in_threadpool(transcode, source, target, kind, start, end)
     except Exception:
         # ffmpeg couldn't read it, ran too long or fell over: the upload and any half-written output both go.
         await run_in_threadpool(drop_files, [source, target])

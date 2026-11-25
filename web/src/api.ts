@@ -180,14 +180,18 @@ export const api = {
   inbox: (before?: number, beforeId?: string) => request<InboxItem[]>(`/api/inbox${historyQuery(before, beforeId)}`),
   callQuality: (report: Record<string, unknown>) => request<{ ok: boolean }>('/api/call-quality', { ...post(report), signal: AbortSignal.timeout(5000) }),
   voiceToken: (channelId: string) => request<{ token: string; url: string }>('/api/voice-token', post({ channelId })),
-  /** Your soundboard clips; `volume` and the name/emoji go as query params, the bytes as the body. */
+  /** Your soundboard clips; `volume`, the name/emoji and the kept part (ms) go as query params, the bytes as the body. */
   sounds: () => request<Sound[]>('/api/sounds'),
-  uploadSound: (file: File, name: string, emoji: string, volume: number) =>
-    request<Sound>(`/api/sounds?name=${encodeURIComponent(name)}&emoji=${encodeURIComponent(emoji)}&volume=${volume}`, {
-      method: 'POST',
-      body: file,
-      headers: { 'Content-Type': file.type || 'application/octet-stream' },
-    }),
+  uploadSound: (file: File, name: string, emoji: string, volume: number, startMs = 0, endMs = 0) =>
+    request<Sound>(
+      `/api/sounds?name=${encodeURIComponent(name)}&emoji=${encodeURIComponent(emoji)}&volume=${volume}` +
+        (endMs > startMs ? `&start=${startMs}&end=${endMs}` : ''),
+      {
+        method: 'POST',
+        body: file,
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      },
+    ),
   updateSound: (id: string, patch: SoundPatch) => request<Sound>(`/api/sounds/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteSound: (id: string) => request<{ ok: boolean }>(`/api/sounds/${id}`, { method: 'DELETE' }),
   /** Everyone's clips in a call you're in (the server checks that you are). */
