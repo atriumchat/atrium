@@ -1,5 +1,7 @@
 """Video and audio in the chat play inline; anything else stays a download. Run: .venv/bin/pytest"""
 
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -50,3 +52,15 @@ def test_other_files_stay_downloads_whatever_type_was_claimed(signed_in):
     page = client.get(upload(client, headers, "page.html", b"<script>alert(1)</script>"))
     assert page.headers["content-type"] == "application/octet-stream"
     assert page.headers["content-disposition"].startswith("attachment;")
+
+
+def test_a_heic_photo_is_a_picture_even_with_no_type(signed_in):
+    client, headers = signed_in
+    sample = (Path(__file__).parent / "sample.heic").read_bytes()
+    # An iPhone sends it as octet-stream (or nothing): the .heic name is what says it's a photo.
+    r = client.post("/api/uploads?name=IMG_0001.HEIC", content=sample, headers={**headers, "Content-Type": "application/octet-stream"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body.get("kind") != "file"
+    assert body["width"] > 0 and body["height"] > 0
+    assert client.get(body["url"]).headers["content-type"] == "image/webp"
