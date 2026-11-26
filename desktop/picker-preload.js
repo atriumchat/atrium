@@ -6,5 +6,6 @@ contextBridge.exposeInMainWorld('atriumPicker', {
   list: (kind) => ipcRenderer.invoke('picker:list', String(kind)),
   /** Share this one; `sound` says whether the computer's sound goes with it. */
   choose: (id, sound) => ipcRenderer.send('picker:choose', String(id), sound === true),
+  openSettings: () => ipcRenderer.send('picker:open-settings'),
   cancel: () => ipcRenderer.send('picker:cancel'),
 });

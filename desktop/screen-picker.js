@@ -1,11 +1,11 @@
 // The screen-share picker (picker.html), for where the system has no picker of its own: live thumbnails of the
 // windows and screens, one to be chosen. choose() answers with the pick, or null when the person cancelled.
-const { BrowserWindow, desktopCapturer, ipcMain, screen } = require('electron');
+const { BrowserWindow, desktopCapturer, ipcMain, screen, shell, systemPreferences } = require('electron');
 const path = require('node:path');
 const i18n = require('./i18n');
 
 // Twice the size a card shows, so the thumbnails stay sharp on a dense screen.
-const THUMBNAIL = { width: 480, height: 300 };
+const THUMBNAIL = { width: 480, height: 270 };
 
 /** @type {BrowserWindow | null} */
 let picker = null;
@@ -38,7 +38,6 @@ async function list(window, kind) {
   const found = await desktopCapturer.getSources({
     types: [kind],
     thumbnailSize: THUMBNAIL,
-    // Only Windows hands out the icons; elsewhere the cards go without.
     fetchWindowIcons: kind === 'window',
   });
   if (window !== picker || window.isDestroyed()) return [];
@@ -46,29 +45,50 @@ async function list(window, kind) {
   const named =
     kind === 'screen'
       ? nameScreens(found)
-      : // A window that can't be drawn (minimized, or the system won't say) is no use to pick, and neither is one without a title.
-        found.filter((source) => source.id !== own && source.name && !source.thumbnail.isEmpty()).map((source) => ({ source, name: source.name }));
+      : found.filter((source) => source.id !== own && source.name).map((source) => ({ source, name: source.name }));
   clearOffered(kind);
   return named.map(({ source, name }) => {
-    offered.set(source.id, { kind, source, name });
+    // Electron may include a minimized window without a usable preview.
+    const unavailable = kind === 'window' && source.thumbnail.isEmpty();
+    if (!unavailable) offered.set(source.id, { kind, source, name });
     return {
       id: source.id,
       name,
+      unavailable,
       thumb: source.thumbnail.isEmpty() ? null : `data:image/jpeg;base64,${source.thumbnail.toJPEG(80).toString('base64')}`,
       icon: source.appIcon && !source.appIcon.isEmpty() ? source.appIcon.resize({ width: 32, height: 32 }).toDataURL() : null,
     };
   });
 }
 
+const mac = process.platform === 'darwin';
+const recordingStatus = () => mac ? systemPreferences.getMediaAccessStatus('screen') : 'granted';
+const needsSettings = (status) => status === 'denied' || status === 'restricted' || status === 'not-determined';
+
 ipcMain.handle('picker:list', async (event, kind) => {
   if (!fromPicker(event) || (kind !== 'window' && kind !== 'screen')) return { error: true };
   const window = picker;
-  try {
-    return { sources: await list(window, kind) };
-  } catch {
-    if (window === picker) clearOffered(kind);
-    return { error: true };
+  const permission = recordingStatus();
+  if (permission === 'denied' || permission === 'restricted') {
+    clearOffered(kind);
+    return { permission: true };
   }
+  try {
+    const sources = await list(window, kind);
+    if (sources.some((source) => source.thumb) || !needsSettings(recordingStatus())) return { sources };
+  } catch {
+    if (!needsSettings(recordingStatus())) {
+      if (window === picker) clearOffered(kind);
+      return { error: true };
+    }
+  }
+  if (window === picker) clearOffered(kind);
+  return { permission: true };
+});
+
+ipcMain.on('picker:open-settings', (event) => {
+  if (!fromPicker(event) || !mac) return;
+  void shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture').catch(() => undefined);
 });
 
 ipcMain.on('picker:choose', (event, id, sound) => {
@@ -91,6 +111,8 @@ function choose(parent, { sound }) {
       ...(modal ? { parent, modal: true } : {}),
       width: 720,
       height: 560,
+      useContentSize: true,
+      frame: process.platform !== 'win32',
       minWidth: 480,
       minHeight: 400,
       title: i18n.t('picker.title'),

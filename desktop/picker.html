@@ -8,16 +8,26 @@
   </head>
   <body>
     <header>
-      <div class="tabs" role="tablist">
-        <button class="tab" id="tab-window" type="button" role="tab" aria-selected="true" data-i18n="picker.windows"></button>
-        <button class="tab" id="tab-screen" type="button" role="tab" aria-selected="false" data-i18n="picker.screens"></button>
+      <div class="heading">
+        <h1 data-i18n="picker.title"></h1>
+        <button class="close" id="close" type="button" data-i18n-attr="aria-label:picker.close">×</button>
+      </div>
+      <div class="tabs" role="tablist" data-i18n-attr="aria-label:picker.title">
+        <button class="tab" id="tab-window" type="button" role="tab" aria-controls="window" aria-selected="true" data-i18n="picker.windows"></button>
+        <button class="tab" id="tab-screen" type="button" role="tab" aria-controls="screen" aria-selected="false" data-i18n="picker.screens"></button>
       </div>
     </header>
     <main>
       <div class="grid" id="window" role="listbox" aria-labelledby="tab-window"></div>
       <div class="grid" id="screen" role="listbox" aria-labelledby="tab-screen" hidden></div>
-      <p class="note" id="note" hidden></p>
-      <span class="spinner" id="wait" role="status" data-i18n-attr="aria-label:picker.loading"></span>
+      <p class="note" id="note" role="status" hidden></p>
+      <div class="note permission" id="permission" hidden>
+        <span data-i18n="picker.permission"></span>
+        <button class="quiet settings" id="settings" type="button" data-i18n="picker.openSettings"></button>
+      </div>
+      <div class="grid skeletons" id="wait" role="status" data-i18n-attr="aria-label:picker.loading">
+        <i></i><i></i><i></i><i></i><i></i><i></i>
+      </div>
     </main>
     <footer>
       <!-- The computer's sound is shared on Windows and macOS; picker.js shows this switch only where it can. -->
