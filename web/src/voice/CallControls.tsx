@@ -22,19 +22,15 @@ import { useCallView } from './callView';
 import { stopMySounds } from './soundboard';
 import { canShareScreen, leaveVoice, screenAudioOn, setScreenAudio, switchScreenSource, toggleCamera, toggleDeafen, toggleMute, toggleScreenShare } from './voice';
 
-export function CallBarButton({ label, onPress, children, pressed, alert, end, joined }: {
+export function CallBarButton({ label, onPress, children, pressed, alert, end }: {
   label: string;
   onPress: () => void;
   children: ReactNode;
   pressed?: boolean;
   alert?: boolean;
   end?: boolean;
-  /** One half of a pill (device button + its menu arrow): the pill carries the fill, so this one has none and no corners. */
-  joined?: boolean;
 }) {
-  const tone = joined
-    ? `rounded-none! [--button-bg:transparent] [--button-bg-hover:color-mix(in_srgb,white_8%,transparent)] ${alert ? '[--button-fg:var(--danger)]' : ''}`
-    : alert
+  const tone = alert
     ? '[--button-bg:color-mix(in_srgb,var(--danger)_15%,var(--default))] [--button-bg-hover:color-mix(in_srgb,var(--danger)_24%,var(--default))] [--button-fg:var(--danger)]'
     : pressed && !end ? '[--button-bg:var(--surface-tertiary)] [--button-bg-hover:var(--default-hover)]' : '';
 
@@ -58,17 +54,14 @@ function DeviceControl({ kind, label, menuLabel, onPress, active, off, menuDisab
   menuDisabled?: boolean;
   children: ReactNode;
 }) {
-  const fill = off
-    ? 'bg-[color-mix(in_srgb,var(--danger)_15%,var(--default))]'
-    : active ? 'bg-surface-tertiary' : 'bg-default';
   return (
-    <div className={`flex shrink-0 items-stretch overflow-hidden rounded-full ${fill}`}>
-      <CallBarButton joined label={label} pressed={active} alert={off} onPress={onPress}>{children}</CallBarButton>
+    <div className="flex shrink-0 items-center gap-0.5">
+      <CallBarButton label={label} pressed={active} alert={off} onPress={onPress}>{children}</CallBarButton>
       <DeviceMenu
         kind={kind}
         label={menuLabel}
         disabled={menuDisabled}
-        className={`grid w-7 shrink-0 place-items-center outline-none transition-colors hover:bg-white/[0.08] aria-expanded:bg-white/[0.08] @max-[23rem]:w-6 data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-inset data-[focus-visible=true]:ring-focus ${off ? 'text-danger/70' : 'text-muted hover:text-foreground'}`}
+        className={`grid size-7 shrink-0 place-items-center rounded-full outline-none transition-colors hover:bg-white/[0.08] aria-expanded:bg-white/[0.08] @max-[23rem]:size-6 data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-inset data-[focus-visible=true]:ring-focus ${off ? 'text-danger/70' : 'text-muted hover:text-foreground'}`}
       />
     </div>
   );
@@ -91,14 +84,14 @@ function ScreenShareControl() {
   const [, refresh] = useState(0);
   const audio = useStore((s) => screenAudioOn(s.room));
   return (
-    <div className="flex shrink-0 items-stretch overflow-hidden rounded-full bg-white/15">
-      <CallBarButton joined pressed label={t('voice.screen.stop')} onPress={toggleScreenShare}>
+    <div className="flex shrink-0 items-center gap-0.5">
+      <CallBarButton pressed label={t('voice.screen.stop')} onPress={toggleScreenShare}>
         <ScreenOffIcon />
       </CallBarButton>
       <Dropdown isOpen={open} onOpenChange={setOpen}>
         <Dropdown.Trigger
           aria-label={t('voice.screen.menu')}
-          className="grid w-7 shrink-0 place-items-center text-foreground/80 outline-none transition-colors hover:bg-white/[0.08] hover:text-foreground aria-expanded:bg-white/[0.08] data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-inset data-[focus-visible=true]:ring-focus"
+          className="grid size-7 shrink-0 place-items-center rounded-full text-foreground/80 outline-none transition-colors hover:bg-white/[0.08] hover:text-foreground aria-expanded:bg-white/[0.08] data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-inset data-[focus-visible=true]:ring-focus"
         >
           <ChevronDownIcon className="chevron-flip size-3.5" aria-hidden="true" />
         </Dropdown.Trigger>
