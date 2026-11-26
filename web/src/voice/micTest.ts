@@ -99,6 +99,7 @@ export async function runMicTest({ inputId, outputId, noise, signal, onStarted, 
       } catch {
         throw new MicTestFailure('noise');
       }
+      signal.throwIfAborted();
       try {
         source.connect(suppressor.input);
       } catch {
@@ -148,18 +149,18 @@ export async function runMicTest({ inputId, outputId, noise, signal, onStarted, 
     if (!tracks.length || tracks.some((track) => track.readyState === 'ended')) throw new MicTestFailure('missing');
     let abortTest: ((error: MicTestFailure) => void) | undefined;
     let silentSince = 0;
-    let notRunning = 0;
+    let stoppedSince = 0;
     meterTimer = setInterval(() => {
       onLevel(level());
       // The same rule as in a call: loud in, nothing out for two seconds means the suppressor is broken. Safari
       // briefly interrupts a context on its own, so a stopped one only fails the test after a couple of seconds.
       if (!suppressor) return;
       if (context.state !== 'running') {
-        notRunning++;
-        if (notRunning > 25) abortTest?.(new MicTestFailure('noise'));
+        if (!stoppedSince) stoppedSince = performance.now();
+        else if (performance.now() - stoppedSince > 2_000) abortTest?.(new MicTestFailure('noise'));
         return;
       }
-      notRunning = 0;
+      stoppedSince = 0;
       const input = suppressor.meterIn.read();
       const output = suppressor.meterOut.read();
       if (input.rmsDb > -55 && output.peak < SILENT_PEAK) {
@@ -168,7 +169,7 @@ export async function runMicTest({ inputId, outputId, noise, signal, onStarted, 
       } else {
         silentSince = 0;
       }
-    }, 80);
+    }, 1000 / 30);
     await new Promise<void>((resolve, reject) => {
       const player = audio;
       const removeListeners = () => {

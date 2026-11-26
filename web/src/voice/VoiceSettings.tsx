@@ -57,6 +57,7 @@ export function CallsGroup({ className = '' }: { className?: string }) {
   const { t } = useT();
   return (
     <Rows title={t('voice.settings.calls')} className={className}>
+      <VoiceDevices />
       <NoiseRow />
       <RowFrame>
         <BypassSwitch />

@@ -65,15 +65,15 @@ export function SettingsDialog({ onClose, start = 'account' }: { onClose: () => 
         {/* The avatar's ring and anything else drawn in the overlay tone follows the window's tone here. */}
         <Modal.Dialog aria-label={t('settings.title')} className="h-[min(720px,88vh)] max-w-[880px] overflow-hidden border border-edge p-0 [--overlay:var(--app-window)]">
           <Modal.CloseTrigger aria-label={t('common.close')} className="z-10"><XIcon size={16} /></Modal.CloseTrigger>
-          <div className="flex h-full">
-            <nav className="flex w-60 shrink-0 flex-col gap-0.5 border-r border-edge p-3">
-              <h2 className="px-3 pb-2 pt-2 text-[13px] font-medium text-muted">{t('settings.title')}</h2>
+          <div className="flex h-full max-md:flex-col">
+            <nav className="flex w-60 shrink-0 flex-col gap-0.5 border-r border-edge p-3 max-md:w-full max-md:flex-row max-md:overflow-x-auto max-md:border-r-0 max-md:border-b max-md:pr-12">
+              <h2 className="px-3 pb-2 pt-2 text-[13px] font-medium text-muted max-md:hidden">{t('settings.title')}</h2>
               {pages.map(({ id, label, icon }) => (
                 <button
                   key={id}
                   onClick={() => setPage(id)}
                   aria-current={open.id === id ? 'page' : undefined}
-                  className={`flex h-10 items-center gap-3 rounded-full px-3 text-left text-[15px] transition-colors ${
+                  className={`flex h-10 items-center gap-3 rounded-full px-3 text-left text-[15px] transition-colors max-md:shrink-0 max-md:whitespace-nowrap ${
                     open.id === id ? 'bg-default text-foreground' : 'text-muted hover:bg-default/50 hover:text-foreground'
                   }`}
                 >
@@ -81,13 +81,13 @@ export function SettingsDialog({ onClose, start = 'account' }: { onClose: () => 
                   {label}
                 </button>
               ))}
-              <div className="flex-1" />
-              <button onClick={logout} className="flex h-10 items-center gap-3 rounded-full px-3 text-left text-[15px] text-danger transition-colors hover:bg-danger/10">
+              <div className="flex-1 max-md:hidden" />
+              <button onClick={logout} className="flex h-10 items-center gap-3 rounded-full px-3 text-left text-[15px] text-danger transition-colors hover:bg-danger/10 max-md:hidden">
                 <LogoutIcon size={18} />
                 {t('settings.logout')}
               </button>
             </nav>
-            <div key={open.id} className="min-w-0 flex-1 overflow-y-auto px-10 pb-10 pt-8">
+            <div key={open.id} className="min-w-0 flex-1 overflow-y-auto px-10 pb-10 pt-8 max-md:min-h-0 max-md:px-4 max-md:pt-4">
               <h2 className="text-[21px] font-medium leading-tight tracking-[-0.01em]">{open.label}</h2>
               {open.content}
             </div>

@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Label, ListBox, Select } from '@heroui/react';
 import { ChevronDownIcon } from '@heroicons/react/24/solid';
-import { filled, rulerTicks, scale } from '@atrium/ui-common';
 import { useT, type Key } from '../i18n';
 import { useStore } from '../store';
-import { Primary, Row, Secondary } from '../ui/settings';
+import { Primary, Row, Secondary, fieldLabel } from '../ui/settings';
 import { getPreferredDevice, listDevices, setPreferredDevice, type AudioDeviceKind } from './devices';
 import { MicTestFailure, runMicTest, supportsMicTest, supportsOutputSelection, type MicTestError } from './micTest';
 
@@ -68,6 +67,7 @@ export function VoiceDevices() {
     return () => {
       mounted.current = false;
       operation.current?.abort();
+      operation.current = null;
       window.removeEventListener('pagehide', onPageHide);
       media?.removeEventListener('devicechange', refreshDevices);
       unsubscribe();
@@ -135,8 +135,9 @@ export function VoiceDevices() {
   useEffect(() => {
     if (noiseRef.current === noise) return;
     noiseRef.current = noise;
-    if (!operation.current) return;
+    const restart = Boolean(operation.current);
     cancel();
+    if (!restart) return;
     void startRef.current();
   }, [noise, cancel]);
 
@@ -150,70 +151,61 @@ export function VoiceDevices() {
     requesting: 'voice.micTest.requesting',
     running: 'voice.micTest.running',
   };
-  const status = error ? ERROR[error] : callActive ? 'voice.micTest.activeCall' : canTest ? messages[phase] : ERROR.unsupported;
+  const status = callActive ? 'voice.micTest.activeCall' : error ? ERROR[error] : canTest ? messages[phase] : ERROR.unsupported;
 
   return (
     <>
-      <DeviceRow
-        title={t('voice.devices.input')}
-        current={input}
-        devices={devices.audioinput}
-        onChange={(id) => pick('audioinput', id)}
-      />
-      <DeviceRow
-        title={t('voice.devices.output')}
-        current={canSelectOutput ? output : 'default'}
-        devices={devices.audiooutput}
-        onChange={(id) => pick('audiooutput', id)}
-        disabled={!canSelectOutput || choosingOutput}
-        hint={canSelectOutput ? undefined : t('voice.devices.systemOutput')}
-      />
+      <div className="grid grid-cols-1 gap-3 border-b border-white/[0.07] py-3 max-md:px-4 md:grid-cols-2 md:gap-4">
+        <DeviceSelect
+          title={t('voice.devices.input')}
+          current={input}
+          devices={devices.audioinput}
+          onChange={(id) => pick('audioinput', id)}
+        />
+        <DeviceSelect
+          title={t('voice.devices.output')}
+          current={canSelectOutput ? output : 'default'}
+          devices={devices.audiooutput}
+          onChange={(id) => pick('audiooutput', id)}
+          disabled={!canSelectOutput || choosingOutput}
+          hint={canSelectOutput ? undefined : t('voice.devices.systemOutput')}
+        />
+      </div>
       {canSelectOutput && media?.selectAudioOutput && (
         <Row title={t('voice.devices.grant')}>
           <Secondary onPress={chooseOutput} isPending={choosingOutput}>{t('voice.devices.choose')}</Secondary>
         </Row>
       )}
-      <div className="border-b border-white/[0.07] py-3 max-md:px-4">
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          <span className="min-w-24 flex-1 text-[14px] font-medium max-md:text-[16px]">{t('voice.micTest.title')}</span>
-          <Primary onPress={phase === 'idle' ? start : cancel} isDisabled={callActive || !canTest || choosingOutput}>
+      <div className="flex flex-col gap-2 border-b border-white/[0.07] py-4 max-md:px-4">
+        <h3 className="text-[15px] font-medium">{t('voice.micTest.title')}</h3>
+        <div className="flex items-center gap-3">
+          <Primary onPress={phase === 'idle' ? start : cancel} isDisabled={callActive || !canTest || choosingOutput}
+            className="min-w-28 shrink-0 whitespace-nowrap max-md:h-10! max-md:w-auto! max-md:text-[14px]! md:rounded-full!">
             {t(button[phase])}
           </Primary>
+          <LevelRuler level={level} label={t('voice.micTest.title')} />
         </div>
-        <LevelRuler level={level} label={t('voice.micTest.title')} />
-        <p role="status" className={`mt-1 text-[13px] ${error ? 'text-danger' : 'text-muted'}`}>{t(status)}</p>
+        <p role="status" className={`text-[13px] ${error && !callActive ? 'text-danger' : 'text-muted'}`}>{t(status)}</p>
       </div>
     </>
   );
 }
 
+const METER_SEGMENTS = 40;
+
 function LevelRuler({ level, label }: { level: number; label: string }) {
-  const ruler = useRef<SVGSVGElement>(null);
-  const [width, setWidth] = useState(0);
-  useEffect(() => {
-    const element = ruler.current;
-    if (!element) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-  const ticks = useMemo(() => rulerTicks(Math.max(0, width - scale.stroke * 2)), [width]);
-  const active = filled(level / 100, ticks.length);
+  const active = Math.round(level / 100 * METER_SEGMENTS);
   return (
-    <div className="my-2 rounded-row border border-white/[0.07] bg-white/[0.03] px-3 py-2.5" role="meter"
-      aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={level}>
-      <svg ref={ruler} width="100%" height={scale.rulerHeight} className="block" aria-hidden="true"
-        strokeWidth={scale.stroke} strokeLinecap="round">
-        {ticks.map((tick, i) => (
-          <line key={i} {...tick} y1={tick.y1 + scale.stroke / 2} y2={tick.y2 - scale.stroke / 2}
-            stroke={i < active ? 'var(--gx-tick-on)' : 'var(--gx-tick)'} />
-        ))}
-      </svg>
+    <div role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={level}
+      className="grid min-w-0 flex-1 grid-cols-[repeat(40,minmax(0,1fr))] gap-px md:gap-0.5">
+      {Array.from({ length: METER_SEGMENTS }, (_, i) => (
+        <span key={i} aria-hidden="true" className={`h-4 rounded-full ${i < active ? 'bg-[#ededef]' : 'bg-white/[0.11]'}`} />
+      ))}
     </div>
   );
 }
 
-function DeviceRow({ title, current, devices, hint, disabled, onChange }: {
+function DeviceSelect({ title, current, devices, hint, disabled, onChange }: {
   title: string;
   current: string;
   devices: MediaDeviceInfo[];
@@ -234,10 +226,11 @@ function DeviceRow({ title, current, devices, hint, disabled, onChange }: {
   }
 
   return (
-    <Row title={title} value={hint}>
+    <div className="min-w-0">
+      <span className={fieldLabel}>{title}</span>
       <Select
         aria-label={title}
-        className="w-[52%] min-w-0 max-w-72 shrink-0"
+        className="w-full min-w-0"
         isDisabled={disabled}
         value={current}
         variant="secondary"
@@ -260,6 +253,7 @@ function DeviceRow({ title, current, devices, hint, disabled, onChange }: {
           </ListBox>
         </Select.Popover>
       </Select>
-    </Row>
+      {hint && <p className="mt-1 text-[13px] text-muted">{hint}</p>}
+    </div>
   );
 }
