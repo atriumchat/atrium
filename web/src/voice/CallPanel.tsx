@@ -74,10 +74,10 @@ function LiveCall({ dm, call }: { dm: Dm; call: CallState | undefined }) {
   // only for video. Waiting for an answer stays bubbles: they show who's being rung.
   const tiles = media.length > 0 || (!isMobile && !alone);
 
-  const controls = (viewActions?: ReactNode) => (
+  const controls = (viewActions?: ReactNode, fullscreen?: boolean) => (
     <>
       {/* Status sits right above the controls, Discord-style: signal bars + what's going on. */}
-      <div className="flex items-center justify-center gap-3 pt-3 text-[13px]">
+      {!fullscreen && <div className="flex items-center justify-center gap-3 pt-3 text-[13px]">
         <CallStatus tone={alone && !ringing ? 'idle' : alone ? 'ringing' : 'live'}>
           {alone && ringing ? t('voice.call.ringing') : alone ? t('voice.call.noAnswer') : <>{t('voice.call.title')} · <CallDuration /></>}
         </CallStatus>
@@ -86,8 +86,8 @@ function LiveCall({ dm, call }: { dm: Dm; call: CallState | undefined }) {
             {dm.kind === 'group' ? t('voice.call.ringOthers') : t('voice.call.ringAgain')}
           </button>
         )}
-      </div>
-      <CallControls viewActions={viewActions} />
+      </div>}
+      <CallControls viewActions={viewActions} fullscreen={fullscreen} />
     </>
   );
 

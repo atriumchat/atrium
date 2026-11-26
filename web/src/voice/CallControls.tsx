@@ -71,10 +71,11 @@ function DeviceControl({ kind, label, menuLabel, onPress, active, off, menuDisab
   );
 }
 
-export function CallControls({ className = '', channel, viewActions }: {
+export function CallControls({ className = '', channel, viewActions, fullscreen = false }: {
   className?: string;
   channel?: Channel;
   viewActions?: ReactNode;
+  fullscreen?: boolean;
 }) {
   const { t } = useT();
   const micOff = useStore((s) => s.muted || s.deafened);
@@ -114,6 +115,7 @@ export function CallControls({ className = '', channel, viewActions }: {
       {deafened ? <HeadphonesSlashIcon /> : <HeadphonesIcon />}
     </DeviceControl>
   );
+  const detachedActions = fullscreen ? undefined : viewActions;
   const screenLabel = t(screenSharing ? 'voice.screen.stop' : 'voice.screen.start');
   const playingName = myPlaying ? mySounds.find((x) => x.id === myPlaying.soundId)?.name ?? '' : '';
   const openVoiceSettings = () => {
@@ -127,7 +129,7 @@ export function CallControls({ className = '', channel, viewActions }: {
 
   return (
     <div ref={toolbar} role="group" aria-label={t('voice.controls.title')} className={`@container shrink-0 px-(--app-pane-inset) py-3 ${className}`}>
-      {screenSharing && (
+      {screenSharing && !fullscreen && (
         <div className="mb-1 flex min-w-0 items-center justify-center gap-2 text-xs">
           <span className="truncate text-muted" title={source}>{t('voice.screen.source', { name: source })}</span>
           <button type="button" onClick={switchScreenSource} className="shrink-0 rounded-row px-2 py-1 text-foreground hover:bg-default focus-visible:ring-2 focus-visible:ring-focus">
@@ -135,17 +137,22 @@ export function CallControls({ className = '', channel, viewActions }: {
           </button>
         </div>
       )}
-      <div className={`grid grid-cols-2 items-center gap-x-2 gap-y-1 @min-[35rem]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] ${viewActions ? '@min-[25rem]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]' : ''}`}>
-        {!compact && <div className="col-start-1 row-start-1 flex h-9 items-center">
+      <div className={`grid grid-cols-2 items-center gap-x-2 gap-y-1 @min-[35rem]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] ${detachedActions ? '@min-[25rem]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]' : ''}`}>
+        {!fullscreen && !compact && <div className="col-start-1 row-start-1 flex h-9 items-center">
           {channel && <CallBarButton label={t('shell.menu.inviteToRoom')} onPress={openInvite}><UserPlusIcon /></CallBarButton>}
         </div>}
-        <div className={`col-span-2 col-start-1 flex min-w-0 items-center justify-center gap-2 @max-[23rem]:gap-1 @min-[35rem]:col-span-1 @min-[35rem]:col-start-2 @min-[35rem]:row-start-1 ${viewActions ? 'row-start-2 @min-[25rem]:col-span-1 @min-[25rem]:col-start-2 @min-[25rem]:row-start-1' : 'row-start-1'}`}>
+        <div className={`col-span-2 col-start-1 flex min-w-0 items-center justify-center gap-2 @max-[23rem]:gap-1 @min-[35rem]:col-span-1 @min-[35rem]:col-start-2 @min-[35rem]:row-start-1 ${detachedActions ? 'row-start-2 @min-[25rem]:col-span-1 @min-[25rem]:col-start-2 @min-[25rem]:row-start-1' : 'row-start-1'}`}>
           <div className="no-scrollbar min-w-0 overflow-x-auto rounded-panel bg-island ring-1 ring-inset ring-separator">
             <div className="flex min-h-(--app-call-dock-height) w-max items-center gap-2 p-1">
               <div role="group" aria-label={t('voice.controls.devices')} className="flex shrink-0 items-center gap-0.5">
                 <DeviceControl kind="audioinput" label={t(micOff ? 'voice.mic.unmute' : 'voice.mic.mute')} menuLabel={t('shell.call.pickMic')} active={micOff} off={micOff} onPress={toggleMute}>
                   {micOff ? <MicSlashIcon /> : <MicIcon />}
                 </DeviceControl>
+                {fullscreen && (
+                  <CallBarButton label={t(deafened ? 'voice.deafen.off' : 'voice.deafen.on')} pressed={deafened} alert={deafened} onPress={toggleDeafen}>
+                    {deafened ? <HeadphonesSlashIcon /> : <HeadphonesIcon />}
+                  </CallBarButton>
+                )}
                 <DeviceControl kind="videoinput" label={t(cameraOn ? 'voice.camera.off' : 'voice.camera.on')} menuLabel={t('voice.camera.choose')} active={cameraOn} menuDisabled={cameraPending} onPress={toggleCamera}>
                   {cameraOn ? <VideoCameraIcon /> : <VideoCameraSlashIcon />}
                 </DeviceControl>
@@ -156,11 +163,12 @@ export function CallControls({ className = '', channel, viewActions }: {
                     <StopIcon />
                   </CallBarButton>
                 )}
-                {!compact && canShareScreen && (
+                {(!compact || fullscreen) && canShareScreen && (
                   <CallBarButton label={screenLabel} pressed={screenSharing} onPress={toggleScreenShare}>
                     <ComputerDesktopIcon />
                   </CallBarButton>
                 )}
+                <SoundboardButton look="control" />
                 <Popover isOpen={moreOpen} onOpenChange={setMoreOpen}>
                   <Popover.Trigger<'button'>
                     render={(props) => <button {...props} />}
@@ -177,7 +185,7 @@ export function CallControls({ className = '', channel, viewActions }: {
                         <span>{t('voice.controls.sound')}</span>
                         {outputControl}
                       </div>
-                      {compact && canShareScreen && (
+                      {compact && !fullscreen && canShareScreen && (
                         <Button variant="ghost" className="w-full justify-start rounded-row px-2" onPress={() => {
                           setMoreOpen(false);
                           void toggleScreenShare();
@@ -186,10 +194,6 @@ export function CallControls({ className = '', channel, viewActions }: {
                           {screenLabel}
                         </Button>
                       )}
-                      <div className="flex items-center justify-between gap-2 px-2 text-sm">
-                        <span>{t('voice.soundboard.label')}</span>
-                        <SoundboardButton look="control" />
-                      </div>
                       {compact && channel && (
                         <Button variant="ghost" className="w-full justify-start rounded-row px-2" onPress={openInvite}>
                           <UserPlusIcon className="size-5" aria-hidden="true" />
@@ -203,14 +207,15 @@ export function CallControls({ className = '', channel, viewActions }: {
                     </Popover.Dialog>
                   </Popover.Content>
                 </Popover>
+                {fullscreen && viewActions}
               </div>
             </div>
           </div>
           <CallBarButton label={t('voice.leave')} onPress={() => void leaveVoice()} end><PhoneXMarkIcon /></CallBarButton>
         </div>
-        {viewActions && (
+        {detachedActions && (
           <div className="col-span-2 col-start-1 row-start-1 flex min-h-9 items-center justify-end @min-[25rem]:col-span-1 @min-[25rem]:col-start-3">
-            {viewActions}
+            {detachedActions}
           </div>
         )}
       </div>

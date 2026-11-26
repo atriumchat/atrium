@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Popover, Spinner } from '@heroui/react';
 import { ArrowsPointingInIcon, ArrowsPointingOutIcon, ChatBubbleLeftIcon, SpeakerWaveIcon } from '@heroicons/react/24/solid';
 import { StartAudio, useIsSpeaking, useParticipants, useTracks, VideoTrack } from '@livekit/components-react';
@@ -216,8 +216,8 @@ function ConnectedStage({ channel }: { channel: Channel }) {
   const speaking = useStore((s) => s.speaking);
   const people = voiceMembers(voiceState, channel.id).map((m) => ({ id: m.userId, muted: m.muted, deafened: m.deafened }));
   const bubbles = isMobile && !(media.length > 0 || cameraPending);
-  const controls = (viewActions?: ReactNode) => (
-    <CallControls channel={channel} viewActions={viewActions} className="max-md:pb-[max(20px,env(safe-area-inset-bottom))]" />
+  const controls = (viewActions?: ReactNode, fullscreen?: boolean) => (
+    <CallControls channel={channel} viewActions={viewActions} fullscreen={fullscreen} className="max-md:pb-[max(20px,env(safe-area-inset-bottom))]" />
   );
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -241,7 +241,7 @@ function ConnectedStage({ channel }: { channel: Channel }) {
  */
 export function MediaStage({ fallback, renderControls }: {
   fallback?: ReactNode;
-  renderControls: (viewActions?: ReactNode) => ReactNode;
+  renderControls: (viewActions?: ReactNode, fullscreen?: boolean) => ReactNode;
 }) {
   const { t } = useT();
   const participants = useParticipants();
@@ -252,10 +252,11 @@ export function MediaStage({ fallback, renderControls }: {
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const [side, setSide] = useState(false);
   const [area, setArea] = useState<HTMLDivElement | null>(null);
-  const [full, setFull] = useState(!!document.fullscreenElement);
+  const [full, setFull] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const stage = useRef<HTMLDivElement>(null);
-  const overPanel = useRef(false);
+  const controls = useRef<HTMLDivElement>(null);
+  const ownsFullscreen = useRef(false);
   const hideTimer = useRef<number | null>(null);
   const pinnable = [...screens, ...cameras];
   const focused = pinnable.find((track) => trackKey(track) === focusKey);
@@ -279,46 +280,69 @@ export function MediaStage({ fallback, renderControls }: {
     if (focusKey && !focused) setFocusKey(null);
   }, [focusKey, focused]);
   const handleFullscreen = (exit = false) => {
-    const action = exit ? document.exitFullscreen() : document.documentElement.requestFullscreen();
-    void action?.catch(() => showError(t('voice.stream.windowError')));
+    if (!document.fullscreenEnabled) return;
+    if (exit) {
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => showError(t('voice.stream.windowError')));
+      return;
+    }
+    ownsFullscreen.current = true;
+    // The document stays the fullscreen element so dialogs and popovers portalled to body remain usable.
+    void document.documentElement.requestFullscreen().catch(() => {
+      ownsFullscreen.current = false;
+      showError(t('voice.stream.windowError'));
+    });
   };
-  // In full screen the panel and the cursor step aside after a couple of quiet seconds; an open popup keeps them.
-  const wake = () => {
+  const overlayOpen = useCallback(() =>
+    Boolean(controls.current?.querySelector('[aria-expanded="true"]') ||
+      document.querySelector('[aria-modal="true"], [data-slot="popover-dialog"], [data-slot="dropdown-menu"]')), []);
+
+  const wake = useCallback(function showControls() {
     setControlsVisible(true);
     if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
     hideTimer.current = window.setTimeout(() => {
       hideTimer.current = null;
-      if (overPanel.current || document.querySelector('[role="dialog"], [role="menu"], [data-slot="dropdown-popover"]')) {
-        wake();
-        return;
-      }
-      setControlsVisible(false);
+      if (overlayOpen() || controls.current?.querySelector(':focus-visible')) showControls();
+      else setControlsVisible(false);
     }, 2500);
-  };
+  }, [overlayOpen]);
 
   useEffect(() => {
-    const onChange = () => setFull(!!document.fullscreenElement);
+    const onChange = () => {
+      const entered = ownsFullscreen.current && document.fullscreenElement === document.documentElement;
+      setFull(entered);
+      if (entered) wake();
+      else {
+        ownsFullscreen.current = false;
+        if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+        setControlsVisible(true);
+      }
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (!ownsFullscreen.current) return;
+      if (event.key === 'Escape' && !overlayOpen() && document.fullscreenElement) {
+        void document.exitFullscreen().catch(() => undefined);
+      } else {
+        wake();
+      }
+    };
     document.addEventListener('fullscreenchange', onChange);
-    return () => document.removeEventListener('fullscreenchange', onChange);
-  }, []);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange);
+      document.removeEventListener('keydown', onKey);
+      if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+      if (ownsFullscreen.current && document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+    };
+  }, [overlayOpen, wake]);
 
   useEffect(() => {
-    if (!full) {
-      setControlsVisible(true);
-      overPanel.current = false;
-      return;
-    }
-    wake();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [full]);
+    if (full && !viewTrack && document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+  }, [full, viewTrack]);
 
-  useEffect(() => () => {
-    if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
-  }, []);
-
-  const viewActions = viewTrack && (
+  const activeTrack = full ? viewTrack : focused;
+  const viewActions = (full || viewTrack) && (
     <>
-      <StreamWindow key={trackKey(viewTrack)} stage={stage} trackRef={viewTrack} />
+      {!full && viewTrack && <StreamWindow key={trackKey(viewTrack)} stage={stage} trackRef={viewTrack} />}
       {document.fullscreenEnabled && (
         <CallBarButton
           label={t(full ? 'voice.stream.exitFullscreen' : 'voice.stream.fullscreen')}
@@ -332,28 +356,29 @@ export function MediaStage({ fallback, renderControls }: {
 
   return (
     <div
-      className={full ? `fixed inset-0 z-[40] flex flex-col bg-window ${controlsVisible ? '' : 'cursor-none'}` : 'contents'}
-      onMouseMove={full ? wake : undefined}
+      data-call-fullscreen={full || undefined}
+      className={full ? `fixed inset-0 z-[40] flex flex-col bg-black ${controlsVisible ? '' : 'cursor-none [&_*]:cursor-none!'}` : 'contents'}
+      onPointerMove={full ? wake : undefined}
       onPointerDown={full ? wake : undefined}
-      onKeyDown={full ? wake : undefined}
+      onFocusCapture={full ? (event) => { if (event.target.matches(':focus-visible')) wake(); } : undefined}
     >
-      {fallback ?? (
-        <div ref={stage} className="relative flex min-h-0 flex-1 bg-window">
+      {(full ? null : fallback) ?? (
+        <div ref={stage} className={`relative flex min-h-0 flex-1 ${full ? 'bg-black' : 'bg-window'}`}>
           <div className="flex min-w-0 flex-1 flex-col">
-            {focused ? (
+            {activeTrack ? (
               <>
-                <div className="flex min-h-0 flex-1 flex-col px-(--app-pane-inset)">
-                  <ScreenStage trackRef={focused} onGrid={() => setFocusKey(null)} onFullscreen={() => handleFullscreen(full)} />
+                <div className={`flex min-h-0 flex-1 flex-col ${full ? '' : 'px-(--app-pane-inset)'}`}>
+                  <ScreenStage trackRef={activeTrack} full={full} onGrid={() => setFocusKey(null)} onFullscreen={() => handleFullscreen(full)} />
                 </div>
-                <div className="no-scrollbar flex shrink-0 justify-center-safe gap-2 overflow-x-auto px-(--app-pane-inset) pt-2">
+                {!full && <div className="no-scrollbar flex shrink-0 justify-center-safe gap-2 overflow-x-auto px-(--app-pane-inset) pt-2">
                   {tiles.map(({ key, participant, video }) => (
                     <div key={key} className="h-[90px] w-[160px] shrink-0">
                       <Tile participant={participant} video={video} height={90}
-                        selected={!!video && trackKey(video) === trackKey(focused)}
+                        selected={!!video && trackKey(video) === trackKey(activeTrack)}
                         onSelect={video ? () => focusOn(video) : undefined} />
                     </div>
                   ))}
-                </div>
+                </div>}
               </>
             ) : (
               <div ref={setArea} className="flex min-h-0 flex-1 flex-wrap content-center justify-center gap-2 px-(--app-pane-inset)">
@@ -376,15 +401,15 @@ export function MediaStage({ fallback, renderControls }: {
               </div>
             )}
           </div>
-          {side && <CallPeople participants={participants} onClose={() => setSide(false)} />}
+          {!full && side && <CallPeople participants={participants} onClose={() => setSide(false)} />}
         </div>
       )}
       <div
-        className={full ? `absolute inset-x-0 bottom-0 transition-opacity duration-200 ${controlsVisible ? '' : 'pointer-events-none opacity-0'}` : 'contents'}
-        onPointerEnter={full ? () => { overPanel.current = true; } : undefined}
-        onPointerLeave={full ? () => { overPanel.current = false; } : undefined}
+        ref={controls}
+        data-fullscreen-controls={full || undefined}
+        className={full ? `absolute inset-x-0 bottom-0 z-10 bg-linear-to-t from-black/80 via-black/40 to-transparent pt-12 transition-opacity duration-200 motion-reduce:transition-none ${controlsVisible ? 'opacity-100' : 'pointer-events-none opacity-0'}` : 'contents'}
       >
-        {renderControls(fallback ? undefined : viewActions)}
+        {renderControls(fallback && !full ? undefined : viewActions, full)}
       </div>
     </div>
   );
@@ -431,8 +456,9 @@ function CallPeople({ participants, onClose }: { participants: Participant[]; on
   );
 }
 
-function ScreenStage({ trackRef, onGrid, onFullscreen }: {
+function ScreenStage({ trackRef, full, onGrid, onFullscreen }: {
   trackRef: TrackReference;
+  full: boolean;
   onGrid: () => void;
   onFullscreen: () => void;
 }) {
@@ -444,7 +470,7 @@ function ScreenStage({ trackRef, onGrid, onFullscreen }: {
   const name = user?.name ?? trackRef.participant.name;
   return (
     <>
-      <div className="flex min-w-0 shrink-0 items-center gap-2 py-2">
+      <div className={`min-w-0 shrink-0 items-center gap-2 py-2 ${full ? 'hidden' : 'flex'}`}>
         <div className="flex min-w-0 flex-1 items-baseline gap-2">
           <h3 className="min-w-0 truncate text-[18px] font-normal">{name}</h3>
           {!camera && <span className="shrink-0 text-[13px] text-muted">{t('voice.stream.live')}</span>}
@@ -455,9 +481,11 @@ function ScreenStage({ trackRef, onGrid, onFullscreen }: {
       </div>
       <button
         type="button"
-        aria-label={t('voice.stream.grid')}
-        className="relative min-h-0 flex-1 overflow-hidden rounded-surface bg-black outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        aria-label={t(full ? 'voice.stream.exitFullscreen' : 'voice.stream.grid')}
+        tabIndex={full ? -1 : 0}
+        className={`relative min-h-0 flex-1 overflow-hidden bg-black outline-none focus-visible:ring-2 focus-visible:ring-focus ${full ? '' : 'rounded-surface'}`}
         onClick={(event) => {
+          if (full) return;
           if (event.detail === 0 || !document.fullscreenEnabled) onGrid();
           else if (event.detail === 1) clickTimer.current = window.setTimeout(onGrid, 300);
         }}
