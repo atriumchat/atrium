@@ -67,40 +67,18 @@ function VoiceStatus() {
         </RoundButton>
       </div>
       <BypassHint stats={stats} />
-      <div className="mt-2 grid grid-cols-3 gap-2">
-        <WideButton label={cameraOn ? t('shell.call.cameraOff') : t('shell.call.cameraOn')} on={cameraOn} disabled={!connected} onPress={toggleCamera}>
+      <div className="mx-auto mt-2 flex w-fit items-center gap-1.5 rounded-full bg-window p-1.5 ring-1 ring-inset ring-separator">
+        <RoundButton label={t(cameraOn ? 'shell.call.cameraOff' : 'shell.call.cameraOn')}
+          tone={cameraOn ? 'on' : 'plain'} pressed={cameraOn} isDisabled={!connected} onPress={toggleCamera}>
           {cameraOn ? <VideoIcon /> : <VideoSlashIcon />}
-        </WideButton>
-        <WideButton
-          label={screenSharing ? t('shell.call.screenStop') : t('shell.call.screenStart')}
-          on={screenSharing}
-          disabled={!connected}
-          onPress={toggleScreenShare}
-        >
+        </RoundButton>
+        <RoundButton label={t(screenSharing ? 'shell.call.screenStop' : 'shell.call.screenStart')}
+          tone={screenSharing ? 'on' : 'plain'} pressed={screenSharing} isDisabled={!connected} onPress={toggleScreenShare}>
           <ScreenIcon />
-        </WideButton>
+        </RoundButton>
         <SoundboardButton look="panel" stopsPlayback disabled={!connected} />
       </div>
     </div>
-  );
-}
-
-function WideButton(props: { label: string; on: boolean; disabled: boolean; onPress: () => void; children: ReactNode }) {
-  return (
-    <Tooltip delay={300} closeDelay={0}>
-      <Button
-        fullWidth
-        variant="tertiary"
-        aria-label={props.label}
-        aria-pressed={props.on}
-        isDisabled={props.disabled}
-        onPress={props.onPress}
-        className={`h-10 rounded-full [&_svg]:size-5 ${props.on ? '[--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]' : ''}`}
-      >
-        {props.children}
-      </Button>
-      <Tooltip.Content>{props.label}</Tooltip.Content>
-    </Tooltip>
   );
 }
 
@@ -161,7 +139,7 @@ function ToggleWithDevice(props: { active: boolean; label: string; onPress: () =
           variant="ghost"
           aria-label={props.label}
           onPress={props.onPress}
-          className={`h-9 w-9 min-w-9 rounded-l-full rounded-r-none p-0 [&_svg]:size-5 ${
+          className={`h-9 w-9 min-w-9 rounded-full p-0 [&_svg]:size-5 ${
             props.active ? '[--button-fg:var(--danger)] [--button-bg-hover:color-mix(in_oklab,var(--danger)_20%,transparent)]' : '[--button-fg:var(--muted)]'
           }`}
         >

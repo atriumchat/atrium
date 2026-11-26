@@ -20,7 +20,6 @@
   --app-header-height: 72px;
   --app-panel-header-height: 56px;
   --app-header-control: 36px;
-  --app-call-dock-height: calc(var(--app-header-control) + 8px);
   --app-corner-trim: 0px;
   --app-radius-fine: calc(8px - var(--app-corner-trim));
   --app-radius-tight: calc(10px - var(--app-corner-trim));
@@ -79,10 +78,16 @@
 }
 
 @utility call-control {
-  @apply grid shrink-0 place-items-center rounded-card p-0 text-foreground outline-none transition-colors;
+  @apply grid shrink-0 place-items-center rounded-full p-0;
   width: var(--app-header-control);
   height: var(--app-header-control);
   min-width: var(--app-header-control);
+
+  @container (max-width: 23rem) {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+  }
 
   &:focus-visible,
   &[data-focus-visible="true"] {

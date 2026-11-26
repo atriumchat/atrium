@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Popover, Spinner } from '@heroui/react';
+import { Button, Popover, Spinner } from '@heroui/react';
 import { ArrowsPointingInIcon, ArrowsPointingOutIcon, ChatBubbleLeftIcon, SpeakerWaveIcon } from '@heroicons/react/24/solid';
 import { StartAudio, useIsSpeaking, useParticipants, useTracks, VideoTrack } from '@livekit/components-react';
 import type { TrackReference } from '@livekit/components-react';
@@ -14,6 +14,7 @@ import { CallDuration } from './CallDuration';
 import { ChannelHeader, HeaderIcon } from '../shell/ChannelHeader';
 import { ChannelMenu } from '../shell/ChannelMenu';
 import { RoundButton, VolumeSlider } from '../ui/ui';
+import { Secondary } from '../ui/settings';
 import { FaceStack } from '../shell/CallPill';
 import { useTileGrid } from './tileGrid';
 import { LineArt } from '../ui/Illustrations';
@@ -475,9 +476,7 @@ function ScreenStage({ trackRef, full, onGrid, onFullscreen }: {
           <h3 className="min-w-0 truncate text-[18px] font-normal">{name}</h3>
           {!camera && <span className="shrink-0 text-[13px] text-muted">{t('voice.stream.live')}</span>}
         </div>
-        <button type="button" onClick={onGrid} className="h-9 shrink-0 rounded-full bg-default px-4 text-sm outline-none transition-colors hover:bg-surface-tertiary focus-visible:ring-2 focus-visible:ring-focus">
-          {t('voice.stream.grid')}
-        </button>
+        <Secondary onPress={onGrid}>{t('voice.stream.grid')}</Secondary>
       </div>
       <button
         type="button"
@@ -591,13 +590,12 @@ function Tile({ participant, video, height, onSelect, selected = false }: {
       </div>
       {remote && (
         <Popover isOpen={volumeOpen} onOpenChange={setVolumeOpen}>
-          <Popover.Trigger
+          <Button isIconOnly size="sm" variant="tertiary"
             aria-label={t('voice.volume', { name })}
-            onClick={(e) => e.stopPropagation()}
-            className={`absolute z-10 grid shrink-0 place-items-center rounded-full bg-black/55 text-white outline-none transition-opacity ${volumeOpen ? '' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100'} ${small ? 'right-1.5 top-1.5 size-5' : 'right-2.5 top-2.5 size-7'}`}
+            className={`absolute z-10 shrink-0 rounded-full p-0 [--button-bg:rgb(0_0_0/0.72)] [--button-bg-hover:var(--default)] [--button-fg:white] ${volumeOpen ? '' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100'} ${small ? 'right-1.5 top-1.5 size-6 [&_svg]:size-3' : 'right-2.5 top-2.5 size-8 [&_svg]:size-3.5'}`}
           >
-            <SpeakerWaveIcon className={small ? 'size-3' : 'size-3.5'} aria-hidden="true" />
-          </Popover.Trigger>
+            <SpeakerWaveIcon aria-hidden="true" />
+          </Button>
           <Popover.Content isNonModal placement="bottom end" className="w-64">
             <Popover.Dialog aria-label={t('voice.volume', { name })} className="p-4">
               <VolumeSlider userId={participant.identity} name={name} showMute />

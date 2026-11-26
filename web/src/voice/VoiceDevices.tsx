@@ -180,7 +180,7 @@ export function VoiceDevices() {
         <h3 className="text-[15px] font-medium">{t('voice.micTest.title')}</h3>
         <div className="flex items-center gap-3">
           <Primary onPress={phase === 'idle' ? start : cancel} isDisabled={callActive || !canTest || choosingOutput}
-            className="min-w-28 shrink-0 whitespace-nowrap max-md:h-10! max-md:w-auto! max-md:text-[14px]! md:rounded-full!">
+            className="min-w-28 shrink-0 whitespace-nowrap max-md:h-10! max-md:w-auto! max-md:text-[14px]!">
             {t(button[phase])}
           </Primary>
           <LevelRuler level={level} label={t('voice.micTest.title')} />

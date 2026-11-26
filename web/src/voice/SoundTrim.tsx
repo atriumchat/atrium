@@ -1,6 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent, type PointerEvent, type RefObject } from "react";
 import { useT } from "../i18n";
 import { PlayIcon, StopIcon } from "../ui/icons";
+import { RoundButton } from "../ui/ui";
 import { MIN_SOUND_SEGMENT_MS, type previewSound } from "./soundboard";
 
 export const MAX_SEGMENT = 240_000;
@@ -166,16 +167,14 @@ export function SoundTrim({ duration, peaks, coveredMs, segment, playing, previe
     <div className="flex flex-col gap-2">
       <span className="text-[14px] font-medium">{t("voice.soundboard.segment")}</span>
       <div className="flex items-start gap-2">
-        <button
-          type="button"
-          aria-label={t(playing ? "voice.soundboard.stop" : "voice.soundboard.preview")}
-          title={t(playing ? "voice.soundboard.stop" : "voice.soundboard.preview")}
-          onClick={onToggle}
-          disabled={disabled}
-          className="my-3 grid size-10 shrink-0 place-items-center rounded-full bg-default outline-none transition-colors hover:bg-surface-tertiary focus-visible:ring-2 focus-visible:ring-focus"
+        <RoundButton
+          label={t(playing ? "voice.soundboard.stop" : "voice.soundboard.preview")}
+          onPress={onToggle}
+          isDisabled={disabled}
+          className="my-3"
         >
-          {playing ? <StopIcon size={16} /> : <PlayIcon size={16} />}
-        </button>
+          {playing ? <StopIcon /> : <PlayIcon />}
+        </RoundButton>
         <div className="min-w-0 flex-1">
           <div ref={viewport} className="no-scrollbar overflow-x-auto rounded-row bg-[#18181b]">
             <div ref={track} className="relative h-16" style={{ width: `${Math.max(1, duration / MAX_SEGMENT) * 100}%` }}>

@@ -5,6 +5,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  Button,
   Dropdown,
   Label,
   Popover,
@@ -37,6 +38,7 @@ import {
   TrashIcon,
 } from "../ui/icons";
 import { field, fieldLabel, Primary, Quiet, Secondary } from "../ui/settings";
+import { RoundButton } from "../ui/ui";
 import {
   addSound,
   inspectSoundFile,
@@ -72,12 +74,9 @@ type DialogState =
 
 // Match the bottom-left panel and the controls under the call.
 const BUTTON = {
-  panel:
-    "flex h-10 w-full items-center justify-center rounded-full bg-default text-foreground [&_svg]:size-5",
-  control: "call-control @max-[23rem]:w-8 @max-[23rem]:min-w-8",
+  panel: "size-10 min-w-10 rounded-full p-0 [&_svg]:size-5",
+  control: "call-control [&_svg]:size-[18px]",
 } as const;
-const BUTTON_ENABLED =
-  "outline-none transition-colors hover:bg-[#28282d] aria-expanded:bg-[#28282d] data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus";
 
 /**
  * The soundboard button of the call (`panel`: the one in the bottom-left panel, `control`: the one among the call
@@ -123,43 +122,26 @@ export function SoundboardButton({
   if (playingId && !open && !dialog) {
     const stop = t("voice.soundboard.stopForCall", { name: playingName });
     return (
-      <button
-        type="button"
-        aria-label={stop}
-        title={stop}
-        onClick={() => void stopMySounds()}
-        className={`${BUTTON[look]} ${BUTTON_ENABLED}`}
-      >
-        <StopIcon size={20} />
-      </button>
+      <RoundButton label={stop} onPress={() => void stopMySounds()} className={BUTTON[look]}>
+        <StopIcon />
+      </RoundButton>
     );
   }
 
-  const face = <SoundboardIcon size={20} />;
+  const face = <SoundboardIcon size={18} />;
   const trigger = disabled ? (
-    <button
-      type="button"
-      disabled
-      aria-label={label}
-      title={label}
-      className={`${BUTTON[look]} opacity-50`}
-    >
+    <Button isIconOnly isDisabled variant="tertiary" aria-label={label} className={BUTTON[look]}>
       {face}
-    </button>
+    </Button>
   ) : (
-    <Popover
-      isOpen={open}
-      onOpenChange={setOpen}
-    >
-      <Popover.Trigger<'button'>
-        render={(props) => <button {...props} />}
-        type="button"
-        aria-label={label}
-        title={label}
-        className={`${BUTTON[look]} ${BUTTON_ENABLED}`}
-      >
-        {face}
-      </Popover.Trigger>
+    <Popover isOpen={open} onOpenChange={setOpen}>
+      <Tooltip delay={250} closeDelay={0}>
+        <Button isIconOnly variant="tertiary" aria-label={label}
+          className={`${BUTTON[look]} aria-expanded:[--button-bg:var(--surface-tertiary)]`}>
+          {face}
+        </Button>
+        <Tooltip.Content placement="top">{label}</Tooltip.Content>
+      </Tooltip>
       <Popover.Content
         placement={look === "panel" ? "top start" : "top"}
         className="w-[min(552px,calc(100vw-16px))]"
@@ -319,30 +301,17 @@ function Panel({
           />
         </label>
         {(playing || listening) && (
-          <button
-            type="button"
-            aria-label={t("voice.soundboard.stop")}
-            title={t("voice.soundboard.stop")}
-            onClick={() => {
-              stopPreview();
-              void stopMySounds();
-            }}
-            className="flex size-10 shrink-0 items-center justify-center rounded-row text-foreground outline-none transition-colors hover:bg-white/[0.08] focus-visible:ring-2 focus-visible:ring-focus"
-          >
-            <StopIcon size={16} />
-          </button>
+          <RoundButton label={t("voice.soundboard.stop")} onPress={() => {
+            stopPreview();
+            void stopMySounds();
+          }}>
+            <StopIcon />
+          </RoundButton>
         )}
         <VolumeButton />
-        <button
-          type="button"
-          aria-label={t("voice.soundboard.add")}
-          title={t("voice.soundboard.add")}
-          disabled={!canAdd}
-          onClick={onAdd}
-          className="flex size-10 shrink-0 items-center justify-center rounded-row text-muted outline-none transition-colors hover:bg-white/[0.08] hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40"
-        >
-          <PlusIcon size={18} />
-        </button>
+        <RoundButton label={t("voice.soundboard.add")} isDisabled={!canAdd} onPress={onAdd}>
+          <PlusIcon />
+        </RoundButton>
       </div>
       <div className="flex">
         {sections.length > 0 && (
@@ -352,20 +321,11 @@ function Panel({
           >
             {sections.map((s) => (
               <Tooltip key={s.id} delay={300} closeDelay={0}>
-                <Tooltip.Trigger<'button'>
-                  render={(props) => <button {...props} />}
-                  type="button"
-                  aria-label={s.title}
-                  aria-current={active === s.id || undefined}
-                  onClick={() => jump(s.id)}
-                  className={`flex size-8 items-center justify-center rounded-tight outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus ${active === s.id ? "bg-white/[0.1] text-foreground" : "text-muted hover:bg-white/[0.05] hover:text-foreground"}`}
-                >
-                  {s.id === "favorites" ? (
-                    <StarIcon size={18} />
-                  ) : (
-                    <SoundboardIcon size={18} />
-                  )}
-                </Tooltip.Trigger>
+                <Button isIconOnly variant="ghost" size="sm" aria-label={s.title}
+                  aria-current={active === s.id || undefined} onPress={() => jump(s.id)}
+                  className={`size-8 rounded-full p-0 ${active === s.id ? "[--button-bg:var(--default)]" : "text-muted"}`}>
+                  {s.id === "favorites" ? <StarIcon size={18} /> : <SoundboardIcon size={18} />}
+                </Button>
                 <Tooltip.Content placement="right">{s.title}</Tooltip.Content>
               </Tooltip>
             ))}
@@ -377,14 +337,14 @@ function Panel({
           className="flex max-h-[min(400px,calc(100dvh-160px))] min-w-0 flex-1 flex-col gap-2 overflow-y-auto py-1 pl-2 pr-3 pb-3"
         >
           {loaded && !q && sounds.length === 0 && (
-            <button
-              type="button"
-              onClick={onAdd}
+            <Button
+              variant="ghost"
+              onPress={onAdd}
               className="flex min-h-24 items-center justify-center gap-2 rounded-surface border border-dashed border-white/15 bg-white/[0.03] px-4 text-sm outline-none transition-colors hover:border-white/35 hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-focus"
             >
               <PlusIcon size={20} />
               {t("voice.soundboard.addFirst")}
-            </button>
+            </Button>
           )}
           {q && shown.length === 0 && (
             <p className="py-6 text-center text-[14px] text-muted">
@@ -431,11 +391,12 @@ function Section({
 }) {
   return (
     <section ref={headRef}>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         aria-expanded={!folded}
-        onClick={onToggle}
-        className="mb-1 flex h-7 max-w-full items-center gap-1.5 rounded-full pr-2 text-[13px] text-muted outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus"
+        onPress={onToggle}
+        className="mb-1 flex h-7 max-w-full justify-start gap-1.5 rounded-full pl-1 pr-2 text-[13px] text-muted outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus"
       >
         <ChevronDownIcon
           size={14}
@@ -443,7 +404,7 @@ function Section({
         />
         {icon}
         <span className="min-w-0 truncate">{title}</span>
-      </button>
+      </Button>
       {!folded && <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{children}</div>}
     </section>
   );
@@ -457,12 +418,13 @@ function VolumeButton() {
   const label = t("voice.soundboard.volume");
   return (
     <Popover>
-      <Popover.Trigger
-        aria-label={label}
-        className={`flex size-10 shrink-0 items-center justify-center rounded-row outline-none transition-colors hover:bg-white/[0.08] hover:text-foreground aria-expanded:bg-white/[0.08] aria-expanded:text-foreground data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus ${muted ? "text-foreground" : "text-muted"}`}
-      >
-        {muted ? <SpeakerSlashIcon size={18} /> : <SpeakerIcon size={18} />}
-      </Popover.Trigger>
+      <Tooltip delay={250} closeDelay={0}>
+        <Button isIconOnly variant="tertiary" aria-label={label}
+          className={`size-10 rounded-full p-0 aria-expanded:[--button-bg:var(--surface-tertiary)] ${muted ? "text-foreground" : "text-muted"}`}>
+          {muted ? <SpeakerSlashIcon size={18} /> : <SpeakerIcon size={18} />}
+        </Button>
+        <Tooltip.Content placement="top">{label}</Tooltip.Content>
+      </Tooltip>
       <Popover.Content placement="bottom end" className="w-64">
         <Popover.Dialog
           aria-label={label}
@@ -507,7 +469,7 @@ function VolumeButton() {
 }
 
 const TILE_ACTION =
-  "relative flex size-7 shrink-0 items-center justify-center rounded-full text-muted outline-none transition-colors hover:bg-white/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus";
+  "relative flex size-7 shrink-0 items-center justify-center rounded-full p-0 text-muted outline-none transition-colors hover:bg-white/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus";
 
 /** Clicking the pill plays to the call. The headphones button previews or stops a local listen. */
 function SoundTile({
@@ -536,7 +498,7 @@ function SoundTile({
   return (
     <div
       data-playing={playing ? "" : undefined}
-      className="group/tile relative flex h-10 min-w-0 items-center overflow-hidden rounded-row bg-[color-mix(in_oklab,var(--overlay),white_6%)] transition-colors hover:bg-[color-mix(in_oklab,var(--overlay),white_11%)] data-[playing]:bg-[color-mix(in_oklab,var(--overlay),white_14%)] data-[playing]:shadow-[inset_0_0_0_1px_rgb(255_255_255/0.22)]"
+      className="group/tile relative flex h-10 min-w-0 items-center overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--overlay),white_6%)] transition-colors hover:bg-[color-mix(in_oklab,var(--overlay),white_11%)] data-[playing]:bg-[color-mix(in_oklab,var(--overlay),white_14%)] data-[playing]:shadow-[inset_0_0_0_1px_rgb(255_255_255/0.22)]"
       onContextMenu={(e) => {
         e.preventDefault();
         setMenu(true);
@@ -546,47 +508,44 @@ function SoundTile({
         <ClipProgress key={playing.at} {...playing} />
       )}
       <Tooltip delay={400} closeDelay={0}>
-        <Tooltip.Trigger<'button'>
-          render={(props) => <button {...props} />}
-          type="button"
+        <Button variant="ghost" size="sm"
           aria-label={broadcast}
-          onClick={() => {
+          onPress={() => {
             if (playing) void stopMySounds();
             else {
               stopPreview();
               void playSound(sound);
             }
           }}
-          className="relative flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-l-[12px] pl-2 pr-1 text-left text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+          className="relative h-full min-w-0 flex-1 justify-start gap-1.5 rounded-full pl-2 pr-1 text-left text-[13px] focus-visible:ring-inset"
         >
           <span aria-hidden className="flex size-5 shrink-0 items-center justify-center text-[17px] leading-none">
             {playing ? <StopIcon size={13} /> : sound.emoji || <SoundboardIcon size={15} className="text-muted" />}
           </span>
           <span className="min-w-0 flex-1 truncate">{sound.name}</span>
           {long && <span className="shrink-0 text-[11px] text-muted">{clock(sound.durationMs)}</span>}
-        </Tooltip.Trigger>
+        </Button>
         <Tooltip.Content>{broadcast}</Tooltip.Content>
       </Tooltip>
-      <button
-        type="button"
-        aria-label={star}
-        aria-pressed={favorite}
-        title={star}
-        onClick={() => toggleFavorite(sound.id)}
-        className={`${TILE_ACTION} opacity-0 group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(hover:none)]:opacity-100`}
-      >
-        {favorite ? <StarFilledIcon size={14} /> : <StarIcon size={14} />}
-      </button>
       <Tooltip delay={300} closeDelay={0}>
-        <Tooltip.Trigger<'button'>
-          render={(props) => <button {...props} />}
-          type="button"
+        <Button isIconOnly variant="ghost" size="sm"
+          aria-label={star}
+          aria-pressed={favorite}
+          onPress={() => toggleFavorite(sound.id)}
+          className={`${TILE_ACTION} opacity-0 group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(hover:none)]:opacity-100`}
+        >
+          {favorite ? <StarFilledIcon size={14} /> : <StarIcon size={14} />}
+        </Button>
+        <Tooltip.Content>{star}</Tooltip.Content>
+      </Tooltip>
+      <Tooltip delay={300} closeDelay={0}>
+        <Button isIconOnly variant="ghost" size="sm"
           aria-label={previewLabel}
-          onClick={() => previewing ? stopPreview() : previewSound(sound)}
-          className={`${TILE_ACTION} ${previewing ? "bg-white/10 text-foreground" : "opacity-0 group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(hover:none)]:opacity-100"}`}
+          onPress={() => { if (previewing) stopPreview(); else previewSound(sound); }}
+          className={`${TILE_ACTION} ${previewing ? "[--button-bg:var(--surface-tertiary)] text-foreground" : "opacity-0 group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(hover:none)]:opacity-100"}`}
         >
           {previewing ? <StopIcon size={14} /> : <HeadphonesIcon size={16} />}
-        </Tooltip.Trigger>
+        </Button>
         <Tooltip.Content>{previewLabel}</Tooltip.Content>
       </Tooltip>
       <Dropdown isOpen={menu} onOpenChange={setMenu}>
@@ -801,7 +760,7 @@ function SoundDialog({
             onPress={submit}
             isDisabled={!ready}
             isPending={busy}
-            className="whitespace-nowrap md:rounded-full!"
+            className="whitespace-nowrap"
           >
             {sound ? t("common.save") : t("voice.soundboard.upload")}
           </Primary>
@@ -878,7 +837,7 @@ function SoundDialog({
                   <EmojiPicker
                     label={t("voice.soundboard.emojiPick")}
                     onPick={(value) => { if (!saving.current) setEmoji(value); }}
-                    className="flex size-[46px] shrink-0 items-center justify-center rounded-row border border-white/[0.07] bg-white/[0.03] text-[22px] outline-none transition-colors hover:border-white/20 aria-expanded:border-white/40 data-[focus-visible=true]:border-white/40"
+                    className="flex size-[46px] shrink-0 items-center justify-center rounded-full border border-white/[0.07] bg-white/[0.03] text-[22px] outline-none transition-colors hover:border-white/20 aria-expanded:border-white/40 data-[focus-visible=true]:border-white/40"
                   >
                     {emoji || <SmileIcon size={20} className="text-muted" />}
                   </EmojiPicker>

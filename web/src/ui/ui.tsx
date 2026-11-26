@@ -22,6 +22,7 @@ export function RoundButton(props: {
   children: ReactNode;
   tone?: 'plain' | 'ghost' | 'on' | 'accent' | 'danger';
   alert?: boolean;
+  pressed?: boolean;
   size?: keyof typeof SIZES;
   isDisabled?: boolean;
   placement?: Placement;
@@ -43,7 +44,7 @@ export function RoundButton(props: {
         isIconOnly
         variant={variant}
         aria-label={props.label}
-        aria-pressed={tone === 'on' ? true : undefined}
+        aria-pressed={props.pressed ?? (tone === 'on' ? true : undefined)}
         isDisabled={props.isDisabled}
         onPress={props.onPress}
         className={`rounded-full p-0 ${SIZES[props.size ?? 'md']} ${toneClass} ${props.alert ? 'text-danger' : ''} ${props.className ?? ''}`}
@@ -83,10 +84,10 @@ export function VolumeSlider({ userId, name, showMute = false }: { userId: strin
         </Slider.Track>
       </Slider>
       {showMute && (
-        <button type="button" className="rounded-row px-2 py-2 text-left text-sm outline-none hover:bg-default focus-visible:ring-2 focus-visible:ring-focus"
-          onClick={() => setValue(toggleUserMute(userId))}>
+        <Button variant="ghost" size="sm" className="w-full justify-start rounded-full px-3"
+          onPress={() => setValue(toggleUserMute(userId))}>
           {t(value === 0 ? 'voice.userUnmute' : 'voice.userMute')}
-        </button>
+        </Button>
       )}
     </div>
   );

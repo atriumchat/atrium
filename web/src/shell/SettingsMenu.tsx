@@ -5,6 +5,7 @@ import { useT } from '../i18n';
 import { getPreferredDevice, listDevices, setPreferredDevice, type DeviceKind } from '../voice/devices';
 import { CheckIcon, GearIcon } from '../ui/icons';
 import { SettingsDialog } from './SettingsDialog';
+import { RoundButton } from '../ui/ui';
 
 /** Gear in the user panel: opens the settings. */
 export function SettingsMenu() {
@@ -12,13 +13,9 @@ export function SettingsMenu() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        aria-label={t('settings.title')}
-        className="flex h-9 w-9 items-center justify-center rounded-full text-muted outline-none transition-colors hover:bg-default hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus"
-      >
-        <GearIcon size={20} />
-      </button>
+      <RoundButton size="sm" tone="ghost" label={t('settings.title')} onPress={() => setOpen(true)} className="text-muted hover:text-foreground">
+        <GearIcon />
+      </RoundButton>
       {open && <SettingsDialog onClose={() => setOpen(false)} />}
     </>
   );
@@ -48,7 +45,7 @@ export function DeviceMenu({ kind, label, className, disabled }: { kind: DeviceK
         isDisabled={disabled}
         className={
           className ??
-          'flex h-9 w-5 items-center justify-center rounded-r-[10px] text-muted outline-none transition-colors hover:bg-default hover:text-foreground data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus'
+          'flex size-5 items-center justify-center rounded-full text-muted outline-none transition-colors hover:bg-default hover:text-foreground data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus'
         }
       >
         <ChevronDownIcon className="size-3.5" strokeWidth={2.5} aria-hidden="true" />
