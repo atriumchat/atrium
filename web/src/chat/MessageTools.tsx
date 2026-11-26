@@ -3,6 +3,7 @@ import { Dropdown, Popover } from '@heroui/react';
 import { api } from '../api';
 import { applyUnreadMarker, getSessionEpoch, patchMessage, showError, useStore } from '../store';
 import { useT } from '../i18n';
+import { EmojiText } from '../ui/EmojiText';
 import type { Message } from '../types';
 import { BookmarkIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/solid';
 import { copyMessageLink, openMessage } from './messageNavigation';
@@ -75,7 +76,7 @@ export function PinsButton({channel}: {channel: string}) {
       {failed ? <button onClick={() => bump(n => n+1)}>{t('chat.retryHistory')}</button> : !items?.length ?
         <p className="px-2 py-3 text-sm text-muted">{t(items ? 'chat.tools.noPins' : 'people.inbox.loading')}</p> :
         items.map(m => <button key={m.id} className="block w-full rounded-row px-3 py-2 text-left outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus" onClick={() => {setOpen(false); void openMessage(m.id);}}>
-          <span className="block text-sm font-medium">{users[m.userId]?.name}</span><span className="line-clamp-2 text-sm text-muted">{blocked.includes(m.userId) ? t('chat.blocked.label') : m.content || t('chat.attachment')}</span>
+          <span className="block text-sm font-medium">{users[m.userId]?.name}</span><span className="line-clamp-2 text-sm text-muted"><EmojiText text={blocked.includes(m.userId) ? t('chat.blocked.label') : m.content || t('chat.attachment')} /></span>
         </button>)}
     </Popover.Dialog></Popover.Content>
   </Popover>;

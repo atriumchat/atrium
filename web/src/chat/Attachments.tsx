@@ -5,6 +5,11 @@ import { t, useT } from '../i18n';
 import type { Attachment } from '../types';
 import { DownloadIcon, SpeakerIcon, SpeakerSlashIcon, XIcon } from '../ui/icons';
 import { useAttachmentMenu } from './AttachmentMenu';
+import { useStore } from '../store';
+import { isGifId, loadChatGif, type Gif } from './giphy';
+import { isKlipySlug, klipySlug } from './klipy';
+import { FavoriteGifButton, toggleFavorite } from './GifPanel';
+import { usePersonalItems } from './expressionPreferences';
 
 const SINGLE_MAX_W = 420;
 const SINGLE_MAX_H = 360;
@@ -12,11 +17,15 @@ const TILE = 180;
 
 /** Pictures, video, audio and files under a message. */
 export function MessageAttachments({ attachments }: { attachments: Attachment[] }) {
-  const images = attachments.filter((a) => a.kind !== 'file');
+  const images = attachments.filter((a) => !a.kind);
   const files = attachments.filter((a) => a.kind === 'file');
+  const gifs = attachments.filter((a) => a.kind === 'giphy' || a.kind === 'klipy');
+  const stickers = attachments.filter((a) => a.kind === 'sticker');
   return (
     <>
       <MessageImages attachments={images} />
+      {gifs.map((gif) => gif.gifId && <GifAttachment key={gif.kind + ':' + gif.gifId} id={gif.gifId} provider={gif.kind === 'klipy' ? 'klipy' : 'giphy'} />)}
+      {stickers.map((sticker) => <StickerAttachment key={sticker.url} sticker={sticker} />)}
       {files.length > 0 && (
         <div className="mt-1 flex flex-col gap-1.5">
           {files.map((f) => {
@@ -26,6 +35,77 @@ export function MessageAttachments({ attachments }: { attachments: Attachment[] 
         </div>
       )}
     </>
+  );
+}
+
+function StickerAttachment({ sticker }: { sticker: Attachment }) {
+  const { t } = useT();
+  const [failed, setFailed] = useState(false);
+  const [play, setPlay] = useState(false);
+  if (failed) return <p className="mt-1 text-sm text-muted">{t('chat.sticker.unavailable')}</p>;
+  return (
+    <div className="relative mt-1 w-fit">
+      <picture>
+        {sticker.animated && !play && <source media="(prefers-reduced-motion: reduce)" srcSet={sticker.url + '?still=true'} />}
+        <img src={sticker.url} width={sticker.width} height={sticker.height} alt={sticker.description || sticker.name || t('chat.expression.sticker')} loading="lazy" onError={() => setFailed(true)} className="block h-auto max-h-40 w-auto max-w-40 object-contain" />
+      </picture>
+      {sticker.animated && !play && <button type="button" aria-label={t('chat.sticker.play')} onClick={() => setPlay(true)} className="absolute inset-0 grid place-items-center motion-safe:hidden"><span className="rounded-full bg-black/75 p-2 text-white" aria-hidden="true">▶</span></button>}
+    </div>
+  );
+}
+
+function GifAttachment({ id, provider }: { id: string; provider: 'klipy' | 'giphy' }) {
+  const apiKey = useStore((s) => provider === 'klipy' ? s.klipyKey : s.giphyKey);
+  return (provider === 'klipy' ? isKlipySlug(id) : isGifId(id)) ? <ChatGif key={apiKey + ':' + id} id={id} apiKey={apiKey} provider={provider} /> : null;
+}
+
+function ChatGif({ id, apiKey, provider }: { id: string; apiKey: string; provider: 'klipy' | 'giphy' }) {
+  const { t } = useT();
+  const user = useStore((s) => s.me?.id);
+  const [favorites, saveFavorites] = usePersonalItems('favorite-gifs', user);
+  const frame = useRef<HTMLDivElement>(null);
+  const [gif, setGif] = useState<Gif | null | undefined>(undefined);
+  const [play, setPlay] = useState(false);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (!apiKey || !frame.current) return;
+    let active = true;
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      observer.disconnect();
+      void loadChatGif(apiKey, id, provider).then((result) => { if (active) setGif(result); });
+    }, { rootMargin: '120px' });
+    observer.observe(frame.current);
+    return () => { active = false; observer.disconnect(); };
+  }, [apiKey, id, provider]);
+
+  if (!apiKey || gif === null || failed) {
+    return <p className="mt-1 text-sm text-muted">{t('chat.gif.unavailable')}</p>;
+  }
+
+  return (
+    <figure
+      ref={frame}
+      aria-busy={!gif}
+      style={gif ? { aspectRatio: gif.aspect, maxWidth: Math.min(320, 300 * gif.aspect) } : undefined}
+      className={`group relative mt-1 aspect-[4/3] w-full max-w-xs overflow-hidden rounded-card ${gif ? '' : 'bg-default'}`}
+    >
+      {gif && (
+        <>
+          <picture>
+            {!play && <source media="(prefers-reduced-motion: reduce)" srcSet={gif.preview} />}
+            <img src={gif.animated} alt={gif.title} onError={() => setFailed(true)} referrerPolicy="no-referrer" className="block h-full w-full object-contain" />
+          </picture>
+          {!play && (
+            <button type="button" aria-label={t('chat.gif.play')} onClick={() => setPlay(true)} className="absolute inset-0 grid place-items-center motion-safe:hidden">
+              <span className="rounded-full bg-black/75 p-2 text-white" aria-hidden="true">▶</span>
+            </button>
+          )}
+          {gif.credit && <figcaption className="pointer-events-none absolute bottom-1 left-1 max-w-[90%] truncate rounded-full bg-black/80 px-2 py-0.5 text-xs text-white">{gif.credit}</figcaption>}
+          {provider === 'klipy' && <FavoriteGifButton saved={favorites.some((saved) => klipySlug(saved) === gif.id)} onPress={() => saveFavorites(toggleFavorite(favorites, gif.id))} />}
+        </>
+      )}
+    </figure>
   );
 }
 

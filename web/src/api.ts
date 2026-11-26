@@ -1,4 +1,5 @@
 import { errorText, t, type Params } from './i18n';
+import type { CustomEmoji, Sticker } from './types';
 import type { Bootstrap, Channel, ChannelAccess, DeletedChannel, Dm, Friend, InboxItem, Message, MyInvite, MyStatus, Permission, Role, Session, Sound, SoundPatch, Upload, User, Category, DiscordPreview, EarlyAccess } from './types';
 
 type ServerInfo = { serverName: string; serverIcon: string | null };
@@ -173,6 +174,15 @@ export const api = {
     request<ServerInfo>('/api/server/icon', { method: 'POST', body: image, headers: { 'Content-Type': image.type || 'application/octet-stream' } }),
   deleteServerIcon: () => request<ServerInfo>('/api/server/icon', { method: 'DELETE' }),
   renameServer: (name: string) => request<ServerInfo>('/api/server', { method: 'PATCH', body: JSON.stringify({ name }) }),
+  setKlipyKey: (key: string) => request<{ klipyKey: string }>('/api/server/klipy', { method: 'PUT', body: JSON.stringify({ key }) }),
+  uploadSticker: (file: File, fields: { name: string; emoji: string; description: string }) =>
+    request<Sticker[]>(`/api/server/stickers?${new URLSearchParams(fields)}`, { method: 'POST', body: file, headers: { 'Content-Type': file.type || 'application/octet-stream' } }),
+  setStickerActive: (id: string, active: boolean) =>
+    request<Sticker[]>(`/api/server/stickers/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ active }) }),
+  uploadEmoji: (name: string, file: File) =>
+    request<CustomEmoji>(`/api/server/emoji/${encodeURIComponent(name)}`, { method: 'POST', body: file, headers: { 'Content-Type': file.type } }),
+  setEmojiActive: (name: string, active: boolean) =>
+    request<CustomEmoji>(`/api/server/emoji/${encodeURIComponent(name)}`, { method: 'PUT', body: JSON.stringify({ active }) }),
   /** Early access: pre-releases for this server, and the weekly numbers it sends (exactly these). */
   earlyAccess: () => request<EarlyAccess>('/api/server/early-access'),
   setEarlyAccess: (enabled: boolean) => request<EarlyAccess>('/api/server/early-access', { method: 'PUT', body: JSON.stringify({ enabled }) }),

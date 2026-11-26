@@ -6,6 +6,7 @@ import type { Dm } from '../types';
 import { DmAvatar } from '../ui/DmAvatar';
 import { ensureHistory } from '../chat/history';
 import { plainText } from '../ui/Markdown';
+import { EmojiText } from '../ui/EmojiText';
 import { RoundButton } from '../ui/ui';
 import { EmptyState } from '../ui/Illustrations';
 import { PhoneIcon, PlusIcon, UsersIcon } from '../ui/icons';
@@ -139,7 +140,7 @@ function FeedRow(props: { active: boolean; onPress: () => void; onWarm: () => vo
           <span className="shrink-0 text-[13px] leading-4 text-faint tabular-nums">{props.stamp}</span>
         </span>
         <span className="mt-0.5 flex items-center gap-2">
-          <span className={`min-w-0 flex-1 truncate leading-5 text-muted ${props.big ? 'text-[15px]' : 'text-[14px]'}`}>{props.text}</span>
+          <span className={`min-w-0 flex-1 truncate leading-5 text-muted ${props.big ? 'text-[15px]' : 'text-[14px]'}`}><EmojiText text={props.text} /></span>
           {props.after}
         </span>
       </span>
@@ -189,7 +190,7 @@ export function ConversationRow({ dm, large = false }: { dm: Dm; large?: boolean
       <DmAvatar dm={dm} size={large ? 48 : 32} online={online} ringBg={bg} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[16px] font-medium leading-5">{title}</span>
-        {subtitle && <span className={`block truncate text-muted ${large ? 'text-[14px]' : 'text-[12px] leading-4'}`}>{subtitle}</span>}
+        {subtitle && <span className={`block truncate text-muted ${large ? 'text-[14px]' : 'text-[12px] leading-4'}`}><EmojiText text={subtitle} /></span>}
       </span>
       {inCall && <PhoneIcon size={16} className="shrink-0 text-success" aria-label={t('shell.home.callActive')} />}
       {unread > 0 && <Badge count={unread} />}

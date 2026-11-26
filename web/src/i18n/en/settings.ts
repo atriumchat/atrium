@@ -3,6 +3,18 @@ import type { settings as source } from '../ru/settings';
 
 /** Same keys as ru/settings.ts: `satisfies` fails tsc on a missing or extra key. */
 export const settings = {
+  'settings.stickers.title': "Server stickers",
+  'settings.klipy.on': "On",
+  'settings.klipy.off': "Off",
+  'settings.klipy.key': "KLIPY API key",
+  'settings.klipy.getKey': "Get a KLIPY key",
+  'settings.klipy.disable': "Turn off KLIPY",
+  'settings.emoji.title': "Server emoji",
+  'settings.emoji.name': "Emoji name",
+  'settings.emoji.image': "Image",
+  'settings.emoji.upload': "Upload",
+  'settings.emoji.hide': "Hide",
+  'settings.emoji.show': "Restore",
   'settings.title': 'Settings',
   'settings.page.account': 'Account',
   'settings.page.voice': 'Voice',

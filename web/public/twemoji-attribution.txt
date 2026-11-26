@@ -1,0 +1,5 @@
+Twemoji graphics © 2022–present Jason Sofonia and Justine De Caires; © 2014–2021 Twitter, Inc.
+Source: https://github.com/jdecked/twemoji
+Distributed unmodified under Creative Commons Attribution 4.0 International.
+License: https://creativecommons.org/licenses/by/4.0/
+Bundled license: /twemoji/LICENSE-GRAPHICS

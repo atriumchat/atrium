@@ -908,6 +908,10 @@ def bootstrap(request: Request, response: Response, user: dict = Depends(current
         "livekitUrl": LIVEKIT_URL,
         "serverName": server_name(),
         "serverIcon": icon_url(),
+        "giphyKey": giphy_key(),
+        "klipyKey": klipy_key(),
+        "stickers": sticker_catalog(),
+        "customEmoji": emoji_catalog(),
         "relayOnly": RELAY_ONLY,
         # On a public demo everyone but the admin is a guest: no password they know, so none is asked for.
         "isGuest": GUEST_MODE and not is_admin(user),
@@ -925,3 +929,4 @@ from .roles import access_of, access_payload, channels_for, list_roles
 from .uploads import PRIVATE_IMAGE_HEADERS, make_avatar, process_image
 from .realtime import disconnect_user, end_dm_voice, presence_payload, sio, user_room
 from .server import icon_url
+from .expressions import emoji_catalog, giphy_key, klipy_key, sticker_catalog

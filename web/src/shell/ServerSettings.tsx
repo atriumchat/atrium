@@ -9,6 +9,7 @@ import { IconCropper, centred, cropToBlob, loadImage, type Crop } from '../ui/Ic
 import { shortStamp } from '../chat/format';
 import type { DeletedChannel, DiscordChannel, DiscordPreview, EarlyAccess } from '../types';
 import { Primary, Quiet, Row, RowFrame, RowValue, Rows, Secondary, SubPage, field, fieldLabel, useSub } from '../ui/settings';
+import { CustomEmojiSettingsRow, KlipySettingsRow, StickerSettingsRow } from './ExpressionSettings';
 
 /**
  * The "Server" page of the settings, for the admin: the server's icon and name, as in the first-run setup. On the
@@ -22,6 +23,9 @@ export function ServerSettings() {
       <Rows title={t('settings.server.title')} className="mt-6">
         <IconRow />
         <NameRow />
+        <KlipySettingsRow />
+        <StickerSettingsRow />
+        <CustomEmojiSettingsRow />
         <ImportRow />
         <TrashRow />
         <RemovedRow />
@@ -36,6 +40,9 @@ export function ServerSettings() {
       </Rows>
       <NameField className="mt-6" />
       <Rows className="mt-6">
+        <KlipySettingsRow />
+        <StickerSettingsRow />
+        <CustomEmojiSettingsRow />
         <ImportRow />
         <TrashRow />
         <RemovedRow />

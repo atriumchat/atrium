@@ -71,7 +71,9 @@ export type DiscordPreview = { name: string; categories: { key: string; name: st
  * loads) or, with kind "file", any other file offered as a download. Pictures may carry `previewUrl`, a small
  * WebP (≤960px) for the chat itself; older messages don't have one.
  */
-export type Attachment = { url: string; previewUrl?: string; width: number; height: number; kind?: 'file'; name?: string; size?: number };
+export type Attachment = { url: string; previewUrl?: string; width: number; height: number; kind?: 'file' | 'giphy' | 'klipy' | 'sticker'; gifId?: string; name?: string; description?: string; animated?: boolean; size?: number };
+export type Sticker = { id: string; name: string; emoji: string; description: string; width: number; height: number; active: boolean };
+export type CustomEmoji = Record<string, boolean>;
 
 export type Reaction = { emoji: string; users: string[] };
 
@@ -145,6 +147,10 @@ export type Bootstrap = {
   serverName: string;
   /** The server's own icon (/api/server/icon?v=…), or null for Atrium's mark. */
   serverIcon?: string | null;
+  giphyKey?: string;
+  klipyKey?: string;
+  stickers?: Sticker[];
+  customEmoji?: CustomEmoji;
   canManageChannels: boolean;
   /** Since roles: every role, highest first, and what you may do. */
   roles?: Role[];

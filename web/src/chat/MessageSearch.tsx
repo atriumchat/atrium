@@ -6,6 +6,7 @@ import { localeOf, useT } from '../i18n';
 import { Dialog } from '../ui/Dialog';
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import { plainText } from '../ui/Markdown';
+import { EmojiText } from '../ui/EmojiText';
 import { fullStamp } from './format';
 import { emptySearchFilters, SearchFilterMenu } from './SearchFilters';
 import { SidePanel } from '../shell/SidePanel';
@@ -392,7 +393,7 @@ function Results({ query, scope, onJump }: { query: string; scope: Map<string, s
     >
       <span className="block truncate text-[13px] font-medium">{users[item.userId]?.name} · {scope.get(item.channelId)}</span>
       <span className="block truncate text-xs text-muted">{fullStamp(item.createdAt)}</span>
-      <span className="mt-1 line-clamp-2 break-words text-sm">{plainText(item.content, users) || t('chat.search.attachments', { n: item.fileCount })}</span>
+      <span className="mt-1 line-clamp-2 break-words text-sm"><EmojiText text={plainText(item.content, users) || t('chat.search.attachments', { n: item.fileCount })} /></span>
     </button>)}
     <p className="px-2 text-sm text-muted empty:hidden" role="status">
       {jumpError || (opening ? t('chat.search.opening') : failed ? t('chat.search.failed') : loading ? t('chat.search.loading') : !visible.length ? t('chat.search.empty') : '')}

@@ -12,7 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from atrium import channels, discord_import, dms, realtime, roles, server, sounds, uploads, users
+from atrium import channels, discord_import, dms, expressions, realtime, roles, server, sounds, uploads, users
 from atrium.config import WEB_DIST
 from atrium.db import init_db
 from atrium.errors import ApiError
@@ -24,7 +24,7 @@ from atrium.users import expire_statuses
 init_db()
 
 api = FastAPI(title="Hangout", docs_url=None, redoc_url=None, openapi_url=None)
-for module in (users, server, uploads, dms, channels, roles, discord_import, realtime, sounds):
+for module in (users, server, uploads, dms, channels, roles, discord_import, realtime, sounds, expressions):
     api.include_router(module.router)
 
 

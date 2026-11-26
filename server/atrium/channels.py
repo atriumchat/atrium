@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from .config import MAX_ATTACHMENTS, MAX_MESSAGE_LEN, MAX_TIME, MENTION
 from .errors import ApiError, Rejected
+from .expressions import KLIPY_SLUG, STICKER_ID, klipy_key
 from .db import connect_db, execute, now_ms, query
 from .auth import current_user
 
@@ -142,9 +143,19 @@ def message_body(user_id: str, data) -> tuple[str, str, list[str]]:
     """
     data = data or {}
     content = str(data.get("content", "")).strip()
+    gif = data.get("gifId")
+    sticker_id = data.get("stickerId")
     ids = data.get("attachments") or []
-    if not isinstance(ids, list) or len(ids) > MAX_ATTACHMENTS:
+    if not isinstance(ids, list) or len(ids) + int(gif is not None) + int(sticker_id is not None) > MAX_ATTACHMENTS:
         raise Rejected("tooManyImages", f"Не больше {MAX_ATTACHMENTS} картинок в одном сообщении", n=MAX_ATTACHMENTS)
+    if gif is not None and (not isinstance(gif, str) or not KLIPY_SLUG.fullmatch(gif) or not klipy_key()):
+        raise Rejected("klipyUnavailable", "Гифка KLIPY недоступна")
+    sticker = None
+    if sticker_id is not None:
+        rows = query("SELECT name, description, width, height, still IS NOT NULL AS animated FROM custom_stickers WHERE id = ? AND active = 1", (sticker_id,)) if isinstance(sticker_id, str) and STICKER_ID.fullmatch(sticker_id) else []
+        if not rows:
+            raise Rejected("stickerUnavailable", "Стикер недоступен")
+        sticker = {**rows[0], "animated": bool(rows[0]["animated"])}
     ids = list(dict.fromkeys(str(i) for i in ids))
     uploads = {}
     if ids:
@@ -155,9 +166,14 @@ def message_body(user_id: str, data) -> tuple[str, str, list[str]]:
         }
     if len(uploads) != len(ids):
         raise Rejected("fileMissing", "Файл не найден, прикрепи его ещё раз")
-    if len(content) > MAX_MESSAGE_LEN or (not content and not ids):
+    if len(content) > MAX_MESSAGE_LEN or (not content and not ids and not gif and not sticker):
         raise Rejected("badMessage", "Пустое или слишком длинное сообщение")
     attachments = [attachment_out(uploads[i]) for i in ids]
+    if gif:
+        # Media always comes from KLIPY in the client. Only the slug is needed to resolve it.
+        attachments.append({"kind": "klipy", "gifId": gif, "url": f"https://klipy.com/gifs/{gif}", "width": 0, "height": 0})
+    if sticker:
+        attachments.append({"kind": "sticker", "url": f"/api/server/stickers/{sticker_id}/image", **sticker})
     return content, json.dumps(attachments), ids
 
 
@@ -542,6 +558,7 @@ def purge_channel(channel_id: str) -> None:
             a["url"].rsplit("/", 1)[-1]
             for r in query("SELECT attachments FROM messages WHERE channel_id = ? AND attachments != '[]'", (channel_id,))
             for a in json.loads(r["attachments"])
+            if a["url"].startswith("/api/uploads/")
         }
     )
     with connect_db() as conn:

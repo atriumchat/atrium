@@ -81,7 +81,7 @@ def make_avatar(data: bytes, size: int = AVATAR_SIZE) -> bytes:
         raise ApiError(400, "notAnImage", "Это не похоже на картинку")
 
 
-def make_image(data: bytes) -> tuple[bytes, int, int, bytes | None]:
+def make_image(data: bytes, max_side: int = IMAGE_MAX_SIDE) -> tuple[bytes, int, int, bytes | None]:
     """Shrink a chat image to IMAGE_MAX_SIDE and re-encode as WebP, keeping animation.
 
     Returns (webp, width, height, preview): the preview is a PREVIEW_SIDE copy for the chat itself, None when the
@@ -89,9 +89,9 @@ def make_image(data: bytes) -> tuple[bytes, int, int, bytes | None]:
     carry GPS) and anything that isn't pixels.
     """
     try:
-        with open_checked(data, IMAGE_MAX_SIDE) as img:
+        with open_checked(data, max_side) as img:
             if getattr(img, "n_frames", 1) > 1:
-                scale = min(1.0, ANIMATION_MAX_SIDE / max(img.size))
+                scale = min(1.0, min(ANIMATION_MAX_SIDE, max_side) / max(img.size))
                 size = (max(1, round(img.width * scale)), max(1, round(img.height * scale)))
                 if size[0] * size[1] * img.n_frames > ANIMATION_PIXEL_BUDGET:
                     raise ApiError(413, "gifTooBig", "Гифка слишком длинная или большая")
@@ -105,7 +105,7 @@ def make_image(data: bytes) -> tuple[bytes, int, int, bytes | None]:
 
             img = ImageOps.exif_transpose(img)  # respect phone camera rotation before EXIF is discarded
             img = img.convert("RGBA") if img.mode in ("RGBA", "LA", "P", "PA") else img.convert("RGB")
-            img.thumbnail((IMAGE_MAX_SIDE, IMAGE_MAX_SIDE), Image.Resampling.LANCZOS)
+            img.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
             out = io.BytesIO()
             img.save(out, format="WEBP", quality=85)
             preview = None

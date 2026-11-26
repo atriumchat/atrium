@@ -25,6 +25,7 @@ from .config import (
     VOICE_TOKEN_TTL,
 )
 from .errors import ApiError, Rejected, socket_error, socket_rejected
+from .expressions import EMOJI_NAME
 from .db import connect_db, execute, now_ms, query
 from .auth import MESSAGES_BY_USER, RateLimit, current_user, user_from_token
 
@@ -335,7 +336,7 @@ async def message_delete(sid, data):
     table, row = found
     if row["user_id"] != user["id"] and not (table == "messages" and can(user, "manageMessages")):
         return socket_error("ownDeleteOnly", "Можно удалять только свои сообщения")
-    upload_ids = [a["url"].rsplit("/", 1)[-1] for a in json.loads(row["attachments"])]
+    upload_ids = [a["url"].rsplit("/", 1)[-1] for a in json.loads(row["attachments"]) if a["url"].startswith("/api/uploads/")]
     with connect_db() as conn:
         conn.execute(f"DELETE FROM {table} WHERE id = ?", (row["id"],))
         conn.execute("DELETE FROM reactions WHERE message_id = ?", (row["id"],))
@@ -376,7 +377,8 @@ async def reaction_toggle(sid, data):
     found = find_message(str(event_data(data).get("messageId", "")))
     if not found or not can_read_message(user["id"], *found):
         return socket_error("noMessage", "Нет такого сообщения")
-    if not is_emoji(emoji):
+    custom = emoji[1:-1] if emoji.startswith(":") and emoji.endswith(":") else ""
+    if not EMOJI_NAME.fullmatch(custom) and not is_emoji(emoji):
         return socket_error("notEmoji", "Это не эмодзи")
     if REACTIONS_BY_USER.wait(user["id"]):
         return socket_error("slowDown", "Не так быстро")
@@ -386,6 +388,8 @@ async def reaction_toggle(sid, data):
             "DELETE FROM reactions WHERE message_id = ? AND user_id = ? AND emoji = ?", (row["id"], user["id"], emoji)
         ).rowcount
         if not removed:
+            if custom and not conn.execute("SELECT 1 FROM custom_emoji WHERE name = ? AND active = 1", (custom,)).fetchone():
+                return socket_error("notEmoji", "Это не эмодзи")
             if conn.execute("SELECT COUNT(DISTINCT emoji) FROM reactions WHERE message_id = ?", (row["id"],)).fetchone()[0] >= 20:
                 return socket_error("reactionLimit", "На сообщении уже 20 разных реакций")
             conn.execute(

@@ -1,4 +1,4 @@
-import type { Category, Channel } from '../types';
+import type { Category, Channel, CustomEmoji, Sticker } from '../types';
 import type { DesktopUpdate } from '../desktop';
 import { get, set, type State } from './core';
 
@@ -16,6 +16,10 @@ export type ShellSlice = {
   serverName: string;
   /** The server's icon, or null: Atrium's mark stands in. */
   serverIcon: string | null;
+  giphyKey: string;
+  klipyKey: string;
+  stickers: Sticker[];
+  customEmoji: CustomEmoji;
   channels: Channel[];
   /** Groups of channels; empty on a server without any (or one from before categories). */
   categories: Category[];
@@ -47,6 +51,10 @@ export function shellSlice(): ShellSlice {
   return {
     serverName: 'Atrium',
     serverIcon: null,
+    giphyKey: '',
+    klipyKey: '',
+    stickers: [],
+    customEmoji: {},
     channels: [],
     categories: [],
     selectedChannelId: null,

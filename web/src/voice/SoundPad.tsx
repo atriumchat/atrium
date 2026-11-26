@@ -20,6 +20,7 @@ import { useStore } from "../store";
 import type { Sound } from "../types";
 import { ConfirmDialog, Dialog } from "../ui/Dialog";
 import { EmojiPicker } from "../ui/EmojiPicker";
+import { EmojiText } from "../ui/EmojiText";
 import {
   ChevronDownIcon,
   DotsVerticalIcon,
@@ -256,7 +257,7 @@ function Peek({ onAll }: { onAll: () => void }) {
               className="h-10 min-w-0 justify-start gap-1.5 rounded-row px-2 text-[13px]"
             >
               <span aria-hidden className="flex size-5 shrink-0 items-center justify-center text-[17px] leading-none">
-                {on ? <StopIcon size={13} /> : sound.emoji || <SoundboardIcon size={15} className="text-muted" />}
+                {on ? <StopIcon size={13} /> : sound.emoji ? <EmojiText text={sound.emoji} unicodeOnly /> : <SoundboardIcon size={15} className="text-muted" />}
               </span>
               <span className="min-w-0 truncate">{sound.name}</span>
             </Button>
@@ -537,7 +538,7 @@ function SoundTile({
           className="relative h-full min-w-0 flex-1 justify-start gap-1.5 rounded-full pl-2 pr-1 text-left text-[13px] focus-visible:ring-inset"
         >
           <span aria-hidden className="flex size-5 shrink-0 items-center justify-center text-[17px] leading-none">
-            {playing ? <StopIcon size={13} /> : sound.emoji || <SoundboardIcon size={15} className="text-muted" />}
+            {playing ? <StopIcon size={13} /> : sound.emoji ? <EmojiText text={sound.emoji} unicodeOnly /> : <SoundboardIcon size={15} className="text-muted" />}
           </span>
           <span className="min-w-0 flex-1 truncate">{sound.name}</span>
           {long && <span className="shrink-0 text-[11px] text-muted">{clock(sound.durationMs)}</span>}
@@ -853,10 +854,11 @@ function SoundDialog({
                 <div className="flex items-center gap-2">
                   <EmojiPicker
                     label={t("voice.soundboard.emojiPick")}
+                    custom={false}
                     onPick={(value) => { if (!saving.current) setEmoji(value); }}
                     className="flex size-[46px] shrink-0 items-center justify-center rounded-full border border-white/[0.07] bg-white/[0.03] text-[22px] outline-none transition-colors hover:border-white/20 aria-expanded:border-white/40 data-[focus-visible=true]:border-white/40"
                   >
-                    {emoji || <SmileIcon size={20} className="text-muted" />}
+                    {emoji ? <EmojiText text={emoji} unicodeOnly /> : <SmileIcon size={20} className="text-muted" />}
                   </EmojiPicker>
                   {emoji && (
                     <Quiet onClick={() => setEmoji("")}>

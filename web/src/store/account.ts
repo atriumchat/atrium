@@ -57,6 +57,10 @@ export function initStore(data: Bootstrap) {
   set({
     serverName: data.serverName,
     serverIcon: data.serverIcon ?? null,
+    giphyKey: data.giphyKey ?? '',
+    klipyKey: data.klipyKey ?? '',
+    stickers: data.stickers ?? [],
+    customEmoji: data.customEmoji ?? {},
     me: data.me,
     users: Object.fromEntries(data.users.map((u) => [u.id, u])),
     channels: data.channels,

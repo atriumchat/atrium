@@ -126,6 +126,7 @@ function connect() {
     useStore.setState((s) => ({ data: s.data ? { ...s.data, channels } : null }));
   });
   live.on('server:updated', (patch: { serverName: string; serverIcon: string | null }) => useStore.setState((s) => ({ data: s.data ? { ...s.data, ...patch } : null })));
+  live.on('klipy:updated', ({ klipyKey }: { klipyKey: string }) => useStore.setState((s) => ({ data: s.data ? { ...s.data, klipyKey } : null })));
   for (const event of ['user:new', 'user:updated']) live.on(event, (user: User) => useStore.setState((s) => ({
     users: { ...s.users, [user.id]: user }, data: s.data?.me.id === user.id ? { ...s.data, me: user } : s.data,
   })));

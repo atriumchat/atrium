@@ -3,6 +3,17 @@ import type { errors as source } from '../ru/errors';
 
 /** Same keys as ru/errors.ts: `satisfies` fails tsc on a missing or extra key. */
 export const errors = {
+  'err.stickerFormat': "Use PNG, APNG, JPG, GIF, or WebP",
+  'err.stickerTooBig': "The sticker exceeds 512 KB",
+  'err.stickerFields': "Enter a name and choose a related emoji",
+  'err.stickerLimit': "This server already has 100 stickers",
+  'err.stickerUnavailable': "This sticker is unavailable",
+  'err.klipyUnavailable': "This KLIPY GIF is unavailable",
+  'err.klipyKeyInvalid': "Check your KLIPY key",
+  'err.emojiNameInvalid': "Use 2–32 letters, numbers, or underscores for the emoji name",
+  'err.emojiTooBig': "The emoji image exceeds 512 KB",
+  'err.emojiLimit': "This server already has 100 custom emoji",
+  'err.emojiNameTaken': "This emoji name is already in use",
   'err.http': 'Error {status}',
   'err.invalidFields': 'Some fields are too short or too long',
   'err.sessionExpired': 'Sign in again',

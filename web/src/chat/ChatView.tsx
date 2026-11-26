@@ -23,6 +23,9 @@ import { UserProfile } from '../people/UserProfile';
 import { GroupInfo } from '../people/GroupInfo';
 import { fileSize, MessageAttachments } from './Attachments';
 import { EmojiPicker } from '../ui/EmojiPicker';
+import { EmojiText, isEmojiOnly } from '../ui/EmojiText';
+import { ExpressionPicker } from './ExpressionPicker';
+import type { Gif } from './giphy';
 import { ensureHistory } from './history';
 import { invitedRoom, Markdown, mentionsToNames, namesToMentions, plainText } from '../ui/Markdown';
 import { RoomCard } from '../voice/RoomCard';
@@ -35,14 +38,6 @@ const TYPING_TTL = 4500;
 const MAX_ATTACHMENTS = 10;
 
 const hasFiles = (e: DragEvent) => e.dataTransfer.types.includes('Files');
-
-const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\p{Regional_Indicator}|‍|️|\s)+$/u;
-const HAS_PICTO = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
-
-function isEmojiOnly(text: string) {
-  const t = text.trim();
-  return t.length > 0 && t.length <= 16 && EMOJI_ONLY.test(t) && HAS_PICTO.test(t);
-}
 
 /** A text channel or a direct-message conversation; both render with the same chat. */
 export type Conversation = { id: string; kind: 'channel' | 'dm'; title: string; userId?: string };
@@ -535,7 +530,8 @@ function MessageBody({ message, startsGroup }: { message: Message; startsGroup: 
   const canDelete = mine || (!message.dm && manageMessages);
   // A reply always shows who wrote it, like Discord, even in the middle of someone's run of messages.
   const showHeader = startsGroup || !!message.replyTo;
-  const big = !message.replyTo && isEmojiOnly(message.content);
+  const catalog = useStore((s) => s.customEmoji);
+  const big = !message.replyTo && isEmojiOnly(message.content, catalog);
 
   function remove(e?: { shiftKey?: boolean }) {
     // Shift skips the question, as in Discord.
@@ -637,7 +633,7 @@ function ReplyLine({ reply }: { reply: NonNullable<Message['replyTo']> }) {
       <span className="absolute -left-[46px] top-[9px] h-3 w-[34px] rounded-tl-[8px] border-l-2 border-t-2 border-white/15" />
       {author && <Avatar user={author} size={16} />}
       {author && <span className="shrink-0 font-medium text-foreground/80">{author.name}</span>}
-      <span className={`truncate ${reply.deleted ? 'italic' : ''}`}>{text}</span>
+      <span className={`truncate ${reply.deleted ? 'italic' : ''}`}><EmojiText text={text} /></span>
     </button>
   );
 }
@@ -663,7 +659,7 @@ function Reactions({ message, meId }: { message: Message; meId: string | undefin
               mine ? 'bg-white font-medium text-black hover:bg-[#e7e7ea]' : 'bg-white/[0.16] text-foreground hover:bg-white/[0.22]'
             }`}
           >
-            <span className="text-[15px] leading-none">{r.emoji}</span>
+            <span className="text-[15px] leading-none"><EmojiText text={r.emoji} /></span>
             {r.users.length}
           </button>
         );
@@ -691,7 +687,7 @@ function MessageActions(props: { message: Message; onReact: (emoji: string) => v
     <div className="absolute -top-4 right-2 z-10 hidden items-center gap-px rounded-fine border-[0.5px] border-white/10 bg-default p-0.5 shadow-[0_4px_12px_rgba(0,0,0,.35)] group-hover:flex group-has-[button:focus-visible]:flex has-[[aria-expanded=true]]:flex">
       {QUICK_REACTIONS.map((e) => (
         <button key={e} onClick={() => props.onReact(e)} aria-label={t('chat.reaction', { emoji: e })} className={`${btn} ${narrow} text-[16px]`}>
-          {e}
+          <EmojiText text={e} />
         </button>
       ))}
       <EmojiPicker label={t('chat.moreReactions')} onPick={props.onReact} className={btn}>
@@ -832,7 +828,7 @@ type PendingFile = { key: string; name: string; size: number; image?: boolean; p
 type MentionOption = { id: string; label: string; user?: User };
 
 // An in-flight send can outlive its composer. Hold uploaded files for retry until the chat opens again.
-const sendDrafts = new Map<string, { text: string; files: PendingFile[]; result: Promise<boolean> | null }>();
+const sendDrafts = new Map<string, { text: string; files: PendingFile[]; gif?: Gif; result: Promise<boolean> | null }>();
 useStore.subscribe((state, previous) => {
   if (state.me?.id !== previous.me?.id) sendDrafts.clear();
 });
@@ -874,6 +870,9 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
   const { id, placeholder, onResize, onSend } = props;
   const [text, setText] = useState(() => sendDrafts.get(id)?.text ?? loadDraft(id));
   const [pending, setPending] = useState<PendingFile[]>(() => sendDrafts.get(id)?.files ?? []);
+  const [gif, setGif] = useState(() => sendDrafts.get(id)?.gif);
+  const klipyKey = useStore((s) => s.klipyKey);
+  const [sendingExpression, setSendingExpression] = useState(false);
   const [sending, setSending] = useState(() => sendDrafts.get(id)?.result ?? null);
   const [caret, setCaret] = useState(0);
   const [pick, setPick] = useState(0);
@@ -885,8 +884,8 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
   const replyId = useStore((s) => s.replyingTo[id]);
   const replyTo = useStore((s) => (replyId ? (s.searchContext?.conversation === id ? s.searchContext.messages : s.messages[id])?.find((m) => m.id === replyId) : undefined));
   const uploading = pending.some((p) => !p.upload);
-  const hasPending = pending.length > 0;
-  const canSend = !sending && !uploading && (text.trim().length > 0 || hasPending);
+  const hasPending = pending.length > 0 || !!gif;
+  const canSend = !sending && !sendingExpression && !uploading && (!gif || !!klipyKey) && (text.trim().length > 0 || hasPending);
 
   // "@" right before the caret opens a list of people to mention.
   const mentionQuery = /(?:^|\s)@([^\s@]{0,32})$/.exec(text.slice(0, caret))?.[1];
@@ -923,6 +922,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
         setText('');
         pendingNow.current.forEach(revokePreview);
         setPending([]);
+        setGif(undefined);
       }
       setSending(null);
     });
@@ -973,7 +973,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
 
   function addFiles(files: File[]) {
     if (sendDrafts.get(id)?.result) return;
-    const accepted = files.slice(0, Math.max(0, MAX_ATTACHMENTS - pending.length));
+    const accepted = files.slice(0, Math.max(0, MAX_ATTACHMENTS - pending.length - Number(!!gif)));
     if (accepted.length < files.length) showError(t('chat.maxAttachments', { n: MAX_ATTACHMENTS }));
     for (const file of accepted) {
       const key = crypto.randomUUID();
@@ -1011,6 +1011,40 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
     });
   }
 
+  function insertEmoji(value: string, keepOpen: boolean) {
+    if (sendDrafts.get(id)?.result) return;
+    const el = ref.current;
+    const start = el?.selectionStart ?? text.length;
+    const end = el?.selectionEnd ?? start;
+    const next = start + value.length;
+    setText(text.slice(0, start) + value + text.slice(end));
+    setCaret(next);
+    requestAnimationFrame(() => {
+      if (!isMobile && !keepOpen) ref.current?.focus();
+      ref.current?.setSelectionRange(next, next);
+    });
+  }
+
+  function attachGif(value: Gif) {
+    setGif(value);
+    if (!isMobile) requestAnimationFrame(() => ref.current?.focus());
+  }
+
+  async function sendExpression(gifId?: string, stickerId?: string) {
+    if (sending || sendingExpression) return;
+    const epoch = getSessionEpoch();
+    const answering = replyId;
+    setSendingExpression(true);
+    try {
+      const sent = await sendMessage(id, '', [], answering, gifId, stickerId);
+      if (!sent || epoch !== getSessionEpoch()) return;
+      if (useStore.getState().replyingTo[id] === answering) setReplyingTo(id, null);
+      onSend();
+    } finally {
+      setSendingExpression(false);
+    }
+  }
+
   function send() {
     if (!canSend || sendDrafts.get(id)?.result) return;
     const epoch = getSessionEpoch();
@@ -1020,18 +1054,18 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
     onSend();
     // The mounted composer owns its blob URLs. A reopened one can use the uploaded previews.
     const files = pending.map((file) => ({ ...file, preview: file.preview ? file.upload?.previewUrl ?? file.upload?.url : undefined }));
-    const result = sendMessage(id, content, files.map((file) => file.upload!.id), answering).then((sent) => {
+    const result = sendMessage(id, content, files.map((file) => file.upload!.id), answering, gif?.id).then((sent) => {
       if (epoch !== getSessionEpoch()) return false;
       if (sent) {
         sendDrafts.delete(id);
         saveDraft(id, '');
         if (useStore.getState().replyingTo[id] === answering) setReplyingTo(id, null);
       } else {
-        sendDrafts.set(id, { text, files, result: null });
+        sendDrafts.set(id, { text, files, gif, result: null });
       }
       return sent;
     });
-    sendDrafts.set(id, { text, files, result });
+    sendDrafts.set(id, { text, files, gif, result });
     setSending(result);
   }
 
@@ -1084,7 +1118,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
             <ReplyIcon size={15} className="shrink-0" />
             <span className="min-w-0 flex-1 truncate">
               {t('chat.replyTo')} <span className="font-medium text-foreground">{users[replyTo.userId]?.name ?? '…'}</span>:{' '}
-              {plainText(replyTo.content, users) || t('chat.attachmentLower')}
+              <EmojiText text={plainText(replyTo.content, users) || t('chat.attachmentLower')} />
             </span>
             <button disabled={!!sending} onClick={() => setReplyingTo(id, null)} aria-label={t('chat.cancelReply')} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-white/10 hover:text-foreground">
               <XIcon size={14} strokeWidth={2.5} />
@@ -1093,6 +1127,19 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
         )}
         {hasPending && (
           <div className="flex gap-2 overflow-x-auto px-3 pt-3">
+            {gif && (
+              <div className="relative h-24 w-28 shrink-0 overflow-hidden rounded-card bg-window">
+                {klipyKey && (
+                  <picture>
+                    <source media="(prefers-reduced-motion: reduce)" srcSet={gif.preview} />
+                    <img src={gif.animated} alt={gif.title} className="h-full w-full object-cover" />
+                  </picture>
+                )}
+                <button type="button" aria-label={t('chat.gif.remove')} disabled={!!sending} onClick={() => setGif(undefined)} className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80">
+                  <XIcon size={14} strokeWidth={3} />
+                </button>
+              </div>
+            )}
             {pending.map((p) => {
               const preview = p.preview ?? (p.image && p.upload ? (p.upload.previewUrl ?? p.upload.url) : undefined);
               return (
@@ -1184,6 +1231,9 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
             aria-label={placeholder}
             className="max-h-[220px] min-w-0 flex-1 resize-none bg-transparent py-1.5 text-[16px] leading-6 text-foreground outline-none placeholder:text-faint placeholder-shown:overflow-hidden placeholder-shown:text-ellipsis placeholder-shown:whitespace-nowrap"
           />
+          <ExpressionPicker apiKey={klipyKey} busy={!!sending || sendingExpression} gifDisabled={pending.length >= MAX_ATTACHMENTS}
+            onGif={(value, draft) => { if (draft) attachGif(value); else void sendExpression(value.id); }}
+            onSticker={(stickerId) => void sendExpression(undefined, stickerId)} onEmoji={insertEmoji} />
           <RoundButton size="sm" tone={canSend ? 'accent' : 'ghost'} label={t('chat.send')} isDisabled={!canSend} onPress={send} className="rounded-row!">
             <ArrowUpIcon aria-hidden="true" />
           </RoundButton>

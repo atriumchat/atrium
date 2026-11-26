@@ -2,6 +2,7 @@ import { Fragment, useState, type ReactNode } from 'react';
 import { t, useT } from '../i18n';
 import { useStore } from '../store';
 import type { User } from '../types';
+import { EmojiText, emojiShortcode } from './EmojiText';
 
 /**
  * Discord-style message formatting, parsed by hand into React elements (never HTML):
@@ -38,7 +39,7 @@ export function plainText(text: string, users: Record<string, User>) {
   return mentionsToNames(text, users)
     .replace(ROOM, (_, id: string) => roomName(id))
     .replace(/```[\w-]*\n?/g, '')
-    .replace(/(\*\*|__|~~|\|\||`)/g, '')
+    .replace(/:[a-z0-9_а-яё]{2,32}:|\*\*|__|~~|\|\||`/g, (token) => token[0] === ':' ? token : '')
     .replace(/^> /gm, '')
     .replace(/\s+/g, ' ')
     .trim();
@@ -110,6 +111,7 @@ const INLINE: { re: RegExp; render: (m: RegExpExecArray, key: string) => ReactNo
   { re: /`([^`\n]+)`/, render: (m, key) => <code key={key} className="rounded-[6px] bg-white/10 px-1.5 py-0.5 font-mono text-[0.88em]">{m[1]}</code> },
   { re: /<@([0-9a-f]{32}|all)>/, render: (m, key) => <Mention key={key} id={m[1]} /> },
   { re: /<#([0-9a-f]{32})>/, render: (m, key) => <RoomName key={key} id={m[1]} /> },
+  { re: emojiShortcode, render: (m, key) => <EmojiText key={key} text={m[0]} /> },
   {
     re: /https?:\/\/[^\s<]+[^\s<.,:;"')\]!?]/,
     render: (m, key) => (
@@ -138,10 +140,10 @@ function inline(text: string, keyBase: string): ReactNode[] {
       if (m && (!best || m.index < best.m.index)) best = { m, rule };
     }
     if (!best) {
-      out.push(rest);
+      out.push(<EmojiText key={`${keyBase}.${n}`} text={rest} />);
       break;
     }
-    if (best.m.index > 0) out.push(rest.slice(0, best.m.index));
+    if (best.m.index > 0) out.push(<EmojiText key={`${keyBase}.${n++}`} text={rest.slice(0, best.m.index)} />);
     out.push(best.rule.render(best.m, `${keyBase}.${n++}`));
     rest = rest.slice(best.m.index + best.m[0].length);
   }

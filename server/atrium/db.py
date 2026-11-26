@@ -381,6 +381,23 @@ def init_db() -> None:
               key TEXT PRIMARY KEY,
               value TEXT NOT NULL
             );
+            -- Small, immutable images are backed up together with the messages that refer to them by name.
+            CREATE TABLE IF NOT EXISTS custom_emoji (
+              name TEXT PRIMARY KEY,
+              image BLOB NOT NULL,
+              active INTEGER NOT NULL DEFAULT 1
+            );
+            CREATE TABLE IF NOT EXISTS custom_stickers (
+              id TEXT PRIMARY KEY,
+              name TEXT NOT NULL,
+              emoji TEXT NOT NULL,
+              description TEXT NOT NULL DEFAULT '',
+              width INTEGER NOT NULL,
+              height INTEGER NOT NULL,
+              image BLOB NOT NULL,
+              still BLOB,
+              active INTEGER NOT NULL DEFAULT 1
+            );
             -- Who was in a voice room on which day (UTC), and whether 3+ people were in it together: the only thing early
             -- access counts from (telemetry.py). Rows older than 30 days are dropped.
             CREATE TABLE IF NOT EXISTS voice_days (
