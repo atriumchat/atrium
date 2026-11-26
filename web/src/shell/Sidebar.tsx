@@ -16,6 +16,7 @@ import { CallDuration } from '../voice/CallDuration';
 import { SoundPlayedMark } from '../voice/SoundPad';
 import { ChannelMenu, InviteToRoom } from './ChannelMenu';
 import { RoundButton, VolumeSlider } from '../ui/ui';
+import { MeCard } from './MeCard';
 import { EmptyState } from '../ui/Illustrations';
 import { UserPlusIcon } from '../ui/icons';
 import { BellSlashIcon, ChevronDownIcon, DotsIcon, HashIcon, HashLockIcon, HeadphonesSlashIcon, MicSlashIcon, PencilIcon, PlusIcon, SpeakerIcon, SpeakerLockIcon, TrashIcon, VideoIcon } from '../ui/icons';
@@ -657,7 +658,9 @@ function VoiceMember({ entry }: { entry: VoiceEntry }) {
   );
   const row = 'flex h-8 w-full items-center gap-2 rounded-full px-1.5';
 
-  if (isMe || !inSameRoom) return <li className={row}>{content}</li>;
+  // Yourself: the same small profile card as at the bottom of the panel, beside the row.
+  if (isMe) return <li><MeCard placement="right" className={`${row} cursor-pointer hover:bg-default/50`}>{content}</MeCard></li>;
+  if (!inSameRoom) return <li className={row}>{content}</li>;
   return (
     <li>
       <Popover>

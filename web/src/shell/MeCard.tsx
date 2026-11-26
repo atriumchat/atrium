@@ -42,7 +42,7 @@ export function untilText(until: number) {
  * left edge (`anchor`). Photo, your line of status in a bubble, and the two things you come here for:
  * editing the profile and the status, with "do not disturb" and "invisible" for a while or for good.
  */
-export function MeCard({ anchor, children, className }: { anchor: RefObject<HTMLElement | null>; children: ReactNode; className?: string }) {
+export function MeCard({ anchor, children, className, placement = 'top start' }: { anchor?: RefObject<HTMLElement | null>; children: ReactNode; className?: string; placement?: 'top start' | 'right' }) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const [settings, setSettings] = useState(false);
@@ -52,7 +52,7 @@ export function MeCard({ anchor, children, className }: { anchor: RefObject<HTML
         <Popover.Trigger aria-label={t('shell.me.profile')} className={className}>
           {children}
         </Popover.Trigger>
-        <Popover.Content triggerRef={anchor} placement="top start" offset={8} className="w-[300px] overflow-hidden p-0">
+        <Popover.Content triggerRef={anchor} placement={placement} offset={8} className="w-[300px] overflow-hidden p-0">
           <Popover.Dialog aria-label={t('shell.me.profile')} className="p-0 outline-none">
             <Card
               onEdit={() => {

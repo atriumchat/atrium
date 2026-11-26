@@ -77,6 +77,27 @@ export const SpeakerIcon = solid(Solid.SpeakerWaveIcon);
 export const SpeakerLockIcon = locked(Solid.SpeakerWaveIcon);
 export const SpeakerSlashIcon = solid(Solid.SpeakerXMarkIcon);
 export const ScreenIcon = solid(Solid.ComputerDesktopIcon);
+/** Vertical bars of a voice: the noise suppression button. */
+export function WaveformIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" {...props}>
+      <path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 10v4" />
+    </svg>
+  );
+}
+/** The screen with a cross on it: what the share button shows while you are sharing. */
+export function ScreenOffIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M2.25 5.25a3 3 0 0 1 3-3h13.5a3 3 0 0 1 3 3V15a3 3 0 0 1-3 3h-3v.257c0 .597.237 1.17.659 1.591l.621.622a.75.75 0 0 1-.53 1.28h-9a.75.75 0 0 1-.53-1.28l.621-.622a2.25 2.25 0 0 0 .659-1.59V18h-3a3 3 0 0 1-3-3V5.25Zm1.5 0v7.5a1.5 1.5 0 0 0 1.5 1.5h13.5a1.5 1.5 0 0 0 1.5-1.5v-7.5a1.5 1.5 0 0 0-1.5-1.5H5.25a1.5 1.5 0 0 0-1.5 1.5Z"
+      />
+      <path d="M9.4 6.4l5.2 5.2M14.6 6.4l-5.2 5.2" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
 export const PhoneDownIcon = solid(Solid.PhoneXMarkIcon);
 export const PhoneIcon = solid(Solid.PhoneIcon);
 export const SignalIcon = solid(Solid.RssIcon);

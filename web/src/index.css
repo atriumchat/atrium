@@ -20,6 +20,8 @@
   --app-header-height: 72px;
   --app-panel-header-height: 56px;
   --app-header-control: 36px;
+  --app-call-control: 48px;
+  --app-call-control-compact: 44px;
   --app-corner-trim: 0px;
   --app-radius-fine: calc(8px - var(--app-corner-trim));
   --app-radius-tight: calc(10px - var(--app-corner-trim));
@@ -77,16 +79,29 @@
   }
 }
 
+/* A chevron on a menu button points down and turns up while its menu is open. */
+.chevron-flip {
+  transition: transform 150ms ease;
+}
+[aria-expanded="true"] > .chevron-flip {
+  transform: rotate(180deg);
+}
+
 @utility call-control {
   @apply grid shrink-0 place-items-center rounded-full p-0;
-  width: var(--app-header-control);
-  height: var(--app-header-control);
-  min-width: var(--app-header-control);
+  width: var(--app-call-control);
+  height: var(--app-call-control);
+  min-width: var(--app-call-control);
 
-  @container (max-width: 23rem) {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
+  @container (width < 35rem) {
+    width: var(--app-call-control-compact);
+    height: var(--app-call-control-compact);
+    min-width: var(--app-call-control-compact);
+  }
+
+  & svg {
+    width: 22px;
+    height: 22px;
   }
 
   &:focus-visible,

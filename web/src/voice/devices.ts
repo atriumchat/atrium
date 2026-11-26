@@ -10,9 +10,31 @@ const get = useStore.getState;
 const userVolumes = new Map<string, number>();
 const audibleVolumes = new Map<string, number>();
 
+// How loud the whole call plays (0..2), on top of each person's own volume; kept on this device.
+const OUTPUT_KEY = 'atrium_output_volume';
+let output = (() => {
+  try {
+    const saved = Number(localStorage.getItem(OUTPUT_KEY));
+    return localStorage.getItem(OUTPUT_KEY) !== null && Number.isFinite(saved) ? Math.min(2, Math.max(0, saved)) : 1;
+  } catch {
+    return 1;
+  }
+})();
+
+export const getOutputVolume = () => output;
+
+export function setOutputVolume(volume: number) {
+  output = volume;
+  try {
+    localStorage.setItem(OUTPUT_KEY, String(volume));
+  } catch {
+    // Not remembered; still applied to this call.
+  }
+  get().room?.remoteParticipants.forEach(applyVolume);
+}
+
 export function applyVolume(participant: RemoteParticipant) {
-  const volume = userVolumes.get(participant.identity);
-  if (volume === undefined) return;
+  const volume = (userVolumes.get(participant.identity) ?? 1) * output;
   participant.setVolume(volume);
   participant.setVolume(volume, Track.Source.ScreenShareAudio);
 }

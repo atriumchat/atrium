@@ -1,8 +1,8 @@
 import { useRef, type ReactNode, type RefObject } from 'react';
-import { Button, Tooltip } from '@heroui/react';
+import { Button, Label, Popover, Switch, Tooltip } from '@heroui/react';
 import { useT } from '../i18n';
 import { dmTitle, isDmId, openDm, selectChannel, useStore } from '../store';
-import { leaveVoice, toggleCamera, toggleDeafen, toggleMute, toggleScreenShare } from '../voice/voice';
+import { leaveVoice, screenSource, setVoicePrefs, toggleCamera, toggleDeafen, toggleMute, toggleScreenShare } from '../voice/voice';
 import { Avatar } from '../ui/Avatar';
 import { useCallStats } from '../voice/stats';
 import { BypassHint, CallQuality } from '../voice/Bypass';
@@ -17,6 +17,8 @@ import {
   MicSlashIcon,
   PhoneDownIcon,
   ScreenIcon,
+  ScreenOffIcon,
+  WaveformIcon,
   VideoIcon,
   VideoSlashIcon,
 } from '../ui/icons';
@@ -48,12 +50,22 @@ function VoiceStatus() {
   });
   const cameraOn = useStore((s) => s.cameraOn);
   const screenSharing = useStore((s) => s.screenSharing);
+  const source = useStore((s) => (s.screenSharing ? screenSource(s.room) : ''));
   const stats = useCallStats(!!channelId);
   if (!channelId) return null;
   const connected = status === 'connected';
 
   return (
     <div className="border-b-[0.5px] border-[#26262b] p-3">
+      {screenSharing && (
+        <div className="mb-2 flex items-center gap-2 border-b-[0.5px] border-[#26262b] pb-2 pl-1.5">
+          <ScreenIcon className="shrink-0 text-muted" />
+          <span className="min-w-0 flex-1 truncate text-[14px] font-medium" title={source}>{source}</span>
+          <RoundButton size="sm" tone="ghost" label={t('shell.call.screenStop')} onPress={toggleScreenShare} className="hover:text-danger">
+            <ScreenOffIcon />
+          </RoundButton>
+        </div>
+      )}
       <div className="flex items-center gap-2 pl-1.5">
         <CallQuality stats={stats} connected={connected} />
         <button onClick={() => (isDmId(channelId) ? openDm(channelId) : selectChannel(channelId))} className="min-w-0 flex-1 text-left">
@@ -62,23 +74,74 @@ function VoiceStatus() {
           </span>
           <span className="block truncate text-[12px] text-muted hover:underline">{where}</span>
         </button>
+        <NoiseButton />
         <RoundButton size="sm" tone="ghost" label={t('shell.call.disconnect')} onPress={() => leaveVoice()} className="hover:text-danger">
           <PhoneDownIcon />
         </RoundButton>
       </div>
       <BypassHint stats={stats} />
-      <div className="mx-auto mt-2 flex w-fit items-center gap-1.5 rounded-full bg-window p-1.5 ring-1 ring-inset ring-separator">
-        <RoundButton label={t(cameraOn ? 'shell.call.cameraOff' : 'shell.call.cameraOn')}
-          tone={cameraOn ? 'on' : 'plain'} pressed={cameraOn} isDisabled={!connected} onPress={toggleCamera}>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        <WideButton label={cameraOn ? t('shell.call.cameraOff') : t('shell.call.cameraOn')} on={cameraOn} disabled={!connected} onPress={toggleCamera}>
           {cameraOn ? <VideoIcon /> : <VideoSlashIcon />}
-        </RoundButton>
-        <RoundButton label={t(screenSharing ? 'shell.call.screenStop' : 'shell.call.screenStart')}
-          tone={screenSharing ? 'on' : 'plain'} pressed={screenSharing} isDisabled={!connected} onPress={toggleScreenShare}>
-          <ScreenIcon />
-        </RoundButton>
+        </WideButton>
+        <WideButton
+          label={screenSharing ? t('shell.call.screenStop') : t('shell.call.screenStart')}
+          on={screenSharing}
+          disabled={!connected}
+          onPress={toggleScreenShare}
+        >
+          {screenSharing ? <ScreenOffIcon /> : <ScreenIcon />}
+        </WideButton>
         <SoundboardButton look="panel" stopsPlayback disabled={!connected} />
       </div>
     </div>
+  );
+}
+
+/** The bars next to the hang-up: one switch for noise suppression, so it can be turned on or off without the settings. */
+function NoiseButton() {
+  const { t } = useT();
+  const on = useStore((s) => s.voicePrefs.noise !== 'off');
+  return (
+    <Popover>
+      <Tooltip delay={300} closeDelay={0}>
+        <Popover.Trigger aria-label={t('voice.noise.title')} className={`flex size-8 shrink-0 items-center justify-center rounded-full outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-focus ${on ? 'text-foreground' : 'text-muted'}`}>
+          <WaveformIcon size={18} />
+        </Popover.Trigger>
+        <Tooltip.Content>{t('voice.noise.title')}</Tooltip.Content>
+      </Tooltip>
+      <Popover.Content placement="top" className="w-64">
+        <Popover.Dialog aria-label={t('voice.noise.title')} className="p-4 outline-none">
+          <Switch className="w-full" isSelected={on} onChange={(value) => void setVoicePrefs({ noise: value ? 'rnnoise' : 'off' })}>
+            <Switch.Content className="flex w-full items-center justify-between gap-3">
+              <Label className="text-[14px] font-medium">{t('voice.noise.title')}</Label>
+              <Switch.Control className="shrink-0 [--switch-control-bg:rgb(255_255_255/0.16)]">
+                <Switch.Thumb />
+              </Switch.Control>
+            </Switch.Content>
+          </Switch>
+        </Popover.Dialog>
+      </Popover.Content>
+    </Popover>
+  );
+}
+
+function WideButton(props: { label: string; on: boolean; disabled: boolean; onPress: () => void; children: ReactNode }) {
+  return (
+    <Tooltip delay={300} closeDelay={0}>
+      <Button
+        fullWidth
+        variant="tertiary"
+        aria-label={props.label}
+        aria-pressed={props.on}
+        isDisabled={props.disabled}
+        onPress={props.onPress}
+        className={`h-10 rounded-full [&_svg]:size-5 ${props.on ? '[--button-bg:white] [--button-bg-hover:#e7e7ea] [--button-fg:#0b0b0c]' : ''}`}
+      >
+        {props.children}
+      </Button>
+      <Tooltip.Content>{props.label}</Tooltip.Content>
+    </Tooltip>
   );
 }
 
@@ -139,7 +202,7 @@ function ToggleWithDevice(props: { active: boolean; label: string; onPress: () =
           variant="ghost"
           aria-label={props.label}
           onPress={props.onPress}
-          className={`h-9 w-9 min-w-9 rounded-full p-0 [&_svg]:size-5 ${
+          className={`h-9 w-9 min-w-9 rounded-l-full rounded-r-none p-0 [&_svg]:size-5 ${
             props.active ? '[--button-fg:var(--danger)] [--button-bg-hover:color-mix(in_oklab,var(--danger)_20%,transparent)]' : '[--button-fg:var(--muted)]'
           }`}
         >

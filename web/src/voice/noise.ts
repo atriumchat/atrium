@@ -280,10 +280,12 @@ async function reconcileOnce() {
     if (haveNs !== undefined && haveNs !== wantNs) {
       await track.restartTrack(captureOptions(want));
     }
+    await syncGain(track);
     return;
   }
 
   if (strongOn) {
+    strongGain(track);
     // A new track can appear while the processor is already on (a recreate by the SDK): it comes with the browser's
     // suppression on until this point, so take it off once. Once per track: a browser that keeps reporting otherwise
     // must not make push-to-talk reopen the microphone on every press.
@@ -339,6 +341,7 @@ async function enableStrong(track: LocalAudioTrack) {
       }
       return;
     }
+    strongGain(track);
     verify(made, track, processor);
     watchProcessorEvents(track);
     startWatchdog(made, track, processor);
@@ -536,6 +539,90 @@ function watchProcessorEvents(track: LocalAudioTrack) {
 }
 
 /** Between the microphone and the call: our node's output, on our context, in place of the raw track. */
+const INPUT_UNITY = 0.005;
+const inputVolume = () => state().voicePrefs.inputVolume ?? 1;
+
+/** Input volume under "Strong": before the model, on the suppressor's own input, so its limiter still guards the peaks. */
+function strongGain(track: LocalAudioTrack) {
+  const processor = track.getProcessor();
+  if (!(processor instanceof StrongProcessor)) return;
+  const sup = processor.session.sup;
+  if (sup) sup.input.gain.setTargetAtTime(inputVolume(), processor.session.ctx.currentTime, 0.02);
+}
+
+/**
+ * Input volume in the other modes: the microphone goes through one gain node only when the volume is not 100%, so at
+ * the default nothing sits between the microphone and the call.
+ */
+async function syncGain(track: LocalAudioTrack) {
+  const volume = inputVolume();
+  const current = track.getProcessor();
+  if (current instanceof GainProcessor) {
+    if (Math.abs(volume - 1) < INPUT_UNITY) {
+      try {
+        await track.stopProcessor();
+      } catch (e) {
+        log('stopProcessor failed', e);
+      }
+    } else {
+      current.setVolume(volume);
+    }
+    return;
+  }
+  if (current || Math.abs(volume - 1) < INPUT_UNITY) return;
+  const ctx = new AudioContext();
+  void ctx.resume().catch(() => undefined);
+  try {
+    await track.setAudioContext(ctx);
+    await track.setProcessor(new GainProcessor(ctx, volume));
+  } catch (e) {
+    log('gain failed', e);
+    void ctx.close().catch(() => undefined);
+  }
+}
+
+class GainProcessor implements TrackProcessor<Track.Kind.Audio, AudioProcessorOptions> {
+  readonly name = 'atrium-gain';
+  processedTrack?: MediaStreamTrack;
+  private source?: MediaStreamAudioSourceNode;
+  private readonly gain: GainNode;
+  private readonly destination: MediaStreamAudioDestinationNode;
+
+  constructor(private readonly ctx: AudioContext, volume: number) {
+    this.gain = ctx.createGain();
+    this.gain.gain.value = volume;
+    this.destination = ctx.createMediaStreamDestination();
+    this.gain.connect(this.destination);
+    this.processedTrack = this.destination.stream.getAudioTracks()[0];
+  }
+
+  async init({ track }: AudioProcessorOptions) {
+    this.attach(track);
+  }
+
+  async restart({ track }: AudioProcessorOptions) {
+    this.attach(track);
+  }
+
+  async destroy() {
+    this.source?.disconnect();
+    this.gain.disconnect();
+    this.processedTrack?.stop();
+    this.processedTrack = undefined;
+    void this.ctx.close().catch(() => undefined);
+  }
+
+  setVolume(volume: number) {
+    this.gain.gain.setTargetAtTime(volume, this.ctx.currentTime, 0.02);
+  }
+
+  private attach(track: MediaStreamTrack) {
+    this.source?.disconnect();
+    this.source = this.ctx.createMediaStreamSource(new MediaStream([track]));
+    this.source.connect(this.gain);
+  }
+}
+
 class StrongProcessor implements TrackProcessor<Track.Kind.Audio, AudioProcessorOptions> {
   readonly name = 'atrium-strong';
   processedTrack?: MediaStreamTrack;

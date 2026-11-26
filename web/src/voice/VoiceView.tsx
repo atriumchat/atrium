@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Button, Popover, Spinner } from '@heroui/react';
-import { ArrowsPointingInIcon, ArrowsPointingOutIcon, ChatBubbleLeftIcon, SpeakerWaveIcon } from '@heroicons/react/24/solid';
+import { Button, Dropdown, Label, Popover, Spinner, Tooltip } from '@heroui/react';
+import { ArrowsPointingInIcon, ArrowsPointingOutIcon, ChatBubbleLeftIcon, Cog6ToothIcon, EllipsisHorizontalIcon, SpeakerWaveIcon, UserGroupIcon } from '@heroicons/react/24/solid';
 import { StartAudio, useIsSpeaking, useParticipants, useTracks, VideoTrack } from '@livekit/components-react';
 import type { TrackReference } from '@livekit/components-react';
 import { RemoteParticipant, Track, type Participant } from 'livekit-client';
 import { setVoiceChat, showError, useStore, voiceMembers } from '../store';
-import { joinVoice, toggleMute } from './voice';
+import { joinVoice, toggleDeafen, toggleMute } from './voice';
+import { SettingsDialog } from '../shell/SettingsDialog';
 import { useIsMobile } from '../hooks';
 import type { Channel } from '../types';
 import { Avatar } from '../ui/Avatar';
@@ -14,11 +15,15 @@ import { CallDuration } from './CallDuration';
 import { ChannelHeader, HeaderIcon } from '../shell/ChannelHeader';
 import { ChannelMenu } from '../shell/ChannelMenu';
 import { RoundButton, VolumeSlider } from '../ui/ui';
-import { Secondary } from '../ui/settings';
 import { FaceStack } from '../shell/CallPill';
 import { useTileGrid } from './tileGrid';
+import { useAvatarTone } from '../ui/avatarTone';
+import { useCallView } from './callView';
+import { onCallIdle, setCallIdle, setWakeCall, wakeCall } from './callIdle';
 import { LineArt } from '../ui/Illustrations';
 import {
+  ChevronDownIcon,
+  HeadphonesIcon,
   HeadphonesSlashIcon,
   MicIcon,
   MicSlashIcon,
@@ -41,10 +46,19 @@ export function VoiceView({ channel }: { channel: Channel }) {
   const live = myChannel === channel.id && status === 'connected' && room !== null;
   const connecting = myChannel === channel.id && status === 'connecting';
   const chatOpen = useStore((s) => s.voiceChatOpen);
+  // The header above the picture fades with the call's controls, but stays in its own strip: the tiles never move.
+  const [idle, setIdle] = useState(false);
+  useEffect(() => onCallIdle(setIdle), []);
   const unread = useStore((s) => (s.unread[channel.id] ?? 0) > 0);
 
   return (
     <div className={`relative flex min-h-0 flex-1 flex-col ${chatOpen ? 'max-md:[&>header]:invisible' : ''}`}>
+      <div
+        data-call-header=""
+        className={`shrink-0 transition-opacity duration-200 motion-reduce:transition-none ${idle ? 'max-md:opacity-100 md:opacity-0' : ''}`}
+        onPointerMove={() => wakeCall?.()}
+        onFocusCapture={() => wakeCall?.()}
+      >
       <ChannelHeader
         compactTitle
         showOnline={false}
@@ -82,6 +96,7 @@ export function VoiceView({ channel }: { channel: Channel }) {
           ) : undefined
         }
       />
+      </div>
       <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${chatOpen ? 'max-md:invisible' : ''}`}>
         {connecting ? <JoiningStage /> : live ? <ConnectedStage channel={channel} /> : <JoinPrompt channel={channel} />}
       </div>
@@ -234,6 +249,9 @@ function ConnectedStage({ channel }: { channel: Channel }) {
   );
 }
 
+const CALL_CONTROLS_IDLE_MS = 2500;
+const HOVER_POINTER = '(hover: hover) and (pointer: fine)';
+
 /**
  * The people and screens of the call we're in, as tiles (from the #metro design): as big as the area allows, between
  * 16:9 and square, rows centred, at most nine; whoever doesn't fit folds into a last "+N" tile that opens everyone at
@@ -255,31 +273,39 @@ export function MediaStage({ fallback, renderControls }: {
   const [area, setArea] = useState<HTMLDivElement | null>(null);
   const [full, setFull] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [hoverPointer, setHoverPointer] = useState(() => window.matchMedia(HOVER_POINTER).matches);
+  const autoHideControls = full || (hoverPointer && !fallback);
+  const showControls = !autoHideControls || controlsVisible;
   const stage = useRef<HTMLDivElement>(null);
   const controls = useRef<HTMLDivElement>(null);
   const ownsFullscreen = useRef(false);
   const hideTimer = useRef<number | null>(null);
-  const pinnable = [...screens, ...cameras];
-  const focused = pinnable.find((track) => trackKey(track) === focusKey);
+  const [stripOpen, setStripOpen] = useState(true);
   const cameraOf = new Map(cameras.map((camera) => [camera.participant.identity, camera]));
-  const fit = useTileGrid(area, focused ? 0 : participants.length + screens.length);
+  const { showSelf, showNoVideo } = useCallView();
+  const everyone = participants.map((participant) => ({ key: participant.identity, participant, video: cameraOf.get(participant.identity) }));
+  // Hidden tiles are only a view setting; if it would leave the call empty, everyone shows.
+  const wanted = everyone.filter(({ participant, video }) => (showSelf || !participant.isLocal) && (showNoVideo || video));
   const tiles = [
     ...screens.map((video) => ({ key: trackKey(video), participant: video.participant, video })),
-    ...participants.map((participant) => ({ key: participant.identity, participant, video: cameraOf.get(participant.identity) })),
+    ...(wanted.length || screens.length ? wanted : everyone),
   ];
+  // Anyone can be brought up big, with a camera or without; a click on whoever is already big goes back to the grid.
+  const focusedTile = tiles.find((tile) => tile.key === focusKey);
+  const focused = focusedTile?.video;
+  const viewTrack = focused ?? screens[0] ?? cameras.find((camera) => !camera.participant.isLocal) ?? cameras[0];
+  const focusOn = (key: string) => setFocusKey(focusKey === key ? null : key);
+  // The person left, or the share ended: back to the grid.
+  useEffect(() => {
+    if (focusKey && !focusedTile) setFocusKey(null);
+  }, [focusKey, focusedTile]);
+  const fit = useTileGrid(area, focusedTile ? 0 : tiles.length);
   const rank = ({ participant, video }: (typeof tiles)[number]) =>
     (video?.source === Track.Source.ScreenShare ? 4 : video ? 2 : 0) + Number(speaking.includes(participant.identity));
   const overflow = fit.fits < tiles.length;
   const ordered = overflow ? [...tiles].sort((a, b) => rank(b) - rank(a)) : tiles;
   const shown = overflow ? ordered.slice(0, Math.max(1, fit.fits - 1)) : ordered;
   const hidden = ordered.slice(shown.length);
-  const viewTrack = focused ?? screens[0] ?? cameras.find((camera) => !camera.participant.isLocal) ?? cameras[0];
-  const focusOn = (track: TrackReference) =>
-    setFocusKey(focusKey === trackKey(track) ? null : trackKey(track));
-  // A publication can be replaced while a camera is off. The grid remains active until another explicit selection.
-  useEffect(() => {
-    if (focusKey && !focused) setFocusKey(null);
-  }, [focusKey, focused]);
   const handleFullscreen = (exit = false) => {
     if (!document.fullscreenEnabled) return;
     if (exit) {
@@ -297,26 +323,63 @@ export function MediaStage({ fallback, renderControls }: {
     Boolean(controls.current?.querySelector('[aria-expanded="true"]') ||
       document.querySelector('[aria-modal="true"], [data-slot="popover-dialog"], [data-slot="dropdown-menu"]')), []);
 
-  const wake = useCallback(function showControls() {
+  useEffect(() => {
+    const media = window.matchMedia(HOVER_POINTER);
+    const update = (event: MediaQueryListEvent) => setHoverPointer(event.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+
+  // Off the picture at all (and not onto the header): everything goes at once, without waiting out the timer.
+  const leave = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const next = event.relatedTarget as Node | null;
+    if (overlayOpen() || controls.current?.querySelector(':focus-visible')) return;
+    if (next instanceof Node && (event.currentTarget.contains(next) || document.querySelector('[data-call-header]')?.contains(next))) return;
+    if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+    hideTimer.current = null;
+    setControlsVisible(false);
+  }, [overlayOpen]);
+
+  const wake = useCallback(function wakeControls() {
     setControlsVisible(true);
     if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
     hideTimer.current = window.setTimeout(() => {
       hideTimer.current = null;
-      if (overlayOpen() || controls.current?.querySelector(':focus-visible')) showControls();
+      const focus = controls.current?.querySelector(':focus-visible');
+      const hover = window.matchMedia(HOVER_POINTER).matches
+        && (controls.current?.querySelector('[data-call-dock]:hover, button:hover') || document.querySelector('[data-call-header]:hover'));
+      if (overlayOpen() || focus || hover) wakeControls();
       else setControlsVisible(false);
-    }, 2500);
+    }, CALL_CONTROLS_IDLE_MS);
   }, [overlayOpen]);
+
+  // The header above follows the same quiet: it fades with the controls and wakes them when the pointer crosses it.
+  useEffect(() => {
+    setWakeCall(wake);
+    return () => {
+      setWakeCall(null);
+      setCallIdle(false);
+    };
+  }, [wake]);
+
+  useEffect(() => {
+    setCallIdle(!showControls);
+  }, [showControls]);
+
+  useEffect(() => {
+    if (!autoHideControls) return;
+    wake();
+    return () => {
+      if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+      hideTimer.current = null;
+    };
+  }, [autoHideControls, full, wake]);
 
   useEffect(() => {
     const onChange = () => {
       const entered = ownsFullscreen.current && document.fullscreenElement === document.documentElement;
       setFull(entered);
-      if (entered) wake();
-      else {
-        ownsFullscreen.current = false;
-        if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
-        setControlsVisible(true);
-      }
+      if (!entered) ownsFullscreen.current = false;
     };
     const onKey = (event: KeyboardEvent) => {
       if (!ownsFullscreen.current) return;
@@ -331,7 +394,6 @@ export function MediaStage({ fallback, renderControls }: {
     return () => {
       document.removeEventListener('fullscreenchange', onChange);
       document.removeEventListener('keydown', onKey);
-      if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
       if (ownsFullscreen.current && document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
     };
   }, [overlayOpen, wake]);
@@ -358,34 +420,57 @@ export function MediaStage({ fallback, renderControls }: {
   return (
     <div
       data-call-fullscreen={full || undefined}
-      className={full ? `fixed inset-0 z-[40] flex flex-col bg-black ${controlsVisible ? '' : 'cursor-none [&_*]:cursor-none!'}` : 'contents'}
-      onPointerMove={full ? wake : undefined}
-      onPointerDown={full ? wake : undefined}
-      onFocusCapture={full ? (event) => { if (event.target.matches(':focus-visible')) wake(); } : undefined}
+      data-idle={!showControls || undefined}
+      className={`group/stage ${full
+        ? 'fixed inset-0 z-[40] flex flex-col bg-black'
+        : autoHideControls ? 'flex min-h-0 flex-1 flex-col' : 'contents'} ${showControls ? '' : 'cursor-none [&_*]:cursor-none!'}`}
+      onPointerMove={autoHideControls ? wake : undefined}
+      onPointerDown={autoHideControls ? wake : undefined}
+      onPointerLeave={autoHideControls ? leave : undefined}
+      onFocusCapture={autoHideControls ? (event) => { if (event.target.matches(':focus-visible')) wake(); } : undefined}
     >
       {(full ? null : fallback) ?? (
         <div ref={stage} className={`relative flex min-h-0 flex-1 ${full ? 'bg-black' : 'bg-window'}`}>
-          <div className="flex min-w-0 flex-1 flex-col">
-            {activeTrack ? (
+          <div className="relative flex min-w-0 flex-1 flex-col">
+            {activeTrack || (!full && focusedTile) ? (
               <>
                 <div className={`flex min-h-0 flex-1 flex-col ${full ? '' : 'px-(--app-pane-inset)'}`}>
-                  <ScreenStage trackRef={activeTrack} full={full} onGrid={() => setFocusKey(null)} onFullscreen={() => handleFullscreen(full)} />
+                  {activeTrack ? (
+                    <ScreenStage trackRef={activeTrack} full={full} onGrid={() => setFocusKey(null)} onFullscreen={() => handleFullscreen(full)} />
+                  ) : focusedTile && (
+                    <PersonStage participant={focusedTile.participant} onGrid={() => setFocusKey(null)} />
+                  )}
                 </div>
-                {!full && <div className="no-scrollbar flex shrink-0 justify-center-safe gap-2 overflow-x-auto px-(--app-pane-inset) pt-2">
+                {!full && stripOpen && <div className="no-scrollbar flex shrink-0 justify-center-safe gap-2 overflow-x-auto px-(--app-pane-inset) pt-2">
                   {tiles.map(({ key, participant, video }) => (
                     <div key={key} className="h-[90px] w-[160px] shrink-0">
                       <Tile participant={participant} video={video} height={90}
-                        selected={!!video && trackKey(video) === trackKey(activeTrack)}
-                        onSelect={video ? () => focusOn(video) : undefined} />
+                        selected={key === focusedTile?.key}
+                        onSelect={() => focusOn(key)} />
                     </div>
                   ))}
                 </div>}
+                {!full && (
+                  <Tooltip delay={250} closeDelay={0}>
+                    <Button
+                      variant="tertiary"
+                      aria-label={t(stripOpen ? 'voice.strip.hide' : 'voice.strip.show')}
+                      aria-expanded={stripOpen}
+                      onPress={() => setStripOpen((open) => !open)}
+                      className={`absolute left-1/2 z-10 h-8 min-w-0 -translate-x-1/2 gap-1.5 rounded-full px-3 [--button-bg:#1c1c1f] [--button-bg-hover:#2a2a2f] [--button-fg:white] ${stripOpen ? 'bottom-[82px]' : 'bottom-3'}`}
+                    >
+                      <ChevronDownIcon size={16} className={`transition-transform duration-150 ${stripOpen ? '' : 'rotate-180'}`} />
+                      <UserGroupIcon className="size-4" aria-hidden="true" />
+                    </Button>
+                    <Tooltip.Content placement="top">{t(stripOpen ? 'voice.strip.hide' : 'voice.strip.show')}</Tooltip.Content>
+                  </Tooltip>
+                )}
               </>
             ) : (
               <div ref={setArea} className="flex min-h-0 flex-1 flex-wrap content-center justify-center gap-2 px-(--app-pane-inset)">
                 {shown.map(({ key, participant, video }) => (
                   <div key={key} className="shrink-0" style={{ width: fit.tileW, height: fit.tileH }}>
-                    <Tile participant={participant} video={video} height={fit.tileH} onSelect={video ? () => focusOn(video) : undefined} />
+                    <Tile participant={participant} video={video} height={fit.tileH} onSelect={() => focusOn(key)} />
                   </div>
                 ))}
                 {hidden.length > 0 && (
@@ -407,8 +492,11 @@ export function MediaStage({ fallback, renderControls }: {
       )}
       <div
         ref={controls}
+        data-call-controls=""
         data-fullscreen-controls={full || undefined}
-        className={full ? `absolute inset-x-0 bottom-0 z-10 bg-linear-to-t from-black/80 via-black/40 to-transparent pt-12 transition-opacity duration-200 motion-reduce:transition-none ${controlsVisible ? 'opacity-100' : 'pointer-events-none opacity-0'}` : 'contents'}
+        className={`${full ? 'absolute inset-x-0 bottom-0 z-10 bg-linear-to-t from-black/80 via-black/40 to-transparent pt-12' : autoHideControls ? 'shrink-0' : 'contents'}
+          ${autoHideControls ? 'transition-opacity motion-reduce:transition-none' : ''}
+          ${showControls ? 'opacity-100 duration-150' : 'pointer-events-none opacity-0 duration-200'}`}
       >
         {renderControls(fallback && !full ? undefined : viewActions, full)}
       </div>
@@ -471,18 +559,11 @@ function ScreenStage({ trackRef, full, onGrid, onFullscreen }: {
   const name = user?.name ?? trackRef.participant.name;
   return (
     <>
-      <div className={`min-w-0 shrink-0 items-center gap-2 py-2 ${full ? 'hidden' : 'flex'}`}>
-        <div className="flex min-w-0 flex-1 items-baseline gap-2">
-          <h3 className="min-w-0 truncate text-[18px] font-normal">{name}</h3>
-          {!camera && <span className="shrink-0 text-[13px] text-muted">{t('voice.stream.live')}</span>}
-        </div>
-        <Secondary onPress={onGrid}>{t('voice.stream.grid')}</Secondary>
-      </div>
       <button
         type="button"
         aria-label={t(full ? 'voice.stream.exitFullscreen' : 'voice.stream.grid')}
         tabIndex={full ? -1 : 0}
-        className={`relative min-h-0 flex-1 overflow-hidden bg-black outline-none focus-visible:ring-2 focus-visible:ring-focus ${full ? '' : 'rounded-surface'}`}
+        className={`relative min-h-0 flex-1 overflow-hidden bg-black outline-none focus-visible:ring-2 focus-visible:ring-focus ${full ? '' : 'mt-2 rounded-surface'}`}
         onClick={(event) => {
           if (full) return;
           if (event.detail === 0 || !document.fullscreenEnabled) onGrid();
@@ -495,9 +576,68 @@ function ScreenStage({ trackRef, full, onGrid, onFullscreen }: {
       >
         <VideoTrack
           trackRef={trackRef}
-          className={`h-full w-full object-contain ${camera && trackRef.participant.isLocal ? '-scale-x-100' : ''}`}
+          className={`h-full w-full ${camera ? 'object-cover' : 'object-contain'} ${camera && trackRef.participant.isLocal ? '-scale-x-100' : ''}`}
         />
+        {!full && (
+          <span className="pointer-events-none absolute bottom-2.5 left-2.5 flex max-w-[calc(100%-20px)] items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[13px] font-medium text-white transition-opacity duration-200 group-data-[idle]/stage:opacity-0">
+            {!camera && <ScreenIcon size={12} className="shrink-0" />}
+            <span className="min-w-0 truncate">{name}</span>
+          </span>
+        )}
       </button>
+    </>
+  );
+}
+
+/** Someone without a camera or a share, brought up big: just their tile; a click on it goes back to the grid. */
+function PersonStage({ participant, onGrid }: { participant: Participant; onGrid: () => void }) {
+  return (
+    <div className="min-h-0 flex-1 pt-2">
+      <Tile participant={participant} height={640} onSelect={onGrid} selected ring={false} />
+    </div>
+  );
+}
+
+/** The "…" on your own tile: mute, deafen and the voice settings. */
+function SelfOptions({ small }: { small: boolean }) {
+  const { t } = useT();
+  const muted = useStore((s) => s.muted || s.deafened);
+  const deafened = useStore((s) => s.deafened);
+  const [settings, setSettings] = useState(false);
+  return (
+    <>
+      <Dropdown>
+        <Dropdown.Trigger
+          aria-label={t('voice.controls.more')}
+          className={`absolute z-10 grid place-items-center rounded-full bg-black/70 text-white outline-none transition-opacity hover:bg-black focus-visible:ring-2 focus-visible:ring-white aria-expanded:opacity-100 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 ${small ? 'bottom-1.5 right-1.5 size-6 [&_svg]:size-3' : 'bottom-2.5 right-2.5 size-8 [&_svg]:size-4'} group-data-[idle]/stage:opacity-0`}
+        >
+          <EllipsisHorizontalIcon aria-hidden="true" />
+        </Dropdown.Trigger>
+        <Dropdown.Popover placement="top end" className="min-w-56">
+          <Dropdown.Menu
+            aria-label={t('voice.controls.more')}
+            onAction={(key) => {
+              if (key === 'mute') void toggleMute();
+              if (key === 'deafen') void toggleDeafen();
+              if (key === 'settings') setSettings(true);
+            }}
+          >
+            <Dropdown.Item id="mute" textValue={t(muted ? 'voice.mic.unmute' : 'voice.mic.mute')}>
+              <Label>{t(muted ? 'voice.mic.unmute' : 'voice.mic.mute')}</Label>
+              {muted ? <MicSlashIcon size={18} className="ml-auto text-danger" /> : <MicIcon size={18} className="ml-auto text-muted" />}
+            </Dropdown.Item>
+            <Dropdown.Item id="deafen" textValue={t(deafened ? 'voice.deafen.off' : 'voice.deafen.on')}>
+              <Label>{t(deafened ? 'voice.deafen.off' : 'voice.deafen.on')}</Label>
+              {deafened ? <HeadphonesSlashIcon size={18} className="ml-auto text-danger" /> : <HeadphonesIcon size={18} className="ml-auto text-muted" />}
+            </Dropdown.Item>
+            <Dropdown.Item id="settings" textValue={t('voice.controls.settings')}>
+              <Label>{t('voice.controls.settings')}</Label>
+              <Cog6ToothIcon className="ml-auto size-[18px] text-muted" aria-hidden="true" />
+            </Dropdown.Item>
+          </Dropdown.Menu>
+        </Dropdown.Popover>
+      </Dropdown>
+      {settings && <SettingsDialog start="voice" onClose={() => setSettings(false)} />}
     </>
   );
 }
@@ -508,7 +648,7 @@ function DeviceVideo({ track }: { track: MediaStreamTrack }) {
   useEffect(() => {
     if (ref.current) ref.current.srcObject = new MediaStream([track]);
   }, [track]);
-  return <video ref={ref} autoPlay muted playsInline className="h-full w-full -scale-x-100 bg-black object-contain" />;
+  return <video ref={ref} autoPlay muted playsInline className="h-full w-full -scale-x-100 bg-black object-cover" />;
 }
 
 /**
@@ -517,10 +657,12 @@ function DeviceVideo({ track }: { track: MediaStreamTrack }) {
  * else's tile sets their volume; their camera, when they have one, comes up big instead, and the volume moves to the
  * speaker button or the right-click.
  */
-function Tile({ participant, video, height, onSelect, selected = false }: {
+function Tile({ participant, video, height, onSelect, selected = false, ring = true }: {
   participant: Participant;
   video?: TrackReference;
   selected?: boolean;
+  /** Whether talking draws the white stroke: off for the big tile, where only the thumbnail below shows it. */
+  ring?: boolean;
   height: number;
   onSelect?: () => void;
 }) {
@@ -531,6 +673,7 @@ function Tile({ participant, video, height, onSelect, selected = false }: {
     (s.calls[s.voiceChannelId ?? '']?.participants ?? s.voiceState).find((e) => e.userId === participant.identity),
   );
   const [volumeOpen, setVolumeOpen] = useState(false);
+  const tone = useAvatarTone(user);
   const name = user?.name ?? participant.name ?? '';
   const label = `${name}${participant.isLocal ? ` ${t('voice.you')}` : ''}`;
   // Your camera on its way: straight from the device, or a dark tile until the device opens.
@@ -540,22 +683,19 @@ function Tile({ participant, video, height, onSelect, selected = false }: {
   const small = height < 120;
   const remote = participant instanceof RemoteParticipant;
   const handleClick = onSelect ?? (remote ? () => setVolumeOpen(true) : undefined);
-  // The speaker button owns the corner; the sound mark steps aside so the two never sit on top of each other.
-  const markPlace = remote
-    ? (small ? 'right-8 top-1.5 size-5' : 'right-11 top-2.5 size-7')
-    : (small ? 'right-1.5 top-1.5 size-5' : 'right-2.5 top-2.5 size-7');
 
   return (
     <div
-      className={`group relative flex h-full w-full items-center justify-center overflow-hidden rounded-surface ${pending || video ? 'bg-black' : 'bg-[#18181b]'}`}
+      className={`group relative flex h-full w-full items-center justify-center overflow-hidden rounded-surface ${pending || video ? 'bg-black' : tone ? '' : 'bg-[#18181b]'}`}
+      style={!pending && !video && tone ? { background: tone } : undefined}
       onContextMenu={remote ? (e) => { if (!e.currentTarget.contains(e.target as Node)) return; e.preventDefault(); setVolumeOpen(true); } : undefined}
     >
       {pending ? (
         preview ? <DeviceVideo track={preview} /> : <Spinner size={small ? 'sm' : 'md'} color="current" className="text-white/60" />
       ) : video ? (
-        // The whole frame, never cropped: 4:3 webcams get dark bars instead of losing forehead and chin.
+        // A camera always fills its tile, cropped to it; a screen share keeps its whole frame.
         // Your own camera is mirrored, like a selfie preview.
-        <VideoTrack trackRef={video} className={`h-full w-full bg-black object-contain ${!screen && participant.isLocal ? '-scale-x-100' : ''}`} />
+        <VideoTrack trackRef={video} className={`h-full w-full bg-black ${screen ? 'object-contain' : 'object-cover'} ${!screen && participant.isLocal ? '-scale-x-100' : ''}`} />
       ) : (
         <Avatar user={user} size={Math.round(Math.min(128, Math.max(28, height * 0.4)))} ringBg="transparent" />
       )}
@@ -568,14 +708,14 @@ function Tile({ participant, video, height, onSelect, selected = false }: {
           className="absolute inset-0 cursor-pointer rounded-surface outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white"
         />
       )}
-      <div className={`pointer-events-none absolute inset-0 rounded-surface ${selected || speaking ? 'ring-2 ring-inset ring-white' : ''}`} />
+      <div className={`pointer-events-none absolute inset-0 rounded-surface ${ring && speaking ? 'ring-2 ring-inset ring-white' : ''}`} />
       <SoundPlayedMark
         userId={participant.identity}
         size={small ? 12 : 14}
-        className={`pointer-events-none absolute items-center justify-center rounded-full bg-black/55 text-white ${markPlace}`}
+        className={`pointer-events-none absolute items-center justify-center rounded-full bg-black/55 text-white ${small ? 'right-1.5 top-1.5 size-5' : 'right-2.5 top-2.5 size-7'}`}
       />
       <div
-        className={`pointer-events-none absolute flex max-w-[calc(100%-16px)] items-center gap-1.5 rounded-full bg-black/55 font-medium text-white ${small ? 'bottom-1.5 left-1.5 px-2 py-0.5 text-[12px]' : 'bottom-2.5 left-2.5 px-2.5 py-1 text-[13px]'}`}
+        className={`pointer-events-none absolute flex max-w-[calc(100%-16px)] items-center gap-1.5 rounded-full bg-black/55 font-medium text-white transition-opacity duration-200 group-data-[idle]/stage:opacity-0 ${small ? 'bottom-1.5 left-1.5 px-2 py-0.5 text-[12px]' : 'bottom-2.5 left-2.5 px-2.5 py-1 text-[13px]'}`}
       >
         {screen ? (
           <ScreenIcon size={12} className="shrink-0" />
@@ -583,20 +723,19 @@ function Tile({ participant, video, height, onSelect, selected = false }: {
           <HeadphonesSlashIcon size={12} className="shrink-0 text-danger" />
         ) : entry?.muted ? (
           <MicSlashIcon size={12} className="shrink-0 text-danger" />
-        ) : (
-          <MicIcon size={12} className="shrink-0" />
-        )}
+        ) : null}
         <span className="min-w-0 truncate">{label}</span>
       </div>
+      {!remote && <SelfOptions small={small} />}
       {remote && (
         <Popover isOpen={volumeOpen} onOpenChange={setVolumeOpen}>
           <Button isIconOnly size="sm" variant="tertiary"
             aria-label={t('voice.volume', { name })}
-            className={`absolute z-10 shrink-0 rounded-full p-0 [--button-bg:rgb(0_0_0/0.72)] [--button-bg-hover:var(--default)] [--button-fg:white] ${volumeOpen ? '' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100'} ${small ? 'right-1.5 top-1.5 size-6 [&_svg]:size-3' : 'right-2.5 top-2.5 size-8 [&_svg]:size-3.5'}`}
+            className={`absolute z-10 shrink-0 rounded-full p-0 [--button-bg:rgb(0_0_0/0.72)] [--button-bg-hover:var(--default)] [--button-fg:white] ${volumeOpen ? '' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100'} ${small ? 'bottom-1.5 right-1.5 size-6 [&_svg]:size-3' : 'bottom-2.5 right-2.5 size-8 [&_svg]:size-4'} group-data-[idle]/stage:opacity-0`}
           >
-            <SpeakerWaveIcon aria-hidden="true" />
+            <EllipsisHorizontalIcon aria-hidden="true" />
           </Button>
-          <Popover.Content isNonModal placement="bottom end" className="w-64">
+          <Popover.Content isNonModal placement="top end" className="w-64">
             <Popover.Dialog aria-label={t('voice.volume', { name })} className="p-4">
               <VolumeSlider userId={participant.identity} name={name} showMute />
             </Popover.Dialog>

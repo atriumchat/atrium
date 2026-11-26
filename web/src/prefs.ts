@@ -10,10 +10,15 @@ export type VoicePrefs = {
   pttKey: string;
   /** Calls only through the relay on 443. */
   relayOnly: boolean;
+  /** Input sensitivity: the gate follows the room's noise by itself, or sits at `sensitivity` dBFS (-100: open always). */
+  autoSensitivity: boolean;
+  sensitivity: number;
+  /** How much the microphone is amplified (1 = as it is, up to 2). */
+  inputVolume: number;
 };
 
 const KEY = 'atrium_voice_prefs';
-export const DEFAULT_PREFS: VoicePrefs = { noise: 'browser', ptt: false, pttKey: 'Backquote', relayOnly: false };
+export const DEFAULT_PREFS: VoicePrefs = { noise: 'browser', ptt: false, pttKey: 'Backquote', relayOnly: false, autoSensitivity: false, sensitivity: -100, inputVolume: 1 };
 
 export function loadPrefs(): VoicePrefs {
   try {

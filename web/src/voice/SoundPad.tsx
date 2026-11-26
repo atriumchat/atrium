@@ -74,8 +74,8 @@ type DialogState =
 
 // Match the bottom-left panel and the controls under the call.
 const BUTTON = {
-  panel: "size-10 min-w-10 rounded-full p-0 [&_svg]:size-5",
-  control: "call-control [&_svg]:size-[18px]",
+  panel: "h-10 w-full min-w-0 rounded-full p-0 [&_svg]:size-5",
+  control: "call-control",
 } as const;
 
 /**
@@ -94,37 +94,55 @@ export function SoundboardButton({
   stopsPlayback?: boolean;
 }) {
   const { t } = useT();
-  const [open, setOpen] = useState(false);
+  // null: closed. "peek": the small list that follows the pointer over the button. "full": the whole soundboard.
+  const [mode, setMode] = useState<"peek" | "full" | null>(null);
   const [dialog, setDialog] = useState<DialogState>(null);
   const label = t("voice.soundboard.label");
+  const anchor = useRef<HTMLButtonElement>(null);
+  const timer = useRef<number | undefined>(undefined);
   const playingId = useStore((s) =>
     stopsPlayback ? s.myPlaying?.soundId ?? null : null,
   );
   const playingName = useStore((s) =>
     playingId ? s.mySounds.find((x) => x.id === playingId)?.name ?? "" : "",
   );
+  const hasSounds = useStore((s) => s.mySounds.length > 0);
 
   useEffect(() => {
-    if (open) return () => stopPreview();
-  }, [open]);
+    if (mode === "full") return () => stopPreview();
+  }, [mode]);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  /** The peek opens a moment after the pointer arrives and closes a moment after it has gone, so it can be reached. */
+  function hover(on: boolean) {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(
+      () => setMode((m) => (on ? (m === null && hasSounds ? "peek" : m) : m === "peek" ? null : m)),
+      on ? 250 : 200,
+    );
+  }
 
   function show(next: NonNullable<DialogState>) {
     stopPreview();
-    setOpen(false);
+    setMode(null);
     setDialog(next);
   }
   /** A saved clip closes the window for good; cancel, the cross and Esc bring the panel back. */
   function hide(reopen = true) {
     setDialog(null);
-    if (reopen) setOpen(true);
+    if (reopen) setMode("full");
   }
 
-  if (playingId && !open && !dialog) {
+  if (playingId && mode === null && !dialog) {
     const stop = t("voice.soundboard.stopForCall", { name: playingName });
     return (
-      <RoundButton label={stop} onPress={() => void stopMySounds()} className={BUTTON[look]}>
-        <StopIcon />
-      </RoundButton>
+      <Tooltip delay={250} closeDelay={0}>
+        <Button isIconOnly variant="tertiary" aria-label={stop}
+          onPress={() => void stopMySounds()} className={BUTTON[look]}>
+          <StopIcon />
+        </Button>
+        <Tooltip.Content placement="top">{stop}</Tooltip.Content>
+      </Tooltip>
     );
   }
 
@@ -134,30 +152,46 @@ export function SoundboardButton({
       {face}
     </Button>
   ) : (
-    <Popover isOpen={open} onOpenChange={setOpen}>
-      <Tooltip delay={250} closeDelay={0}>
-        <Button isIconOnly variant="tertiary" aria-label={label}
+    <>
+      <Tooltip delay={250} closeDelay={0} isDisabled={mode !== null}>
+        <Button ref={anchor} isIconOnly variant="tertiary" aria-label={label}
+          aria-haspopup="dialog" aria-expanded={mode !== null}
+          onPress={() => { window.clearTimeout(timer.current); setMode("full"); }}
+          onHoverStart={() => hover(true)} onHoverEnd={() => hover(false)}
           className={`${BUTTON[look]} aria-expanded:[--button-bg:var(--surface-tertiary)]`}>
           {face}
         </Button>
         <Tooltip.Content placement="top">{label}</Tooltip.Content>
       </Tooltip>
-      <Popover.Content
-        placement={look === "panel" ? "top start" : "top"}
-        className="w-[min(552px,calc(100vw-16px))]"
-      >
-        <Popover.Dialog
-          aria-label={label}
-          className="flex flex-col p-0 outline-none"
+      <Popover isOpen={mode !== null} onOpenChange={(next) => { if (!next) setMode(null); }}>
+        <Popover.Content
+          triggerRef={anchor}
+          isNonModal={mode === "peek"}
+          placement={look === "panel" ? "top start" : "top"}
+          className={mode === "peek" ? "w-[min(420px,calc(100vw-16px))]" : "w-[min(552px,calc(100vw-16px))]"}
         >
-          <Panel
-            onAdd={() => show({ kind: "add" })}
-            onEdit={(sound) => show({ kind: "edit", sound })}
-            onDelete={(sound) => show({ kind: "delete", sound })}
-          />
-        </Popover.Dialog>
-      </Popover.Content>
-    </Popover>
+          <Popover.Dialog
+            aria-label={label}
+            className="flex flex-col p-0 outline-none"
+          >
+            <div
+              onPointerEnter={() => window.clearTimeout(timer.current)}
+              onPointerLeave={() => hover(false)}
+            >
+              {mode === "peek" ? (
+                <Peek onAll={() => setMode("full")} />
+              ) : (
+                <Panel
+                  onAdd={() => show({ kind: "add" })}
+                  onEdit={(sound) => show({ kind: "edit", sound })}
+                  onDelete={(sound) => show({ kind: "delete", sound })}
+                />
+              )}
+            </div>
+          </Popover.Dialog>
+        </Popover.Content>
+      </Popover>
+    </>
   );
 
   return (
@@ -186,12 +220,58 @@ export function SoundboardButton({
   );
 }
 
+/** What the pointer over the button shows: the first six sounds (favourites first) to play at once, and "See all". */
+function Peek({ onAll }: { onAll: () => void }) {
+  const { t } = useT();
+  const sounds = useStore((s) => s.mySounds);
+  const favorites = useStore((s) => s.soundboard.favorites);
+  const playing = useStore((s) => s.myPlaying);
+  const first = [...sounds.filter((x) => favorites.includes(x.id)), ...sounds.filter((x) => !favorites.includes(x.id))].slice(0, 6);
+  return (
+    <div className="p-3">
+      <div className="mb-2 flex items-center justify-between gap-2 pl-1">
+        <span className="flex min-w-0 items-center gap-2 text-[14px] font-medium">
+          <SoundboardIcon size={16} className="shrink-0" />
+          <span className="truncate">{t("voice.soundboard.label")}</span>
+        </span>
+        <Button variant="ghost" size="sm" onPress={onAll} className="h-7 shrink-0 rounded-full px-3 text-[13px]">
+          {t("voice.soundboard.seeAll")}
+        </Button>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {first.map((sound) => {
+          const on = playing?.soundId === sound.id;
+          return (
+            <Button
+              key={sound.id}
+              variant="tertiary"
+              aria-label={t(on ? "voice.soundboard.stopForCall" : "voice.soundboard.playForCall", { name: sound.name })}
+              onPress={() => {
+                if (on) void stopMySounds();
+                else {
+                  stopPreview();
+                  void playSound(sound);
+                }
+              }}
+              className="h-10 min-w-0 justify-start gap-1.5 rounded-row px-2 text-[13px]"
+            >
+              <span aria-hidden className="flex size-5 shrink-0 items-center justify-center text-[17px] leading-none">
+                {on ? <StopIcon size={13} /> : sound.emoji || <SoundboardIcon size={15} className="text-muted" />}
+              </span>
+              <span className="min-w-0 truncate">{sound.name}</span>
+            </Button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 type SectionId = "favorites" | "mine";
 
 /**
- * Discord's layout in our look: search and volume on top; under them a slim rail of section icons (a click scrolls to
- * the section, the one in view is marked) and the list, each section folding under its header, sounds as three-column
- * pills.
+ * Discord's layout in our look: search and volume on top, then one list whose sections (favourites, yours) fold under
+ * their headers, sounds as three-column pills.
  */
 function Panel({
   onAdd,
@@ -210,9 +290,6 @@ function Panel({
   const [query, setQuery] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [folded, setFolded] = useState<SectionId[]>([]);
-  const [current, setCurrent] = useState<SectionId>("favorites");
-  const list = useRef<HTMLDivElement>(null);
-  const heads = useRef<Partial<Record<SectionId, HTMLElement | null>>>({});
   const q = query.trim().toLowerCase();
   const shown = q
     ? sounds.filter((s) => s.name.toLowerCase().includes(q))
@@ -225,48 +302,12 @@ function Panel({
     sections.push({ id: "favorites", title: t("voice.soundboard.favorites") });
   if (shown.length > 0)
     sections.push({ id: "mine", title: t("voice.soundboard.mine") });
-  const active = sections.some((s) => s.id === current)
-    ? current
-    : sections[0]?.id;
 
   useEffect(() => {
     let mounted = true;
     void loadMySounds().finally(() => { if (mounted) setLoaded(true); });
     return () => { mounted = false; };
   }, []);
-
-  function track() {
-    const box = list.current;
-    if (!box || sections.length === 0) return;
-    const atEnd =
-      box.scrollTop > 0 &&
-      box.scrollTop + box.clientHeight >= box.scrollHeight - 2;
-    let now = sections[0].id;
-    if (atEnd) now = sections[sections.length - 1].id;
-    else {
-      const top = box.getBoundingClientRect().top;
-      for (const s of sections) {
-        const head = heads.current[s.id];
-        if (head && head.getBoundingClientRect().top - top <= 12) now = s.id;
-      }
-    }
-    setCurrent(now);
-  }
-
-  function jump(id: SectionId) {
-    setFolded((f) => f.filter((x) => x !== id));
-    const box = list.current;
-    const head = heads.current[id];
-    if (!box || !head) return;
-    box.scrollTo({
-      top:
-        box.scrollTop +
-        head.getBoundingClientRect().top -
-        box.getBoundingClientRect().top,
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
-    });
-    setCurrent(id);
-  }
 
   function fold(id: SectionId) {
     setFolded((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id]));
@@ -314,27 +355,8 @@ function Panel({
         </RoundButton>
       </div>
       <div className="flex">
-        {sections.length > 0 && (
-          <nav
-            aria-label={t("voice.soundboard.label")}
-            className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-white/[0.07] py-1 pl-2 pr-1.5"
-          >
-            {sections.map((s) => (
-              <Tooltip key={s.id} delay={300} closeDelay={0}>
-                <Button isIconOnly variant="ghost" size="sm" aria-label={s.title}
-                  aria-current={active === s.id || undefined} onPress={() => jump(s.id)}
-                  className={`size-8 rounded-full p-0 ${active === s.id ? "[--button-bg:var(--default)]" : "text-muted"}`}>
-                  {s.id === "favorites" ? <StarIcon size={18} /> : <SoundboardIcon size={18} />}
-                </Button>
-                <Tooltip.Content placement="right">{s.title}</Tooltip.Content>
-              </Tooltip>
-            ))}
-          </nav>
-        )}
         <div
-          ref={list}
-          onScroll={track}
-          className="flex max-h-[min(400px,calc(100dvh-160px))] min-w-0 flex-1 flex-col gap-2 overflow-y-auto py-1 pl-2 pr-3 pb-3"
+          className="flex max-h-[min(400px,calc(100dvh-160px))] min-w-0 flex-1 flex-col gap-2 overflow-y-auto px-3 pb-3 pt-1"
         >
           {loaded && !q && sounds.length === 0 && (
             <Button
@@ -360,9 +382,6 @@ function Panel({
               }
               folded={folded.includes(s.id)}
               onToggle={() => fold(s.id)}
-              headRef={(el) => {
-                heads.current[s.id] = el;
-              }}
             >
               {s.id === "favorites" ? favorite.map(tile) : shown.map(tile)}
             </Section>
@@ -379,18 +398,16 @@ function Section({
   icon,
   folded,
   onToggle,
-  headRef,
   children,
 }: {
   title: string;
   icon?: ReactNode;
   folded: boolean;
   onToggle: () => void;
-  headRef: (el: HTMLElement | null) => void;
   children: ReactNode;
 }) {
   return (
-    <section ref={headRef}>
+    <section>
       <Button
         variant="ghost"
         size="sm"

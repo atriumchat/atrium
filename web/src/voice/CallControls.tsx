@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Button, Popover, Tooltip } from '@heroui/react';
+import { Button, Dropdown, Label, Popover, Tooltip } from '@heroui/react';
 import {
   Cog6ToothIcon,
   ComputerDesktopIcon,
@@ -15,29 +15,32 @@ import type { Channel } from '../types';
 import { InviteToRoom } from '../shell/ChannelMenu';
 import { DeviceMenu } from '../shell/SettingsMenu';
 import { SettingsDialog } from '../shell/SettingsDialog';
-import { HeadphonesIcon, HeadphonesSlashIcon, MicIcon, MicSlashIcon, StopIcon } from '../ui/icons';
+import { CheckIcon, ChevronDownIcon, HeadphonesIcon, HeadphonesSlashIcon, MicIcon, MicSlashIcon, ScreenOffIcon, StopIcon } from '../ui/icons';
 import type { DeviceKind } from './devices';
 import { SoundboardButton } from './SoundPad';
+import { useCallView } from './callView';
 import { stopMySounds } from './soundboard';
-import { canShareScreen, leaveVoice, screenSource, switchScreenSource, toggleCamera, toggleDeafen, toggleMute, toggleScreenShare } from './voice';
+import { canShareScreen, leaveVoice, screenAudioOn, setScreenAudio, switchScreenSource, toggleCamera, toggleDeafen, toggleMute, toggleScreenShare } from './voice';
 
-const item = 'call-control [&_svg]:size-[18px]';
-
-export function CallBarButton({ label, onPress, children, pressed, alert, end }: {
+export function CallBarButton({ label, onPress, children, pressed, alert, end, joined }: {
   label: string;
   onPress: () => void;
   children: ReactNode;
   pressed?: boolean;
   alert?: boolean;
   end?: boolean;
+  /** One half of a pill (device button + its menu arrow): the pill carries the fill, so this one has none and no corners. */
+  joined?: boolean;
 }) {
-  const tone = alert
+  const tone = joined
+    ? `rounded-none! [--button-bg:transparent] [--button-bg-hover:color-mix(in_srgb,white_8%,transparent)] ${alert ? '[--button-fg:var(--danger)]' : ''}`
+    : alert
     ? '[--button-bg:color-mix(in_srgb,var(--danger)_15%,var(--default))] [--button-bg-hover:color-mix(in_srgb,var(--danger)_24%,var(--default))] [--button-fg:var(--danger)]'
     : pressed && !end ? '[--button-bg:var(--surface-tertiary)] [--button-bg-hover:var(--default-hover)]' : '';
 
   return (
     <Tooltip delay={250} closeDelay={0}>
-      <Button isIconOnly variant={end ? 'danger' : 'tertiary'} aria-label={label} aria-pressed={pressed} onPress={onPress} className={`${item} ${tone}`}>
+      <Button isIconOnly variant={end ? 'danger' : 'tertiary'} aria-label={label} aria-pressed={pressed} onPress={onPress} className={`call-control ${tone}`}>
         {children}
       </Button>
       <Tooltip.Content placement="top">{label}</Tooltip.Content>
@@ -55,15 +58,76 @@ function DeviceControl({ kind, label, menuLabel, onPress, active, off, menuDisab
   menuDisabled?: boolean;
   children: ReactNode;
 }) {
+  const fill = off
+    ? 'bg-[color-mix(in_srgb,var(--danger)_15%,var(--default))]'
+    : active ? 'bg-surface-tertiary' : 'bg-default';
   return (
-    <div className="flex shrink-0 items-center gap-0.5">
-      <CallBarButton label={label} pressed={active} alert={off} onPress={onPress}>{children}</CallBarButton>
+    <div className={`flex shrink-0 items-stretch overflow-hidden rounded-full ${fill}`}>
+      <CallBarButton joined label={label} pressed={active} alert={off} onPress={onPress}>{children}</CallBarButton>
       <DeviceMenu
         kind={kind}
         label={menuLabel}
         disabled={menuDisabled}
-        className="grid size-6 shrink-0 place-items-center rounded-full text-muted outline-none transition-colors hover:bg-default hover:text-foreground aria-expanded:bg-default @max-[23rem]:size-5 data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-inset data-[focus-visible=true]:ring-focus"
+        className={`grid w-7 shrink-0 place-items-center outline-none transition-colors hover:bg-white/[0.08] aria-expanded:bg-white/[0.08] @max-[23rem]:w-6 data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-inset data-[focus-visible=true]:ring-focus ${off ? 'text-danger/70' : 'text-muted hover:text-foreground'}`}
       />
+    </div>
+  );
+}
+
+/** A row of the "More" menu that switches something on or off; the check says which. */
+function ViewToggle({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
+  return (
+    <Button variant="ghost" aria-pressed={on} className="w-full justify-between rounded-full px-3" onPress={onPress}>
+      {label}
+      <span className="grid size-5 place-items-center">{on && <CheckIcon size={18} />}</span>
+    </Button>
+  );
+}
+
+/** While you share: the stop button and, glued to it, the menu with what else can be done with the share. */
+function ScreenShareControl() {
+  const { t } = useT();
+  const [open, setOpen] = useState(false);
+  const [, refresh] = useState(0);
+  const audio = useStore((s) => screenAudioOn(s.room));
+  return (
+    <div className="flex shrink-0 items-stretch overflow-hidden rounded-full bg-white/15">
+      <CallBarButton joined pressed label={t('voice.screen.stop')} onPress={toggleScreenShare}>
+        <ScreenOffIcon />
+      </CallBarButton>
+      <Dropdown isOpen={open} onOpenChange={setOpen}>
+        <Dropdown.Trigger
+          aria-label={t('voice.screen.menu')}
+          className="grid w-7 shrink-0 place-items-center text-foreground/80 outline-none transition-colors hover:bg-white/[0.08] hover:text-foreground aria-expanded:bg-white/[0.08] data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-inset data-[focus-visible=true]:ring-focus"
+        >
+          <ChevronDownIcon className="chevron-flip size-3.5" aria-hidden="true" />
+        </Dropdown.Trigger>
+        <Dropdown.Popover placement="top end" className="min-w-60">
+          <Dropdown.Menu
+            aria-label={t('voice.screen.menu')}
+            onAction={(key) => {
+              if (key === 'stop') void toggleScreenShare();
+              if (key === 'change') void switchScreenSource();
+              if (key === 'audio') void setScreenAudio(!audio).then(() => refresh((n) => n + 1));
+            }}
+          >
+            <Dropdown.Item id="stop" textValue={t('voice.screen.stop')} variant="danger">
+              <Label>{t('voice.screen.stop')}</Label>
+              <ScreenOffIcon className="ml-auto size-5 text-danger" />
+            </Dropdown.Item>
+            <Dropdown.Item id="change" textValue={t('voice.screen.change')}>
+              <Label>{t('voice.screen.change')}</Label>
+              <ComputerDesktopIcon className="ml-auto size-5 text-muted" aria-hidden="true" />
+            </Dropdown.Item>
+            {audio !== null && (
+              <Dropdown.Item id="audio" textValue={t('voice.screen.audio')}>
+                <Label>{t('voice.screen.audio')}</Label>
+                <span className="ml-auto grid size-5 place-items-center">{audio && <CheckIcon size={18} />}</span>
+              </Dropdown.Item>
+            )}
+          </Dropdown.Menu>
+        </Dropdown.Popover>
+      </Dropdown>
     </div>
   );
 }
@@ -80,12 +144,12 @@ export function CallControls({ className = '', channel, viewActions, fullscreen 
   const cameraOn = useStore((s) => s.cameraOn);
   const cameraPending = useStore((s) => s.cameraPending);
   const screenSharing = useStore((s) => s.screenSharing);
-  const source = useStore((s) => s.screenSharing ? screenSource(s.room) : '');
   const myPlaying = useStore((s) => s.myPlaying);
   const mySounds = useStore((s) => s.mySounds);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const { showSelf, showNoVideo, set: setView } = useCallView();
   const [compact, setCompact] = useState(false);
   const toolbar = useRef<HTMLDivElement>(null);
 
@@ -126,26 +190,18 @@ export function CallControls({ className = '', channel, viewActions, fullscreen 
 
   return (
     <div ref={toolbar} role="group" aria-label={t('voice.controls.title')} className={`@container shrink-0 px-(--app-pane-inset) py-3 ${className}`}>
-      {screenSharing && !fullscreen && (
-        <div className="mb-1 flex min-w-0 items-center justify-center gap-2 text-xs">
-          <span className="truncate text-muted" title={source}>{t('voice.screen.source', { name: source })}</span>
-          <Button variant="ghost" size="sm" onPress={switchScreenSource} className="h-7 shrink-0 rounded-full px-3 text-xs">
-            {t('voice.screen.change')}
-          </Button>
-        </div>
-      )}
       <div className={`grid grid-cols-2 items-center gap-x-2 gap-y-1 @min-[35rem]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] ${detachedActions ? '@min-[25rem]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]' : ''}`}>
-        {!fullscreen && !compact && <div className="col-start-1 row-start-1 flex h-9 items-center">
+        {!fullscreen && !compact && <div className="col-start-1 row-start-1 flex items-center">
           {channel && <CallBarButton label={t('shell.menu.inviteToRoom')} onPress={openInvite}><UserPlusIcon /></CallBarButton>}
         </div>}
         <div className={`col-span-2 col-start-1 flex min-w-0 items-center justify-center gap-2 @max-[23rem]:gap-1 @min-[35rem]:col-span-1 @min-[35rem]:col-start-2 @min-[35rem]:row-start-1 ${detachedActions ? 'row-start-2 @min-[25rem]:col-span-1 @min-[25rem]:col-start-2 @min-[25rem]:row-start-1' : 'row-start-1'}`}>
-          <div className="no-scrollbar min-w-0 overflow-x-auto rounded-full bg-island ring-1 ring-inset ring-separator">
-            <div className="flex w-max items-center gap-1.5 p-1.5">
-              <div role="group" aria-label={t('voice.controls.devices')} className="flex shrink-0 items-center gap-1.5">
+          <div data-call-dock className="no-scrollbar min-w-0 overflow-x-auto rounded-full bg-island ring-1 ring-inset ring-separator">
+            <div className="flex w-max items-center gap-1.5 p-1.5 @max-[23rem]:gap-1 @max-[23rem]:p-1">
+              <div role="group" aria-label={t('voice.controls.devices')} className="flex shrink-0 items-center gap-1.5 @max-[23rem]:gap-1">
                 <DeviceControl kind="audioinput" label={t(micOff ? 'voice.mic.unmute' : 'voice.mic.mute')} menuLabel={t('shell.call.pickMic')} active={micOff} off={micOff} onPress={toggleMute}>
                   {micOff ? <MicSlashIcon /> : <MicIcon />}
                 </DeviceControl>
-                {fullscreen && (
+                {fullscreen && !compact && (
                   <CallBarButton label={t(deafened ? 'voice.deafen.off' : 'voice.deafen.on')} pressed={deafened} alert={deafened} onPress={toggleDeafen}>
                     {deafened ? <HeadphonesSlashIcon /> : <HeadphonesIcon />}
                   </CallBarButton>
@@ -154,25 +210,25 @@ export function CallControls({ className = '', channel, viewActions, fullscreen 
                   {cameraOn ? <VideoCameraIcon /> : <VideoCameraSlashIcon />}
                 </DeviceControl>
               </div>
-              <div role="group" aria-label={t('voice.controls.actions')} className="flex shrink-0 items-center gap-1.5">
-                {myPlaying && (
+              <div role="group" aria-label={t('voice.controls.actions')} className="flex shrink-0 items-center gap-1.5 @max-[23rem]:gap-1">
+                {myPlaying && !compact && (
                   <CallBarButton label={t('voice.soundboard.stopForCall', { name: playingName })} onPress={() => void stopMySounds()}>
                     <StopIcon />
                   </CallBarButton>
                 )}
-                {(!compact || fullscreen) && canShareScreen && (
-                  <CallBarButton label={screenLabel} pressed={screenSharing} onPress={toggleScreenShare}>
+                {!compact && canShareScreen && (screenSharing ? <ScreenShareControl /> : (
+                  <CallBarButton label={screenLabel} onPress={toggleScreenShare}>
                     <ComputerDesktopIcon />
                   </CallBarButton>
-                )}
-                <SoundboardButton look="control" />
+                ))}
+                <SoundboardButton look="control" stopsPlayback={compact} />
                 <Popover isOpen={moreOpen} onOpenChange={setMoreOpen}>
                   <Tooltip delay={250} closeDelay={0}>
                     <Button
                       isIconOnly
                       variant="tertiary"
                       aria-label={t('voice.controls.more')}
-                      className={`${item} aria-expanded:[--button-bg:var(--surface-tertiary)]`}
+                      className="call-control aria-expanded:[--button-bg:var(--surface-tertiary)]"
                     >
                       <EllipsisHorizontalIcon aria-hidden="true" />
                     </Button>
@@ -184,13 +240,22 @@ export function CallControls({ className = '', channel, viewActions, fullscreen 
                         <span>{t('voice.controls.sound')}</span>
                         {outputControl}
                       </div>
-                      {compact && !fullscreen && canShareScreen && (
+                      {compact && canShareScreen && (
                         <Button variant="ghost" className="w-full justify-start rounded-full px-3" onPress={() => {
                           setMoreOpen(false);
                           void toggleScreenShare();
                         }}>
-                          <ComputerDesktopIcon className="size-5" aria-hidden="true" />
+                          {screenSharing ? <ScreenOffIcon className="size-5" /> : <ComputerDesktopIcon className="size-5" aria-hidden="true" />}
                           {screenLabel}
+                        </Button>
+                      )}
+                      {screenSharing && (
+                        <Button variant="ghost" className="w-full justify-start rounded-full px-3" onPress={() => {
+                          setMoreOpen(false);
+                          void switchScreenSource();
+                        }}>
+                          <ComputerDesktopIcon className="size-5" aria-hidden="true" />
+                          {t('voice.screen.change')}
                         </Button>
                       )}
                       {compact && channel && (
@@ -199,6 +264,10 @@ export function CallControls({ className = '', channel, viewActions, fullscreen 
                           {t('shell.menu.inviteToRoom')}
                         </Button>
                       )}
+                      <div role="separator" className="mx-2 my-1 h-px bg-separator" />
+                      <ViewToggle label={t('voice.view.self')} on={showSelf} onPress={() => setView({ showSelf: !showSelf })} />
+                      <ViewToggle label={t('voice.view.noVideo')} on={showNoVideo} onPress={() => setView({ showNoVideo: !showNoVideo })} />
+                      <div role="separator" className="mx-2 my-1 h-px bg-separator" />
                       <Button variant="ghost" className="w-full justify-start rounded-full px-3" onPress={openVoiceSettings}>
                         <Cog6ToothIcon className="size-5" aria-hidden="true" />
                         {t('voice.controls.settings')}

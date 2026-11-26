@@ -10,6 +10,8 @@ import { desktop } from '../desktop';
 import { startQualityReports, type QualityReporter } from './report';
 // Push-to-talk listens from the moment the call code loads; it calls back into applyMic() below.
 import './ptt';
+// The sensitivity gate watches the call from the moment the call code loads too.
+import './gate';
 import { t } from '../i18n';
 
 /** The call itself: connecting to LiveKit, the mic, camera and screen, leaving. */
@@ -109,6 +111,14 @@ async function updateMicTrack(room: Room, live: boolean) {
       showError(t('voice.err.micOffFailed'));
     }
   }
+}
+
+/** The microphone's volume: saved and applied to the live microphone without touching anything else of the call. */
+export async function setInputVolume(inputVolume: number) {
+  const prefs = { ...get().voicePrefs, inputVolume };
+  set({ voicePrefs: prefs });
+  savePrefs(prefs);
+  await applyNoise();
 }
 
 /** Change voice settings: saved on this device and applied to the call right away where possible. */
@@ -326,6 +336,18 @@ export function screenSource(room: Room | null) {
   const track = room?.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track?.mediaStreamTrack;
   if (!track) return '';
   return screenNames.get(track) || track.label || t('voice.controls.screen');
+}
+
+/** The computer's sound inside your screen share: null when this share carries none, otherwise whether it is on. */
+export function screenAudioOn(room: Room | null) {
+  const publication = room?.localParticipant.getTrackPublication(Track.Source.ScreenShareAudio);
+  return publication?.track ? !publication.isMuted : null;
+}
+
+export async function setScreenAudio(on: boolean) {
+  const publication = get().room?.localParticipant.getTrackPublication(Track.Source.ScreenShareAudio);
+  if (!publication?.track) return;
+  await (on ? publication.unmute() : publication.mute());
 }
 
 async function screenOperation(switchSource: boolean) {
