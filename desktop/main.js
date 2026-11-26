@@ -12,6 +12,7 @@ const {
   ipcMain,
   nativeImage,
   net,
+  desktopCapturer,
   powerMonitor,
   safeStorage,
   screen,
@@ -948,5 +949,10 @@ function startMain(bounds = null) {
   // macOS asks for the microphone once, for the app — not per call. Camera is asked on first use.
   if (isMac && app.isPackaged && systemPreferences.getMediaAccessStatus('microphone') === 'not-determined') {
     void systemPreferences.askForMediaAccess('microphone');
+  }
+  // Screen recording has no "ask" call: macOS puts the app in its list and shows the prompt only once the app tries to
+  // capture. Done here, at start, so the switch is there in System Settings before the first screen share.
+  if (isMac && app.isPackaged && systemPreferences.getMediaAccessStatus('screen') !== 'granted') {
+    void desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } }).catch(() => undefined);
   }
 }

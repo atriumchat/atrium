@@ -68,11 +68,8 @@ const needsSettings = (status) => status === 'denied' || status === 'restricted'
 ipcMain.handle('picker:list', async (event, kind) => {
   if (!fromPicker(event) || (kind !== 'window' && kind !== 'screen')) return { error: true };
   const window = picker;
-  const permission = recordingStatus();
-  if (permission === 'denied' || permission === 'restricted') {
-    clearOffered(kind);
-    return { permission: true };
-  }
+  // macOS reports "denied" until the app has tried to capture once, so always try: the attempt is what shows the
+  // system prompt and puts Atrium in the Screen Recording list.
   try {
     const sources = await list(window, kind);
     if (sources.some((source) => source.thumb) || !needsSettings(recordingStatus())) return { sources };
