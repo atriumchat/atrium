@@ -332,7 +332,8 @@ export function MediaStage({ fallback, renderControls }: {
 
   // Off the picture at all (and not onto the header): everything goes at once, without waiting out the timer.
   const leave = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    const next = event.relatedTarget as Node | null;
+    if (event.pointerType === 'touch') return;
+    const next = event.relatedTarget;
     if (overlayOpen() || controls.current?.querySelector(':focus-visible')) return;
     if (next instanceof Node && (event.currentTarget.contains(next) || document.querySelector('[data-call-header]')?.contains(next))) return;
     if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
