@@ -559,11 +559,20 @@ function ScreenStage({ trackRef, full, onGrid, onFullscreen }: {
   const name = user?.name ?? trackRef.participant.name;
   return (
     <>
+      {!full && (
+        <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 py-2 transition-opacity duration-200 group-data-[idle]/stage:opacity-0 motion-reduce:transition-none">
+          <div className="flex min-w-0 items-baseline gap-2">
+            <h3 className="truncate text-lg font-normal">{name}</h3>
+            {!camera && <span className="shrink-0 text-[13px] text-muted">{t('voice.stream.live')}</span>}
+          </div>
+          <Button variant="tertiary" size="sm" className="shrink-0 rounded-full" onPress={onGrid}>{t('voice.stream.grid')}</Button>
+        </div>
+      )}
       <button
         type="button"
         aria-label={t(full ? 'voice.stream.exitFullscreen' : 'voice.stream.grid')}
         tabIndex={full ? -1 : 0}
-        className={`relative min-h-0 flex-1 overflow-hidden bg-black outline-none focus-visible:ring-2 focus-visible:ring-focus ${full ? '' : 'mt-2 rounded-surface'}`}
+        className={`relative min-h-0 flex-1 overflow-hidden bg-black outline-none focus-visible:ring-2 focus-visible:ring-focus ${full ? '' : 'rounded-surface'}`}
         onClick={(event) => {
           if (full) return;
           if (event.detail === 0 || !document.fullscreenEnabled) onGrid();
@@ -578,12 +587,6 @@ function ScreenStage({ trackRef, full, onGrid, onFullscreen }: {
           trackRef={trackRef}
           className={`h-full w-full ${camera ? 'object-cover' : 'object-contain'} ${camera && trackRef.participant.isLocal ? '-scale-x-100' : ''}`}
         />
-        {!full && (
-          <span className="pointer-events-none absolute bottom-2.5 left-2.5 flex max-w-[calc(100%-20px)] items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[13px] font-medium text-white transition-opacity duration-200 group-data-[idle]/stage:opacity-0">
-            {!camera && <ScreenIcon size={12} className="shrink-0" />}
-            <span className="min-w-0 truncate">{name}</span>
-          </span>
-        )}
       </button>
     </>
   );
