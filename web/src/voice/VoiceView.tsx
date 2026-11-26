@@ -257,23 +257,27 @@ export function MediaStage({ fallback, renderControls }: {
   const stage = useRef<HTMLDivElement>(null);
   const overPanel = useRef(false);
   const hideTimer = useRef<number | null>(null);
-  // A screen share or a camera can be brought up big; the first screen share is the default.
   const pinnable = [...screens, ...cameras];
-  const focused = pinnable.find((x) => trackKey(x) === focusKey) ?? screens[0];
-  const cameraOf = new Map(cameras.map((c) => [c.participant.identity, c]));
-  const fit = useTileGrid(area, focused ? 0 : participants.length);
-  // Only when they don't all fit does the order matter: cameras first, then talking, the rest as they came.
-  const rank = (p: Participant) => (cameraOf.has(p.identity) ? 2 : 0) + (speaking.includes(p.identity) ? 1 : 0);
-  const overflow = fit.fits < participants.length;
-  const ordered = overflow ? [...participants].sort((a, b) => rank(b) - rank(a)) : participants;
+  const focused = pinnable.find((track) => trackKey(track) === focusKey);
+  const cameraOf = new Map(cameras.map((camera) => [camera.participant.identity, camera]));
+  const fit = useTileGrid(area, focused ? 0 : participants.length + screens.length);
+  const tiles = [
+    ...screens.map((video) => ({ key: trackKey(video), participant: video.participant, video })),
+    ...participants.map((participant) => ({ key: participant.identity, participant, video: cameraOf.get(participant.identity) })),
+  ];
+  const rank = ({ participant, video }: (typeof tiles)[number]) =>
+    (video?.source === Track.Source.ScreenShare ? 4 : video ? 2 : 0) + Number(speaking.includes(participant.identity));
+  const overflow = fit.fits < tiles.length;
+  const ordered = overflow ? [...tiles].sort((a, b) => rank(b) - rank(a)) : tiles;
   const shown = overflow ? ordered.slice(0, Math.max(1, fit.fits - 1)) : ordered;
   const hidden = ordered.slice(shown.length);
-  const cameraParticipant = shown.find((participant) => !participant.isLocal && cameraOf.has(participant.identity))
-    ?? shown.find((participant) => cameraOf.has(participant.identity));
-  const viewTrack = focused ?? (cameraParticipant && cameraOf.get(cameraParticipant.identity));
-  // A click on what's already big goes back to the grid (or stays on the first screen share when there is one).
+  const viewTrack = focused ?? screens[0] ?? cameras.find((camera) => !camera.participant.isLocal) ?? cameras[0];
   const focusOn = (track: TrackReference) =>
-    setFocusKey(focused && trackKey(track) === trackKey(focused) ? null : trackKey(track));
+    setFocusKey(focusKey === trackKey(track) ? null : trackKey(track));
+  // A publication can be replaced while a camera is off. The grid remains active until another explicit selection.
+  useEffect(() => {
+    if (focusKey && !focused) setFocusKey(null);
+  }, [focusKey, focused]);
   const handleFullscreen = (exit = false) => {
     const action = exit ? document.exitFullscreen() : document.documentElement.requestFullscreen();
     void action?.catch(() => showError(t('voice.stream.windowError')));
@@ -338,60 +342,41 @@ export function MediaStage({ fallback, renderControls }: {
           <div className="flex min-w-0 flex-1 flex-col">
             {focused ? (
               <>
-                <div className="min-h-0 flex-1 px-(--app-pane-inset)">
-                  <ScreenStage trackRef={focused} />
+                <div className="flex min-h-0 flex-1 flex-col px-(--app-pane-inset)">
+                  <ScreenStage trackRef={focused} onGrid={() => setFocusKey(null)} onFullscreen={() => handleFullscreen(full)} />
                 </div>
-                {/* Every screen share, then everyone: a click on a thumbnail brings that track up, the big one carries a ring. */}
-                <div className="no-scrollbar flex shrink-0 justify-center gap-2 overflow-x-auto px-(--app-pane-inset) pt-2">
-                  {screens.map((s) => (
-                    <button
-                      key={trackKey(s)}
-                      onClick={() => focusOn(s)}
-                      aria-label={t('voice.stream.show')}
-                      className={`h-[90px] w-[160px] shrink-0 overflow-hidden rounded-row bg-black ${focused && trackKey(s) === trackKey(focused) ? 'ring-2 ring-inset ring-white' : ''}`}
-                    >
-                      <VideoTrack trackRef={s} className="h-full w-full object-cover" />
-                    </button>
+                <div className="no-scrollbar flex shrink-0 justify-center-safe gap-2 overflow-x-auto px-(--app-pane-inset) pt-2">
+                  {tiles.map(({ key, participant, video }) => (
+                    <div key={key} className="h-[90px] w-[160px] shrink-0">
+                      <Tile participant={participant} video={video} height={90}
+                        selected={!!video && trackKey(video) === trackKey(focused)}
+                        onSelect={video ? () => focusOn(video) : undefined} />
+                    </div>
                   ))}
-                  {participants.map((p) => {
-                    const camera = cameraOf.get(p.identity);
-                    const isFocused = !!camera && !!focused && trackKey(camera) === trackKey(focused);
-                    return (
-                      <div
-                        key={p.identity}
-                        className={`h-[90px] w-[160px] shrink-0 rounded-surface ${isFocused ? 'ring-2 ring-inset ring-white' : ''}`}
-                      >
-                        <Tile participant={p} camera={camera} height={90} onSelect={camera ? () => focusOn(camera) : undefined} />
-                      </div>
-                    );
-                  })}
                 </div>
               </>
             ) : (
               <div ref={setArea} className="flex min-h-0 flex-1 flex-wrap content-center justify-center gap-2 px-(--app-pane-inset)">
-                {shown.map((p) => {
-                  const camera = cameraOf.get(p.identity);
-                  return (
-                    <div key={p.identity} className="shrink-0" style={{ width: fit.tileW, height: fit.tileH }}>
-                      <Tile participant={p} camera={camera} height={fit.tileH} onSelect={camera ? () => focusOn(camera) : undefined} />
-                    </div>
-                  );
-                })}
+                {shown.map(({ key, participant, video }) => (
+                  <div key={key} className="shrink-0" style={{ width: fit.tileW, height: fit.tileH }}>
+                    <Tile participant={participant} video={video} height={fit.tileH} onSelect={video ? () => focusOn(video) : undefined} />
+                  </div>
+                ))}
                 {hidden.length > 0 && (
                   <button
                     onClick={() => setSide(true)}
                     aria-label={t('voice.people.open')}
-                    className="flex shrink-0 flex-col items-center justify-center gap-3 rounded-surface bg-[#18181b] text-foreground transition-colors hover:bg-default"
-                    style={{ width: fit.tileW, height: fit.tileH }}
+                    className={`flex shrink-0 flex-col items-center justify-center gap-3 rounded-surface bg-[#18181b] text-foreground transition-colors hover:bg-default ${fit.fits < 2 ? 'absolute right-4 top-2 z-10 size-9' : ''}`}
+                    style={fit.fits < 2 ? undefined : { width: fit.tileW, height: fit.tileH }}
                   >
-                    <FaceStack users={hidden.map((p) => users[p.identity])} ringBg="#18181b" size={Math.round(Math.min(56, Math.max(24, fit.tileH * 0.22)))} />
+                    {fit.fits >= 2 && <FaceStack users={hidden.map(({ participant }) => users[participant.identity])} ringBg="#18181b" size={Math.round(Math.min(56, Math.max(24, fit.tileH * 0.22)))} />}
                     <span className={`font-medium ${fit.tileH < 120 ? 'text-[13px]' : 'text-[16px]'}`}>+{hidden.length}</span>
                   </button>
                 )}
               </div>
             )}
           </div>
-          {side && <CallPeople participants={ordered} onClose={() => setSide(false)} />}
+          {side && <CallPeople participants={participants} onClose={() => setSide(false)} />}
         </div>
       )}
       <div
@@ -412,7 +397,7 @@ function CallPeople({ participants, onClose }: { participants: Participant[]; on
   const speaking = useStore((s) => s.speaking);
   const entries = useStore((s) => s.calls[s.voiceChannelId ?? '']?.participants ?? s.voiceState);
   return (
-    <aside className="flex w-[280px] shrink-0 flex-col border-l border-white/[0.06] max-md:hidden">
+    <aside className="flex w-[280px] shrink-0 flex-col border-l border-white/[0.06] bg-window max-md:absolute max-md:inset-y-0 max-md:right-0 max-md:z-20 max-md:max-w-full">
       <header className="flex h-14 shrink-0 items-center gap-2 pl-5 pr-3">
         <h3 className="flex-1 text-[20px] font-light tracking-[-0.3px]">{t('voice.people.title', { n: participants.length })}</h3>
         <RoundButton size="sm" tone="ghost" label={t('voice.people.close')} onPress={onClose}>
@@ -446,22 +431,47 @@ function CallPeople({ participants, onClose }: { participants: Participant[]; on
   );
 }
 
-function ScreenStage({ trackRef }: { trackRef: TrackReference }) {
+function ScreenStage({ trackRef, onGrid, onFullscreen }: {
+  trackRef: TrackReference;
+  onGrid: () => void;
+  onFullscreen: () => void;
+}) {
   const { t } = useT();
   const user = useStore((s) => s.users[trackRef.participant.identity]);
-  // A camera is not a broadcast: no tag, and your own frame stays mirrored like the tile.
+  const clickTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(clickTimer.current), []);
   const camera = trackRef.source === Track.Source.Camera;
+  const name = user?.name ?? trackRef.participant.name;
   return (
-    <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-surface bg-black">
-      <VideoTrack
-        trackRef={trackRef}
-        className={`h-full w-full object-contain ${camera && trackRef.participant.isLocal ? '-scale-x-100' : ''}`}
-      />
-      <div className="absolute left-3 top-3 flex items-center gap-2 rounded-fine bg-black/60 px-2.5 py-1 text-[13px] font-medium text-white">
-        {!camera && <span className="rounded-[4px] bg-danger px-1 text-[11px] font-bold uppercase leading-4">{t('voice.stream.live')}</span>}
-        {user?.name ?? trackRef.participant.name}
+    <>
+      <div className="flex min-w-0 shrink-0 items-center gap-2 py-2">
+        <div className="flex min-w-0 flex-1 items-baseline gap-2">
+          <h3 className="min-w-0 truncate text-[18px] font-normal">{name}</h3>
+          {!camera && <span className="shrink-0 text-[13px] text-muted">{t('voice.stream.live')}</span>}
+        </div>
+        <button type="button" onClick={onGrid} className="h-9 shrink-0 rounded-full bg-default px-4 text-sm outline-none transition-colors hover:bg-surface-tertiary focus-visible:ring-2 focus-visible:ring-focus">
+          {t('voice.stream.grid')}
+        </button>
       </div>
-    </div>
+      <button
+        type="button"
+        aria-label={t('voice.stream.grid')}
+        className="relative min-h-0 flex-1 overflow-hidden rounded-surface bg-black outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        onClick={(event) => {
+          if (event.detail === 0 || !document.fullscreenEnabled) onGrid();
+          else if (event.detail === 1) clickTimer.current = window.setTimeout(onGrid, 300);
+        }}
+        onDoubleClick={() => {
+          window.clearTimeout(clickTimer.current);
+          onFullscreen();
+        }}
+      >
+        <VideoTrack
+          trackRef={trackRef}
+          className={`h-full w-full object-contain ${camera && trackRef.participant.isLocal ? '-scale-x-100' : ''}`}
+        />
+      </button>
+    </>
   );
 }
 
@@ -480,9 +490,10 @@ function DeviceVideo({ track }: { track: MediaStreamTrack }) {
  * else's tile sets their volume; their camera, when they have one, comes up big instead, and the volume moves to the
  * speaker button or the right-click.
  */
-function Tile({ participant, camera, height, onSelect }: {
+function Tile({ participant, video, height, onSelect, selected = false }: {
   participant: Participant;
-  camera?: TrackReference;
+  video?: TrackReference;
+  selected?: boolean;
   height: number;
   onSelect?: () => void;
 }) {
@@ -496,7 +507,8 @@ function Tile({ participant, camera, height, onSelect }: {
   const name = user?.name ?? participant.name ?? '';
   const label = `${name}${participant.isLocal ? ` ${t('voice.you')}` : ''}`;
   // Your camera on its way: straight from the device, or a dark tile until the device opens.
-  const pending = useStore((s) => s.cameraPending) && participant.isLocal && !camera;
+  const screen = video?.source === Track.Source.ScreenShare;
+  const pending = useStore((s) => s.cameraPending) && participant.isLocal && !video;
   const preview = useStore((s) => s.cameraPreview);
   const small = height < 120;
   const remote = participant instanceof RemoteParticipant;
@@ -508,30 +520,39 @@ function Tile({ participant, camera, height, onSelect }: {
 
   return (
     <div
-      className={`group relative flex h-full w-full items-center justify-center overflow-hidden rounded-surface ${pending || camera ? 'bg-black' : 'bg-[#18181b]'} ${handleClick ? 'cursor-pointer' : ''}`}
-      // The volume popover is portalled but its clicks still bubble here through React: only the tile itself counts.
-      onClick={handleClick ? (e) => { if (e.currentTarget.contains(e.target as Node)) handleClick(); } : undefined}
-      onContextMenu={remote ? (e) => { e.preventDefault(); setVolumeOpen(true); } : undefined}
+      className={`group relative flex h-full w-full items-center justify-center overflow-hidden rounded-surface ${pending || video ? 'bg-black' : 'bg-[#18181b]'}`}
+      onContextMenu={remote ? (e) => { if (!e.currentTarget.contains(e.target as Node)) return; e.preventDefault(); setVolumeOpen(true); } : undefined}
     >
       {pending ? (
         preview ? <DeviceVideo track={preview} /> : <Spinner size={small ? 'sm' : 'md'} color="current" className="text-white/60" />
-      ) : camera ? (
+      ) : video ? (
         // The whole frame, never cropped: 4:3 webcams get dark bars instead of losing forehead and chin.
         // Your own camera is mirrored, like a selfie preview.
-        <VideoTrack trackRef={camera} className={`h-full w-full bg-black object-contain ${participant.isLocal ? '-scale-x-100' : ''}`} />
+        <VideoTrack trackRef={video} className={`h-full w-full bg-black object-contain ${!screen && participant.isLocal ? '-scale-x-100' : ''}`} />
       ) : (
         <Avatar user={user} size={Math.round(Math.min(128, Math.max(28, height * 0.4)))} ringBg="transparent" />
       )}
-      <div className={`pointer-events-none absolute inset-0 rounded-surface ${speaking ? 'ring-2 ring-inset ring-white' : ''}`} />
+      {handleClick && (
+        <button
+          type="button"
+          aria-pressed={onSelect ? selected : undefined}
+          aria-label={onSelect ? `${screen ? t('voice.stream.show') : t('voice.stream.focus')}: ${name}` : t('voice.volume', { name })}
+          onClick={handleClick}
+          className="absolute inset-0 cursor-pointer rounded-surface outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white"
+        />
+      )}
+      <div className={`pointer-events-none absolute inset-0 rounded-surface ${selected || speaking ? 'ring-2 ring-inset ring-white' : ''}`} />
       <SoundPlayedMark
         userId={participant.identity}
         size={small ? 12 : 14}
-        className={`absolute items-center justify-center rounded-full bg-black/55 text-white ${markPlace}`}
+        className={`pointer-events-none absolute items-center justify-center rounded-full bg-black/55 text-white ${markPlace}`}
       />
       <div
-        className={`absolute flex max-w-[calc(100%-16px)] items-center gap-1.5 rounded-full bg-black/55 font-medium text-white ${small ? 'bottom-1.5 left-1.5 px-2 py-0.5 text-[12px]' : 'bottom-2.5 left-2.5 px-2.5 py-1 text-[13px]'}`}
+        className={`pointer-events-none absolute flex max-w-[calc(100%-16px)] items-center gap-1.5 rounded-full bg-black/55 font-medium text-white ${small ? 'bottom-1.5 left-1.5 px-2 py-0.5 text-[12px]' : 'bottom-2.5 left-2.5 px-2.5 py-1 text-[13px]'}`}
       >
-        {entry?.deafened ? (
+        {screen ? (
+          <ScreenIcon size={12} className="shrink-0" />
+        ) : entry?.deafened ? (
           <HeadphonesSlashIcon size={12} className="shrink-0 text-danger" />
         ) : entry?.muted ? (
           <MicSlashIcon size={12} className="shrink-0 text-danger" />
@@ -545,13 +566,13 @@ function Tile({ participant, camera, height, onSelect }: {
           <Popover.Trigger
             aria-label={t('voice.volume', { name })}
             onClick={(e) => e.stopPropagation()}
-            className={`absolute z-10 grid shrink-0 place-items-center rounded-full bg-black/55 text-white outline-none transition-opacity ${volumeOpen ? '' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'} ${small ? 'right-1.5 top-1.5 size-5' : 'right-2.5 top-2.5 size-7'}`}
+            className={`absolute z-10 grid shrink-0 place-items-center rounded-full bg-black/55 text-white outline-none transition-opacity ${volumeOpen ? '' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100'} ${small ? 'right-1.5 top-1.5 size-5' : 'right-2.5 top-2.5 size-7'}`}
           >
             <SpeakerWaveIcon className={small ? 'size-3' : 'size-3.5'} aria-hidden="true" />
           </Popover.Trigger>
-          <Popover.Content placement="bottom end" className="w-64">
-            <Popover.Dialog className="p-5">
-              <VolumeSlider userId={participant.identity} name={name} />
+          <Popover.Content isNonModal placement="bottom end" className="w-64">
+            <Popover.Dialog aria-label={t('voice.volume', { name })} className="p-4">
+              <VolumeSlider userId={participant.identity} name={name} showMute />
             </Popover.Dialog>
           </Popover.Content>
         </Popover>

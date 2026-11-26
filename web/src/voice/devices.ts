@@ -8,6 +8,7 @@ const get = useStore.getState;
 
 // Per-person volume (0..2), kept for the session so it survives reconnects and channel switches.
 const userVolumes = new Map<string, number>();
+const audibleVolumes = new Map<string, number>();
 
 export function applyVolume(participant: RemoteParticipant) {
   const volume = userVolumes.get(participant.identity);
@@ -22,8 +23,15 @@ export function getUserVolume(userId: string) {
 
 export function setUserVolume(userId: string, volume: number) {
   userVolumes.set(userId, volume);
+  if (volume > 0) audibleVolumes.set(userId, volume);
   const participant = get().room?.remoteParticipants.get(userId);
   if (participant) applyVolume(participant);
+}
+
+export function toggleUserMute(userId: string) {
+  const volume = getUserVolume(userId) === 0 ? audibleVolumes.get(userId) ?? 1 : 0;
+  setUserVolume(userId, volume);
+  return volume;
 }
 
 // Devices used by calls, remembered across sessions.

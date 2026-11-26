@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Button, Label, Slider, Tooltip } from '@heroui/react';
 import { useT } from '../i18n';
-import { getUserVolume, setUserVolume } from '../voice/devices';
+import { getUserVolume, setUserVolume, toggleUserMute } from '../voice/devices';
 
 type Placement = 'top' | 'bottom' | 'left' | 'right';
 
@@ -56,29 +56,38 @@ export function RoundButton(props: {
 }
 
 /** Per-person playback volume, 0–200%. */
-export function VolumeSlider({ userId, name }: { userId: string; name: string }) {
+export function VolumeSlider({ userId, name, showMute = false }: { userId: string; name: string; showMute?: boolean }) {
   const { t } = useT();
   const [value, setValue] = useState(() => getUserVolume(userId));
   return (
-    <Slider
-      value={value}
-      onChange={(v) => {
-        const next = Array.isArray(v) ? v[0] : v;
-        setValue(next);
-        setUserVolume(userId, next);
-      }}
-      minValue={0}
-      maxValue={2}
-      step={0.01}
-      formatOptions={{ style: 'percent' }}
-      className="w-full"
-    >
-      <Label>{t('common.volume', { name })}</Label>
-      <Slider.Output />
-      <Slider.Track>
-        <Slider.Fill />
-        <Slider.Thumb />
-      </Slider.Track>
-    </Slider>
+    <div className="flex w-full flex-col gap-3">
+      <Slider
+        value={value}
+        onChange={(v) => {
+          const next = Array.isArray(v) ? v[0] : v;
+          setValue(next);
+          setUserVolume(userId, next);
+        }}
+        minValue={0}
+        maxValue={2}
+        step={0.01}
+        formatOptions={{ style: 'percent' }}
+        className="w-full"
+      >
+        <Label>{showMute ? t('voice.userVolume') : t('common.volume', { name })}</Label>
+        <Slider.Output />
+        <Slider.Track>
+          <Slider.Fill />
+          {showMute && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 z-10 w-px bg-foreground/60 mix-blend-difference" />}
+          <Slider.Thumb />
+        </Slider.Track>
+      </Slider>
+      {showMute && (
+        <button type="button" className="rounded-row px-2 py-2 text-left text-sm outline-none hover:bg-default focus-visible:ring-2 focus-visible:ring-focus"
+          onClick={() => setValue(toggleUserMute(userId))}>
+          {t(value === 0 ? 'voice.userUnmute' : 'voice.userMute')}
+        </button>
+      )}
+    </div>
   );
 }
