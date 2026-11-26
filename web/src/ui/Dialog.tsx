@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type DragEvent, type ReactNode } from 'react';
 import { AlertDialog, Button, Drawer, Modal } from '@heroui/react';
 import { useT } from '../i18n';
 import { useIsMobile } from '../hooks';
@@ -27,6 +27,21 @@ const WINDOW = 'border border-edge [--overlay:var(--app-window)]';
 // HeroUI's Drawer leaves in 200ms.
 const SHEET_EXIT_MS = 220;
 
+function fileDropHandlers(onFileDrop?: (file: File) => void) {
+  if (!onFileDrop) return {};
+  return {
+    onDragOver(event: DragEvent) {
+      if (event.dataTransfer.types.includes('Files')) event.preventDefault();
+    },
+    onDrop(event: DragEvent) {
+      if (!event.dataTransfer.types.includes('Files')) return;
+      event.preventDefault();
+      const file = event.dataTransfer.files[0];
+      if (file) onFileDrop(file);
+    },
+  };
+}
+
 /**
  * A window on the phone: a sheet from the bottom almost to the top (HeroUI's Drawer), rounded on top, with a handle
  * to pull it down by and the cross. Only the middle scrolls; the title and the footer stay put, and they (with the
@@ -38,31 +53,36 @@ function Sheet({
   header,
   children,
   footer,
+  isBusy = false,
+  onFileDrop,
 }: {
   label: string;
   onClose: () => void;
   header?: ReactNode;
   children?: ReactNode;
   footer?: ReactNode;
+  isBusy?: boolean;
+  onFileDrop?: (file: File) => void;
 }) {
   // Closing by a pull, the cross or a tap outside first lets it slide away (HeroUI's leaving transition runs only
   // while it is still mounted, closed), then tells the owner, which unmounts it.
   const [open, setOpen] = useState(true);
   function close() {
+    if (isBusy) return;
     setOpen(false);
     setTimeout(onClose, SHEET_EXIT_MS);
   }
   return (
-    <Drawer.Backdrop isOpen={open} onOpenChange={(next) => !next && close()} className="sheet-backdrop">
+    <Drawer.Backdrop isOpen={open} isDismissable={!isBusy} isKeyboardDismissDisabled={isBusy} onOpenChange={(next) => !next && close()} className="sheet-backdrop">
       <Drawer.Content placement="bottom">
-        <Drawer.Dialog aria-label={label} className={`sheet ${SHEET}`}>
+        <Drawer.Dialog aria-label={label} className={`sheet ${SHEET}`} {...fileDropHandlers(onFileDrop)}>
           {/* The theme's separator would vanish on the sheet's tone. */}
           <Drawer.Handle className="pb-1 pt-2.5 [&>[data-slot=drawer-handle-bar]]:bg-white/25" />
           {header && <Drawer.Header className="gap-1 px-5 pr-14 pt-3">{header}</Drawer.Header>}
           <Drawer.Body className="mx-0 px-0 text-[15px] text-foreground">{children}</Drawer.Body>
           {footer && <Drawer.Footer className="block">{footer}</Drawer.Footer>}
           {/* Last, so the handle, title and body keep their spacing as neighbours. */}
-          <Drawer.CloseTrigger><XIcon size={16} /></Drawer.CloseTrigger>
+          <Drawer.CloseTrigger isDisabled={isBusy}><XIcon size={16} /></Drawer.CloseTrigger>
         </Drawer.Dialog>
       </Drawer.Content>
     </Drawer.Backdrop>
@@ -83,6 +103,8 @@ export function Dialog({
   children,
   footer,
   sheet = false,
+  isBusy = false,
+  onFileDrop,
 }: {
   title: string;
   subtitle?: string;
@@ -90,6 +112,8 @@ export function Dialog({
   children?: ReactNode;
   footer?: ReactNode;
   sheet?: boolean;
+  isBusy?: boolean;
+  onFileDrop?: (file: File) => void;
 }) {
   const isMobile = useIsMobile();
   const { t } = useT();
@@ -98,6 +122,8 @@ export function Dialog({
       <Sheet
         label={title}
         onClose={onClose}
+        isBusy={isBusy}
+        onFileDrop={onFileDrop}
         header={
           <>
             <Drawer.Heading className="text-[18px] font-medium">{title}</Drawer.Heading>
@@ -111,10 +137,10 @@ export function Dialog({
     );
   }
   return (
-    <Modal.Backdrop ref={focusReducedMotionDialog} isOpen onOpenChange={(open) => !open && onClose()}>
+    <Modal.Backdrop ref={focusReducedMotionDialog} isOpen isDismissable={!isBusy} isKeyboardDismissDisabled={isBusy} onOpenChange={(open) => !open && !isBusy && onClose()}>
       <Modal.Container size="md" placement="auto">
-        <Modal.Dialog className={`${WINDOW} ${sheet ? 'max-h-[80vh]' : ''}`}>
-          <Modal.CloseTrigger aria-label={t('common.close')}><XIcon size={16} /></Modal.CloseTrigger>
+        <Modal.Dialog className={`${WINDOW} ${sheet ? 'max-h-[80vh]' : ''}`} {...fileDropHandlers(onFileDrop)}>
+          <Modal.CloseTrigger isDisabled={isBusy} aria-label={t('common.close')}><XIcon size={16} /></Modal.CloseTrigger>
           <Modal.Header className="gap-1 pr-8">
             <Modal.Heading className="text-[18px] font-medium">{title}</Modal.Heading>
             {subtitle && <p className="text-[14px] text-muted">{subtitle}</p>}

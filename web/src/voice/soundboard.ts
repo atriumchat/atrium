@@ -17,6 +17,7 @@ const set = useStore.setState;
 
 /** The picked file: bigger than this the server won't take it (it keeps the first 4 minutes, compressed). */
 const MAX_SOUND_BYTES = 50 * 1024 * 1024;
+export const MIN_SOUND_SEGMENT_MS = 500;
 /** Clips longer than this stream; short ones and old ones with no length (0) are decoded and preloaded. */
 const LONG_LIMIT_MS = 10_000;
 /** Whatever a file says, a streamed clip is cut off here (the server already trims it to 4 minutes). */
@@ -150,7 +151,7 @@ function isLong(durationMs: number): boolean {
  * clip's own volume; what's heard is that times the soundboard's master volume, so `refresh` re-applies it when
  * either slider moves while the clip plays.
  */
-type Play = { userId: string; stop: () => void; base: number; refresh: () => void };
+type Play = { userId: string; stop: () => void; base: number; refresh: () => void; positionMs: () => number | null };
 
 /** The part of a clip to sound, in ms from its start; absent means all of it. */
 type Range = { fromMs: number; toMs: number };
@@ -202,7 +203,7 @@ function playBuffer(
   source.buffer = buffer;
   source.connect(gain).connect(context.destination);
   let done = false;
-  let started = false;
+  let startedAt: number | null = null;
   const finish = () => {
     if (done) return;
     done = true;
@@ -217,8 +218,9 @@ function playBuffer(
     base,
     // A short ramp: a jump in gain clicks.
     refresh: () => gain.gain.setTargetAtTime(level(play.base), context.currentTime, 0.015),
+    positionMs: () => startedAt === null ? null : (range?.fromMs ?? 0) + (context.currentTime - startedAt) * 1000,
     stop: () => {
-      if (started && !done) source.stop();
+      if (startedAt !== null && !done) source.stop();
       finish();
     },
   };
@@ -229,9 +231,9 @@ function playBuffer(
     await ensureRunning(context);
     await applySink(context);
     if (done) return;
-    started = true;
     try {
       source.start(0, (range?.fromMs ?? 0) / 1000, range ? (range.toMs - range.fromMs) / 1000 : undefined);
+      startedAt = context.currentTime;
     } catch {
       finish();
     }
@@ -247,6 +249,7 @@ function playLong(
   userId: string,
   onEnded?: () => void,
   range?: Range,
+  loop = false,
 ): Play {
   const audio = new Audio();
   audio.preload = 'auto';
@@ -257,6 +260,7 @@ function playLong(
   }
   audio.src = url;
   let done = false;
+  let started = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
   const finish = () => {
     if (done) return;
@@ -277,19 +281,40 @@ function playLong(
     refresh: () => {
       audio.volume = level(play.base);
     },
+    positionMs: () => started && !done ? audio.currentTime * 1000 : null,
     stop: finish,
   };
-  audio.onended = finish;
+  const checkRange = () => {
+    if (!range || done) return;
+    if (audio.currentTime * 1000 >= range.toMs || audio.ended) {
+      if (!loop) {
+        finish();
+        return;
+      }
+      audio.currentTime = range.fromMs / 1000;
+      if (audio.paused) void audio.play().catch(finish);
+    }
+    const left = range.toMs - audio.currentTime * 1000;
+    timer = setTimeout(checkRange, Math.max(8, Math.min(80, left)));
+  };
+  audio.onended = loop && range ? () => {
+    if (timer) clearTimeout(timer);
+    checkRange();
+  } : finish;
   audio.onerror = finish;
   audio.oncanplay = () => {
     audio.oncanplay = null;
     if (done) return;
     if (timer) clearTimeout(timer);
-    // A chosen part of the clip: start where it begins and stop where it ends.
     if (range) {
       audio.currentTime = range.fromMs / 1000;
-      timer = setTimeout(finish, Math.max(0, range.toMs - range.fromMs));
-      void audio.play().catch(finish);
+      timer = setTimeout(finish, MAX_LONG_SECONDS * 1000);
+      void audio.play().then(() => {
+        if (done) return;
+        started = true;
+        if (timer) clearTimeout(timer);
+        checkRange();
+      }, finish);
       return;
     }
     const elapsed = arrived === null ? 0 : (Date.now() - arrived) / 1000;
@@ -321,38 +346,151 @@ export async function loadMySounds(): Promise<void> {
   }
 }
 
-/** null if the file is a fine clip, otherwise a ready-to-show reason. */
-export async function checkSoundFile(file: File): Promise<string | null> {
-  if (file.size > MAX_SOUND_BYTES) return t('voice.sound.tooBig');
-  return (await readDuration(file)) === null ? t('voice.sound.notAudio') : null;
+export async function inspectSoundFile(file: File, signal: AbortSignal) {
+  if (file.size > MAX_SOUND_BYTES) return { error: t('voice.sound.tooBig') } as const;
+  const durationMs = await readDuration(file, signal);
+  signal.throwIfAborted();
+  if (!durationMs) return { error: t('voice.sound.notAudio') } as const;
+  if (durationMs < MIN_SOUND_SEGMENT_MS) return { error: t('voice.soundboard.shortFile') } as const;
+  return { durationMs, waveform: await soundWaveform(file, durationMs, signal) } as const;
 }
 
-/**
- * The length of a file from its header, in ms, or null when the browser can't play it. Decoding it whole instead would
- * take a minute and a gigabyte for a long mp3, and the server is the one that really checks the file.
- */
-function readDuration(file: File): Promise<number | null> {
+const WAVE_BARS = 200;
+const WAVE_LIMIT = 30 * 1024 * 1024;
+
+async function soundWaveform(file: File, durationMs: number, signal: AbortSignal) {
+  const large = file.size > WAVE_LIMIT;
+  const sampleMs = large ? Math.min(60_000, durationMs) : durationMs;
+  const count = Math.max(1, Math.ceil(WAVE_BARS * sampleMs / durationMs));
+  let context: AudioContext | undefined;
+  try {
+    context = new AudioContext();
+    const bytes = large && durationMs > 60_000 ? await wavePrefix(file, durationMs) : await file.arrayBuffer();
+    signal.throwIfAborted();
+    const buffer = await context.decodeAudioData(bytes);
+    signal.throwIfAborted();
+    const length = Math.min(buffer.length, Math.ceil(sampleMs / 1000 * buffer.sampleRate));
+    const coveredMs = Math.min(sampleMs, buffer.duration * 1000);
+    const channels = Array.from({ length: buffer.numberOfChannels }, (_, i) => buffer.getChannelData(i));
+    const peaks = Array.from({ length: count }, (_, i) => {
+      const start = Math.floor(i * length / count);
+      const end = Math.floor((i + 1) * length / count);
+      let peak = 0;
+      for (const channel of channels) {
+        for (let at = start; at < end; at++) peak = Math.max(peak, Math.abs(channel[at]));
+      }
+      return peak;
+    });
+    return { peaks, coveredMs };
+  } catch {
+    signal.throwIfAborted();
+    // Containers such as MP4 can keep their index at the end, so a byte prefix cannot be decoded in isolation.
+    return large ? sampleWaveform(file, sampleMs, count, signal) : { peaks: [], coveredMs: 0 };
+  } finally {
+    void context?.close().catch(() => undefined);
+  }
+}
+
+/** Prefix decoders can read MP3 and PCM WAV. Make the WAV container's lengths match the sampled bytes. */
+async function wavePrefix(file: File, durationMs: number) {
+  const bytes = await file.slice(0, Math.min(WAVE_LIMIT, Math.ceil(file.size * 62_000 / durationMs))).arrayBuffer();
+  const data = new DataView(bytes);
+  if (data.byteLength >= 12 && data.getUint32(0) === 0x52494646 && data.getUint32(8) === 0x57415645) {
+    data.setUint32(4, data.byteLength - 8, true);
+    for (let at = 12; at + 8 <= data.byteLength;) {
+      const length = data.getUint32(at + 4, true);
+      if (data.getUint32(at) === 0x64617461) {
+        data.setUint32(at + 4, Math.min(length, data.byteLength - at - 8), true);
+        break;
+      }
+      at += 8 + length + (length % 2);
+    }
+  }
+  return bytes;
+}
+
+/** Sample only the first minute through the media decoder when a large container has no decodable prefix. */
+function sampleWaveform(file: File, sampleMs: number, count: number, signal: AbortSignal) {
+  return new Promise<{ peaks: number[]; coveredMs: number }>((resolve) => {
+    let context: AudioContext;
+    try {
+      context = new AudioContext();
+    } catch {
+      resolve({ peaks: [], coveredMs: 0 });
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const audio = new Audio(url);
+    const analyser = context.createAnalyser();
+    const silence = context.createGain();
+    silence.gain.value = 0;
+    context.createMediaElementSource(audio).connect(analyser).connect(silence).connect(context.destination);
+    const samples = new Float32Array(analyser.fftSize);
+    const peaks: number[] = Array.from({ length: count }, () => 0);
+    const speed = 4;
+    audio.playbackRate = speed;
+    let frame = 0;
+    let lastMs = 0;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timeout);
+      cancelAnimationFrame(frame);
+      signal.removeEventListener('abort', finish);
+      audio.onended = audio.onerror = null;
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      URL.revokeObjectURL(url);
+      void context.close().catch(() => undefined);
+      resolve({ peaks: peaks.slice(0, Math.ceil(lastMs / sampleMs * count)), coveredMs: lastMs });
+    };
+    const draw = () => {
+      lastMs = Math.min(sampleMs, audio.currentTime * 1000);
+      const i = Math.min(count - 1, Math.floor(lastMs / sampleMs * count));
+      analyser.getFloatTimeDomainData(samples);
+      for (const sample of samples) peaks[i] = Math.max(peaks[i], Math.abs(sample));
+      if (lastMs >= sampleMs) finish();
+      else frame = requestAnimationFrame(draw);
+    };
+    const timeout = setTimeout(finish, sampleMs / speed + 4000);
+    if (signal.aborted) {
+      finish();
+      return;
+    }
+    signal.addEventListener('abort', finish, { once: true });
+    audio.onended = audio.onerror = finish;
+    void Promise.all([context.resume(), audio.play()]).then(() => {
+      if (!done) frame = requestAnimationFrame(draw);
+    }, finish);
+  });
+}
+
+/** Read duration from metadata without decoding the entire track. */
+function readDuration(file: File, signal: AbortSignal): Promise<number | null> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
     const audio = new Audio();
     let timer: ReturnType<typeof setTimeout> | null = null;
     const done = (ms: number | null) => {
+      audio.onloadedmetadata = audio.onerror = null;
+      signal.removeEventListener('abort', abort);
       if (timer) clearTimeout(timer);
       audio.removeAttribute('src');
+      audio.load();
       URL.revokeObjectURL(url);
       resolve(ms);
     };
+    const abort = () => done(null);
+    if (signal.aborted) return abort();
+    signal.addEventListener('abort', abort, { once: true });
     audio.preload = 'metadata';
-    audio.onloadedmetadata = () => done(Number.isFinite(audio.duration) ? Math.round(audio.duration * 1000) : 0);
+    audio.onloadedmetadata = () => done(Number.isFinite(audio.duration) ? Math.round(audio.duration * 1000) : null);
     audio.onerror = () => done(null);
     timer = setTimeout(() => done(null), 8000);
     audio.src = url;
   });
-}
-
-/** How long the picked file is in ms (0 when its header doesn't say), or null when it can't be read. */
-export function soundFileDuration(file: File): Promise<number | null> {
-  return readDuration(file);
 }
 
 export async function addSound(
@@ -437,7 +575,7 @@ export function stopPreview() {
 }
 
 /** Play a clip on this device only, ignoring mute; `range` plays just the chosen part. Returns controls scoped to this preview. */
-export function previewSound(sound: Sound, range?: Range) {
+export function previewSound(sound: Sound, range?: Range, loop = false) {
   stopPreview();
   const request = { play: null as Play | null, volume: sound.volume };
   preview = request;
@@ -450,7 +588,7 @@ export function previewSound(sound: Sound, range?: Range) {
     set({ previewing: null });
   };
   if (isLong(sound.durationMs)) {
-    request.play = playLong(sound.url, request.volume, null, '', ended, range);
+    request.play = playLong(sound.url, request.volume, null, '', ended, range, loop);
   } else {
     const cached = cachedBuffer(sound.url);
     if (cached) request.play = playBuffer(cached, request.volume, '', ended, range);
@@ -461,6 +599,7 @@ export function previewSound(sound: Sound, range?: Range) {
     });
   }
   return {
+    positionMs: () => preview === request ? request.play?.positionMs() ?? null : null,
     stop: () => {
       if (preview === request) stopPreview();
     },

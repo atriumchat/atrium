@@ -352,13 +352,13 @@ a,
   }
 }
 
-/* The icon crop's zoom (ui/IconCropper.tsx), in the setup wizard and the settings: a thin line and a white dot. */
-.icon-zoom .slider__track {
+/* A slim track for icon zoom and per-sound volume. */
+:is(.icon-zoom, .thin-slider) .slider__track {
   height: 20px;
   border-color: transparent !important;
   background: transparent;
 }
-.icon-zoom .slider__track::before {
+:is(.icon-zoom, .thin-slider) .slider__track::before {
   content: "";
   position: absolute;
   inset: 50% 0 auto;
@@ -367,18 +367,18 @@ a,
   border-radius: 999px;
   background: #ffffff1f;
 }
-.icon-zoom .slider__fill {
+:is(.icon-zoom, .thin-slider) .slider__fill {
   top: 50%;
   height: 3px;
   margin-top: -1.5px;
   border-radius: 999px;
   background: #f2f2f4;
 }
-.icon-zoom .slider__thumb {
+:is(.icon-zoom, .thin-slider) .slider__thumb {
   width: 20px;
   background: transparent;
 }
-.icon-zoom .slider__thumb::after {
+:is(.icon-zoom, .thin-slider) .slider__thumb::after {
   width: 14px;
   height: 14px;
   border-radius: 999px;

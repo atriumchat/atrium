@@ -2,7 +2,6 @@ import {
   useEffect,
   useRef,
   useState,
-  type ChangeEvent,
   type ReactNode,
 } from "react";
 import {
@@ -11,6 +10,7 @@ import {
   Popover,
   Separator,
   Slider,
+  Spinner,
   Switch,
   Tooltip,
 } from "@heroui/react";
@@ -39,18 +39,19 @@ import {
 import { field, fieldLabel, Primary, Quiet, Secondary } from "../ui/settings";
 import {
   addSound,
-  checkSoundFile,
+  inspectSoundFile,
   editSound,
   loadMySounds,
   playSound,
   previewSound,
   removeSound,
   setSoundboard,
-  soundFileDuration,
   stopMySounds,
   stopPreview,
   toggleFavorite,
 } from "./soundboard";
+
+import { MAX_SEGMENT, SoundTrim } from "./SoundTrim";
 
 const MAX_SOUNDS = 20;
 const MAX_NAME = 32;
@@ -58,19 +59,9 @@ const MAX_NAME = 32;
 const PLAYED_FOR = 2500;
 /** Clips longer than this show their length on the pill. */
 const LONG_MS = 10_000;
-const MAX_MS = 240_000;
-/** A segment of a track is never shorter than this. */
-const MIN_SEGMENT = 500;
-
 function clock(ms: number) {
   const s = Math.round(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
-
-/** м:сс.д, for the segment's two marks: tenths matter when a track is cut by ear. */
-function clockTenths(ms: number) {
-  const tenths = Math.round(ms / 100);
-  return `${Math.floor(tenths / 600)}:${String(Math.floor((tenths % 600) / 10)).padStart(2, "0")}.${tenths % 10}`;
 }
 
 type DialogState =
@@ -688,7 +679,7 @@ function SoundDialog({
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
-  const [fileMs, setFileMs] = useState<number | null>(null);
+  const [wave, setWave] = useState<{ durationMs: number; peaks: number[]; coveredMs: number } | null>(null);
   /** The part of the picked file that will be kept, in ms (start, end). */
   const [segment, setSegment] = useState<[number, number]>([0, 0]);
   const [name, setName] = useState(sound?.name ?? "");
@@ -697,7 +688,9 @@ function SoundDialog({
   const [volume, setVolume] = useState(sound?.volume ?? 1);
   const [busy, setBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
-  const checkId = useRef(0);
+  const check = useRef<AbortController>(null);
+  const saving = useRef(false);
+  const playing = useStore((state) => state.previewing === (sound?.id ?? ""));
   const local = useRef<{ file: File; url: string } | null>(null);
   // Whether this window started a preview: closing it (cancel, the cross, Esc, a finished upload) ends that preview.
   const listened = useRef<ReturnType<typeof previewSound> | null>(null);
@@ -709,6 +702,7 @@ function SoundDialog({
 
   useEffect(
     () => () => {
+      check.current?.abort();
       listened.current?.stop();
       if (local.current) URL.revokeObjectURL(local.current.url);
     },
@@ -716,57 +710,42 @@ function SoundDialog({
   );
 
   const label = name.trim();
-  const ready =
-    !!label && !busy && (sound ? true : !!file && !fileError && !checking);
-  const maxSegment = fileMs ?? 0;
-  const chosen = segment[1] > segment[0] ? { fromMs: segment[0], toMs: segment[1] } : undefined;
+  const ready = !!label && !busy && (sound ? true : !!file && !!wave && !fileError && !checking);
 
-  /** The segment keeps its limits: the other handle follows when one is pulled past them. */
-  function moveSegment(value: number | number[]) {
-    const next = Array.isArray(value) ? value : [value, segment[1]];
-    const movedStart = next[0] !== segment[0];
-    let [from, to] = next;
-    if (to - from > MAX_MS) {
-      if (movedStart) to = from + MAX_MS;
-      else from = to - MAX_MS;
-    }
-    if (to - from < MIN_SEGMENT) {
-      if (movedStart) to = from + MIN_SEGMENT;
-      else from = to - MIN_SEGMENT;
-    }
-    from = Math.max(0, Math.min(from, Math.max(0, maxSegment - MIN_SEGMENT)));
-    to = Math.min(maxSegment, Math.max(to, from + Math.min(MIN_SEGMENT, maxSegment)));
-    setSegment([from, to]);
-  }
-
-  async function pick(e: ChangeEvent<HTMLInputElement>) {
-    const picked = e.target.files?.[0];
-    e.target.value = "";
-    if (!picked) return;
+  async function pick(picked?: File) {
+    if (!picked || saving.current) return;
     endListening();
-    const id = ++checkId.current;
+    check.current?.abort();
+    const controller = new AbortController();
+    check.current = controller;
+    if (local.current) URL.revokeObjectURL(local.current.url);
+    local.current = null;
     setFile(picked);
     setFileError(null);
-    setFileMs(null);
-    setSegment([0, 0]);
+    setWave(null);
     setChecking(true);
     if (!named) setName(picked.name.replace(/\.[^.]*$/, "").slice(0, MAX_NAME));
-    const problem = await checkSoundFile(picked);
-    if (id !== checkId.current) return;
-    const ms = problem ? null : await soundFileDuration(picked);
-    if (id !== checkId.current) return;
-    setFileError(problem);
-    setFileMs(ms);
-    setSegment([0, Math.min(ms ?? 0, MAX_MS)]);
-    setChecking(false);
+    try {
+      const result = await inspectSoundFile(picked, controller.signal);
+      if (controller.signal.aborted) return;
+      if (result.error !== undefined) setFileError(result.error);
+      else {
+        setWave({ durationMs: result.durationMs, ...result.waveform });
+        setSegment([0, Math.min(result.durationMs, MAX_SEGMENT)]);
+      }
+    } catch {
+      if (!controller.signal.aborted) setFileError(t("voice.sound.notAudio"));
+    } finally {
+      if (!controller.signal.aborted) setChecking(false);
+    }
   }
 
-  function listen() {
+  function listen(range = segment) {
     if (sound) {
       listened.current = previewSound({ ...sound, volume });
       return;
     }
-    if (!file || fileError) return;
+    if (!file || !wave || fileError || saving.current) return;
     if (local.current?.file !== file) {
       if (local.current) URL.revokeObjectURL(local.current.url);
       local.current = { file, url: URL.createObjectURL(file) };
@@ -779,23 +758,32 @@ function SoundDialog({
         emoji,
         volume,
         createdAt: 0,
-        // Unknown length: stream it like a long clip rather than decode a whole file in memory.
-        durationMs: fileMs || LONG_MS + 1,
+        durationMs: wave.durationMs,
         url: local.current.url,
       },
-      chosen,
+      { fromMs: range[0], toMs: range[1] },
+      wave.durationMs > LONG_MS,
     );
   }
 
+  function togglePreview() {
+    if (playing) endListening();
+    else listen();
+  }
+
   async function submit() {
-    if (!ready) return;
+    if (!ready || saving.current) return;
+    saving.current = true;
     endListening();
     setBusy(true);
     const ok = sound
       ? await editSound(sound.id, { name: label, emoji, volume })
-      : !!file && (await addSound(file, label, emoji, volume, chosen));
+      : !!file && (await addSound(file, label, emoji, volume, { fromMs: segment[0], toMs: segment[1] }));
     if (ok) (onSaved ?? onClose)();
-    else setBusy(false);
+    else {
+      saving.current = false;
+      setBusy(false);
+    }
   }
 
   return (
@@ -804,9 +792,11 @@ function SoundDialog({
         sound ? t("voice.soundboard.editTitle") : t("voice.soundboard.newTitle")
       }
       onClose={onClose}
+      isBusy={busy}
+      onFileDrop={sound ? undefined : pick}
       footer={
         <>
-          <Quiet onClick={onClose}>{t("common.cancel")}</Quiet>
+          <Quiet onClick={onClose} disabled={busy}>{t("common.cancel")}</Quiet>
           <Primary
             onPress={submit}
             isDisabled={!ready}
@@ -819,122 +809,118 @@ function SoundDialog({
       }
     >
       <form
-        className="flex flex-col gap-5"
         onSubmit={(e) => {
           e.preventDefault();
           void submit();
         }}
       >
-        {!sound && (
-          <div>
-            <span className={fieldLabel}>{t("voice.soundboard.file")}</span>
-            <div className="flex items-center gap-3">
-              <Secondary
-                onPress={() => input.current?.click()}
-                className="whitespace-nowrap"
-              >
-                {t("voice.soundboard.pick")}
-              </Secondary>
-              <span
-                className={`min-w-0 flex-1 truncate text-[14px] ${file ? "" : "text-muted"}`}
-              >
-                {file ? file.name : t("voice.soundboard.noFile")}
-              </span>
+        <fieldset disabled={busy} className="flex min-w-0 flex-col gap-5">
+          {!sound && (
+            <div>
+              <div className="flex items-center gap-3">
+                <Secondary onPress={() => input.current?.click()} isDisabled={busy} className="whitespace-nowrap">
+                  {t("voice.soundboard.pick")}
+                </Secondary>
+                {file && <span className="min-w-0 flex-1 truncate text-[14px]" title={file.name}>{file.name}</span>}
+              </div>
+              {fileError && <p role="alert" className="mt-2 text-[13px] text-danger">{fileError}</p>}
+              <input
+                ref={input}
+                type="file"
+                accept="audio/*"
+                hidden
+                onChange={(event) => {
+                  const selected = event.currentTarget.files?.[0];
+                  event.currentTarget.value = "";
+                  void pick(selected);
+                }}
+              />
             </div>
-            <p
-              className={`mt-2 text-[13px] ${fileError ? "text-danger" : "text-muted"}`}
-            >
-              {fileError ?? t("voice.soundboard.limits")}
-            </p>
-            {!fileError && fileMs !== null && fileMs > 0 && (
+          )}
+          {checking && (
+            <div role="status" aria-label={t("voice.soundboard.reading")} className="grid h-16 place-items-center rounded-row bg-[#18181b]">
+              <Spinner size="sm" color="current" />
+            </div>
+          )}
+          {wave && (
+            <SoundTrim
+              duration={wave.durationMs}
+              peaks={wave.peaks}
+              coveredMs={wave.coveredMs}
+              segment={segment}
+              playing={playing}
+              preview={listened}
+              disabled={busy}
+              onChange={setSegment}
+              onReplay={listen}
+              onToggle={togglePreview}
+              onStop={endListening}
+            />
+          )}
+          {(sound || wave) && (
+            <>
+              <label className="block">
+                <span className={fieldLabel}>{t("voice.soundboard.name")}</span>
+                <input
+                  autoFocus={!!sound}
+                  value={name}
+                  maxLength={MAX_NAME}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setNamed(true);
+                  }}
+                  className={field}
+                />
+              </label>
+              <div>
+                <span className={fieldLabel}>{t("voice.soundboard.emoji")}</span>
+                <div className="flex items-center gap-2">
+                  <EmojiPicker
+                    label={t("voice.soundboard.emojiPick")}
+                    onPick={(value) => { if (!saving.current) setEmoji(value); }}
+                    className="flex size-[46px] shrink-0 items-center justify-center rounded-row border border-white/[0.07] bg-white/[0.03] text-[22px] outline-none transition-colors hover:border-white/20 aria-expanded:border-white/40 data-[focus-visible=true]:border-white/40"
+                  >
+                    {emoji || <SmileIcon size={20} className="text-muted" />}
+                  </EmojiPicker>
+                  {emoji && (
+                    <Quiet onClick={() => setEmoji("")}>
+                      {t("voice.soundboard.emojiClear")}
+                    </Quiet>
+                  )}
+                </div>
+              </div>
               <Slider
-                value={segment}
-                onChange={moveSegment}
+                value={volume}
+                isDisabled={busy}
+                onChange={(v) => {
+                  const next = Array.isArray(v) ? v[0] : v;
+                  setVolume(next);
+                  listened.current?.setVolume(next);
+                }}
                 minValue={0}
-                maxValue={fileMs}
-                step={100}
-                className="mt-4 w-full"
+                maxValue={1}
+                step={0.01}
+                formatOptions={{ style: "percent" }}
+                className="thin-slider w-full"
               >
-                <Label>{t("voice.soundboard.segment")}</Label>
-                <Slider.Output className="text-[13px] tabular-nums text-muted">
-                  {clockTenths(segment[0])} – {clockTenths(segment[1])}
-                </Slider.Output>
+                <Label>{t("voice.soundboard.soundVolume")}</Label>
+                <Slider.Output />
                 <Slider.Track>
                   <Slider.Fill />
-                  <Slider.Thumb index={0} />
-                  <Slider.Thumb index={1} />
+                  <Slider.Thumb />
                 </Slider.Track>
               </Slider>
-            )}
-            <input
-              ref={input}
-              type="file"
-              accept="audio/*"
-              hidden
-              onChange={pick}
-            />
-          </div>
-        )}
-        <label className="block">
-          <span className={fieldLabel}>{t("voice.soundboard.name")}</span>
-          <input
-            autoFocus={!!sound}
-            value={name}
-            maxLength={MAX_NAME}
-            onChange={(e) => {
-              setName(e.target.value);
-              setNamed(true);
-            }}
-            className={field}
-          />
-        </label>
-        <div>
-          <span className={fieldLabel}>{t("voice.soundboard.emoji")}</span>
-          <div className="flex items-center gap-2">
-            <EmojiPicker
-              label={t("voice.soundboard.emojiPick")}
-              onPick={setEmoji}
-              className="flex size-[46px] shrink-0 items-center justify-center rounded-row border border-white/[0.07] bg-white/[0.03] text-[22px] outline-none transition-colors hover:border-white/20 aria-expanded:border-white/40 data-[focus-visible=true]:border-white/40"
-            >
-              {emoji || <SmileIcon size={20} className="text-muted" />}
-            </EmojiPicker>
-            {emoji && (
-              <Quiet onClick={() => setEmoji("")}>
-                {t("voice.soundboard.emojiClear")}
-              </Quiet>
-            )}
-          </div>
-        </div>
-        <Slider
-          value={volume}
-          onChange={(v) => {
-            const next = Array.isArray(v) ? v[0] : v;
-            setVolume(next);
-            listened.current?.setVolume(next);
-          }}
-          minValue={0}
-          maxValue={1}
-          step={0.01}
-          formatOptions={{ style: "percent" }}
-          className="w-full"
-        >
-          <Label>{t("voice.soundboard.soundVolume")}</Label>
-          <Slider.Output />
-          <Slider.Track>
-            <Slider.Fill />
-            <Slider.Thumb />
-          </Slider.Track>
-        </Slider>
-        <div>
-          <Secondary
-            onPress={listen}
-            isDisabled={!sound && (!file || !!fileError || checking)}
-            className="whitespace-nowrap"
-          >
-            <PlayIcon size={12} />
-            {t("voice.soundboard.preview")}
-          </Secondary>
-        </div>
+              {sound && (
+                <div>
+                  <Secondary onPress={togglePreview} isDisabled={busy} className="whitespace-nowrap">
+                    {playing ? <StopIcon size={12} /> : <PlayIcon size={12} />}
+                    {t(playing ? "voice.soundboard.stop" : "voice.soundboard.preview")}
+                  </Secondary>
+                </div>
+              )}
+            </>
+          )}
+        </fieldset>
       </form>
     </Dialog>
   );
