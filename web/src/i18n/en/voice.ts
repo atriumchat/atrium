@@ -174,6 +174,7 @@ export const voice = {
   'voice.soundboard.favorites': 'Favorites',
   'voice.soundboard.mine': 'My sounds',
   'voice.soundboard.add': 'Add sound',
+  'voice.soundboard.addFirst': 'Add your first sound',
   'voice.soundboard.none': 'Nothing found',
   'voice.soundboard.previewOnly': 'Preview for yourself: {name}',
   'voice.soundboard.stopPreview': 'Stop preview: {name}',

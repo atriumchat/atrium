@@ -170,6 +170,7 @@ export const voice = {
   'voice.soundboard.favorites': 'Избранное',
   'voice.soundboard.mine': 'Мои звуки',
   'voice.soundboard.add': 'Добавить звук',
+  'voice.soundboard.addFirst': 'Добавить первый звук',
   'voice.soundboard.none': 'Ничего не нашлось',
   'voice.soundboard.previewOnly': 'Послушать себе: {name}',
   'voice.soundboard.stopPreview': 'Остановить предпрослушивание: {name}',

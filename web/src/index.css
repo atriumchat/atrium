@@ -282,7 +282,7 @@ a,
 
 /*
  * My own clip playing, on its tile in the soundboard (voice/SoundPad.tsx): a fill sweeping left to right over the
- * clip's length, or, while the length is not known yet, one short pulse. Neither loops.
+ * clip's length.
  */
 @keyframes sound-fill {
   from {
@@ -290,17 +290,6 @@ a,
   }
   to {
     transform: scaleX(1);
-  }
-}
-@keyframes sound-pulse {
-  0% {
-    opacity: 0;
-  }
-  25% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
   }
 }
 

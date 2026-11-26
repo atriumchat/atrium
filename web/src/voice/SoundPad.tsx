@@ -129,7 +129,7 @@ export function SoundboardButton({
     if (reopen) setOpen(true);
   }
 
-  if (playingId) {
+  if (playingId && !open && !dialog) {
     const stop = t("voice.soundboard.stopForCall", { name: playingName });
     return (
       <button
@@ -171,7 +171,7 @@ export function SoundboardButton({
       </Popover.Trigger>
       <Popover.Content
         placement={look === "panel" ? "top start" : "top"}
-        className="w-[min(420px,calc(100vw-16px))]"
+        className="w-[min(552px,calc(100vw-16px))]"
       >
         <Popover.Dialog
           aria-label={label}
@@ -235,6 +235,7 @@ function Panel({
   const playing = useStore((s) => s.myPlaying);
   const listening = useStore((s) => s.previewing !== null);
   const [query, setQuery] = useState("");
+  const [loaded, setLoaded] = useState(false);
   const [folded, setFolded] = useState<SectionId[]>([]);
   const [current, setCurrent] = useState<SectionId>("favorites");
   const list = useRef<HTMLDivElement>(null);
@@ -244,7 +245,7 @@ function Panel({
     ? sounds.filter((s) => s.name.toLowerCase().includes(q))
     : sounds;
   const favorite = shown.filter((s) => favorites.includes(s.id));
-  const canAdd = !q && sounds.length < MAX_SOUNDS;
+  const canAdd = sounds.length < MAX_SOUNDS;
 
   const sections: { id: SectionId; title: string }[] = [];
   if (favorite.length > 0)
@@ -256,7 +257,9 @@ function Panel({
     : sections[0]?.id;
 
   useEffect(() => {
-    void loadMySounds();
+    let mounted = true;
+    void loadMySounds().finally(() => { if (mounted) setLoaded(true); });
+    return () => { mounted = false; };
   }, []);
 
   function track() {
@@ -287,7 +290,7 @@ function Panel({
         box.scrollTop +
         head.getBoundingClientRect().top -
         box.getBoundingClientRect().top,
-      behavior: "smooth",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
     });
     setCurrent(id);
   }
@@ -382,6 +385,16 @@ function Panel({
           onScroll={track}
           className="flex max-h-[min(400px,calc(100dvh-160px))] min-w-0 flex-1 flex-col gap-2 overflow-y-auto py-1 pl-2 pr-3 pb-3"
         >
+          {loaded && !q && sounds.length === 0 && (
+            <button
+              type="button"
+              onClick={onAdd}
+              className="flex min-h-24 items-center justify-center gap-2 rounded-surface border border-dashed border-white/15 bg-white/[0.03] px-4 text-sm outline-none transition-colors hover:border-white/35 hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <PlusIcon size={20} />
+              {t("voice.soundboard.addFirst")}
+            </button>
+          )}
           {q && shown.length === 0 && (
             <p className="py-6 text-center text-[14px] text-muted">
               {t("voice.soundboard.none")}
@@ -440,7 +453,7 @@ function Section({
         {icon}
         <span className="min-w-0 truncate">{title}</span>
       </button>
-      {!folded && <div className="grid grid-cols-2 gap-1.5">{children}</div>}
+      {!folded && <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{children}</div>}
     </section>
   );
 }
@@ -532,38 +545,21 @@ function SoundTile({
   return (
     <div
       data-playing={playing ? "" : undefined}
-      className="relative flex h-10 min-w-0 items-center overflow-hidden rounded-row bg-[color-mix(in_oklab,var(--overlay),white_6%)] transition-colors hover:bg-[color-mix(in_oklab,var(--overlay),white_11%)] data-[playing]:bg-[color-mix(in_oklab,var(--overlay),white_14%)] data-[playing]:shadow-[inset_0_0_0_1px_rgb(255_255_255/0.22)]"
+      className="group/tile relative flex h-10 min-w-0 items-center overflow-hidden rounded-row bg-[color-mix(in_oklab,var(--overlay),white_6%)] transition-colors hover:bg-[color-mix(in_oklab,var(--overlay),white_11%)] data-[playing]:bg-[color-mix(in_oklab,var(--overlay),white_14%)] data-[playing]:shadow-[inset_0_0_0_1px_rgb(255_255_255/0.22)]"
       onContextMenu={(e) => {
         e.preventDefault();
         setMenu(true);
       }}
     >
-      {playing && (
-        <span
-          key={playing.at}
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 origin-left bg-white/[0.16]"
-          style={{
-            animation:
-              playing.duration > 0
-                ? `sound-fill ${playing.duration}ms linear forwards`
-                : "sound-pulse 450ms ease-out forwards",
-          }}
-        />
+      {playing && playing.duration > 0 && (
+        <ClipProgress key={playing.at} {...playing} />
       )}
       <Tooltip delay={400} closeDelay={0}>
         <Tooltip.Trigger<'button'>
           render={(props) => <button {...props} />}
           type="button"
           aria-label={broadcast}
-          onClick={(e) => {
-            e.currentTarget.blur();
-            console.info("[soundboard] tile", {
-              soundId: sound.id,
-              userId: sound.userId,
-              durationMs: sound.durationMs,
-              how: e.detail === 0 ? "key" : "click",
-            });
+          onClick={() => {
             if (playing) void stopMySounds();
             else {
               stopPreview();
@@ -580,20 +576,30 @@ function SoundTile({
         </Tooltip.Trigger>
         <Tooltip.Content>{broadcast}</Tooltip.Content>
       </Tooltip>
+      <button
+        type="button"
+        aria-label={star}
+        aria-pressed={favorite}
+        title={star}
+        onClick={() => toggleFavorite(sound.id)}
+        className={`${TILE_ACTION} opacity-0 group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(hover:none)]:opacity-100`}
+      >
+        {favorite ? <StarFilledIcon size={14} /> : <StarIcon size={14} />}
+      </button>
       <Tooltip delay={300} closeDelay={0}>
         <Tooltip.Trigger<'button'>
           render={(props) => <button {...props} />}
           type="button"
           aria-label={previewLabel}
           onClick={() => previewing ? stopPreview() : previewSound(sound)}
-          className={`${TILE_ACTION} ${previewing ? "bg-white/10 text-foreground" : ""}`}
+          className={`${TILE_ACTION} ${previewing ? "bg-white/10 text-foreground" : "opacity-0 group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(hover:none)]:opacity-100"}`}
         >
           {previewing ? <StopIcon size={14} /> : <HeadphonesIcon size={16} />}
         </Tooltip.Trigger>
         <Tooltip.Content>{previewLabel}</Tooltip.Content>
       </Tooltip>
       <Dropdown isOpen={menu} onOpenChange={setMenu}>
-        <Dropdown.Trigger aria-label={t("voice.soundboard.actions", { name: sound.name })} className={`${TILE_ACTION} mr-1`}>
+        <Dropdown.Trigger aria-label={t("voice.soundboard.actions", { name: sound.name })} className={`${TILE_ACTION} absolute right-1 top-1.5 opacity-0 pointer-events-none focus-visible:z-10 focus-visible:opacity-100 focus-visible:pointer-events-auto [@media(hover:none)]:static [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100`}>
           <DotsVerticalIcon size={16} />
         </Dropdown.Trigger>
         <Dropdown.Popover placement="bottom end" className="min-w-48">
@@ -630,6 +636,20 @@ function SoundTile({
         </Dropdown.Popover>
       </Dropdown>
     </div>
+  );
+}
+
+function ClipProgress({ at, duration }: { at: number; duration: number }) {
+  const [elapsed] = useState(() => Math.max(0, Date.now() - at));
+  return (
+    <span
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 origin-left bg-white/[0.16] motion-reduce:hidden"
+      style={{
+        animation: `sound-fill ${duration}ms linear forwards`,
+        animationDelay: `-${elapsed}ms`,
+      }}
+    />
   );
 }
 
@@ -791,7 +811,7 @@ function SoundDialog({
             onPress={submit}
             isDisabled={!ready}
             isPending={busy}
-            className="whitespace-nowrap"
+            className="whitespace-nowrap md:rounded-full!"
           >
             {sound ? t("common.save") : t("voice.soundboard.upload")}
           </Primary>
