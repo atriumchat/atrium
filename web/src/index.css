@@ -535,6 +535,13 @@ a,
     transform: translate(calc(var(--gx-dx, 0) * var(--gx-shift)), calc(var(--gx-dy, 0) * var(--gx-shift))) scale(var(--gx-scale-pop));
   }
 }
+/* Leaving the way it came: back towards its anchor, a little smaller, fading. */
+@keyframes gx-pop-out {
+  to {
+    opacity: 0;
+    transform: translate(calc(var(--gx-dx, 0) * var(--gx-shift)), calc(var(--gx-dy, 0) * var(--gx-shift))) scale(var(--gx-scale-pop));
+  }
+}
 @keyframes gx-window-in {
   from {
     opacity: 0;
@@ -583,8 +590,9 @@ a,
   &[data-entering="true"] {
     animation: gx-pop-in var(--gx-pop-in, var(--gx-motion-fast)) var(--gx-ease-out) backwards;
   }
+  /* Leaving is visible on purpose: a bare 90ms fade read as no animation at all. */
   &[data-exiting="true"] {
-    animation: gx-fade-out var(--gx-motion-exit) var(--gx-ease-in) forwards;
+    animation: gx-pop-out var(--gx-motion-fast) var(--gx-ease-in) forwards;
   }
 }
 /* A menu at the pointer: the same arrival in the exit's time, hanging off its top-left corner. */
@@ -608,7 +616,7 @@ a,
     animation: gx-fade-in var(--gx-motion-base) var(--gx-ease-out) backwards;
   }
   &[data-exiting="true"] {
-    animation: gx-fade-out var(--gx-motion-exit) var(--gx-ease-in) forwards;
+    animation: gx-fade-out var(--gx-motion-fast) var(--gx-ease-in) forwards;
   }
 }
 :is(.modal__container, .alert-dialog__container):not(.modal__container--full) {
@@ -616,7 +624,7 @@ a,
     animation: gx-window-in var(--gx-motion-base) var(--gx-ease-out) backwards;
   }
   &[data-exiting="true"] {
-    animation: gx-window-out var(--gx-motion-exit) var(--gx-ease-in) forwards;
+    animation: gx-window-out var(--gx-motion-fast) var(--gx-ease-in) forwards;
   }
 }
 

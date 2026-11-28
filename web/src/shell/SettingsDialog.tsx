@@ -9,7 +9,7 @@ import { VoiceSettings } from '../voice/VoiceSettings';
 import { ServerSettings } from './ServerSettings';
 import { RolesSettings } from './RolesSettings';
 import { AtriumMark } from '../ui/Logo';
-import { focusReducedMotionDialog } from '../ui/Dialog';
+import { windowRef } from '../ui/Dialog';
 import { Row, Rows, Secondary } from '../ui/settings';
 import { LogoutIcon, MicIcon, RefreshIcon, ShieldIcon, UserIcon, XIcon } from '../ui/icons';
 
@@ -64,7 +64,7 @@ export function SettingsDialog({ onClose, start = 'account' }: { onClose: () => 
   const groups = (['personal', 'server'] as const).map((group) => ({ group, items: pages.filter((p) => p.group === group) })).filter((g) => g.items.length);
 
   return (
-    <Modal.Backdrop ref={focusReducedMotionDialog} isOpen onOpenChange={(o) => !o && onClose()}>
+    <Modal.Backdrop ref={windowRef} isOpen onOpenChange={(o) => !o && onClose()}>
       <Modal.Container size="lg" placement="center">
         {/* The avatar's ring and anything else drawn in the overlay tone follows the window's tone here. */}
         <Modal.Dialog aria-label={t('settings.title')} className="h-[min(720px,88vh)] max-w-[880px] overflow-hidden border border-edge p-0 [--overlay:var(--app-window)]">

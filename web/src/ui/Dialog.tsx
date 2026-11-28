@@ -4,6 +4,7 @@ import { useT } from '../i18n';
 import { useIsMobile } from '../hooks';
 import { showError } from '../store';
 import { XIcon } from './icons';
+import { exitGhost } from './exitGhost';
 
 // The phone's sheet: from the bottom almost to the top, the status bar plus a little left above it. A share of its
 // frame, not of the screen, so it shrinks with the keyboard and the buttons at its foot stay in view.
@@ -24,6 +25,9 @@ export function focusReducedMotionDialog(backdrop: HTMLDivElement | null) {
 }
 
 const WINDOW = 'border border-edge [--overlay:var(--app-window)]';
+// Every window's backdrop: focus for reduced motion, and a ghost that plays the leaving animation when the owner
+// unmounts the window (one ref for all of them, so it never changes between renders).
+export const windowRef = exitGhost<HTMLDivElement>(focusReducedMotionDialog);
 // HeroUI's Drawer leaves in 200ms.
 const SHEET_EXIT_MS = 220;
 
@@ -137,7 +141,7 @@ export function Dialog({
     );
   }
   return (
-    <Modal.Backdrop ref={focusReducedMotionDialog} isOpen isDismissable={!isBusy} isKeyboardDismissDisabled={isBusy} onOpenChange={(open) => !open && !isBusy && onClose()}>
+    <Modal.Backdrop ref={windowRef} isOpen isDismissable={!isBusy} isKeyboardDismissDisabled={isBusy} onOpenChange={(open) => !open && !isBusy && onClose()}>
       <Modal.Container size="md" placement="auto">
         <Modal.Dialog className={`${WINDOW} ${sheet ? 'max-h-[80vh]' : ''}`} {...fileDropHandlers(onFileDrop)}>
           <Modal.CloseTrigger isDisabled={isBusy} aria-label={t('common.close')}><XIcon size={16} /></Modal.CloseTrigger>
@@ -180,7 +184,7 @@ export function Window({
     );
   }
   return (
-    <Modal.Backdrop ref={focusReducedMotionDialog} isOpen onOpenChange={(open) => !open && onClose()}>
+    <Modal.Backdrop ref={windowRef} isOpen onOpenChange={(open) => !open && onClose()}>
       <Modal.Container size="sm" placement="center">
         <Modal.Dialog aria-label={label} className={`${WINDOW} ${className}`}>
           <Modal.CloseTrigger aria-label={t('common.close')} className="z-10"><XIcon size={16} /></Modal.CloseTrigger>
@@ -224,7 +228,7 @@ export function ConfirmDialog({
   }
 
   return (
-    <AlertDialog.Backdrop ref={focusReducedMotionDialog} isOpen onOpenChange={(open) => !open && onClose()} isDismissable>
+    <AlertDialog.Backdrop ref={windowRef} isOpen onOpenChange={(open) => !open && onClose()} isDismissable>
       <AlertDialog.Container size="sm">
         <AlertDialog.Dialog>
           <AlertDialog.Header>

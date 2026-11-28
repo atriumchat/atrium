@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Description, Dropdown, Label, Separator } from '@heroui/react';
 import { CheckIcon } from './icons';
 import { Radio } from './Radio';
+import { exitGhost } from './exitGhost';
 
 /**
  * Every menu in the app is built from these parts, so they all look and behave alike: one width (220-300), one row
@@ -51,9 +52,13 @@ function MenuList({ label, onAction, choice, children }: Pick<MenuSpec, 'label' 
   );
 }
 
+// A right-click menu is unmounted the moment it closes (a row picked, a click outside): its ghost plays the leaving.
+const pointerMenuRef = exitGhost<HTMLElement>();
+
 function Popup({ spec, placement, offset, triggerRef, atPointer, choice }: { spec: MenuSpec; placement?: Placement; offset?: number; triggerRef?: ComponentProps<typeof Dropdown.Popover>['triggerRef']; atPointer?: boolean; choice?: Choice }) {
   return (
     <Dropdown.Popover
+      ref={atPointer ? pointerMenuRef : undefined}
       triggerRef={triggerRef}
       placement={placement ?? 'bottom end'}
       offset={offset}
