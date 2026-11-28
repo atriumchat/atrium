@@ -34,7 +34,7 @@ export function CallButtons({ dm }: { dm: Dm }) {
       <button
         onClick={() => joinVoice(dm.id)}
         aria-label={label}
-        className="mr-1 hidden h-(--app-header-control) items-center gap-2 whitespace-nowrap rounded-control-sm bg-[#f2f2f4] px-(--app-radius-control-sm) text-[15px] font-medium text-[#0c0c0e] transition-colors hover:bg-white @min-[38rem]/chat-header:flex"
+        className="mr-1 hidden h-(--app-header-control) items-center gap-2 whitespace-nowrap rounded-full bg-[#f2f2f4] px-(--app-radius-control-sm) text-[15px] font-medium text-[#0c0c0e] transition-colors hover:bg-white @min-[38rem]/chat-header:flex"
       >
         <PhoneIcon size={16} />
         {live ? t('chat.call.joinShort') : t('voice.call.start')}

@@ -142,7 +142,7 @@ export function MicMenu({ label, className, disabled }: { label: string; classNa
           aria-label={label}
           className={
             className ??
-            'flex h-9 w-5 items-center justify-center rounded-r-[10px] text-muted outline-none transition-colors hover:bg-default hover:text-foreground data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus'
+            'flex h-9 w-5 items-center justify-center rounded-r-full text-muted outline-none transition-colors hover:bg-default hover:text-foreground data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus'
           }
         >
           <ChevronDownIcon className="chevron-flip size-3.5" aria-hidden="true" />

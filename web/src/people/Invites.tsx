@@ -105,7 +105,7 @@ export function InviteBanner() {
         variant="tertiary"
         size="sm"
         onPress={() => setOpen(true)}
-        className="h-8 shrink-0 whitespace-nowrap rounded-row px-(--app-radius-row) text-xs"
+        className="h-8 shrink-0 whitespace-nowrap rounded-full px-(--app-radius-row) text-xs"
       >
         {t('people.invite.button')}
       </Button>

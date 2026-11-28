@@ -213,7 +213,7 @@
   width: 48px;
   height: 48px;
   border: 1px solid var(--gx-outline);
-  border-radius: var(--gx-radius-button);
+  border-radius: 999px;
   background: transparent;
   color: var(--gx-text);
   cursor: pointer;
@@ -229,7 +229,7 @@
   height: 48px;
   padding: 0 20px;
   border: 1px solid var(--gx-outline);
-  border-radius: var(--gx-radius-button);
+  border-radius: 999px;
   background: transparent;
   color: var(--gx-text);
   font: 400 var(--gx-button-size) var(--gx-font);
@@ -244,7 +244,7 @@
   flex: 1;
   height: 48px;
   border: 0;
-  border-radius: var(--gx-radius-button);
+  border-radius: 999px;
   background: var(--gx-button);
   color: var(--gx-button-ink);
   font: 500 var(--gx-button-size) var(--gx-font);

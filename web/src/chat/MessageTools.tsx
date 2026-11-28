@@ -82,7 +82,7 @@ export function useMessageMenu(message: Message, actions: MessageActions) {
       <div role="group" aria-label={t('chat.addReaction')} className="flex gap-1 px-2 pt-2">
         {QUICK_REACTIONS.map(emoji => (
           <button key={emoji} type="button" onClick={() => { close(); actions.onReact(emoji); }} aria-label={t('chat.reaction', { emoji })}
-            className="grid size-9 place-items-center rounded-row text-[18px] outline-none hover:bg-default focus-visible:ring-2 focus-visible:ring-focus">
+            className="grid size-9 place-items-center rounded-full text-[18px] outline-none hover:bg-default focus-visible:ring-2 focus-visible:ring-focus">
             <EmojiText text={emoji} />
           </button>
         ))}

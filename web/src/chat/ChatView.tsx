@@ -714,7 +714,7 @@ function ReactionChip({ messageId, emoji, count, mine, who, landed }: { messageI
  */
 function MessageActions(props: { menu: ReturnType<typeof useMessageMenu>; onReact: (emoji: string) => void; onReply: () => void; onEdit?: () => void; onDelete?: (e?: { shiftKey?: boolean }) => void }) {
   const { t } = useT();
-  const btn = 'flex h-7 w-7 items-center justify-center rounded-[6px] text-muted transition-colors hover:bg-white/10 hover:text-foreground [&_svg]:size-[18px]';
+  const btn = 'flex h-7 w-7 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/10 hover:text-foreground [&_svg]:size-[18px]';
   const narrow = '@max-[34rem]/message:hidden';
   return (
     <div className="absolute -top-4 right-2 z-10 hidden animate-gx-fade items-center gap-px rounded-fine border-[0.5px] border-white/10 bg-default p-0.5 shadow-[0_4px_12px_rgba(0,0,0,.35)] group-hover:flex group-has-[button:focus-visible]:flex has-[[aria-expanded=true]]:flex">
@@ -1164,7 +1164,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
           <div key={m.key} role="alert" className="mx-3 mt-3 flex animate-gx-rise-fast items-center gap-2 rounded-row bg-white/[0.06] py-1 pl-2 pr-1 text-[13px]">
             <span className="shrink-0 text-danger">{t('chat.unsent')}</span>
             <span className="min-w-0 flex-1 truncate text-muted">{m.text.trim() || m.gif?.title || m.files[0]?.name || t('chat.attachmentLower')}</span>
-            <button type="button" onClick={() => retry(m)} className="shrink-0 whitespace-nowrap rounded-row px-2 py-0.5 text-foreground hover:bg-white/10">
+            <button type="button" onClick={() => retry(m)} className="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-foreground hover:bg-white/10">
               {t('chat.unsentRetry')}
             </button>
             <button type="button" aria-label={t('chat.unsentDismiss')} onClick={() => setFailedSends(failedSends.filter((f) => f.key !== m.key))} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-white/10 hover:text-foreground">
@@ -1231,7 +1231,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
           </div>
         )}
         <div className="flex min-h-12 min-w-0 items-end gap-2 p-1.5">
-          <RoundButton size="sm" tone="ghost" label={t('chat.attachFile')} onPress={() => fileInput.current?.click()} className="rounded-row!">
+          <RoundButton size="sm" tone="ghost" label={t('chat.attachFile')} onPress={() => fileInput.current?.click()} className="rounded-full!">
             <PlusIcon aria-hidden="true" />
           </RoundButton>
           <textarea
@@ -1290,7 +1290,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
           <ExpressionPicker apiKey={klipyKey} busy={sendingExpression} gifDisabled={pending.length >= MAX_ATTACHMENTS}
             onGif={(value, draft) => { if (draft) attachGif(value); else void sendExpression(value.id); }}
             onSticker={(stickerId) => void sendExpression(undefined, stickerId)} onEmoji={insertEmoji} />
-          <RoundButton size="sm" tone={canSend ? 'accent' : 'ghost'} label={t('chat.send')} isDisabled={!canSend} onPress={send} className="rounded-row!">
+          <RoundButton size="sm" tone={canSend ? 'accent' : 'ghost'} label={t('chat.send')} isDisabled={!canSend} onPress={send} className="rounded-full!">
             <ArrowUpIcon aria-hidden="true" />
           </RoundButton>
         </div>

@@ -56,7 +56,7 @@
 }
 
 @utility header-action {
-  @apply grid shrink-0 place-items-center rounded-row p-0 text-muted outline-none transition-colors;
+  @apply grid shrink-0 place-items-center rounded-full p-0 text-muted outline-none transition-colors;
   width: var(--app-header-control);
   height: var(--app-header-control);
   min-width: var(--app-header-control);
@@ -76,6 +76,39 @@
   &:focus-visible,
   &[data-focus-visible="true"] {
     @apply ring-2 ring-inset ring-focus;
+  }
+}
+
+/*
+ * Every button is a circle or a pill: HeroUI's defaults are rounded-3xl (buttons) and rounded-xl (close
+ * crosses), which is not fully round. Components layer, so a call site's own rounded-* still wins for tiles.
+ */
+@layer components {
+  .button,
+  .close-button {
+    border-radius: 9999px;
+  }
+  .button-group--horizontal .button:first-child {
+    border-start-start-radius: 9999px;
+    border-end-start-radius: 9999px;
+  }
+  .button-group--horizontal .button:last-child {
+    border-start-end-radius: 9999px;
+    border-end-end-radius: 9999px;
+  }
+  .button-group--horizontal .button:first-child:last-child {
+    border-radius: 9999px;
+  }
+  .button-group--vertical .button:first-child {
+    border-start-start-radius: 9999px;
+    border-start-end-radius: 9999px;
+  }
+  .button-group--vertical .button:last-child {
+    border-end-start-radius: 9999px;
+    border-end-end-radius: 9999px;
+  }
+  .button-group--vertical .button:first-child:last-child {
+    border-radius: 9999px;
   }
 }
 
@@ -121,7 +154,7 @@
   @container chat-header (min-width: 35rem) {
     width: auto;
     padding-inline: 12px var(--app-radius-control-sm);
-    border-radius: var(--app-radius-control-sm);
+    border-radius: 9999px;
     background: var(--default);
   }
 }

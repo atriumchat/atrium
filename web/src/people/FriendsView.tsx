@@ -235,7 +235,7 @@ function AddFriend() {
           aria-label={t('people.friends.nickLabel')}
           className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-faint"
         />
-        <Button type="submit" isPending={busy} isDisabled={!name.trim()} className="h-10 rounded-control-sm px-(--app-radius-control-sm)">
+        <Button type="submit" isPending={busy} isDisabled={!name.trim()} className="h-10 rounded-full px-(--app-radius-control-sm)">
           {t('people.friends.send')}
         </Button>
       </form>

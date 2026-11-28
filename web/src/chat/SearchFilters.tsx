@@ -86,7 +86,7 @@ export function SearchFilterMenu({ id, words, canSearch, filters, authors, conve
                   key={key}
                   type="button"
                   aria-label={t('chat.search.removeFilter', { name: text })}
-                  className="flex min-w-0 max-w-full items-center gap-1.5 rounded-row bg-default px-2 py-1.5 text-xs hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-focus"
+                  className="flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-default px-2 py-1.5 text-xs hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-focus"
                   onClick={() => {
                     onChange({ ...filters, [key]: emptySearchFilters[key] });
                     focusField();

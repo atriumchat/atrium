@@ -150,7 +150,7 @@ function JoinPrompt({ channel }: { channel: Channel }) {
           <button
             type="button"
             onClick={() => joinVoice(channel.id)}
-            className="mt-6 flex h-11 min-w-40 items-center justify-center whitespace-nowrap rounded-control bg-[#f2f2f4] px-(--app-radius-control) text-[15px] font-semibold text-[#0c0c0e] transition-[background-color,transform] duration-150 hover:bg-white active:scale-[0.98] disabled:opacity-80 max-md:hidden"
+            className="mt-6 flex h-11 min-w-40 items-center justify-center whitespace-nowrap rounded-full bg-[#f2f2f4] px-(--app-radius-control) text-[15px] font-semibold text-[#0c0c0e] transition-[background-color,transform] duration-150 hover:bg-white active:scale-[0.98] disabled:opacity-80 max-md:hidden"
           >
             {t('voice.room.joinVoice')}
           </button>
@@ -478,7 +478,7 @@ export function MediaStage({ fallback, renderControls }: {
                   <button
                     onClick={() => setSide(true)}
                     aria-label={t('voice.people.open')}
-                    className={`flex shrink-0 flex-col items-center justify-center gap-3 rounded-surface bg-[#18181b] text-foreground transition-colors hover:bg-default ${fit.fits < 2 ? 'absolute right-4 top-2 z-10 size-9' : ''}`}
+                    className={`flex shrink-0 flex-col items-center justify-center gap-3 ${fit.fits < 2 ? 'rounded-full' : 'rounded-surface'} bg-[#18181b] text-foreground transition-colors hover:bg-default ${fit.fits < 2 ? 'absolute right-4 top-2 z-10 size-9' : ''}`}
                     style={fit.fits < 2 ? undefined : { width: fit.tileW, height: fit.tileH }}
                   >
                     {fit.fits >= 2 && <FaceStack users={hidden.map(({ participant }) => users[participant.identity])} ringBg="#18181b" size={Math.round(Math.min(56, Math.max(24, fit.tileH * 0.22)))} />}

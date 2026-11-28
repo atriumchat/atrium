@@ -363,7 +363,7 @@ function Tile({ label, onPress, children, disabled, accent, busy }: { label: str
       type="button"
       onClick={onPress}
       disabled={disabled || busy}
-      className={`flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl transition-[background-color,transform,opacity] active:scale-[0.97] disabled:opacity-40 ${accent ? 'bg-white text-black hover:bg-[#e7e7ea]' : 'bg-default hover:bg-[#28282d]'}`}
+      className={`flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full transition-[background-color,transform,opacity] active:scale-[0.97] disabled:opacity-40 ${accent ? 'bg-white text-black hover:bg-[#e7e7ea]' : 'bg-default hover:bg-[#28282d]'}`}
     >
       {children}
       <span className="max-w-full truncate px-1 text-[13px] font-medium">{label}</span>
