@@ -175,6 +175,9 @@ export const chat = {
   'chat.replyTo': 'Ответ',
   'chat.send': 'Отправить',
   'chat.sendFailed': 'Не удалось отправить сообщение',
+  'chat.unsent': 'Не отправлено',
+  'chat.unsentRetry': 'Повторить',
+  'chat.unsentDismiss': 'Убрать',
   'chat.size.b': '{n} Б',
   'chat.size.kb': '{n} КБ',
   'chat.size.mb': '{n} МБ',
@@ -186,4 +189,5 @@ export const chat = {
   'chat.typing.many': 'печатают…',
   'chat.typing.one': 'печатает…',
   'chat.uploadFailed': 'Не удалось загрузить «{name}»: {error}',
+  'chat.menu.copyText': 'Копировать текст',
 } as const;

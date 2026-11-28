@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode, type RefObject } from 'react';
-import { Description, Dropdown, Label, Popover, Separator } from '@heroui/react';
+import { Popover } from '@heroui/react';
+import { Menu, MenuItem, MenuSeparator, SubMenu } from '../ui/Menu';
 import { api } from '../api';
 import { showError, useStore } from '../store';
 import { localeOf, t, useT, type Key } from '../i18n';
@@ -131,56 +132,41 @@ function StatusRow() {
   }
 
   return (
-    <Dropdown>
-      <Dropdown.Trigger className="flex h-10 w-full items-center gap-3 rounded-fine px-3 text-left text-[14px] outline-none transition-colors hover:bg-white/[0.06] data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus">
-        <span className="flex w-4 shrink-0 justify-center">
-          <StatusDot status={status} />
-        </span>
-        <span className="min-w-0 flex-1 truncate">
-          {statusLabel(status)}
-          {until && status !== 'online' && <span className="text-muted"> · {untilText(until)}</span>}
-        </span>
-        <ChevronRightIcon size={16} className="shrink-0 text-muted" />
-      </Dropdown.Trigger>
-      <Dropdown.Popover placement="right top" offset={12} className="min-w-64">
-        <Dropdown.Menu aria-label={t('shell.status.title')} onAction={(key) => key === 'online' && choose('online')}>
-          <Dropdown.Item id="online" textValue={t('shell.status.online')}>
-            <StatusDot status="online" />
-            <Label>{t('shell.status.online')}</Label>
-          </Dropdown.Item>
-          <Separator />
-          <Timed status="dnd" hint={t('shell.status.dndHint')} onPick={choose} />
-          <Timed status="invisible" hint={t('shell.status.invisibleHint')} onPick={choose} />
-        </Dropdown.Menu>
-      </Dropdown.Popover>
-    </Dropdown>
+    <Menu
+      label={t('shell.status.title')}
+      placement="right top"
+      offset={12}
+      triggerClassName="flex h-10 w-full items-center gap-3 rounded-fine px-3 text-left text-[14px] outline-none transition-colors hover:bg-white/[0.06] data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus"
+      trigger={
+        <>
+          <span className="flex w-4 shrink-0 justify-center">
+            <StatusDot status={status} />
+          </span>
+          <span className="min-w-0 flex-1 truncate">
+            {statusLabel(status)}
+            {until && status !== 'online' && <span className="text-muted"> · {untilText(until)}</span>}
+          </span>
+          <ChevronRightIcon size={16} className="shrink-0 text-muted" />
+        </>
+      }
+      onAction={(key) => key === 'online' && choose('online')}
+    >
+      <MenuItem id="online" label={t('shell.status.online')} icon={<StatusDot status="online" />} check={status === 'online'} />
+      <MenuSeparator />
+      <Timed status="dnd" current={status} hint={t('shell.status.dndHint')} onPick={choose} />
+      <Timed status="invisible" current={status} hint={t('shell.status.invisibleHint')} onPick={choose} />
+    </Menu>
   );
 }
 
-function Timed({ status, hint, onPick }: { status: MyStatus; hint: string; onPick: (status: MyStatus, minutes: number) => void }) {
+function Timed({ status, current, hint, onPick }: { status: MyStatus; current: MyStatus; hint: string; onPick: (status: MyStatus, minutes: number) => void }) {
   const { t } = useT();
   return (
-    <Dropdown.SubmenuTrigger>
-      <Dropdown.Item id={status} textValue={statusLabel(status)}>
-        <span className="flex self-start pt-1">
-          <StatusDot status={status} />
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <Label>{statusLabel(status)}</Label>
-          <Description className="text-[12px] text-muted">{hint}</Description>
-        </span>
-        <Dropdown.SubmenuIndicator />
-      </Dropdown.Item>
-      <Dropdown.Popover offset={8} className="min-w-44">
-        <Dropdown.Menu aria-label={t('shell.status.duration', { status: statusLabel(status) })} onAction={(key) => onPick(status, Number(key))}>
-          {DURATIONS.map(([minutes, key]) => (
-            <Dropdown.Item key={minutes} id={String(minutes)} textValue={t(key)}>
-              <Label>{t(key)}</Label>
-            </Dropdown.Item>
-          ))}
-        </Dropdown.Menu>
-      </Dropdown.Popover>
-    </Dropdown.SubmenuTrigger>
+    <SubMenu id={status} label={statusLabel(status)} description={hint} icon={<StatusDot status={status} />} check={current === status} onAction={(key) => onPick(status, Number(key))}>
+      {DURATIONS.map(([minutes, key]) => (
+        <MenuItem key={minutes} id={String(minutes)} label={t(key)} />
+      ))}
+    </SubMenu>
   );
 }
 

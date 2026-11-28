@@ -12,6 +12,8 @@ export const settings = {
   'settings.emoji.hide': "Скрыть",
   'settings.emoji.show': "Вернуть в выбор",
   'settings.title': 'Настройки',
+  'settings.group.personal': 'Личные',
+  'settings.group.server': 'Настройки сервера',
   'settings.page.account': 'Аккаунт',
   'settings.page.voice': 'Голос',
   'settings.page.server': 'Сервер',

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { ChevronDownIcon, ChevronRightIcon, Cog6ToothIcon } from '@heroicons/react/24/solid';
-import { Dropdown, Label, Popover, Slider } from '@heroui/react';
+import { Popover, Slider } from '@heroui/react';
+import { Menu, MenuItem } from '../ui/Menu';
 import { useT } from '../i18n';
 import { useStore } from '../store';
 import { SettingsDialog } from '../shell/SettingsDialog';
 import { CheckIcon } from '../ui/icons';
-import { Radio } from '../ui/Radio';
 import type { NoiseMode } from '../prefs';
 import { getOutputVolume, getPreferredDevice, listDevices, setOutputVolume, setPreferredDevice, type AudioDeviceKind } from './devices';
 import { micTrack } from './noise';
@@ -49,46 +49,28 @@ function useMicLevel(active: boolean) {
 }
 
 /** A row that opens its own list of choices to the right: the title, what is chosen now, the arrow. */
-function ChoiceRow({ title, value, children }: { title: string; value: string; children: React.ReactNode }) {
+function ChoiceRow({ title, value, selected, onSelect, items }: { title: string; value: string; selected: string; onSelect: (id: string) => void; items: { id: string; name: string }[] }) {
   return (
-    <Dropdown>
-      <Dropdown.Trigger className="flex w-full items-center gap-2 rounded-row px-3 py-2 text-left outline-none transition-colors hover:bg-default focus-visible:ring-2 focus-visible:ring-focus aria-expanded:bg-default">
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="text-[15px]">{title}</span>
-          <span className="truncate text-[13px] text-muted">{value}</span>
-        </span>
-        <ChevronRightIcon className="size-4 shrink-0 text-muted" aria-hidden="true" />
-      </Dropdown.Trigger>
-      <Dropdown.Popover placement="right top" className="min-w-64 max-w-80">
-        {children}
-      </Dropdown.Popover>
-    </Dropdown>
-  );
-}
-
-function Choices({ label, selected, onSelect, items }: { label: string; selected: string; onSelect: (id: string) => void; items: { id: string; name: string }[] }) {
-  return (
-    <Dropdown.Menu
-      aria-label={label}
-      selectionMode="single"
-      disallowEmptySelection
-      selectedKeys={[selected]}
-      onSelectionChange={(keys) => {
-        const id = [...keys][0];
-        if (id !== undefined) onSelect(String(id));
-      }}
+    <Menu
+      label={title}
+      placement="right top"
+      wide
+      choice={{ selected, onSelect }}
+      triggerClassName="flex w-full items-center gap-2 rounded-row px-3 py-2 text-left outline-none transition-colors hover:bg-default focus-visible:ring-2 focus-visible:ring-focus aria-expanded:bg-default"
+      trigger={
+        <>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-[15px]">{title}</span>
+            <span className="truncate text-[13px] text-muted">{value}</span>
+          </span>
+          <ChevronRightIcon className="size-4 shrink-0 text-muted" aria-hidden="true" />
+        </>
+      }
     >
       {items.map((item) => (
-        <Dropdown.Item key={item.id} id={item.id} textValue={item.name}>
-          {({ isSelected }) => (
-            <>
-              <Label className="truncate">{item.name}</Label>
-              <Radio on={isSelected} />
-            </>
-          )}
-        </Dropdown.Item>
+        <MenuItem key={item.id} id={item.id} label={item.name} radio />
       ))}
-    </Dropdown.Menu>
+    </Menu>
   );
 }
 
@@ -149,31 +131,33 @@ export function MicMenu({ label, className, disabled }: { label: string; classNa
         </Popover.Trigger>
         <Popover.Content placement="top" className="w-[320px] max-w-[calc(100vw-16px)]">
           <Popover.Dialog aria-label={label} className="flex flex-col p-2 outline-none">
-            <ChoiceRow title={t('voice.devices.mic')} value={nameOf('audioinput')}>
-              <Choices
-                label={t('voice.devices.mic')}
-                selected={chosen.audioinput}
-                items={list('audioinput')}
-                onSelect={(id) => {
-                  setChosen((c) => ({ ...c, audioinput: id }));
-                  void setPreferredDevice('audioinput', id);
-                }}
-              />
-            </ChoiceRow>
-            <ChoiceRow title={t('voice.noise.title')} value={profiles.find((p) => p.id === noise)?.name ?? ''}>
-              <Choices label={t('voice.noise.title')} selected={noise} items={profiles} onSelect={(id) => void setVoicePrefs({ noise: id as NoiseMode })} />
-            </ChoiceRow>
-            <ChoiceRow title={t('voice.devices.output')} value={nameOf('audiooutput')}>
-              <Choices
-                label={t('voice.devices.output')}
-                selected={chosen.audiooutput}
-                items={list('audiooutput')}
-                onSelect={(id) => {
-                  setChosen((c) => ({ ...c, audiooutput: id }));
-                  void setPreferredDevice('audiooutput', id);
-                }}
-              />
-            </ChoiceRow>
+            <ChoiceRow
+              title={t('voice.devices.mic')}
+              value={nameOf('audioinput')}
+              selected={chosen.audioinput}
+              items={list('audioinput')}
+              onSelect={(id) => {
+                setChosen((c) => ({ ...c, audioinput: id }));
+                void setPreferredDevice('audioinput', id);
+              }}
+            />
+            <ChoiceRow
+              title={t('voice.noise.title')}
+              value={profiles.find((p) => p.id === noise)?.name ?? ''}
+              selected={noise}
+              items={profiles}
+              onSelect={(id) => void setVoicePrefs({ noise: id as NoiseMode })}
+            />
+            <ChoiceRow
+              title={t('voice.devices.output')}
+              value={nameOf('audiooutput')}
+              selected={chosen.audiooutput}
+              items={list('audiooutput')}
+              onSelect={(id) => {
+                setChosen((c) => ({ ...c, audiooutput: id }));
+                void setPreferredDevice('audiooutput', id);
+              }}
+            />
             <div role="separator" className="mx-3 my-2 h-px bg-separator" />
             <div className="px-3 py-1">
               <p className="text-[15px]">{t('voice.menu.inputVolume')}</p>

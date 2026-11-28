@@ -181,4 +181,8 @@ export const shell = {
   'shell.access.cancel': 'Cancel',
   'shell.private': 'Private',
   'shell.menu.inviteLink': 'Link for new people',
+  'shell.menu.openChat': 'Open chat',
+  'shell.menu.server': 'Server menu',
+  'shell.menu.serverSettings': 'Server settings',
+  'shell.menu.create': 'Create',
 } satisfies Record<keyof typeof source, Entry>;

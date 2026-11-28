@@ -148,7 +148,7 @@ export function InviteButton() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button onClick={() => setOpen(true)} aria-label={t('shell.sidebar.invite')} title={t('shell.sidebar.invite')} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-default outline-none transition-[background-color,transform] duration-150 hover:bg-[#28282d] focus-visible:ring-2 focus-visible:ring-focus active:scale-95 max-md:h-12 max-md:w-12">
+      <button onClick={() => setOpen(true)} aria-label={t('shell.sidebar.invite')} title={t('shell.sidebar.invite')} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-default outline-none transition-[background-color,transform] hover:bg-[#28282d] focus-visible:ring-2 focus-visible:ring-focus active:scale-95 max-md:h-12 max-md:w-12">
         <UserPlusIcon size={20} />
       </button>
       {open && <InviteDialog onClose={() => setOpen(false)} />}
@@ -160,7 +160,7 @@ export function InviteButton() {
  * Your personal invite, laid out like Fluxer's invite window: who it's for on top, the people who already
  * came through it in the middle, and the one link to send at the bottom with its copy button inside.
  */
-function InviteDialog({ onClose }: { onClose: () => void }) {
+export function InviteDialog({ onClose }: { onClose: () => void }) {
   const { t } = useT();
   const users = useStore((s) => s.users);
   const isMobile = useStore((s) => s.isMobile);

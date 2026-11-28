@@ -184,7 +184,7 @@ function TabHeader({ friends = false }: { friends?: boolean }) {
       <ServerMark icon={serverIcon} size={36} />
       <h1 className="min-w-0 flex-1 truncate text-[24px] font-bold">{serverName}</h1>
       {friends && (
-        <button onClick={openFriends} aria-label={t('shell.home.friends')} className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-95">
+        <button onClick={openFriends} aria-label={t('shell.home.friends')} className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-[background-color,transform] hover:bg-white/10 active:scale-95">
           <UsersIcon size={21} />
           {incoming > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-danger px-1 text-center text-[11px] font-medium leading-[18px] text-white ring-2 ring-[var(--app-window)]">{incoming > 99 ? '99+' : incoming}</span>}
         </button>
@@ -273,7 +273,7 @@ function Tab({ id, label, icon, badge = 0 }: { id: MobileTab; label: string; ico
       onClick={() => openTab(id)}
       aria-label={label}
       aria-current={active ? 'page' : undefined}
-      className={`flex h-full min-w-0 flex-auto items-center justify-center rounded-full px-3 transition-[background-color,color] duration-300 ${
+      className={`flex h-full min-w-0 flex-auto items-center justify-center rounded-full px-3 transition-[background-color,color] duration-(--gx-motion-slow) ease-gx-out ${
         active ? 'bg-surface-tertiary text-foreground' : 'text-muted'
       }`}
     >
@@ -287,7 +287,7 @@ function Tab({ id, label, icon, badge = 0 }: { id: MobileTab; label: string; ico
       </span>
       <span
         aria-hidden
-        className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-medium transition-[max-width,opacity,margin] duration-[350ms] ease-[cubic-bezier(.2,.8,.2,1)] ${
+        className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-medium transition-[max-width,opacity,margin] duration-(--gx-motion-slow) ease-gx-out ${
           active ? 'ml-2 max-w-[120px] opacity-100' : 'ml-0 max-w-0 opacity-0'
         }`}
       >

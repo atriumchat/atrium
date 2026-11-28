@@ -196,7 +196,7 @@ function Bubble(props: { person: BubblePerson; nodeRef: (el: HTMLDivElement | nu
       {tag && (
         // A point 10px above the top of the circle; the tag hangs from it, centred.
         <div className="absolute left-0 top-0 z-10 h-0 w-0 will-change-transform" style={{ transform: 'translateY(calc(var(--bubble-r) * -1px - 10px))' }}>
-          <span className="pointer-events-none absolute bottom-0 left-0 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-full bg-default px-3 py-2 text-[13px] font-medium leading-none text-white opacity-0 shadow-[0_2px_10px_rgba(0,0,0,.35)] transition-[opacity,transform] duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+          <span className="pointer-events-none absolute bottom-0 left-0 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-full bg-default px-3 py-2 text-[13px] font-medium leading-none text-white opacity-0 shadow-[0_2px_10px_rgba(0,0,0,.35)] transition-[opacity,transform] group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
             {name}
           </span>
         </div>

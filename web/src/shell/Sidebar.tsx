@@ -1,10 +1,9 @@
 import { useRef, useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
-import { Dropdown, Label } from '@heroui/react';
+import { Menu, MenuItem, MenuSeparator } from '../ui/Menu';
 import { ChatBubbleLeftIcon } from '@heroicons/react/24/solid';
 import { InviteButton } from '../people/Invites';
 import { ListHead } from './ListHead';
 import { CallPill, FaceStack } from './CallPill';
-import { Popover } from '@heroui/react';
 import { api } from '../api';
 import { selectChannel, setChannels, setVoiceChat, showError, useNameColor, useStore, voiceMembers } from '../store';
 import { joinVoice } from '../voice/voice';
@@ -14,8 +13,10 @@ import type { Category, Channel, VoiceEntry } from '../types';
 import { Avatar } from '../ui/Avatar';
 import { CallDuration } from '../voice/CallDuration';
 import { SoundPlayedMark } from '../voice/SoundPad';
-import { ChannelMenu, InviteToRoom } from './ChannelMenu';
-import { RoundButton, VolumeSlider } from '../ui/ui';
+import { ServerTitle } from './ServerMenu';
+import { ChannelContext, ChannelMenu, InviteToRoom } from './ChannelMenu';
+import { RoundButton } from '../ui/ui';
+import { usePersonContext } from '../people/UserProfile';
 import { MeCard } from './MeCard';
 import { EmptyState } from '../ui/Illustrations';
 import { UserPlusIcon } from '../ui/icons';
@@ -25,7 +26,6 @@ export function Sidebar() {
   const { t } = useT();
   const channels = useStore((s) => s.channels);
   const categories = useStore((s) => s.categories);
-  const serverName = useStore((s) => s.serverName);
   const [filter, setFilter] = useState('');
   const query = filter.trim().toLowerCase();
   const visible = query ? channels.filter((c) => c.name.toLowerCase().includes(query)) : channels;
@@ -42,7 +42,7 @@ export function Sidebar() {
   return (
     <aside className="flex min-h-0 min-w-0 flex-1 flex-col">
       <ListHead
-        title={serverName}
+        title={<ServerTitle />}
         action={<InviteButton />}
         search={filter}
         onSearch={setFilter}
@@ -328,47 +328,32 @@ function CategorySection({ category, children }: { category: Category; children:
           <ChevronDownIcon size={14} className={`shrink-0 transition-transform ${folded ? '-rotate-90' : ''}`} />
         </button>
         {canManage ? (
-          <Dropdown>
-            <Dropdown.Trigger isDisabled={busy} aria-label={t('shell.category.actions', { name: category.name })} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted outline-none hover:bg-white/[0.06] hover:text-foreground data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus">
-              <DotsIcon size={16} />
-            </Dropdown.Trigger>
-            <Dropdown.Popover placement="bottom end" className="min-w-56">
-              <Dropdown.Menu
-                aria-label={t('shell.category.actions', { name: category.name })}
-                onAction={(key) => {
-                  if (key === 'text' || key === 'voice') {
-                    setAdding(key);
-                    setRenaming(false);
-                    setName('');
-                    setFolded(false);
-                  }
-                  if (key === 'rename') {
-                    setRenaming(true);
-                    setAdding(null);
-                    setName(category.name);
-                  }
-                  if (key === 'delete') void remove();
-                }}
-              >
-                <Dropdown.Item id="text" textValue={t('shell.sidebar.createText')}>
-                  <Label>{t('shell.sidebar.createText')}</Label>
-                  <HashIcon size={16} className="ml-auto text-muted" />
-                </Dropdown.Item>
-                <Dropdown.Item id="voice" textValue={t('shell.sidebar.createVoice')}>
-                  <Label>{t('shell.sidebar.createVoice')}</Label>
-                  <SpeakerIcon size={16} className="ml-auto text-muted" />
-                </Dropdown.Item>
-                <Dropdown.Item id="rename" textValue={t('shell.menu.rename')}>
-                  <Label>{t('shell.menu.rename')}</Label>
-                  <PencilIcon size={16} className="ml-auto text-muted" />
-                </Dropdown.Item>
-                <Dropdown.Item id="delete" textValue={t('shell.category.delete')} variant="danger">
-                  <Label>{t('shell.category.delete')}</Label>
-                  <TrashIcon size={16} className="ml-auto text-danger" />
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown.Popover>
-          </Dropdown>
+          <Menu
+            label={t('shell.category.actions', { name: category.name })}
+            triggerProps={{ isDisabled: busy }}
+            triggerClassName="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted outline-none hover:bg-white/[0.06] hover:text-foreground data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus"
+            trigger={<DotsIcon size={16} />}
+            onAction={(key) => {
+              if (key === 'text' || key === 'voice') {
+                setAdding(key);
+                setRenaming(false);
+                setName('');
+                setFolded(false);
+              }
+              if (key === 'rename') {
+                setRenaming(true);
+                setAdding(null);
+                setName(category.name);
+              }
+              if (key === 'delete') void remove();
+            }}
+          >
+            <MenuItem id="text" label={t('shell.sidebar.createText')} icon={<HashIcon />} />
+            <MenuItem id="voice" label={t('shell.sidebar.createVoice')} icon={<SpeakerIcon />} />
+            <MenuItem id="rename" label={t('shell.menu.rename')} icon={<PencilIcon />} />
+            <MenuSeparator />
+            <MenuItem id="delete" label={t('shell.category.delete')} icon={<TrashIcon />} danger />
+          </Menu>
         ) : (
           <span className="h-7" />
         )}
@@ -446,7 +431,7 @@ function NewCategory() {
 /** A pill row: 40px, plain 18px icon, 16px label; the open one gets the graphite fill, a new one is bold. */
 function itemClass(active: boolean, strong = false) {
   return `flex h-10 w-full items-center gap-2.5 rounded-full px-4 text-left text-[16px] md:rounded-compact transition-colors max-md:h-11 ${
-    active ? 'bg-default font-medium text-foreground' : strong ? 'font-semibold text-foreground hover:bg-white/[0.04]' : 'font-medium text-muted hover:bg-white/[0.04] hover:text-foreground'
+    active ? 'bg-default font-medium text-foreground' : strong ? 'font-semibold text-foreground hover:bg-white/[0.08]' : 'font-medium text-muted hover:bg-white/[0.08] hover:text-foreground'
   }`;
 }
 
@@ -483,7 +468,7 @@ function TextItem({ channel }: { channel: Channel }) {
       ? t('shell.sidebar.unread', { name: channel.name })
       : undefined;
   return (
-    <div className="group relative">
+    <ChannelContext channelId={channel.id} className="group relative">
       <button
         onClick={() => selectChannel(channel.id)}
         onPointerEnter={() => void ensureHistory(channel.id, 'channel', { quiet: true })}
@@ -495,15 +480,15 @@ function TextItem({ channel }: { channel: Channel }) {
         {channel.private && <PrivateText />}
         {muted && !showMentions && <BellSlashIcon size={14} className="shrink-0 md:group-hover:hidden" />}
         {showMentions ? (
-          <span className="min-w-5 rounded-full bg-danger px-1.5 text-center text-[11px] font-medium leading-5 text-white md:group-hover:hidden">
+          <span className="min-w-5 animate-gx-badge rounded-full bg-danger px-1.5 text-center text-[11px] font-medium leading-5 text-white md:group-hover:hidden">
             {mentions > 99 ? '99+' : mentions}
           </span>
         ) : (
-          showUnread && <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-foreground md:group-hover:hidden" />
+          showUnread && <span aria-hidden className="h-2 w-2 shrink-0 animate-gx-badge rounded-full bg-foreground md:group-hover:hidden" />
         )}
       </button>
       <RowMenu channelId={channel.id} />
-    </div>
+    </ChannelContext>
   );
 }
 
@@ -533,12 +518,12 @@ function VoiceItem({ channel }: { channel: Channel }) {
 
   return (
     <div>
-      <div className="group group/voice-row relative">
+      <ChannelContext channelId={channel.id} className="group group/voice-row relative">
         {/* A click joins on a computer; on a phone it opens the room first, with a Join button, like Discord's app. */}
         <button
           onClick={() => (isMobile ? selectChannel(channel.id) : joinVoice(channel.id))}
           className={`flex w-full items-center gap-2.5 rounded-compact px-4 text-left transition-colors ${twoLines ? 'py-2' : 'h-10 max-md:h-11'} pr-4 ${hasMenu ? 'group-hover:pr-[104px] [@media(hover:none)]:pr-[104px]' : 'group-hover:pr-[72px] [@media(hover:none)]:pr-[72px]'} ${
-            lit || connectedHere ? 'bg-default text-foreground' : members.length ? 'text-foreground hover:bg-white/[0.04]' : 'text-muted hover:bg-white/[0.04] hover:text-foreground'
+            lit || connectedHere ? 'bg-default text-foreground' : members.length ? 'text-foreground hover:bg-white/[0.08]' : 'text-muted hover:bg-white/[0.08] hover:text-foreground'
           }`}
         >
           {channel.private
@@ -558,7 +543,7 @@ function VoiceItem({ channel }: { channel: Channel }) {
               </span>
             )}
           </span>
-          {!chatOpen && (mentioned || unread) && <span aria-hidden className={`size-2 shrink-0 rounded-full ${mentioned ? 'bg-danger' : 'bg-foreground'}`} />}
+          {!chatOpen && (mentioned || unread) && <span aria-hidden className={`size-2 shrink-0 animate-gx-badge rounded-full ${mentioned ? 'bg-danger' : 'bg-foreground'}`} />}
           {/* Discord's right edge: the running time in green (no pill) when you're in the room, the headcount otherwise.
               Both give way to the row's buttons on hover. */}
           {connectedHere ? (
@@ -600,7 +585,7 @@ function VoiceItem({ channel }: { channel: Channel }) {
             <ChatBubbleLeftIcon className="size-4" aria-hidden="true" />
           </button>
         {hasMenu && <RowMenu channelId={channel.id} top={top} />}
-      </div>
+      </ChannelContext>
       {connectedHere && (
         <ul className="pb-1 pl-8 pt-1">
           {members.map((m) => (
@@ -639,6 +624,7 @@ function VoiceMember({ entry }: { entry: VoiceEntry }) {
   const isMe = useStore((s) => s.me?.id === entry.userId);
   const inSameRoom = useStore((s) => s.voiceChannelId === entry.channelId && s.voiceStatus === 'connected');
   const speaking = useStore((s) => inSameRoom && s.speaking.includes(entry.userId));
+  const person = usePersonContext(entry.userId);
 
   const content = (
     <>
@@ -660,19 +646,14 @@ function VoiceMember({ entry }: { entry: VoiceEntry }) {
 
   // Yourself: the same small profile card as at the bottom of the panel, beside the row.
   if (isMe) return <li><MeCard placement="right" className={`${row} cursor-pointer hover:bg-default/50`}>{content}</MeCard></li>;
-  if (!inSameRoom) return <li className={row}>{content}</li>;
+  // Someone else in your room: a click (or a right-click) opens their menu, with their volume on top.
+  if (!inSameRoom) return <li className={row} {...person.bind(null)}>{content}{person.menu}</li>;
   return (
-    <li>
-      <Popover>
-        <Popover.Trigger aria-label={t('shell.sidebar.volume', { name: user?.name ?? '' })} className={`${row} cursor-pointer hover:bg-default/50`}>
-          {content}
-        </Popover.Trigger>
-        <Popover.Content placement="right" className="w-64">
-          <Popover.Dialog className="p-5">
-            <VolumeSlider userId={entry.userId} name={user?.name ?? ''} />
-          </Popover.Dialog>
-        </Popover.Content>
-      </Popover>
+    <li {...person.bind(null)}>
+      <button type="button" aria-label={t('shell.sidebar.volume', { name: user?.name ?? '' })} onClick={(e) => person.openFrom(e, null)} className={`${row} cursor-pointer hover:bg-default/50`}>
+        {content}
+      </button>
+      {person.menu}
     </li>
   );
 }

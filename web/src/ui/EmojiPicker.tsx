@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Button, Input, Popover } from '@heroui/react';
+import { Button, Popover } from '@heroui/react';
 import { CakeIcon, ClockIcon, FaceSmileIcon, FlagIcon, GlobeAltIcon, HashtagIcon, LightBulbIcon, MagnifyingGlassIcon, PuzzlePieceIcon, ServerIcon, SparklesIcon, SunIcon, UserIcon } from '@heroicons/react/24/outline';
 import { useT } from '../i18n';
 import { usePersonalItems } from '../chat/expressionPreferences';
@@ -29,6 +29,9 @@ const englishData = () => Promise.all([
   import('emojibase-data/en/shortcodes/emojibase.json'),
   import('emojibase-data/en/shortcodes/github.json'),
 ]);
+
+/** The search box of every picker: the settings field look (plain border, no glow on focus), pill-shaped. */
+export const pickerSearch = 'block h-10 w-full rounded-full border border-white/[0.07] bg-white/[0.03] pr-3 text-[15px] outline-none transition-colors placeholder:text-faint focus:border-white/40 max-md:text-[16px]';
 
 const searchTerm = (value: string) => value.toLowerCase().replaceAll('ё', 'е').replace(/[_:-]+/g, ' ').trim();
 
@@ -104,6 +107,8 @@ export function EmojiGrid({ custom, onPick, composer = false, addAction, startOn
     [4, t('chat.emoji.food'), CakeIcon], [5, t('chat.emoji.travel'), GlobeAltIcon], [6, t('chat.emoji.activity'), PuzzlePieceIcon],
     [7, t('chat.emoji.objects'), LightBulbIcon], [8, t('chat.emoji.symbols'), HashtagIcon], [9, t('chat.emoji.flags'), FlagIcon],
   ] as const;
+  // One server per install: its emoji sit under the server's name in the list, not as a rail entry of their own.
+  const rail = composer ? groups.filter(([id]) => id !== 'server') : groups;
   const needle = searchTerm(query);
   useEffect(() => {
     if (!startOnServer) return;
@@ -186,26 +191,26 @@ export function EmojiGrid({ custom, onPick, composer = false, addAction, startOn
       <div className={`flex shrink-0 items-center gap-2 ${composer ? 'border-b border-edge px-3 py-3' : ''}`}>
         <div className="relative min-w-0 flex-1">
           {composer && <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted" />}
-          <Input type="search" aria-label={t('chat.emoji.search')} placeholder={t('chat.emoji.search')} value={query}
+          <input type="search" aria-label={t('chat.emoji.search')} placeholder={t('chat.emoji.search')} value={query}
             onChange={(event) => { setQuery(event.target.value); setCount(BATCH); setPreview(null); if (scroll.current) scroll.current.scrollTop = 0; }}
             onKeyDown={(event) => {
               if (event.nativeEvent.isComposing) return;
               if (event.key === 'Enter' && needle && results[0]) { event.preventDefault(); choose(results[0], event.shiftKey); }
               if (event.key === 'ArrowDown') { event.preventDefault(); scroll.current?.querySelector<HTMLButtonElement>('[data-emoji]')?.focus(); }
             }}
-            className={`w-full max-md:text-base ${composer ? 'rounded-full border border-edge bg-window pl-9' : ''}`} />
+            className={`${pickerSearch} ${composer ? 'pl-9' : 'pl-3'}`} />
         </div>
         {addAction}
       </div>
       <div className={composer ? 'flex min-h-0 flex-1' : ''}>
-        <div className={`flex gap-1 ${composer ? 'w-11 shrink-0 flex-col items-center overflow-y-auto border-r border-edge py-2' : 'my-2 overflow-x-auto'}`} role="group" aria-label={t('chat.emoji.categories')}>
-          {groups.map(([id, label, Icon]) => (
+        {rail.length > 1 && <div className={`flex gap-1 ${composer ? 'w-11 shrink-0 flex-col items-center overflow-y-auto border-r border-edge py-2' : 'my-2 overflow-x-auto'}`} role="group" aria-label={t('chat.emoji.categories')}>
+          {rail.map(([id, label, Icon]) => (
             <Button key={id} size="sm" variant="ghost" isIconOnly={composer} aria-label={label} aria-pressed={!needle && group === id}
               onPress={() => selectGroup(id)} className={`shrink-0 rounded-full ${composer ? 'size-8 min-w-8 p-0' : ''} ${!needle && group === id ? 'bg-white/15' : 'text-muted'}`}>
               {composer ? <Icon className="size-4" title={label} /> : label}
             </Button>
           ))}
-        </div>
+        </div>}
         <div ref={scroll} onScroll={updateCategory}
           onPointerOver={composer ? (event) => {
             const tile = (event.target as HTMLElement).closest<HTMLElement>('[data-emoji]');

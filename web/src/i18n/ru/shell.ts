@@ -185,4 +185,8 @@ export const shell = {
   'shell.access.cancel': 'Отмена',
   'shell.private': 'Приватный',
   'shell.menu.inviteLink': 'Ссылка для новых людей',
+  'shell.menu.openChat': 'Открыть чат',
+  'shell.menu.server': 'Меню сервера',
+  'shell.menu.serverSettings': 'Настройки сервера',
+  'shell.menu.create': 'Создать',
 } as const;

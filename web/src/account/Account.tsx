@@ -17,15 +17,17 @@ import { LANGS, setLang, useT, type Lang } from '../i18n';
  * a row like the rest (the photo and about are on the "You" tab).
  */
 /** Per device (not part of the account), so it is shown by the phone's "You" tab too. */
-export function LanguageRow() {
+export function LanguageRow({ withIcon = false }: { withIcon?: boolean }) {
   const { t, choice } = useT();
   const options: [Lang | 'system', string][] = [['system', t('account.language.system')], ...LANGS.map((l): [Lang, string] => [l.id, l.label])];
   return (
     <ChoiceRow<Lang | 'system'>
       icon={
-        <RowIcon>
-          <GlobeIcon />
-        </RowIcon>
+        withIcon ? (
+          <RowIcon>
+            <GlobeIcon />
+          </RowIcon>
+        ) : undefined
       }
       title={t('account.language')}
       value={choice ?? 'system'}

@@ -1,12 +1,17 @@
-import { useEffect, useState } from 'react';
-import { Dropdown, Popover } from '@heroui/react';
+import { useEffect, useRef, useState } from 'react';
+import { Popover } from '@heroui/react';
 import { api } from '../api';
 import { applyUnreadMarker, getSessionEpoch, patchMessage, showError, useStore } from '../store';
 import { useT } from '../i18n';
 import { EmojiText } from '../ui/EmojiText';
+import { EmojiGrid } from '../ui/EmojiPicker';
+import { mentionsToNames } from '../ui/Markdown';
+import { ContextMenu, Menu, MenuItem, MenuSeparator, useContextMenu, type MenuSpec } from '../ui/Menu';
+import { CopyIcon, LinkIcon, PencilIcon, PinIcon, ReplyIcon, SmileIcon, TrashIcon, UnreadIcon } from '../ui/icons';
 import type { Message } from '../types';
 import { BookmarkIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/solid';
 import { copyMessageLink, openMessage } from './messageNavigation';
+import { copyText } from './imageCopy';
 
 export function MessageRoute() {
   useEffect(() => {
@@ -24,12 +29,37 @@ export function MessageRoute() {
   return null;
 }
 
-export function MessageTools({message, className}: {message: Message; className: string}) {
+/** The three reactions one tap away on a message, in its hover bar and at the top of its menu. */
+export const QUICK_REACTIONS = ['👍', '❤️', '😂'];
+
+type MessageActions = { onReact: (emoji: string) => void; onReply: () => void; onEdit?: () => void; onDelete?: () => void };
+
+/** What is selected inside this message, if anything: "Copy" then copies that rather than the whole text. */
+function selectedIn(messageId: string) {
+  const selection = window.getSelection();
+  const box = document.getElementById(`msg-${messageId}`);
+  if (!selection || selection.isCollapsed || !box?.contains(selection.anchorNode)) return '';
+  return selection.toString().trim();
+}
+
+/**
+ * The one menu of a message: the "..." in its hover bar and a right-click on it open the same rows. `spec(close)` is
+ * the menu, `bind` goes on the message's element, `node` (the context menu and the emoji list the menu can open)
+ * is rendered inside it.
+ */
+export function useMessageMenu(message: Message, actions: MessageActions) {
   const { t } = useT();
   const allowed = useStore(s => !message.dm && s.permissions.includes('manageMessages'));
-  const action = async (id: string) => {
+  const [picking, setPicking] = useState(false);
+
+  const run = async (id: string) => {
     const epoch = getSessionEpoch();
     try {
+      if (id === 'react') setTimeout(() => setPicking(true), 0);
+      if (id === 'reply') actions.onReply();
+      if (id === 'edit') actions.onEdit?.();
+      if (id === 'delete') actions.onDelete?.();
+      if (id === 'copy') copyText(selectedIn(message.id) || mentionsToNames(message.content ?? '', useStore.getState().users));
       if (id === 'link') copyMessageLink(message.id);
       if (id === 'unread') {
         const event = await api.markUnread(message.id);
@@ -44,12 +74,65 @@ export function MessageTools({message, className}: {message: Message; className:
       }
     } catch (e) { if (epoch === getSessionEpoch()) showError(String(e)); }
   };
-  return <Dropdown><Dropdown.Trigger aria-label={t('chat.actions')} className={className}><EllipsisHorizontalIcon className="size-[18px]" aria-hidden="true" /></Dropdown.Trigger>
-    <Dropdown.Popover><Dropdown.Menu aria-label={t('chat.actions')} onAction={key => void action(String(key))}>
-      <Dropdown.Item id="unread">{t('chat.tools.unread')}</Dropdown.Item>
-      <Dropdown.Item id="link">{t('chat.tools.link')}</Dropdown.Item>
-      {allowed && <Dropdown.Item id="pin">{t(message.pinned ? 'chat.tools.unpin' : 'chat.tools.pin')}</Dropdown.Item>}
-    </Dropdown.Menu></Dropdown.Popover></Dropdown>;
+
+  const spec = (close: () => void): MenuSpec => ({
+    label: t('chat.actions'),
+    onAction: key => void run(key),
+    header: (
+      <div role="group" aria-label={t('chat.addReaction')} className="flex gap-1 px-2 pt-2">
+        {QUICK_REACTIONS.map(emoji => (
+          <button key={emoji} type="button" onClick={() => { close(); actions.onReact(emoji); }} aria-label={t('chat.reaction', { emoji })}
+            className="grid size-9 place-items-center rounded-row text-[18px] outline-none hover:bg-default focus-visible:ring-2 focus-visible:ring-focus">
+            <EmojiText text={emoji} />
+          </button>
+        ))}
+      </div>
+    ),
+    children: [
+      <MenuItem key="react" id="react" label={t('chat.addReaction')} icon={<SmileIcon />} />,
+      <MenuItem key="reply" id="reply" label={t('chat.reply')} icon={<ReplyIcon />} />,
+      actions.onEdit && <MenuItem key="edit" id="edit" label={t('chat.edit')} icon={<PencilIcon />} />,
+      !!message.content && <MenuItem key="copy" id="copy" label={t('chat.menu.copyText')} icon={<CopyIcon />} />,
+      allowed && <MenuItem key="pin" id="pin" label={t(message.pinned ? 'chat.tools.unpin' : 'chat.tools.pin')} icon={<PinIcon />} />,
+      <MenuItem key="unread" id="unread" label={t('chat.tools.unread')} icon={<UnreadIcon />} />,
+      <MenuItem key="link" id="link" label={t('chat.tools.link')} icon={<LinkIcon />} />,
+      actions.onDelete && <MenuSeparator key="separator" />,
+      actions.onDelete && <MenuItem key="delete" id="delete" label={t('chat.delete')} icon={<TrashIcon />} danger />,
+    ],
+  });
+
+  const context = useContextMenu(({ point, close }) => <ContextMenu point={point} onClose={close} {...spec(close)} />);
+  const node = (
+    <>
+      {context.menu}
+      {picking && <ReactionPicker message={message} onPick={actions.onReact} onClose={() => setPicking(false)} />}
+    </>
+  );
+  // A link, a picture or a file keeps its own menu; so does a profile name or avatar.
+  const bind = context.bind(null, { skip: e => !!(e.target as HTMLElement).closest('a, img, video') });
+  return { spec, bind, node };
+}
+
+/** The full emoji list for "Add reaction", hung off the message itself. */
+function ReactionPicker({ message, onPick, onClose }: { message: Message; onPick: (emoji: string) => void; onClose: () => void }) {
+  const { t } = useT();
+  const anchor = useRef<HTMLElement | null>(document.getElementById(`msg-${message.id}`));
+  return (
+    <Popover isOpen onOpenChange={open => !open && onClose()}>
+      <Popover.Content triggerRef={anchor} placement="bottom end" className="w-[328px] max-w-[calc(100vw-24px)]">
+        <Popover.Dialog aria-label={t('chat.addReaction')} className="p-2">
+          <EmojiGrid custom onPick={emoji => { onClose(); onPick(emoji); }} />
+        </Popover.Dialog>
+      </Popover.Content>
+    </Popover>
+  );
+}
+
+export function MessageTools({menu, className}: {menu: ReturnType<typeof useMessageMenu>; className: string}) {
+  const { t } = useT();
+  const [open, setOpen] = useState(false);
+  return <Menu {...menu.spec(() => setOpen(false))} isOpen={open} onOpenChange={setOpen} triggerLabel={t('chat.actions')} triggerClassName={className}
+    trigger={<EllipsisHorizontalIcon className="size-[18px]" aria-hidden="true" />} />;
 }
 
 export function PinsButton({channel}: {channel: string}) {

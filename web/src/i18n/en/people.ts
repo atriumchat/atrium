@@ -160,4 +160,7 @@ export const people = {
   'people.roles.none': 'No roles',
   'people.roles.save': 'Save',
   'people.roles.find': 'Find member',
+  'people.menu.profile': 'Profile',
+  'people.menu.addFriend': 'Add friend',
+  'people.menu.actions': 'Actions for {name}',
 } satisfies Record<keyof typeof source, Entry>;

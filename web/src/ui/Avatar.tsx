@@ -24,7 +24,7 @@ export function Avatar({ user, size = 32, speaking = false, dimmed = false, onli
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <div
-        className="flex h-full w-full select-none items-center justify-center rounded-full font-medium text-white transition-[box-shadow,opacity] duration-100"
+        className="flex h-full w-full select-none items-center justify-center rounded-full font-medium text-white transition-[box-shadow,opacity]"
         style={{
           fontSize: size * 0.42,
           background: user?.color ?? 'var(--accent)',

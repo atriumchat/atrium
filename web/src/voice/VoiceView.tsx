@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Button, Dropdown, Label, Popover, Spinner, Tooltip } from '@heroui/react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { Button, Spinner, Tooltip } from '@heroui/react';
 import { ArrowsPointingInIcon, ArrowsPointingOutIcon, ChatBubbleLeftIcon, Cog6ToothIcon, EllipsisHorizontalIcon, SpeakerWaveIcon, UserGroupIcon } from '@heroicons/react/24/solid';
 import { StartAudio, useIsSpeaking, useParticipants, useTracks, VideoTrack } from '@livekit/components-react';
 import type { TrackReference } from '@livekit/components-react';
@@ -14,7 +14,9 @@ import { BubbleCloud } from './Bubbles';
 import { CallDuration } from './CallDuration';
 import { ChannelHeader, HeaderIcon } from '../shell/ChannelHeader';
 import { ChannelMenu } from '../shell/ChannelMenu';
-import { RoundButton, VolumeSlider } from '../ui/ui';
+import { RoundButton } from '../ui/ui';
+import { Menu, MenuItem, MenuSeparator } from '../ui/Menu';
+import { usePersonContext, usePersonMenu } from '../people/UserProfile';
 import { FaceStack } from '../shell/CallPill';
 import { useTileGrid } from './tileGrid';
 import { useAvatarTone } from '../ui/avatarTone';
@@ -55,7 +57,7 @@ export function VoiceView({ channel }: { channel: Channel }) {
     <div className={`relative flex min-h-0 flex-1 flex-col ${chatOpen ? 'max-md:[&>header]:invisible' : ''}`}>
       <div
         data-call-header=""
-        className={`shrink-0 transition-opacity duration-200 motion-reduce:transition-none ${idle ? 'max-md:opacity-100 md:opacity-0' : ''}`}
+        className={`shrink-0 transition-opacity duration-(--gx-motion-base) motion-reduce:transition-none ${idle ? 'max-md:opacity-100 md:opacity-0' : ''}`}
         onPointerMove={() => wakeCall?.()}
         onFocusCapture={() => wakeCall?.()}
       >
@@ -150,7 +152,7 @@ function JoinPrompt({ channel }: { channel: Channel }) {
           <button
             type="button"
             onClick={() => joinVoice(channel.id)}
-            className="mt-6 flex h-11 min-w-40 items-center justify-center whitespace-nowrap rounded-control bg-[#f2f2f4] px-(--app-radius-control) text-[15px] font-semibold text-[#0c0c0e] transition-[background-color,transform] duration-150 hover:bg-white active:scale-[0.98] disabled:opacity-80 max-md:hidden"
+            className="mt-6 flex h-11 min-w-40 items-center justify-center whitespace-nowrap rounded-control bg-[#f2f2f4] px-(--app-radius-control) text-[15px] font-semibold text-[#0c0c0e] transition-[background-color,transform] hover:bg-white active:scale-[0.98] disabled:opacity-80 max-md:hidden"
           >
             {t('voice.room.joinVoice')}
           </button>
@@ -185,14 +187,14 @@ function JoinPrompt({ channel }: { channel: Channel }) {
             type="button"
             onClick={() => void toggleMute()}
             aria-label={micOff ? t('voice.mic.unmute') : t('voice.mic.mute')}
-            className={`flex size-14 shrink-0 items-center justify-center rounded-full transition-[background-color,transform] duration-150 active:scale-95 ${micOff ? 'bg-white/10 text-danger' : 'bg-white text-black'}`}
+            className={`flex size-14 shrink-0 items-center justify-center rounded-full transition-[background-color,transform] active:scale-95 ${micOff ? 'bg-white/10 text-danger' : 'bg-white text-black'}`}
           >
             {micOff ? <MicSlashIcon size={26} /> : <MicIcon size={26} />}
           </button>
           <button
             type="button"
             onClick={() => joinVoice(channel.id)}
-            className="flex h-14 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[#f2f2f4] text-[17px] font-semibold text-[#0c0c0e] transition-[background-color,transform] duration-150 hover:bg-white active:scale-[0.98] disabled:opacity-80"
+            className="flex h-14 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[#f2f2f4] text-[17px] font-semibold text-[#0c0c0e] transition-[background-color,transform] hover:bg-white active:scale-[0.98] disabled:opacity-80"
           >
             {t('voice.room.joinVoice')}
           </button>
@@ -460,7 +462,7 @@ export function MediaStage({ fallback, renderControls }: {
                       onPress={() => setStripOpen((open) => !open)}
                       className={`absolute left-1/2 z-10 h-8 min-w-0 -translate-x-1/2 gap-1.5 rounded-full px-3 [--button-bg:#1c1c1f] [--button-bg-hover:#2a2a2f] [--button-fg:white] ${stripOpen ? 'bottom-[82px]' : 'bottom-3'}`}
                     >
-                      <ChevronDownIcon size={16} className={`transition-transform duration-150 ${stripOpen ? '' : 'rotate-180'}`} />
+                      <ChevronDownIcon size={16} className={`transition-transform ${stripOpen ? '' : 'rotate-180'}`} />
                       <UserGroupIcon className="size-4" aria-hidden="true" />
                     </Button>
                     <Tooltip.Content placement="top">{t(stripOpen ? 'voice.strip.hide' : 'voice.strip.show')}</Tooltip.Content>
@@ -497,11 +499,22 @@ export function MediaStage({ fallback, renderControls }: {
         data-fullscreen-controls={full || undefined}
         className={`${full ? 'absolute inset-x-0 bottom-0 z-10 bg-linear-to-t from-black/80 via-black/40 to-transparent pt-12' : autoHideControls ? 'shrink-0' : 'contents'}
           ${autoHideControls ? 'transition-opacity motion-reduce:transition-none' : ''}
-          ${showControls ? 'opacity-100 duration-150' : 'pointer-events-none opacity-0 duration-200'}`}
+          ${showControls ? 'opacity-100' : 'pointer-events-none opacity-0 duration-(--gx-motion-base)'}`}
       >
         {renderControls(fallback && !full ? undefined : viewActions, full)}
       </div>
     </div>
+  );
+}
+
+/** A row of the call's people: a right-click opens the person's menu. */
+function CallPerson({ userId, children }: { userId: string; children: ReactNode }) {
+  const person = usePersonContext(userId);
+  return (
+    <li className="flex h-11 items-center gap-2.5 rounded-full px-2.5 hover:bg-white/[0.04]" {...person.bind(null)}>
+      {children}
+      {person.menu}
+    </li>
   );
 }
 
@@ -525,7 +538,7 @@ function CallPeople({ participants, onClose }: { participants: Participant[]; on
           const entry = entries.find((e) => e.userId === p.identity);
           const name = `${user?.name ?? p.name ?? ''}${p.isLocal ? ` ${t('voice.you')}` : ''}`;
           return (
-            <li key={p.identity} className="flex h-11 items-center gap-2.5 rounded-full px-2.5 hover:bg-white/[0.04]">
+            <CallPerson key={p.identity} userId={p.identity}>
               <Avatar user={user} size={28} ringBg="var(--app-window)" />
               <span className={`min-w-0 flex-1 truncate text-[15px] ${speaking.includes(p.identity) ? 'font-medium text-foreground' : 'text-foreground/85'}`}>
                 {name}
@@ -538,7 +551,7 @@ function CallPeople({ participants, onClose }: { participants: Participant[]; on
               ) : (
                 <MicIcon size={15} className="shrink-0 text-muted" />
               )}
-            </li>
+            </CallPerson>
           );
         })}
       </ul>
@@ -561,7 +574,7 @@ function ScreenStage({ trackRef, full, onGrid, onFullscreen }: {
   return (
     <>
       {!full && (
-        <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 py-2 transition-opacity duration-200 group-data-[idle]/stage:opacity-0 motion-reduce:transition-none">
+        <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 py-2 transition-opacity duration-(--gx-motion-base) group-data-[idle]/stage:opacity-0 motion-reduce:transition-none">
           <div className="flex min-w-0 items-baseline gap-2">
             <h3 className="truncate text-lg font-normal">{name}</h3>
             {!camera && <span className="shrink-0 text-[13px] text-muted">{t('voice.stream.live')}</span>}
@@ -610,37 +623,22 @@ function SelfOptions({ small }: { small: boolean }) {
   const [settings, setSettings] = useState(false);
   return (
     <>
-      <Dropdown>
-        <Dropdown.Trigger
-          aria-label={t('voice.controls.more')}
-          className={`absolute z-10 grid place-items-center rounded-full bg-black/70 text-white outline-none transition-opacity hover:bg-black focus-visible:ring-2 focus-visible:ring-white aria-expanded:opacity-100 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 ${small ? 'bottom-1.5 right-1.5 size-6 [&_svg]:size-3' : 'bottom-2.5 right-2.5 size-8 [&_svg]:size-4'} group-data-[idle]/stage:opacity-0`}
-        >
-          <EllipsisHorizontalIcon aria-hidden="true" />
-        </Dropdown.Trigger>
-        <Dropdown.Popover placement="top end" className="min-w-56">
-          <Dropdown.Menu
-            aria-label={t('voice.controls.more')}
-            onAction={(key) => {
-              if (key === 'mute') void toggleMute();
-              if (key === 'deafen') void toggleDeafen();
-              if (key === 'settings') setSettings(true);
-            }}
-          >
-            <Dropdown.Item id="mute" textValue={t(muted ? 'voice.mic.unmute' : 'voice.mic.mute')}>
-              <Label>{t(muted ? 'voice.mic.unmute' : 'voice.mic.mute')}</Label>
-              {muted ? <MicSlashIcon size={18} className="ml-auto text-danger" /> : <MicIcon size={18} className="ml-auto text-muted" />}
-            </Dropdown.Item>
-            <Dropdown.Item id="deafen" textValue={t(deafened ? 'voice.deafen.off' : 'voice.deafen.on')}>
-              <Label>{t(deafened ? 'voice.deafen.off' : 'voice.deafen.on')}</Label>
-              {deafened ? <HeadphonesSlashIcon size={18} className="ml-auto text-danger" /> : <HeadphonesIcon size={18} className="ml-auto text-muted" />}
-            </Dropdown.Item>
-            <Dropdown.Item id="settings" textValue={t('voice.controls.settings')}>
-              <Label>{t('voice.controls.settings')}</Label>
-              <Cog6ToothIcon className="ml-auto size-[18px] text-muted" aria-hidden="true" />
-            </Dropdown.Item>
-          </Dropdown.Menu>
-        </Dropdown.Popover>
-      </Dropdown>
+      <Menu
+        label={t('voice.controls.more')}
+        placement="top end"
+        triggerClassName={`absolute z-10 grid place-items-center rounded-full bg-black/70 text-white outline-none transition-opacity hover:bg-black focus-visible:ring-2 focus-visible:ring-white aria-expanded:opacity-100 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 ${small ? 'bottom-1.5 right-1.5 size-6 [&_svg]:size-3' : 'bottom-2.5 right-2.5 size-8 [&_svg]:size-4'} group-data-[idle]/stage:opacity-0`}
+        trigger={<EllipsisHorizontalIcon aria-hidden="true" />}
+        onAction={(key) => {
+          if (key === 'mute') void toggleMute();
+          if (key === 'deafen') void toggleDeafen();
+          if (key === 'settings') setSettings(true);
+        }}
+      >
+        <MenuItem id="mute" label={t(muted ? 'voice.mic.unmute' : 'voice.mic.mute')} icon={muted ? <MicSlashIcon /> : <MicIcon />} />
+        <MenuItem id="deafen" label={t(deafened ? 'voice.deafen.off' : 'voice.deafen.on')} icon={deafened ? <HeadphonesSlashIcon /> : <HeadphonesIcon />} />
+        <MenuSeparator />
+        <MenuItem id="settings" label={t('voice.controls.settings')} icon={<Cog6ToothIcon />} />
+      </Menu>
       {settings && <SettingsDialog start="voice" onClose={() => setSettings(false)} />}
     </>
   );
@@ -676,7 +674,8 @@ function Tile({ participant, video, height, onSelect, selected = false, ring = t
   const entry = useStore((s) =>
     (s.calls[s.voiceChannelId ?? '']?.participants ?? s.voiceState).find((e) => e.userId === participant.identity),
   );
-  const [volumeOpen, setVolumeOpen] = useState(false);
+  const person = usePersonContext(participant.identity);
+  const personMenu = usePersonMenu(participant.identity, { voice: true });
   const tone = useAvatarTone(user);
   const name = user?.name ?? participant.name ?? '';
   const label = `${name}${participant.isLocal ? ` ${t('voice.you')}` : ''}`;
@@ -686,13 +685,13 @@ function Tile({ participant, video, height, onSelect, selected = false, ring = t
   const preview = useStore((s) => s.cameraPreview);
   const small = height < 120;
   const remote = participant instanceof RemoteParticipant;
-  const handleClick = onSelect ?? (remote ? () => setVolumeOpen(true) : undefined);
+  const handleClick = onSelect ?? (remote ? (e: MouseEvent<HTMLElement>) => person.openFrom(e, null) : undefined);
 
   return (
     <div
       className={`group relative flex h-full w-full items-center justify-center overflow-hidden rounded-surface ${pending || video ? 'bg-black' : tone ? '' : 'bg-[#18181b]'}`}
       style={!pending && !video && tone ? { background: tone } : undefined}
-      onContextMenu={remote ? (e) => { if (!e.currentTarget.contains(e.target as Node)) return; e.preventDefault(); setVolumeOpen(true); } : undefined}
+      {...(remote ? person.bind(null) : {})}
     >
       {pending ? (
         preview ? <DeviceVideo track={preview} /> : <Spinner size={small ? 'sm' : 'md'} color="current" className="text-white/60" />
@@ -719,7 +718,7 @@ function Tile({ participant, video, height, onSelect, selected = false, ring = t
         className={`pointer-events-none absolute items-center justify-center rounded-full bg-black/55 text-white ${small ? 'right-1.5 top-1.5 size-5' : 'right-2.5 top-2.5 size-7'}`}
       />
       <div
-        className={`pointer-events-none absolute flex max-w-[calc(100%-16px)] items-center gap-1.5 rounded-full bg-black/55 font-medium text-white transition-opacity duration-200 group-data-[idle]/stage:opacity-0 ${small ? 'bottom-1.5 left-1.5 px-2 py-0.5 text-[12px]' : 'bottom-2.5 left-2.5 px-2.5 py-1 text-[13px]'}`}
+        className={`pointer-events-none absolute flex max-w-[calc(100%-16px)] items-center gap-1.5 rounded-full bg-black/55 font-medium text-white transition-opacity duration-(--gx-motion-base) group-data-[idle]/stage:opacity-0 ${small ? 'bottom-1.5 left-1.5 px-2 py-0.5 text-[12px]' : 'bottom-2.5 left-2.5 px-2.5 py-1 text-[13px]'}`}
       >
         {screen ? (
           <ScreenIcon size={12} className="shrink-0" />
@@ -731,21 +730,19 @@ function Tile({ participant, video, height, onSelect, selected = false, ring = t
         <span className="min-w-0 truncate">{label}</span>
       </div>
       {!remote && <SelfOptions small={small} />}
-      {remote && (
-        <Popover isOpen={volumeOpen} onOpenChange={setVolumeOpen}>
-          <Button isIconOnly size="sm" variant="tertiary"
-            aria-label={t('voice.volume', { name })}
-            className={`absolute z-10 shrink-0 rounded-full p-0 [--button-bg:rgb(0_0_0/0.72)] [--button-bg-hover:var(--default)] [--button-fg:white] ${volumeOpen ? '' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100'} ${small ? 'bottom-1.5 right-1.5 size-6 [&_svg]:size-3' : 'bottom-2.5 right-2.5 size-8 [&_svg]:size-4'} group-data-[idle]/stage:opacity-0`}
-          >
-            <EllipsisHorizontalIcon aria-hidden="true" />
-          </Button>
-          <Popover.Content isNonModal placement="top end" className="w-64">
-            <Popover.Dialog aria-label={t('voice.volume', { name })} className="p-4">
-              <VolumeSlider userId={participant.identity} name={name} showMute />
-            </Popover.Dialog>
-          </Popover.Content>
-        </Popover>
+      {remote && personMenu.spec && (
+        <>
+          <Menu
+            {...personMenu.spec}
+            placement="top end"
+            triggerLabel={t('voice.volume', { name })}
+            triggerClassName={`absolute z-10 grid place-items-center rounded-full bg-black/70 text-white outline-none transition-opacity hover:bg-black focus-visible:ring-2 focus-visible:ring-white aria-expanded:opacity-100 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 ${small ? 'bottom-1.5 right-1.5 size-6 [&_svg]:size-3' : 'bottom-2.5 right-2.5 size-8 [&_svg]:size-4'} group-data-[idle]/stage:opacity-0`}
+            trigger={<EllipsisHorizontalIcon aria-hidden="true" />}
+          />
+          {personMenu.dialogs}
+        </>
       )}
+      {person.menu}
     </div>
   );
 }

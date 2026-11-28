@@ -179,6 +179,9 @@ export const chat = {
   'chat.replyTo': 'Reply to',
   'chat.send': 'Send',
   'chat.sendFailed': 'Couldn\'t send the message',
+  'chat.unsent': 'Not sent',
+  'chat.unsentRetry': 'Retry',
+  'chat.unsentDismiss': 'Dismiss',
   'chat.size.b': '{n} B',
   'chat.size.kb': '{n} KB',
   'chat.size.mb': '{n} MB',
@@ -190,4 +193,5 @@ export const chat = {
   'chat.typing.many': 'are typing…',
   'chat.typing.one': 'is typing…',
   'chat.uploadFailed': 'Couldn\'t upload {name}: {error}',
+  'chat.menu.copyText': 'Copy text',
 } satisfies Record<keyof typeof source, Entry>;

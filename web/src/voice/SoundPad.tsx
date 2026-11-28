@@ -6,10 +6,8 @@ import {
 } from "react";
 import {
   Button,
-  Dropdown,
   Label,
   Popover,
-  Separator,
   Slider,
   Spinner,
   Switch,
@@ -21,6 +19,7 @@ import type { Sound } from "../types";
 import { ConfirmDialog, Dialog } from "../ui/Dialog";
 import { EmojiPicker } from "../ui/EmojiPicker";
 import { EmojiText } from "../ui/EmojiText";
+import { Menu, MenuItem, MenuSeparator } from "../ui/Menu";
 import {
   ChevronDownIcon,
   DotsVerticalIcon,
@@ -254,7 +253,7 @@ function Peek({ onAll }: { onAll: () => void }) {
                   void playSound(sound);
                 }
               }}
-              className="h-10 min-w-0 justify-start gap-1.5 rounded-row px-2 text-[13px]"
+              className="h-10 w-full min-w-0 justify-start gap-1.5 overflow-hidden rounded-row px-2 text-[13px]"
             >
               <span aria-hidden className="flex size-5 shrink-0 items-center justify-center text-[17px] leading-none">
                 {on ? <StopIcon size={13} /> : sound.emoji ? <EmojiText text={sound.emoji} unicodeOnly /> : <SoundboardIcon size={15} className="text-muted" />}
@@ -535,7 +534,7 @@ function SoundTile({
               void playSound(sound);
             }
           }}
-          className="relative h-full min-w-0 flex-1 justify-start gap-1.5 rounded-full pl-2 pr-1 text-left text-[13px] focus-visible:ring-inset"
+          className="relative h-full min-w-0 flex-1 justify-start gap-1.5 rounded-full pl-2 pr-2 text-left text-[13px] focus-visible:ring-inset [@media(hover:none)]:pr-9"
         >
           <span aria-hidden className="flex size-5 shrink-0 items-center justify-center text-[17px] leading-none">
             {playing ? <StopIcon size={13} /> : sound.emoji ? <EmojiText text={sound.emoji} unicodeOnly /> : <SoundboardIcon size={15} className="text-muted" />}
@@ -543,14 +542,18 @@ function SoundTile({
           <span className="min-w-0 flex-1 truncate">{sound.name}</span>
           {long && <span className="shrink-0 text-[11px] text-muted">{clock(sound.durationMs)}</span>}
         </Button>
-        <Tooltip.Content>{broadcast}</Tooltip.Content>
+        <Tooltip.Content placement="bottom">{sound.name}</Tooltip.Content>
       </Tooltip>
+      <div
+        data-on={previewing || menu ? "" : undefined}
+        className="pointer-events-none absolute inset-y-0 right-0 flex items-center gap-0.5 rounded-r-full bg-[color-mix(in_oklab,var(--overlay),white_11%)] pl-2 pr-9 opacity-0 transition-opacity group-focus-within/tile:pointer-events-auto group-focus-within/tile:opacity-100 group-hover/tile:pointer-events-auto group-hover/tile:opacity-100 data-[on]:pointer-events-auto data-[on]:opacity-100 [@media(hover:none)]:hidden"
+      >
       <Tooltip delay={300} closeDelay={0}>
         <Button isIconOnly variant="ghost" size="sm"
           aria-label={star}
           aria-pressed={favorite}
           onPress={() => toggleFavorite(sound.id)}
-          className={`${TILE_ACTION} opacity-0 group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(hover:none)]:opacity-100`}
+          className={TILE_ACTION}
         >
           {favorite ? <StarFilledIcon size={14} /> : <StarIcon size={14} />}
         </Button>
@@ -560,49 +563,31 @@ function SoundTile({
         <Button isIconOnly variant="ghost" size="sm"
           aria-label={previewLabel}
           onPress={() => { if (previewing) stopPreview(); else previewSound(sound); }}
-          className={`${TILE_ACTION} ${previewing ? "[--button-bg:var(--surface-tertiary)] text-foreground" : "opacity-0 group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(hover:none)]:opacity-100"}`}
+          className={`${TILE_ACTION} ${previewing ? "[--button-bg:var(--surface-tertiary)] text-foreground" : ""}`}
         >
           {previewing ? <StopIcon size={14} /> : <HeadphonesIcon size={16} />}
         </Button>
         <Tooltip.Content>{previewLabel}</Tooltip.Content>
       </Tooltip>
-      <Dropdown isOpen={menu} onOpenChange={setMenu}>
-        <Dropdown.Trigger aria-label={t("voice.soundboard.actions", { name: sound.name })} className={`${TILE_ACTION} absolute right-1 top-1.5 opacity-0 pointer-events-none focus-visible:z-10 focus-visible:opacity-100 focus-visible:pointer-events-auto [@media(hover:none)]:static [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100`}>
-          <DotsVerticalIcon size={16} />
-        </Dropdown.Trigger>
-        <Dropdown.Popover placement="bottom end" className="min-w-48">
-          <Dropdown.Menu
-            aria-label={t("voice.soundboard.actions", { name: sound.name })}
-            onAction={(key) => {
-              if (key === "favorite") toggleFavorite(sound.id);
-              if (key === "edit") onEdit();
-              if (key === "delete") onDelete();
-            }}
-          >
-            <MenuItem
-              id="favorite"
-              label={star}
-              icon={
-                favorite ? <StarFilledIcon size={16} /> : <StarIcon size={16} className="text-muted" />
-              }
-            />
-            <MenuItem
-              id="edit"
-              label={t("voice.soundboard.edit")}
-              icon={<PencilIcon size={16} />}
-            />
-            <Separator />
-            <Dropdown.Item
-              id="delete"
-              textValue={t("voice.soundboard.delete")}
-              variant="danger"
-            >
-              <Label>{t("voice.soundboard.delete")}</Label>
-              <TrashIcon size={16} className="ml-auto text-danger" />
-            </Dropdown.Item>
-          </Dropdown.Menu>
-        </Dropdown.Popover>
-      </Dropdown>
+      </div>
+      <Menu
+        label={t("voice.soundboard.actions", { name: sound.name })}
+        placement="bottom end"
+        isOpen={menu}
+        onOpenChange={setMenu}
+        triggerClassName={`${TILE_ACTION} absolute right-1 top-1.5 opacity-0 pointer-events-none group-hover/tile:pointer-events-auto group-hover/tile:opacity-100 group-focus-within/tile:pointer-events-auto group-focus-within/tile:opacity-100 focus-visible:z-10 focus-visible:opacity-100 focus-visible:pointer-events-auto [@media(hover:none)]:static [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100`}
+        trigger={<DotsVerticalIcon size={16} />}
+        onAction={(key) => {
+          if (key === "favorite") toggleFavorite(sound.id);
+          if (key === "edit") onEdit();
+          if (key === "delete") onDelete();
+        }}
+      >
+        <MenuItem id="favorite" label={star} icon={favorite ? <StarFilledIcon /> : <StarIcon />} />
+        <MenuItem id="edit" label={t("voice.soundboard.edit")} icon={<PencilIcon />} />
+        <MenuSeparator />
+        <MenuItem id="delete" label={t("voice.soundboard.delete")} icon={<TrashIcon />} danger />
+      </Menu>
     </div>
   );
 }
@@ -618,23 +603,6 @@ function ClipProgress({ at, duration }: { at: number; duration: number }) {
         animationDelay: `-${elapsed}ms`,
       }}
     />
-  );
-}
-
-function MenuItem({
-  id,
-  label,
-  icon,
-}: {
-  id: string;
-  label: string;
-  icon: ReactNode;
-}) {
-  return (
-    <Dropdown.Item id={id} textValue={label}>
-      <Label>{label}</Label>
-      <span className="ml-auto text-muted">{icon}</span>
-    </Dropdown.Item>
   );
 }
 

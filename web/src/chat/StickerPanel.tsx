@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Button, Input } from '@heroui/react';
+import { Button } from '@heroui/react';
 import { MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { useT } from '../i18n';
 import { useStore } from '../store';
 import type { Sticker } from '../types';
+import { pickerSearch } from '../ui/EmojiPicker';
 import { EmojiText } from '../ui/EmojiText';
 import { usePersonalItems } from './expressionPreferences';
 
@@ -31,7 +32,7 @@ export function StickerPanel({ onPick, onAdd }: { onPick: (id: string) => void; 
       <div className="flex items-center gap-2 border-b border-edge px-3 py-3">
         <div className="relative min-w-0 flex-1">
           <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted" />
-          <Input type="search" aria-label={t('chat.sticker.search')} placeholder={t('chat.sticker.search')} value={query} onChange={(e) => { setQuery(e.target.value); setPreview(null); }} className="w-full rounded-full border border-edge bg-window pl-9 max-md:text-base" />
+          <input type="search" aria-label={t('chat.sticker.search')} placeholder={t('chat.sticker.search')} value={query} onChange={(e) => { setQuery(e.target.value); setPreview(null); }} className={`${pickerSearch} pl-9`} />
         </div>
         {canAdd && <Button variant="tertiary" isIconOnly aria-label={t('chat.sticker.add')} onPress={onAdd} className="size-9 min-w-9 rounded-full p-0"><PlusIcon className="size-4" /></Button>}
       </div>
@@ -55,7 +56,9 @@ export function StickerPanel({ onPick, onAdd }: { onPick: (id: string) => void; 
           </section>
         ))}
       </div>
-      {preview && <div className="flex items-center gap-2 border-t border-white/10 px-3 py-2 text-sm"><EmojiText text={preview.emoji} /><span className="truncate">{preview.name}</span></div>}
+      <div className="flex h-10 shrink-0 items-center gap-2 border-t border-edge px-3 text-sm">
+        {preview && <><EmojiText text={preview.emoji} /><span className="truncate">{preview.name}</span></>}
+      </div>
     </>
   );
 }

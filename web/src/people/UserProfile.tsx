@@ -1,37 +1,218 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { Button, Dropdown, Label, Popover } from '@heroui/react';
+import { Button, Popover } from '@heroui/react';
+import { NoSymbolIcon, UserMinusIcon } from '@heroicons/react/24/solid';
 import { api } from '../api';
 import { addUser, messageUser, showError, useNameColor, useStore } from '../store';
+import { getUserVolume, toggleUserMute } from '../voice/devices';
+import { VolumeSlider } from '../ui/ui';
+import { ContextMenu, Menu, MenuItem, MenuSeparator, useContextMenu, type MenuSpec } from '../ui/Menu';
 import { RoleChips, topOf, useMyTop, UserRolesEditor } from './Roles';
 import type { MyStatus, User } from '../types';
 import { Avatar } from '../ui/Avatar';
-import { ConfirmDialog } from '../ui/Dialog';
+import { ConfirmDialog, Window } from '../ui/Dialog';
 import { ResetLinkButton } from './ResetLink';
 import { useT, type Key } from '../i18n';
 import { dateOnly } from '../chat/format';
-import { BubbleIcon, CameraIcon, CheckIcon, PencilIcon, PhoneIcon, UserPlusIcon } from '../ui/icons';
+import { AtIcon, BubbleIcon, CameraIcon, CheckIcon, PencilIcon, PhoneIcon, SpeakerSlashIcon, TrashIcon, UserIcon, UserPlusIcon } from '../ui/icons';
 import { joinVoice } from '../voice/voice';
 
 type Placement = 'top' | 'bottom' | 'left' | 'right' | 'right top' | 'left top' | 'top start' | 'bottom start';
 
-/** Wrap any avatar or name: clicking it opens the person's profile card. */
+/**
+ * Wrap any avatar or name: clicking it opens the person's profile card, a right-click their menu (the same one
+ * wherever you meet them: a message, the member list, a call).
+ */
 export function UserProfile(props: { userId: string; children: ReactNode; placement?: Placement; className?: string }) {
   const [open, setOpen] = useState(false);
   const { t } = useT();
   const name = useStore((s) => s.users[props.userId]?.name ?? '');
+  const ctx = useContextMenu(({ point, close }) => <PersonContextMenu userId={props.userId} point={point} onClose={close} onProfile={() => setOpen(true)} />);
   return (
-    <Popover isOpen={open} onOpenChange={setOpen}>
-      <Popover.Trigger aria-label={t('people.profile.label', { name })} className={props.className ?? 'cursor-pointer'}>
-        {props.children}
-      </Popover.Trigger>
-      {/* On a low window the card scrolls instead of losing its last rows under the edge. */}
-      <Popover.Content placement={props.placement ?? 'right top'} className="max-h-[calc(100dvh-24px)] w-80 overflow-y-auto p-0">
-        <Popover.Dialog className="p-0 outline-none">
-          <ProfileCard userId={props.userId} onClose={() => setOpen(false)} />
-        </Popover.Dialog>
-      </Popover.Content>
-    </Popover>
+    <span className="contents" {...ctx.bind(null)}>
+      <Popover isOpen={open} onOpenChange={(next) => !(next && ctx.justHeld()) && setOpen(next)}>
+        <Popover.Trigger aria-label={t('people.profile.label', { name })} className={props.className ?? 'cursor-pointer'}>
+          {props.children}
+        </Popover.Trigger>
+        {/* On a low window the card scrolls instead of losing its last rows under the edge. */}
+        <Popover.Content placement={props.placement ?? 'right top'} className="max-h-[calc(100dvh-24px)] w-80 overflow-y-auto p-0">
+          <Popover.Dialog className="p-0 outline-none">
+            <ProfileCard userId={props.userId} onClose={() => setOpen(false)} />
+          </Popover.Dialog>
+        </Popover.Content>
+      </Popover>
+      {ctx.menu}
+    </span>
   );
+}
+
+/** Puts "@name " at the end of what's typed in the message field, as if it had been picked from the list there. */
+function mentionInComposer(name: string) {
+  const field = document.querySelector<HTMLTextAreaElement>('textarea[data-composer]');
+  const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+  if (!field || !set) return;
+  const before = field.value;
+  set.call(field, `${before}${before && !/\s$/.test(before) ? ' ' : ''}@${name} `);
+  field.dispatchEvent(new Event('input', { bubbles: true }));
+  field.focus();
+}
+
+type Asking = 'friend' | 'block' | 'remove';
+
+/**
+ * What the menu of a person has: their profile, a mention (where there is a message field), a message and a call, the
+ * friendship, and the red rows last: block, and for those who may, taking them off the server. In a call you're in,
+ * their volume on top and "mute for me". `pending` is true from the moment a pick opens a window until it's closed, so a
+ * menu that lives only while it's open can wait for it.
+ */
+export function usePersonMenu(userId: string, options: { voice?: boolean; onProfile?: () => void; onDone?: () => void } = {}) {
+  const { t } = useT();
+  const user = useStore((s) => s.users[userId]);
+  const isMe = useStore((s) => s.me?.id === userId);
+  const status = useStore((s) => s.friends.find((f) => f.userId === userId)?.status);
+  const blocked = useStore((s) => s.blocked.includes(userId));
+  const mayRemove = useStore((s) => s.permissions.includes('removeMembers'));
+  const myTop = useMyTop();
+  const canRemove = useStore((s) => !!s.users[userId] && !s.users[userId].admin && (s.isAdmin || (mayRemove && topOf(s.users[userId], s.roles) < myTop)));
+  const inMyCall = useStore((s) => s.voiceStatus === 'connected' && s.voiceState.some((v) => v.userId === userId && v.channelId === s.voiceChannelId));
+  const [asking, setAsking] = useState<Asking | 'profile' | null>(null);
+  const pending = useRef(false);
+  const name = user?.name ?? '';
+
+  function ask(next: Asking | 'profile') {
+    pending.current = true;
+    setAsking(next);
+  }
+  function done() {
+    pending.current = false;
+    setAsking(null);
+    options.onDone?.();
+  }
+  async function friends(action: () => Promise<unknown>) {
+    try {
+      useStore.setState({ friends: (await action()) as never });
+    } catch (e) {
+      showError(e instanceof Error ? e.message : t('people.failed'));
+    }
+  }
+  async function block(action: () => Promise<string[]>) {
+    try {
+      useStore.setState({ blocked: await action() });
+    } catch (e) {
+      showError(e instanceof Error ? e.message : t('people.failed'));
+    }
+  }
+  async function serverSide(action: () => Promise<User>) {
+    try {
+      addUser(await action());
+    } catch (e) {
+      showError(e instanceof Error ? e.message : t('people.failed'));
+    }
+  }
+
+  function run(key: string) {
+    if (key === 'profile') return options.onProfile ? options.onProfile() : ask('profile');
+    if (key === 'mention') return mentionInComposer(name);
+    if (key === 'message') return void messageUser(userId);
+    if (key === 'call') return void messageUser(userId).then((dm) => dm && joinVoice(dm.id));
+    if (key === 'mute') return void toggleUserMute(userId);
+    if (key === 'add') return void friends(() => api.addFriend(name));
+    if (key === 'accept') return void friends(() => api.acceptFriend(userId));
+    if (key === 'unfriend') return ask('friend');
+    if (key === 'unblock') return void block(() => api.unblock(userId));
+    if (key === 'block') return ask('block');
+    if (key === 'letBack') return void serverSide(() => api.letBack(userId));
+    if (key === 'remove') return ask('remove');
+  }
+
+  const showVolume = !!options.voice && inMyCall && !isMe;
+  const mentionable = !!document.querySelector('textarea[data-composer]');
+  const spec: MenuSpec = {
+    label: t('people.menu.actions', { name }),
+    onAction: run,
+    header: showVolume ? (
+      <div className="px-4 pt-3">
+        <VolumeSlider userId={userId} name={name} />
+      </div>
+    ) : undefined,
+    children: isMe
+      ? [<MenuItem key="profile" id="profile" label={t('people.menu.profile')} icon={<UserIcon />} />]
+      : [
+          <MenuItem key="profile" id="profile" label={t('people.menu.profile')} icon={<UserIcon />} />,
+          mentionable && <MenuItem key="mention" id="mention" label={t('chat.mention')} icon={<AtIcon />} />,
+          <MenuItem key="message" id="message" label={t('people.friends.message')} icon={<BubbleIcon />} disabled={blocked} />,
+          <MenuItem key="call" id="call" label={t('voice.call.start')} icon={<PhoneIcon />} disabled={blocked} />,
+          showVolume && <MenuItem key="mute" id="mute" label={t(getUserVolume(userId) === 0 ? 'voice.userUnmute' : 'voice.userMute')} icon={<SpeakerSlashIcon />} />,
+          <MenuSeparator key="friends" />,
+          status === 'incoming' ? (
+            <MenuItem key="friend" id="accept" label={t('people.profile.acceptRequest')} icon={<CheckIcon />} disabled={blocked} />
+          ) : status === 'friend' ? (
+            <MenuItem key="friend" id="unfriend" label={t('people.profile.removeFriend')} icon={<UserPlusIcon />} />
+          ) : status === 'outgoing' ? (
+            <MenuItem key="friend" id="unfriend" label={t('people.friends.cancelRequest')} icon={<UserPlusIcon />} />
+          ) : (
+            <MenuItem key="friend" id="add" label={t('people.menu.addFriend')} icon={<UserPlusIcon />} disabled={blocked} />
+          ),
+          <MenuSeparator key="danger" />,
+          <MenuItem key="block" id={blocked ? 'unblock' : 'block'} label={blocked ? t('people.profile.unblock') : t('people.profile.block')} icon={<NoSymbolIcon />} danger={!blocked} />,
+          canRemove && (user?.removed
+            ? <MenuItem key="server" id="letBack" label={t('people.admin.letBack')} icon={<UserPlusIcon />} />
+            : <MenuItem key="server" id="remove" label={t('people.admin.remove')} icon={<UserMinusIcon />} danger />),
+        ],
+  };
+
+  const dialogs = (
+    <>
+      {asking === 'profile' && (
+        <Window label={t('people.profile.label', { name })} onClose={done} className="w-80 overflow-hidden p-0">
+          <ProfileCard userId={userId} onClose={done} />
+        </Window>
+      )}
+      {asking === 'friend' && (
+        <ConfirmDialog
+          title={status === 'friend' ? t('people.profile.removeFriendTitle', { name }) : t('people.profile.cancelRequestTitle', { name })}
+          text=""
+          confirmLabel={status === 'friend' ? t('people.profile.removeFriend') : t('people.friends.cancelRequest')}
+          onConfirm={() => friends(() => api.removeFriend(userId))}
+          onClose={done}
+        />
+      )}
+      {asking === 'block' && (
+        <ConfirmDialog title={t('people.profile.blockTitle', { name })} text={t('people.profile.blockText')} confirmLabel={t('people.profile.block')} onConfirm={() => block(() => api.block(userId))} onClose={done} />
+      )}
+      {asking === 'remove' && (
+        <ConfirmDialog title={t('people.admin.removeTitle', { name })} text={t('people.admin.removeText')} confirmLabel={t('people.admin.remove')} onConfirm={() => serverSide(() => api.removeUser(userId))} onClose={done} />
+      )}
+    </>
+  );
+  return { spec: user ? spec : null, dialogs, pending };
+}
+
+/** A person's menu at a point: lives only while it's open, or while a window it opened is. */
+export function PersonContextMenu({ userId, point, onClose, voice, onProfile }: { userId: string; point: { x: number; y: number }; onClose: () => void; voice?: boolean; onProfile?: () => void }) {
+  const [open, setOpen] = useState(true);
+  const { spec, dialogs, pending } = usePersonMenu(userId, { voice, onProfile, onDone: onClose });
+  if (!spec) return null;
+  return (
+    <>
+      {open && (
+        <ContextMenu
+          point={point}
+          onClose={() => {
+            setOpen(false);
+            if (!pending.current) onClose();
+          }}
+          {...spec}
+        />
+      )}
+      {dialogs}
+    </>
+  );
+}
+
+/** A person's row or tile in a call: a click or a right-click opens their menu (volume on top), "..." too. */
+export function usePersonContext(userId: string, options: { onProfile?: () => void } = {}) {
+  const ctx = useContextMenu(({ point, close }) => <PersonContextMenu userId={userId} point={point} onClose={close} voice onProfile={options.onProfile} />);
+  return ctx;
 }
 
 export function ProfileCard({ userId, onClose }: { userId: string; onClose: () => void }) {
@@ -182,7 +363,7 @@ function Tile({ label, onPress, children, disabled, accent, busy }: { label: str
       type="button"
       onClick={onPress}
       disabled={disabled || busy}
-      className={`flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl transition-[background-color,transform,opacity] duration-150 active:scale-[0.97] disabled:opacity-40 ${accent ? 'bg-white text-black hover:bg-[#e7e7ea]' : 'bg-default hover:bg-[#28282d]'}`}
+      className={`flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl transition-[background-color,transform,opacity] active:scale-[0.97] disabled:opacity-40 ${accent ? 'bg-white text-black hover:bg-[#e7e7ea]' : 'bg-default hover:bg-[#28282d]'}`}
     >
       {children}
       <span className="max-w-full truncate px-1 text-[13px] font-medium">{label}</span>
@@ -425,26 +606,17 @@ export function AvatarPicker({ size = 80 }: { size?: number }) {
         </span>
       </button>
       {/* iOS contact-photo style edit badge: upload or remove. */}
-      <Dropdown>
-        <Dropdown.Trigger
-          aria-label={t('people.profile.photo')}
-          className="absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-default text-foreground outline-none ring-[3px] ring-[var(--overlay)] transition-colors hover:bg-default/80 data-[focus-visible=true]:ring-focus"
-        >
-          <PencilIcon size={14} strokeWidth={2.2} />
-        </Dropdown.Trigger>
-        <Dropdown.Popover placement="bottom start" className="min-w-48">
-          <Dropdown.Menu aria-label={t('people.profile.photo')} onAction={(key) => (key === 'remove' ? remove() : inputRef.current?.click())}>
-            <Dropdown.Item id="upload" textValue={t('people.profile.uploadPhoto')}>
-              <Label>{t('people.profile.uploadPhoto')}</Label>
-            </Dropdown.Item>
-            {me?.avatarUrl ? (
-              <Dropdown.Item id="remove" textValue={t('people.profile.removePhoto')} variant="danger">
-                <Label>{t('people.profile.removePhoto')}</Label>
-              </Dropdown.Item>
-            ) : null}
-          </Dropdown.Menu>
-        </Dropdown.Popover>
-      </Dropdown>
+      <Menu
+        label={t('people.profile.photo')}
+        triggerClassName="absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-default text-foreground outline-none ring-[3px] ring-[var(--overlay)] transition-colors hover:bg-default/80 data-[focus-visible=true]:ring-focus"
+        trigger={<PencilIcon size={14} strokeWidth={2.2} />}
+        placement="bottom start"
+        onAction={(key) => (key === 'remove' ? remove() : inputRef.current?.click())}
+      >
+        <MenuItem id="upload" label={t('people.profile.uploadPhoto')} icon={<CameraIcon />} />
+        {me?.avatarUrl ? <MenuSeparator /> : null}
+        {me?.avatarUrl ? <MenuItem id="remove" label={t('people.profile.removePhoto')} icon={<TrashIcon />} danger /> : null}
+      </Menu>
       <input
         ref={inputRef}
         type="file"

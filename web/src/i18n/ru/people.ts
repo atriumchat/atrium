@@ -181,4 +181,7 @@ export const people = {
   'people.roles.none': 'Нет ролей',
   'people.roles.save': 'Сохранить',
   'people.roles.find': 'Найти участника',
+  'people.menu.profile': 'Профиль',
+  'people.menu.addFriend': 'Добавить в друзья',
+  'people.menu.actions': 'Действия с {name}',
 } as const;

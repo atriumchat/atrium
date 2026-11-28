@@ -89,7 +89,7 @@ export function GroupInfo({ dm, children, onRename, onLeave }: { dm: Dm; childre
 /** A round button with its word under it. */
 function Action({ label, onPress, children, danger, disabled }: { label: string; onPress: () => void; children: ReactNode; danger?: boolean; disabled?: boolean }) {
   return (
-    <button type="button" onClick={onPress} disabled={disabled} aria-label={label} className="flex w-[72px] flex-col items-center gap-2 transition-[opacity,transform] duration-150 active:scale-95 disabled:opacity-40">
+    <button type="button" onClick={onPress} disabled={disabled} aria-label={label} className="flex w-[72px] flex-col items-center gap-2 transition-[opacity,transform] active:scale-95 disabled:opacity-40">
       <span className="flex size-12 items-center justify-center rounded-full bg-default transition-colors hover:bg-[#28282d]">{children}</span>
       <span className={`max-w-full truncate text-[13px] font-medium ${danger ? 'text-danger' : ''}`}>{label}</span>
     </button>

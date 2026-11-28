@@ -26,7 +26,7 @@ export function DownloadRailButton() {
           render={(attributes) => <button {...attributes} />}
           onClick={() => setOpen(true)}
           aria-label={t('settings.downloads.button')}
-          className="flex h-12 w-12 items-center justify-center rounded-full bg-default text-success transition-colors duration-200 hover:bg-success hover:text-success-foreground focus-visible:ring-2 focus-visible:ring-focus"
+          className="flex h-12 w-12 items-center justify-center rounded-full bg-default text-success transition-colors hover:bg-success hover:text-success-foreground focus-visible:ring-2 focus-visible:ring-focus"
         >
           <DownloadIcon size={22} />
         </Tooltip.Trigger>

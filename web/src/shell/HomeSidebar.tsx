@@ -64,7 +64,7 @@ function NavItem(props: { active: boolean; onPress: () => void; icon: ReactNode;
     <button
       onClick={props.onPress}
       className={`flex h-10 w-full items-center gap-2.5 rounded-full px-4 text-left text-[16px] font-medium transition-colors ${
-        props.active ? 'bg-default text-foreground' : 'text-muted hover:text-foreground'
+        props.active ? 'bg-default text-foreground' : 'text-muted hover:bg-white/[0.08] hover:text-foreground'
       }`}
     >
       {props.icon}
@@ -131,7 +131,7 @@ function FeedRow(props: { active: boolean; onPress: () => void; onWarm: () => vo
       onClick={props.onPress}
       onPointerEnter={props.onWarm}
       onFocus={props.onWarm}
-      className={`flex w-full items-center gap-3 text-left transition-colors ${props.big ? 'h-[68px] rounded-panel px-3 active:bg-default/60' : 'h-[60px] rounded-surface px-2.5'} ${props.active ? 'bg-default' : 'hover:bg-white/[0.04]'}`}
+      className={`flex w-full items-center gap-3 text-left transition-colors ${props.big ? 'h-[68px] rounded-panel px-3 active:bg-default/60' : 'h-[60px] rounded-surface px-2.5'} ${props.active ? 'bg-default' : 'hover:bg-white/[0.08]'}`}
     >
       {props.avatar}
       <span className="min-w-0 flex-1">
@@ -151,7 +151,7 @@ function FeedRow(props: { active: boolean; onPress: () => void; onWarm: () => vo
 /** Red for what's yours (DMs, mentions); `quiet` is grey, for plain chatter in a channel. */
 export function Badge({ count, label, quiet = false }: { count: number; label?: string; quiet?: boolean }) {
   return (
-    <span className={`min-w-5 shrink-0 rounded-full px-1.5 text-center text-[11px] font-medium leading-5 ${quiet ? 'bg-default text-muted' : 'bg-danger text-white'}`}>
+    <span className={`min-w-5 shrink-0 animate-gx-badge rounded-full px-1.5 text-center text-[11px] font-medium leading-5 ${quiet ? 'bg-default text-muted' : 'bg-danger text-white'}`}>
       {label ?? (count > 99 ? '99+' : count)}
     </span>
   );
@@ -184,7 +184,7 @@ export function ConversationRow({ dm, large = false }: { dm: Dm; large?: boolean
     <button
       onClick={() => openDm(dm.id)}
       className={`flex w-full items-center gap-2.5 rounded-full px-1.5 text-left transition-colors ${large ? 'h-[68px] rounded-panel px-3' : 'h-11 pr-3'} ${
-        active ? 'bg-default text-foreground' : unread ? 'text-foreground hover:bg-default/50' : `${large ? 'text-foreground' : 'text-muted'} hover:text-foreground`
+        active ? 'bg-default text-foreground' : unread ? 'text-foreground hover:bg-white/[0.08]' : `${large ? 'text-foreground' : 'text-muted'} hover:bg-white/[0.08] hover:text-foreground`
       }`}
     >
       <DmAvatar dm={dm} size={large ? 48 : 32} online={online} ringBg={bg} />

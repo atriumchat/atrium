@@ -3,7 +3,7 @@ import { Label, ListBox, Select } from '@heroui/react';
 import { ChevronDownIcon } from '@heroicons/react/24/solid';
 import { useT, type Key } from '../i18n';
 import { useStore } from '../store';
-import { Primary, Row, Secondary, fieldLabel } from '../ui/settings';
+import { Row, Secondary, fieldLabel } from '../ui/settings';
 import { getPreferredDevice, listDevices, setPreferredDevice, type AudioDeviceKind } from './devices';
 import { MicTestFailure, runMicTest, supportsMicTest, supportsOutputSelection, type MicTestError } from './micTest';
 
@@ -179,10 +179,10 @@ export function VoiceDevices() {
       <div className="flex flex-col gap-2 border-b border-white/[0.07] py-4 max-md:px-4">
         <h3 className="text-[15px] font-medium">{t('voice.micTest.title')}</h3>
         <div className="flex items-center gap-3">
-          <Primary onPress={phase === 'idle' ? start : cancel} isDisabled={callActive || !canTest || choosingOutput}
+          <Secondary onPress={phase === 'idle' ? start : cancel} isDisabled={callActive || !canTest || choosingOutput}
             className="min-w-28 shrink-0 whitespace-nowrap max-md:h-10! max-md:w-auto! max-md:text-[14px]!">
             {t(button[phase])}
-          </Primary>
+          </Secondary>
           <LevelRuler level={level} label={t('voice.micTest.title')} />
         </div>
         <p role="status" className={`text-[13px] ${error && !callActive ? 'text-danger' : 'text-muted'}`}>{t(status)}</p>

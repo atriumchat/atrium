@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { ease, motion } from '@atrium/ui-common';
 import { useT } from '../i18n';
 import { RoundButton } from './ui';
 import { ChevronLeftIcon } from './icons';
 
-const PUSH_MS = 280;
-const PUSH_EASE = 'cubic-bezier(.2,.8,.2,1)';
+const PUSH_MS = motion.slow;
+const PUSH_EASE = ease.out;
 
 /**
  * The phone's push / pop: a screen that slides in from the right over another, which drifts left and dims a

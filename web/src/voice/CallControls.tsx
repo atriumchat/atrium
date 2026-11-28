@@ -1,7 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Button, Dropdown, Label, Popover, Tooltip } from '@heroui/react';
+import { Button, Tooltip } from '@heroui/react';
 import {
-  Cog6ToothIcon,
   ComputerDesktopIcon,
   EllipsisHorizontalIcon,
   PhoneXMarkIcon,
@@ -15,7 +14,8 @@ import type { Channel } from '../types';
 import { InviteToRoom } from '../shell/ChannelMenu';
 import { DeviceMenu } from '../shell/SettingsMenu';
 import { SettingsDialog } from '../shell/SettingsDialog';
-import { CheckIcon, ChevronDownIcon, HeadphonesIcon, HeadphonesSlashIcon, MicIcon, MicSlashIcon, ScreenOffIcon, StopIcon } from '../ui/icons';
+import { ChevronDownIcon, GearIcon, HeadphonesIcon, HeadphonesSlashIcon, MicIcon, MicSlashIcon, ScreenIcon, ScreenOffIcon, SpeakerIcon, StopIcon } from '../ui/icons';
+import { Menu, MenuItem, MenuSeparator } from '../ui/Menu';
 import type { DeviceKind } from './devices';
 import { SoundboardButton } from './SoundPad';
 import { useCallView } from './callView';
@@ -67,16 +67,6 @@ function DeviceControl({ kind, label, menuLabel, onPress, active, off, menuDisab
   );
 }
 
-/** A row of the "More" menu that switches something on or off; the check says which. */
-function ViewToggle({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
-  return (
-    <Button variant="ghost" aria-pressed={on} className="w-full justify-between rounded-full px-3" onPress={onPress}>
-      {label}
-      <span className="grid size-5 place-items-center">{on && <CheckIcon size={18} />}</span>
-    </Button>
-  );
-}
-
 /** While you share: the stop button and, glued to it, the menu with what else can be done with the share. */
 function ScreenShareControl() {
   const { t } = useT();
@@ -88,39 +78,24 @@ function ScreenShareControl() {
       <CallBarButton pressed label={t('voice.screen.stop')} onPress={toggleScreenShare}>
         <ScreenOffIcon />
       </CallBarButton>
-      <Dropdown isOpen={open} onOpenChange={setOpen}>
-        <Dropdown.Trigger
-          aria-label={t('voice.screen.menu')}
-          className="grid size-7 shrink-0 place-items-center rounded-full text-foreground/80 outline-none transition-colors hover:bg-white/[0.08] hover:text-foreground aria-expanded:bg-white/[0.08] data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-inset data-[focus-visible=true]:ring-focus"
-        >
-          <ChevronDownIcon className="chevron-flip size-3.5" aria-hidden="true" />
-        </Dropdown.Trigger>
-        <Dropdown.Popover placement="top end" className="min-w-60">
-          <Dropdown.Menu
-            aria-label={t('voice.screen.menu')}
-            onAction={(key) => {
-              if (key === 'stop') void toggleScreenShare();
-              if (key === 'change') void switchScreenSource();
-              if (key === 'audio') void setScreenAudio(!audio).then(() => refresh((n) => n + 1));
-            }}
-          >
-            <Dropdown.Item id="stop" textValue={t('voice.screen.stop')} variant="danger">
-              <Label>{t('voice.screen.stop')}</Label>
-              <ScreenOffIcon className="ml-auto size-5 text-danger" />
-            </Dropdown.Item>
-            <Dropdown.Item id="change" textValue={t('voice.screen.change')}>
-              <Label>{t('voice.screen.change')}</Label>
-              <ComputerDesktopIcon className="ml-auto size-5 text-muted" aria-hidden="true" />
-            </Dropdown.Item>
-            {audio !== null && (
-              <Dropdown.Item id="audio" textValue={t('voice.screen.audio')}>
-                <Label>{t('voice.screen.audio')}</Label>
-                <span className="ml-auto grid size-5 place-items-center">{audio && <CheckIcon size={18} />}</span>
-              </Dropdown.Item>
-            )}
-          </Dropdown.Menu>
-        </Dropdown.Popover>
-      </Dropdown>
+      <Menu
+        label={t('voice.screen.menu')}
+        placement="top end"
+        isOpen={open}
+        onOpenChange={setOpen}
+        triggerClassName="grid size-7 shrink-0 place-items-center rounded-full text-foreground/80 outline-none transition-colors hover:bg-white/[0.08] hover:text-foreground aria-expanded:bg-white/[0.08] data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-inset data-[focus-visible=true]:ring-focus"
+        trigger={<ChevronDownIcon className="chevron-flip size-3.5" aria-hidden="true" />}
+        onAction={(key) => {
+          if (key === 'stop') void toggleScreenShare();
+          if (key === 'change') void switchScreenSource();
+          if (key === 'audio') void setScreenAudio(!audio).then(() => refresh((n) => n + 1));
+        }}
+      >
+        <MenuItem id="change" label={t('voice.screen.change')} icon={<ScreenIcon />} />
+        {audio !== null && <MenuItem id="audio" label={t('voice.screen.audio')} icon={<SpeakerIcon />} checkbox={audio} />}
+        <MenuSeparator />
+        <MenuItem id="stop" label={t('voice.screen.stop')} icon={<ScreenOffIcon />} danger />
+      </Menu>
     </div>
   );
 }
@@ -164,18 +139,9 @@ export function CallControls({ className = '', channel, viewActions, fullscreen 
     return () => observer.disconnect();
   }, []);
 
-  const outputControl = (
-    <DeviceControl kind="audiooutput" label={t(deafened ? 'voice.deafen.off' : 'voice.deafen.on')} menuLabel={t('shell.call.pickOutput')} active={deafened} off={deafened} onPress={toggleDeafen}>
-      {deafened ? <HeadphonesSlashIcon /> : <HeadphonesIcon />}
-    </DeviceControl>
-  );
   const detachedActions = fullscreen ? undefined : viewActions;
   const screenLabel = t(screenSharing ? 'voice.screen.stop' : 'voice.screen.start');
   const playingName = myPlaying ? mySounds.find((x) => x.id === myPlaying.soundId)?.name ?? '' : '';
-  const openVoiceSettings = () => {
-    setMoreOpen(false);
-    setSettingsOpen(true);
-  };
   const openInvite = () => {
     setMoreOpen(false);
     setInviteOpen(true);
@@ -215,59 +181,44 @@ export function CallControls({ className = '', channel, viewActions, fullscreen 
                   </CallBarButton>
                 ))}
                 <SoundboardButton look="control" stopsPlayback={compact} />
-                <Popover isOpen={moreOpen} onOpenChange={setMoreOpen}>
-                  <Tooltip delay={250} closeDelay={0}>
-                    <Button
-                      isIconOnly
-                      variant="tertiary"
-                      aria-label={t('voice.controls.more')}
-                      className="call-control aria-expanded:[--button-bg:var(--surface-tertiary)]"
-                    >
-                      <EllipsisHorizontalIcon aria-hidden="true" />
-                    </Button>
-                    <Tooltip.Content placement="top">{t('voice.controls.more')}</Tooltip.Content>
-                  </Tooltip>
-                  <Popover.Content placement="top end" className="w-64 max-w-[calc(100vw-16px)]">
-                    <Popover.Dialog aria-label={t('voice.controls.more')} className="max-h-[calc(100dvh-24px)] overflow-auto p-2">
-                      <div className="flex items-center justify-between gap-2 px-2 text-sm">
-                        <span>{t('voice.controls.sound')}</span>
-                        {outputControl}
-                      </div>
-                      {compact && canShareScreen && (
-                        <Button variant="ghost" className="w-full justify-start rounded-full px-3" onPress={() => {
-                          setMoreOpen(false);
-                          void toggleScreenShare();
-                        }}>
-                          {screenSharing ? <ScreenOffIcon className="size-5" /> : <ComputerDesktopIcon className="size-5" aria-hidden="true" />}
-                          {screenLabel}
-                        </Button>
-                      )}
-                      {screenSharing && (
-                        <Button variant="ghost" className="w-full justify-start rounded-full px-3" onPress={() => {
-                          setMoreOpen(false);
-                          void switchScreenSource();
-                        }}>
-                          <ComputerDesktopIcon className="size-5" aria-hidden="true" />
-                          {t('voice.screen.change')}
-                        </Button>
-                      )}
-                      {compact && channel && (
-                        <Button variant="ghost" className="w-full justify-start rounded-full px-3" onPress={openInvite}>
-                          <UserPlusIcon className="size-5" aria-hidden="true" />
-                          {t('shell.menu.inviteToRoom')}
-                        </Button>
-                      )}
-                      <div role="separator" className="mx-2 my-1 h-px bg-separator" />
-                      <ViewToggle label={t('voice.view.self')} on={showSelf} onPress={() => setView({ showSelf: !showSelf })} />
-                      <ViewToggle label={t('voice.view.noVideo')} on={showNoVideo} onPress={() => setView({ showNoVideo: !showNoVideo })} />
-                      <div role="separator" className="mx-2 my-1 h-px bg-separator" />
-                      <Button variant="ghost" className="w-full justify-start rounded-full px-3" onPress={openVoiceSettings}>
-                        <Cog6ToothIcon className="size-5" aria-hidden="true" />
-                        {t('voice.controls.settings')}
+                <Menu
+                  label={t('voice.controls.more')}
+                  placement="top end"
+                  isOpen={moreOpen}
+                  onOpenChange={setMoreOpen}
+                  onAction={(key) => {
+                    if (key === 'deafen') void toggleDeafen();
+                    if (key === 'screen') void toggleScreenShare();
+                    if (key === 'change') void switchScreenSource();
+                    if (key === 'invite') setInviteOpen(true);
+                    if (key === 'self') setView({ showSelf: !showSelf });
+                    if (key === 'noVideo') setView({ showNoVideo: !showNoVideo });
+                    if (key === 'settings') setSettingsOpen(true);
+                  }}
+                  button={
+                    <Tooltip delay={250} closeDelay={0}>
+                      <Button
+                        isIconOnly
+                        variant="tertiary"
+                        aria-label={t('voice.controls.more')}
+                        className="call-control aria-expanded:[--button-bg:var(--surface-tertiary)]"
+                      >
+                        <EllipsisHorizontalIcon aria-hidden="true" />
                       </Button>
-                    </Popover.Dialog>
-                  </Popover.Content>
-                </Popover>
+                      <Tooltip.Content placement="top">{t('voice.controls.more')}</Tooltip.Content>
+                    </Tooltip>
+                  }
+                >
+                  <MenuItem id="deafen" label={t(deafened ? 'voice.deafen.off' : 'voice.deafen.on')} icon={deafened ? <HeadphonesSlashIcon /> : <HeadphonesIcon />} />
+                  {compact && canShareScreen && <MenuItem id="screen" label={screenLabel} icon={screenSharing ? <ScreenOffIcon /> : <ScreenIcon />} />}
+                  {screenSharing && <MenuItem id="change" label={t('voice.screen.change')} icon={<ScreenIcon />} />}
+                  {compact && channel && <MenuItem id="invite" label={t('shell.menu.inviteToRoom')} icon={<UserPlusIcon />} />}
+                  <MenuSeparator />
+                  <MenuItem id="self" label={t('voice.view.self')} icon={<VideoCameraIcon />} checkbox={showSelf} />
+                  <MenuItem id="noVideo" label={t('voice.view.noVideo')} icon={<VideoCameraSlashIcon />} checkbox={showNoVideo} />
+                  <MenuSeparator />
+                  <MenuItem id="settings" label={t('voice.controls.settings')} icon={<GearIcon />} />
+                </Menu>
                 {fullscreen && viewActions}
                 <CallBarButton label={t('voice.leave')} onPress={() => void leaveVoice()} end><PhoneXMarkIcon /></CallBarButton>
               </div>

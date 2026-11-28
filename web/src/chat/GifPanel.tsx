@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Button, Input, Spinner } from '@heroui/react';
+import { Button, Spinner } from '@heroui/react';
 import { ArrowLeftIcon, ArrowTrendingUpIcon, MagnifyingGlassIcon, StarIcon } from '@heroicons/react/24/outline';
 import { useT } from '../i18n';
 import { useStore } from '../store';
+import { pickerSearch } from '../ui/EmojiPicker';
 import type { Gif } from './giphy';
 import { isKlipySlug, klipyCategories, klipyItems, KlipyError, klipySlug, searchKlipy } from './klipy';
 import { usePersonalItems } from './expressionPreferences';
@@ -89,11 +90,11 @@ export function GifPanel({ apiKey, onPick }: { apiKey: string; onPick: (gif: Gif
         {view !== 'home' && <span className="shrink-0 text-sm font-semibold max-sm:hidden">{sectionTitle}</span>}
         <div className="relative min-w-0 flex-1">
           <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted" />
-          <Input type="search" aria-label={searchLabel} placeholder={searchLabel} maxLength={80} value={query} onChange={(event) => {
+          <input type="search" aria-label={searchLabel} placeholder={searchLabel} maxLength={80} value={query} onChange={(event) => {
             const next = event.target.value;
             if (view === 'favorites' || next.trim() === term) setQuery(next);
             else reset(view, next);
-          }} className="w-full rounded-full border border-edge bg-window pl-9 max-md:text-base" />
+          }} className={`${pickerSearch} pl-9`} />
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3" aria-busy={state === 'loading'}>

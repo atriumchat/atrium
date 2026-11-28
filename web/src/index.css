@@ -81,7 +81,7 @@
 
 /* A chevron on a menu button points down and turns up while its menu is open. */
 .chevron-flip {
-  transition: transform 150ms ease;
+  transition: transform var(--gx-motion-fast) var(--gx-ease-standard);
 }
 [aria-expanded="true"] > .chevron-flip {
   transform: rotate(180deg);
@@ -148,6 +148,18 @@
   --color-others-ink: var(--room-others-ink);
   /* The quietest text: section titles, placeholders. */
   --color-faint: var(--field-placeholder);
+  /* Motion tokens (@atrium/ui-common): every plain `transition-*` is a state change, `fast` on `standard`. */
+  --default-transition-duration: var(--gx-motion-fast);
+  --default-transition-timing-function: var(--gx-ease-standard);
+  --ease-gx-out: var(--gx-ease-out);
+  --ease-gx-in: var(--gx-ease-in);
+  --ease-gx-standard: var(--gx-ease-standard);
+  --animate-gx-fade: gx-fade-in var(--gx-motion-fast) var(--gx-ease-out);
+  --animate-gx-rise: gx-rise-in var(--gx-motion-base) var(--gx-ease-out) backwards;
+  --animate-gx-rise-fast: gx-rise-in var(--gx-motion-fast) var(--gx-ease-out) backwards;
+  --animate-gx-badge: gx-badge-in var(--gx-motion-fast) var(--gx-ease-out) backwards;
+  --animate-gx-pop: gx-pop var(--gx-motion-base) var(--gx-ease-out);
+  --animate-gx-tab: gx-fade-in var(--gx-motion-exit) var(--gx-ease-out);
 }
 
 /*
@@ -360,10 +372,10 @@ a,
   }
 }
 .sheet {
-  animation: sheet-up 300ms cubic-bezier(0.32, 0.72, 0, 1);
+  animation: sheet-up var(--gx-motion-slow) var(--gx-ease-out);
 }
 .sheet-backdrop {
-  animation: sheet-fade 250ms cubic-bezier(0.32, 0.72, 0, 1);
+  animation: sheet-fade var(--gx-motion-slow) var(--gx-ease-out);
 }
 @media (prefers-reduced-motion: reduce) {
   .sheet,
@@ -475,5 +487,163 @@ a,
   }
   30% {
     opacity: 1;
+  }
+}
+
+/*
+ * Motion (one vocabulary, DESIGN.md / specs: motion). Only opacity and transform move. Things arrive in
+ * `fast`/`base` on `ease-out` and leave in `exit` on `ease-in`, from the side they hang off, by a few pixels and a
+ * few percent of scale. HeroUI's overlays (zoom from 90%, a dialog flying in from 105%) are replaced here: its
+ * react-aria parts set data-entering / data-exiting / data-placement, and these unlayered rules win over its layers.
+ * With prefers-reduced-motion the shifts and scales drop to nothing and only the fade stays.
+ */
+:root {
+  --gx-shift: 4px;
+  --gx-shift-toast: 6px;
+  --gx-scale-pop: 0.97;
+  --gx-scale-window: 0.96;
+  --gx-scale-window-out: 0.98;
+  --gx-scale-badge: 0.8;
+  --gx-scale-chip: 1.12;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --gx-shift: 0px;
+    --gx-shift-toast: 0px;
+    --gx-scale-pop: 1;
+    --gx-scale-window: 1;
+    --gx-scale-window-out: 1;
+    --gx-scale-badge: 1;
+    --gx-scale-chip: 1;
+  }
+}
+
+@keyframes gx-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes gx-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+/* A menu or popover: from its anchor's side (--gx-dx / --gx-dy are -1, 0 or 1 by data-placement). */
+@keyframes gx-pop-in {
+  from {
+    opacity: 0;
+    transform: translate(calc(var(--gx-dx, 0) * var(--gx-shift)), calc(var(--gx-dy, 0) * var(--gx-shift))) scale(var(--gx-scale-pop));
+  }
+}
+@keyframes gx-window-in {
+  from {
+    opacity: 0;
+    transform: scale(var(--gx-scale-window));
+  }
+}
+@keyframes gx-window-out {
+  to {
+    opacity: 0;
+    transform: scale(var(--gx-scale-window-out));
+  }
+}
+@keyframes gx-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--gx-shift));
+  }
+}
+@keyframes gx-badge-in {
+  from {
+    opacity: 0;
+    transform: scale(var(--gx-scale-badge));
+  }
+}
+/* My own reaction landing: up a little and back, never under 1. */
+@keyframes gx-pop {
+  45% {
+    transform: scale(var(--gx-scale-chip));
+  }
+}
+
+/* Menus, submenus, popovers (the pickers), selects. */
+:is(.popover, .dropdown__popover, .select__popover, .combo-box__popover, .autocomplete__popover, .date-picker__popover, .date-range-picker__popover) {
+  &[data-placement="top"] {
+    --gx-dy: 1;
+  }
+  &[data-placement="bottom"] {
+    --gx-dy: -1;
+  }
+  &[data-placement="left"] {
+    --gx-dx: 1;
+  }
+  &[data-placement="right"] {
+    --gx-dx: -1;
+  }
+  &[data-entering="true"] {
+    animation: gx-pop-in var(--gx-pop-in, var(--gx-motion-fast)) var(--gx-ease-out) backwards;
+  }
+  &[data-exiting="true"] {
+    animation: gx-fade-out var(--gx-motion-exit) var(--gx-ease-in) forwards;
+  }
+}
+/* A menu at the pointer: the same arrival in the exit's time, hanging off its top-left corner. */
+.context-menu {
+  --gx-pop-in: var(--gx-motion-exit);
+  transform-origin: var(--trigger-anchor-point, 0 0);
+}
+/* Tooltips only fade (their delay is the component's). */
+.tooltip {
+  &[data-entering="true"] {
+    animation: gx-fade-in var(--gx-motion-exit) var(--gx-ease-out) backwards;
+  }
+  &[data-exiting="true"] {
+    animation: gx-fade-out var(--gx-motion-exit) var(--gx-ease-in) forwards;
+  }
+}
+
+/* Windows: the backdrop fades, the window rises from 96%; out, a fade and a slight shrink. */
+:is(.modal__backdrop, .alert-dialog__backdrop) {
+  &[data-entering="true"] {
+    animation: gx-fade-in var(--gx-motion-base) var(--gx-ease-out) backwards;
+  }
+  &[data-exiting="true"] {
+    animation: gx-fade-out var(--gx-motion-exit) var(--gx-ease-in) forwards;
+  }
+}
+:is(.modal__container, .alert-dialog__container):not(.modal__container--full) {
+  &[data-entering="true"] {
+    animation: gx-window-in var(--gx-motion-base) var(--gx-ease-out) backwards;
+  }
+  &[data-exiting="true"] {
+    animation: gx-window-out var(--gx-motion-exit) var(--gx-ease-in) forwards;
+  }
+}
+
+/* A settings page opening: its content comes up 4px, 120ms; the window keeps its size. */
+.gx-page-in {
+  animation: gx-rise-in var(--gx-motion-fast) var(--gx-ease-out) backwards;
+}
+
+/* Toasts: 6px down from the top edge and a fade in; out, a fade only. */
+.toast {
+  --toast-ease: var(--gx-ease-out);
+  --toast-enter-duration: var(--gx-motion-base);
+  --toast-exit-duration: var(--gx-motion-exit);
+  --toast-opacity-duration: var(--gx-motion-base);
+  &[data-entering="true"] {
+    --toast-enter: calc(-1 * var(--gx-shift-toast));
+    opacity: 0;
+  }
+  &[data-exiting="true"] {
+    --toast-ease: var(--gx-ease-in);
+    --toast-opacity-duration: var(--gx-motion-exit);
+  }
+  &[data-exiting="true"][data-frontmost="true"],
+  &[data-exiting="true"][data-expanded="true"]:not([data-frontmost="true"]),
+  &[data-exiting="true"]:not([data-expanded="true"]):not([data-frontmost="true"]) {
+    --toast-enter: 0%;
+    --toast-translate-duration: var(--gx-motion-exit);
+    --toast-opacity-duration: var(--gx-motion-exit);
   }
 }

@@ -213,7 +213,7 @@ run.onclick = async () => {
       equal(editor.value, '@Alice ');
     });
 
-    await check('Pending send retains the draft and clears it on successful acknowledgment', async () => {
+    await check('Send clears the field at once, keeps typing free and sends in order', async () => {
       connectSocket('fixture', () => {});
       const socket = getSocket();
       socket.connected = true;
@@ -228,13 +228,18 @@ run.onclick = async () => {
       const editor = fixture.querySelector('textarea');
       flushSync(() => change(editor, 'Keep this draft'));
       flushSync(() => { key(editor, 'Enter'); key(editor, 'Enter'); });
-      equal([editor.value, editor.readOnly, sent], ['Keep this draft', true, ['Keep this draft']]);
+      equal([editor.value, editor.readOnly], ['', false]);
+      await new Promise((r) => setTimeout(r, 300));
+      equal(sent.length, 1);
+      flushSync(() => change(editor, 'Typed while sending'));
+      flushSync(() => key(editor, 'Enter'));
+      equal(editor.value, '');
       response.resolve({ ok: true });
-      await waitFor(() => !editor.readOnly && !editor.value);
-      equal(sessionStorage.getItem(historyDraftKey), null);
+      await waitFor(() => sent.length === 2);
+      equal([sent, sessionStorage.getItem(historyDraftKey)], [['Keep this draft', 'Typed while sending'], null]);
     });
 
-    await check('A failed send outside its chat restores text and uploaded files for retry', async () => {
+    await check('A failed send stays as not sent with its text and files, and retries', async () => {
       connectSocket('fixture', () => {});
       const socket = getSocket();
       socket.connected = true;
@@ -265,9 +270,9 @@ run.onclick = async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
       renderChat(conversation);
       const reopened = fixture.querySelector('textarea');
-      equal([reopened.value, reopened.readOnly, fixture.textContent.includes('fixture.txt')], ['Text to retry', false, true]);
-      key(reopened, 'Enter');
-      await waitFor(() => !reopened.value && !fixture.textContent.includes('fixture.txt'));
+      equal([reopened.value, reopened.readOnly, fixture.textContent.includes(t('chat.unsent'))], ['', false, true]);
+      fixture.querySelector('[role=alert] button').click();
+      await waitFor(() => sent.length === 2 && !fixture.querySelector('[role=alert]'));
       equal(sent, [['Text to retry', ['upload-id']], ['Text to retry', ['upload-id']]]);
     });
 

@@ -47,7 +47,7 @@ export function YouTab() {
       {/* Your photo, blurred, behind the top of the card: the same banner others see on your profile. */}
       <div className="relative h-[120px] shrink-0 overflow-hidden rounded-popover bg-surface-tertiary">
         {me.avatarUrl && <img src={me.avatarUrl} alt="" className="h-full w-full scale-150 object-cover opacity-70 blur-2xl" />}
-        <button type="button" onClick={toSettings} aria-label={t('shell.you.settings')} className="absolute right-2.5 top-2.5 flex h-10 w-10 items-center justify-center rounded-full bg-black/45 transition-transform duration-150 active:scale-95">
+        <button type="button" onClick={toSettings} aria-label={t('shell.you.settings')} className="absolute right-2.5 top-2.5 flex h-10 w-10 items-center justify-center rounded-full bg-black/45 transition-transform active:scale-95">
           <GearIcon size={20} />
         </button>
       </div>
@@ -110,7 +110,7 @@ export function YouTab() {
             title={t('shell.you.account')}
             onPress={() => setPage('account')}
           />
-          <LanguageRow />
+          <LanguageRow withIcon />
           {isAdmin && (
             <Row
               icon={
@@ -293,7 +293,7 @@ function BioPage({ onSaved }: { onSaved: () => void }) {
 /** One of the two buttons on your card. */
 function Pill({ children, onPress }: { children: ReactNode; onPress: () => void }) {
   return (
-    <button type="button" onClick={onPress} className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-white/[0.09] px-2.5 text-[16px] font-medium transition-[background-color,transform] duration-150 active:scale-[0.97] active:bg-white/[0.16]">
+    <button type="button" onClick={onPress} className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-white/[0.09] px-2.5 text-[16px] font-medium transition-[background-color,transform] active:scale-[0.97] active:bg-white/[0.16]">
       {children}
     </button>
   );

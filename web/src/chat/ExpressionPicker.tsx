@@ -77,14 +77,14 @@ export function ExpressionPicker({ apiKey, busy, gifDisabled, onGif, onEmoji, on
                   {tabs.map((tab) => <Tabs.Tab id={tab} key={tab} className="h-8 rounded-full px-3 text-sm text-muted data-[selected]:bg-white/12 data-[selected]:text-foreground">{labels[tab]}</Tabs.Tab>)}
                 </Tabs.List>
               </div>
-              <Tabs.Panel id="gif" className="flex h-[min(436px,51dvh)] flex-col p-0 outline-none">
+              <Tabs.Panel id="gif" className="animate-gx-tab flex h-[min(436px,51dvh)] flex-col p-0 outline-none">
                 <GifPanel apiKey={apiKey} onPick={(gif, draft) => { if (!draft || !gifDisabled) { close(); onGif(gif, draft); } }} />
                 {gifDisabled && apiKey && <p className="border-t border-white/10 px-3 py-2 text-xs text-muted">{t('chat.maxAttachments', { n: 10 })}</p>}
               </Tabs.Panel>
-              <Tabs.Panel id="sticker" className="flex h-[min(436px,51dvh)] flex-col p-0 outline-none">
+              <Tabs.Panel id="sticker" className="animate-gx-tab flex h-[min(436px,51dvh)] flex-col p-0 outline-none">
                 <StickerPanel onAdd={() => add('sticker')} onPick={(id) => { close(); onSticker(id); }} />
               </Tabs.Panel>
-              <Tabs.Panel id="emoji" className="flex h-[min(436px,51dvh)] flex-col p-0 outline-none">
+              <Tabs.Panel id="emoji" className="animate-gx-tab flex h-[min(436px,51dvh)] flex-col p-0 outline-none">
                 <EmojiGrid custom composer startOnServer={newEmoji} addAction={isAdmin && <Button variant="secondary" aria-label={t('chat.emoji.add')} onPress={() => add('emoji')} className="h-9 min-w-9 shrink-0 gap-1.5 whitespace-nowrap rounded-full px-3 max-sm:size-9 max-sm:p-0"><PlusIcon className="size-4" /><span className="max-sm:hidden">{t('chat.emoji.add')}</span></Button>} onPick={(value, keepOpen) => { if (!keepOpen) close(); onEmoji(value, keepOpen); }} />
               </Tabs.Panel>
             </Tabs>

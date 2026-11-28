@@ -3,6 +3,8 @@ import { t, useT } from '../i18n';
 import { useStore } from '../store';
 import type { User } from '../types';
 import { EmojiText, emojiShortcode } from './EmojiText';
+import { useContextMenu } from './Menu';
+import { PersonContextMenu } from '../people/UserProfile';
 
 /**
  * Discord-style message formatting, parsed by hand into React elements (never HTML):
@@ -154,9 +156,12 @@ function Mention({ id }: { id: string }) {
   const { t } = useT();
   const user = useStore((s) => (id === 'all' ? undefined : s.users[id]));
   const isMe = useStore((s) => id === 'all' || s.me?.id === id);
+  // A right-click on someone's name opens their menu, as anywhere else they appear.
+  const person = useContextMenu(({ point, close }) => <PersonContextMenu userId={id} point={point} onClose={close} />);
   return (
-    <span className={`text-[#64a8ff] ${isMe ? 'font-semibold' : 'font-medium'}`}>
+    <span className={`text-[#64a8ff] ${isMe ? 'font-semibold' : 'font-medium'}`} {...(user ? person.bind(null) : {})}>
       @{id === 'all' ? t('common.md.everyone') : (user?.name ?? t('common.md.someone'))}
+      {person.menu}
     </span>
   );
 }

@@ -1,4 +1,4 @@
-import { color, font, radius, space, type, wideFrom } from './tokens';
+import { color, ease, font, motion, radius, space, type, wideFrom } from './tokens';
 
 /**
  * The tokens as CSS: `--gx-…` variables on :root, the page and its text switching at `wideFrom`. Pure, so the web
@@ -71,6 +71,13 @@ export function tokenCss() {
     'radius-button': `${radius.button}px`,
     'radius-field': `${radius.field}px`,
     'radius-popover': `${radius.popover}px`,
+    'motion-fast': `${motion.fast}ms`,
+    'motion-base': `${motion.base}ms`,
+    'motion-slow': `${motion.slow}ms`,
+    'motion-exit': `${motion.exit}ms`,
+    'ease-out': ease.out,
+    'ease-in': ease.in,
+    'ease-standard': ease.standard,
   };
   const lines = Object.entries(vars).map(([name, value]) => `  --gx-${name}: ${value};`);
   return [

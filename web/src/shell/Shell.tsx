@@ -26,6 +26,7 @@ import { UpdateBanner } from './UpdateBanner';
 import { InviteBanner, prefetchInvite } from '../people/Invites';
 import { ArtPlayground, Playground } from './Playground';
 import { QuickSwitch, QuickSwitchButton } from './QuickSwitch';
+import { ServerContext } from './ServerMenu';
 
 // Desktop app: clicking a message notification opens that conversation.
 desktop?.onOpenConversation((id) => openDm(id));
@@ -185,6 +186,7 @@ function ServerRail({ className, onQuickSwitch }: { className: string; onQuickSw
           {mode === 'home' ? <HomeFilledIcon size={24} /> : <HomeIcon size={24} />}
         </span>
       </RailItem>
+      <ServerContext>
       <RailItem label={serverName} active={mode === 'server'} badge={mode === 'server' ? 0 : serverBadge} onPress={openServer}>
         {/* The server's own icon fills the circle; without one, Atrium's mark on the circle, as for home. */}
         {serverIcon ? (
@@ -197,6 +199,7 @@ function ServerRail({ className, onQuickSwitch }: { className: string; onQuickSw
           </span>
         )}
       </RailItem>
+      </ServerContext>
       <QuickSwitchButton onPress={onQuickSwitch} />
       {/* In a browser: get the app, at the foot of the rail as in Discord. */}
       {whereToUseNeeded() && (
@@ -209,13 +212,13 @@ function ServerRail({ className, onQuickSwitch }: { className: string; onQuickSw
 }
 
 // Round, always: the rail's circles sit 12 from a 36 corner, so 24 keeps them concentric.
-const railShape = (_active: boolean) => 'rounded-full transition-colors duration-200 ease-out';
+const railShape = (_active: boolean) => 'rounded-full transition-colors';
 
 function RailItem(props: { label: string; active: boolean; badge?: number; onPress: () => void; children: ReactNode }) {
   return (
     <div className="group/rail relative flex w-full justify-center">
       <span
-        className={`absolute left-0 top-1/2 w-1 -translate-y-1/2 rounded-r-full bg-foreground transition-[height] duration-200 ease-out ${props.active ? 'h-10' : 'h-0 group-hover/rail:h-5'}`}
+        className={`absolute left-0 top-1/2 w-1 -translate-y-1/2 rounded-r-full bg-foreground transition-[height] ${props.active ? 'h-10' : 'h-0 group-hover/rail:h-5'}`}
       />
       <Tooltip delay={0} closeDelay={0}>
         <Tooltip.Trigger<'button'>
@@ -227,7 +230,7 @@ function RailItem(props: { label: string; active: boolean; badge?: number; onPre
         >
           {props.children}
           {!!props.badge && (
-            <span className="absolute -bottom-0.5 -right-0.5 min-w-5 rounded-full bg-danger px-1 text-center text-[11px] font-bold leading-5 text-white ring-[3px] ring-[var(--app-side)]">
+            <span className="absolute -bottom-0.5 -right-0.5 min-w-5 animate-gx-badge rounded-full bg-danger px-1 text-center text-[11px] font-bold leading-5 text-white ring-[3px] ring-[var(--app-side)]">
               {props.badge > 99 ? '99+' : props.badge}
             </span>
           )}

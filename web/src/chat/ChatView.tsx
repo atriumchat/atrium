@@ -1,7 +1,7 @@
-import { Fragment, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type DragEvent, type Ref } from 'react';
-import { Button, Dropdown, Input, Label, ScrollShadow, TextField } from '@heroui/react';
+import { Fragment, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore, type DragEvent, type Ref } from 'react';
+import { Button, Input, ScrollShadow, TextField } from '@heroui/react';
 import { ArrowUpIcon, PlusIcon } from '@heroicons/react/24/solid';
-import { MessageTools, PinsButton } from './MessageTools';
+import { MessageTools, PinsButton, QUICK_REACTIONS, useMessageMenu } from './MessageTools';
 import { openMessage } from './messageNavigation';
 import { forgetUnreadMarker } from '../store/chat';
 import { api } from '../api';
@@ -23,6 +23,7 @@ import { UserProfile } from '../people/UserProfile';
 import { GroupInfo } from '../people/GroupInfo';
 import { fileSize, MessageAttachments } from './Attachments';
 import { EmojiPicker } from '../ui/EmojiPicker';
+import { Menu, MenuItem, MenuSeparator } from '../ui/Menu';
 import { EmojiText, isEmojiOnly } from '../ui/EmojiText';
 import { ExpressionPicker } from './ExpressionPicker';
 import type { Gif } from './giphy';
@@ -156,6 +157,7 @@ export function ChatView({ conversation, room = false }: { conversation: Convers
   }
 
   const list = messages ?? [];
+  const fresh = useFreshIds(list, loaded && !context);
   const placeholder = t(isGroup ? 'chat.placeholder.group' : isDm ? 'chat.placeholder.dm' : room ? 'chat.placeholder.room' : 'chat.placeholder.channel', { title: channel.title });
 
   return (
@@ -290,7 +292,7 @@ export function ChatView({ conversation, room = false }: { conversation: Convers
                 </div>
               )}
               {m.id === divider && <div role="separator" className="my-2 flex items-center gap-2 px-3 text-xs font-medium text-accent before:h-px before:flex-1 before:bg-current after:h-px after:flex-1 after:bg-current">{t('chat.tools.divider')}</div>}
-              <MessageRow message={m} startsGroup={startsGroup || m.id === divider} />
+              <MessageRow message={m} startsGroup={startsGroup || m.id === divider} fresh={fresh.has(m.id)} />
             </Fragment>
           );
         })}
@@ -359,43 +361,22 @@ function ConversationMenu({ dm, onRename, onLeave }: { dm: Dm; onRename: () => v
   const group = dm.kind === 'group';
 
   return (
-    <>
-      <Dropdown>
-        <Dropdown.Trigger
-          aria-label={t('chat.more')}
-          className="header-action"
-        >
-          <DotsIcon size={20} />
-        </Dropdown.Trigger>
-        <Dropdown.Popover placement="bottom end" className="min-w-56">
-          <Dropdown.Menu
-            aria-label={t('chat.actions')}
-            onAction={(key) => {
-              if (key === 'add') openPicker({ mode: 'add', dmId: dm.id });
-              if (key === 'rename') onRename();
-              if (key === 'leave') onLeave();
-            }}
-          >
-            <Dropdown.Item id="add" textValue={t('chat.addPeople')}>
-              <Label>{group ? t('chat.addPeople') : t('chat.createGroup')}</Label>
-              <UserPlusIcon size={16} className="ml-auto" />
-            </Dropdown.Item>
-            {group ? (
-              <Dropdown.Item id="rename" textValue={t('chat.rename')}>
-                <Label>{t('chat.rename')}</Label>
-                <PencilIcon size={16} className="ml-auto" />
-              </Dropdown.Item>
-            ) : null}
-            {group ? (
-              <Dropdown.Item id="leave" textValue={t('chat.leaveGroup')} variant="danger">
-                <Label>{t('chat.leaveGroup')}</Label>
-                <LogoutIcon size={16} className="ml-auto text-danger" />
-              </Dropdown.Item>
-            ) : null}
-          </Dropdown.Menu>
-        </Dropdown.Popover>
-      </Dropdown>
-    </>
+    <Menu
+      label={t('chat.actions')}
+      triggerLabel={t('chat.more')}
+      triggerClassName="header-action"
+      trigger={<DotsIcon size={20} />}
+      onAction={(key) => {
+        if (key === 'add') openPicker({ mode: 'add', dmId: dm.id });
+        if (key === 'rename') onRename();
+        if (key === 'leave') onLeave();
+      }}
+    >
+      <MenuItem id="add" label={group ? t('chat.addPeople') : t('chat.createGroup')} icon={<UserPlusIcon />} />
+      {group ? <MenuItem id="rename" label={t('chat.rename')} icon={<PencilIcon />} /> : null}
+      {group ? <MenuSeparator /> : null}
+      {group ? <MenuItem id="leave" label={t('chat.leaveGroup')} icon={<LogoutIcon />} danger /> : null}
+    </Menu>
   );
 }
 
@@ -495,13 +476,43 @@ function OngoingCall() {
   );
 }
 
-const QUICK_REACTIONS = ['👍', '❤️', '😂'];
+/**
+ * Which messages arrived while this channel was open: the ones appended after the newest one seen so far (a new
+ * message from someone, or my own just sent). Whatever was there when it loaded, what loading older history
+ * prepends, a jump or a search context that swaps the whole list, all stay plain, so only a live arrival animates
+ * (a rise of 4px, which never changes the row's height, so the pinned scroll doesn't move). Once fresh, always
+ * fresh: the class stays and the animation has long finished by the time anything re-renders it.
+ */
+function useFreshIds(list: Message[], enabled: boolean): ReadonlySet<string> {
+  const [seen, setSeen] = useState<{ last: string | null; fresh: ReadonlySet<string> } | null>(null);
+  const last = list.length ? list[list.length - 1].id : null;
+  if (!enabled) {
+    if (seen) setSeen(null);
+    return NONE;
+  }
+  if (!seen) {
+    setSeen({ last, fresh: NONE });
+    return NONE;
+  }
+  if (seen.last === last) return seen.fresh;
+  const at = seen.last === null ? -1 : list.findIndex((m) => m.id === seen.last);
+  // The old newest one is gone: the list was replaced, not appended to.
+  if (seen.last !== null && at === -1) {
+    setSeen({ last, fresh: seen.fresh });
+    return seen.fresh;
+  }
+  const next = new Set(seen.fresh);
+  for (const m of list.slice(at + 1)) next.add(m.id);
+  setSeen({ last, fresh: next });
+  return next;
+}
+const NONE: ReadonlySet<string> = new Set();
 
 /**
  * Messages from someone you blocked stay folded into one quiet line, unless you open them. Memoised: a new
  * message, edit or reaction only re-renders its own row (message objects stay the same unless they change).
  */
-const MessageRow = memo(function MessageRow(props: { message: Message; startsGroup: boolean }) {
+const MessageRow = memo(function MessageRow(props: { message: Message; startsGroup: boolean; fresh: boolean }) {
   const { t } = useT();
   const blocked = useStore((s) => s.blocked.includes(props.message.userId));
   const [shown, setShown] = useState(false);
@@ -518,7 +529,7 @@ const MessageRow = memo(function MessageRow(props: { message: Message; startsGro
   return <MessageBody {...props} />;
 });
 
-function MessageBody({ message, startsGroup }: { message: Message; startsGroup: boolean }) {
+function MessageBody({ message, startsGroup, fresh }: { message: Message; startsGroup: boolean; fresh: boolean }) {
   const { t } = useT();
   const user = useStore((s) => s.users[message.userId]);
   const meId = useStore((s) => s.me?.id);
@@ -528,6 +539,13 @@ function MessageBody({ message, startsGroup }: { message: Message; startsGroup: 
   const [confirming, setConfirming] = useState(false);
   const mine = message.userId === meId;
   const canDelete = mine || (!message.dm && manageMessages);
+  const onEdit = mine && message.content !== undefined && !invitedRoom(message.content) ? () => setEditing(message.id) : undefined;
+  const menu = useMessageMenu(message, {
+    onReact: (emoji) => toggleReaction(message.id, emoji),
+    onReply: () => setReplyingTo(message.channelId, message.id),
+    onEdit,
+    onDelete: canDelete ? () => remove() : undefined,
+  });
   // A reply always shows who wrote it, like Discord, even in the middle of someone's run of messages.
   const showHeader = startsGroup || !!message.replyTo;
   const catalog = useStore((s) => s.customEmoji);
@@ -542,7 +560,8 @@ function MessageBody({ message, startsGroup }: { message: Message; startsGroup: 
   return (
     <div
       id={`msg-${message.id}`}
-      className={`group @container/message relative rounded-fine pl-[60px] pr-2 transition-colors ${showHeader ? 'mt-4 pb-0.5 pt-0.5' : 'py-0.5'} ${
+      {...menu.bind}
+      className={`group @container/message relative rounded-fine pl-[60px] pr-2 transition-colors ${fresh ? 'animate-gx-rise' : ''} ${showHeader ? 'mt-4 pb-0.5 pt-0.5' : 'py-0.5'} ${
         'hover:bg-white/[0.03]'
       } ${editing ? 'bg-white/[0.03]' : ''}`}
     >
@@ -591,13 +610,14 @@ function MessageBody({ message, startsGroup }: { message: Message; startsGroup: 
       <Reactions message={message} meId={meId} />
       {!editing && (
         <MessageActions
-          message={message}
+          menu={menu}
           onReact={(emoji) => toggleReaction(message.id, emoji)}
           onReply={() => setReplyingTo(message.channelId, message.id)}
-          onEdit={mine && message.content !== undefined && !invitedRoom(message.content) ? () => setEditing(message.id) : undefined}
+          onEdit={onEdit}
           onDelete={canDelete ? remove : undefined}
         />
       )}
+      {menu.node}
       {confirming && (
         <ConfirmDialog
           title={t('chat.deleteTitle')}
@@ -642,27 +662,15 @@ function Reactions({ message, meId }: { message: Message; meId: string | undefin
   const { t } = useT();
   const users = useStore((s) => s.users);
   const reactions = message.reactions ?? [];
+  // The chips there from the start: only one that comes later and is mine pops as it lands.
+  const [initial] = useState(() => new Set(reactions.map((r) => r.emoji)));
   if (reactions.length === 0) return null;
   return (
     <div className="mt-1 flex flex-wrap items-center gap-1">
       {reactions.map((r) => {
         const mine = !!meId && r.users.includes(meId);
         const who = r.users.map((id) => users[id]?.name ?? '…').join(', ');
-        return (
-          <button
-            key={r.emoji}
-            onClick={() => toggleReaction(message.id, r.emoji)}
-            title={who}
-            aria-label={`${r.emoji} ${r.users.length}: ${who}`}
-            aria-pressed={mine}
-            className={`flex h-7 items-center gap-1 rounded-full px-2 text-[13px] tabular-nums transition-colors ${
-              mine ? 'bg-white font-medium text-black hover:bg-[#e7e7ea]' : 'bg-white/[0.16] text-foreground hover:bg-white/[0.22]'
-            }`}
-          >
-            <span className="text-[15px] leading-none"><EmojiText text={r.emoji} /></span>
-            {r.users.length}
-          </button>
-        );
+        return <ReactionChip key={r.emoji} messageId={message.id} emoji={r.emoji} count={r.users.length} mine={mine} who={who} landed={mine && !initial.has(r.emoji)} />;
       })}
       <EmojiPicker
         label={t('chat.addReaction')}
@@ -675,16 +683,41 @@ function Reactions({ message, meId }: { message: Message; meId: string | undefin
   );
 }
 
+/** One reaction. When it becomes mine (or arrives already mine, after the message was shown) it pops once. */
+function ReactionChip({ messageId, emoji, count, mine, who, landed }: { messageId: string; emoji: string; count: number; mine: boolean; who: string; landed: boolean }) {
+  const [wasMine, setWasMine] = useState(mine);
+  const [pop, setPop] = useState(landed);
+  if (mine !== wasMine) {
+    setWasMine(mine);
+    setPop(mine);
+  }
+  return (
+    <button
+      onClick={() => toggleReaction(messageId, emoji)}
+      onAnimationEnd={() => setPop(false)}
+      title={who}
+      aria-label={`${emoji} ${count}: ${who}`}
+      aria-pressed={mine}
+      className={`flex h-7 items-center gap-1 rounded-full px-2 text-[13px] tabular-nums transition-colors ${pop ? 'animate-gx-pop' : ''} ${
+        mine ? 'bg-white font-medium text-black hover:bg-[#e7e7ea]' : 'bg-white/[0.16] text-foreground hover:bg-white/[0.22]'
+      }`}
+    >
+      <span className="text-[15px] leading-none"><EmojiText text={emoji} /></span>
+      {count}
+    </button>
+  );
+}
+
 /**
  * Hover bar at the message's top right, as small as Discord's: three quick reactions (dropped when the panel is
  * narrow, where they would cover the avatar), any emoji, reply, the tools, edit and delete.
  */
-function MessageActions(props: { message: Message; onReact: (emoji: string) => void; onReply: () => void; onEdit?: () => void; onDelete?: (e?: { shiftKey?: boolean }) => void }) {
+function MessageActions(props: { menu: ReturnType<typeof useMessageMenu>; onReact: (emoji: string) => void; onReply: () => void; onEdit?: () => void; onDelete?: (e?: { shiftKey?: boolean }) => void }) {
   const { t } = useT();
   const btn = 'flex h-7 w-7 items-center justify-center rounded-[6px] text-muted transition-colors hover:bg-white/10 hover:text-foreground [&_svg]:size-[18px]';
   const narrow = '@max-[34rem]/message:hidden';
   return (
-    <div className="absolute -top-4 right-2 z-10 hidden items-center gap-px rounded-fine border-[0.5px] border-white/10 bg-default p-0.5 shadow-[0_4px_12px_rgba(0,0,0,.35)] group-hover:flex group-has-[button:focus-visible]:flex has-[[aria-expanded=true]]:flex">
+    <div className="absolute -top-4 right-2 z-10 hidden animate-gx-fade items-center gap-px rounded-fine border-[0.5px] border-white/10 bg-default p-0.5 shadow-[0_4px_12px_rgba(0,0,0,.35)] group-hover:flex group-has-[button:focus-visible]:flex has-[[aria-expanded=true]]:flex">
       {QUICK_REACTIONS.map((e) => (
         <button key={e} onClick={() => props.onReact(e)} aria-label={t('chat.reaction', { emoji: e })} className={`${btn} ${narrow} text-[16px]`}>
           <EmojiText text={e} />
@@ -697,7 +730,7 @@ function MessageActions(props: { message: Message; onReact: (emoji: string) => v
       <button onClick={props.onReply} aria-label={t('chat.reply')} title={t('chat.reply')} className={btn}>
         <ReplyIcon size={18} />
       </button>
-      <MessageTools message={props.message} className={btn}/>
+      <MessageTools menu={props.menu} className={btn} />
       {props.onEdit && (
         <button onClick={props.onEdit} aria-label={t('chat.edit')} title={t('chat.edit')} className={btn}>
           <PencilIcon size={16} />
@@ -827,11 +860,37 @@ type PendingFile = { key: string; name: string; size: number; image?: boolean; p
 
 type MentionOption = { id: string; label: string; user?: User };
 
-// An in-flight send can outlive its composer. Hold uploaded files for retry until the chat opens again.
-const sendDrafts = new Map<string, { text: string; files: PendingFile[]; gif?: Gif; result: Promise<boolean> | null }>();
+/*
+ * A message leaves the composer the moment it is sent. Sends go out one at a time per chat, in order. One the server
+ * didn't take stays here as "not sent" (text, files, reply) until retried or dismissed, so nothing typed is lost and
+ * nothing already in the field is overwritten.
+ */
+type OutgoingMessage = { key: string; channel: string; text: string; content: string; files: PendingFile[]; gif?: Gif; answering?: string };
+
+const sendQueues = new Map<string, Promise<unknown>>();
+let failedSends: OutgoingMessage[] = [];
+const failedListeners = new Set<() => void>();
+const setFailedSends = (next: OutgoingMessage[]) => {
+  failedSends = next;
+  failedListeners.forEach((listener) => listener());
+};
 useStore.subscribe((state, previous) => {
-  if (state.me?.id !== previous.me?.id) sendDrafts.clear();
+  if (state.me?.id !== previous.me?.id) {
+    sendQueues.clear();
+    setFailedSends([]);
+  }
 });
+
+function deliver(message: OutgoingMessage) {
+  const epoch = getSessionEpoch();
+  const run = (sendQueues.get(message.channel) ?? Promise.resolve()).then(async () => {
+    if (epoch !== getSessionEpoch()) return;
+    const sent = await sendMessage(message.channel, message.content, message.files.map((file) => file.upload!.id), message.answering, message.gif?.id);
+    if (epoch !== getSessionEpoch()) return;
+    if (!sent) setFailedSends([...failedSends.filter((m) => m.key !== message.key), message]);
+  });
+  sendQueues.set(message.channel, run);
+}
 
 function revokePreview(file: PendingFile) {
   if (file.preview?.startsWith('blob:')) URL.revokeObjectURL(file.preview);
@@ -868,12 +927,18 @@ function saveDraft(id: string, text: string) {
 function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: string; onResize: () => void; onSend: () => void }) {
   const { t } = useT();
   const { id, placeholder, onResize, onSend } = props;
-  const [text, setText] = useState(() => sendDrafts.get(id)?.text ?? loadDraft(id));
-  const [pending, setPending] = useState<PendingFile[]>(() => sendDrafts.get(id)?.files ?? []);
-  const [gif, setGif] = useState(() => sendDrafts.get(id)?.gif);
+  const [text, setText] = useState(() => loadDraft(id));
+  const [pending, setPending] = useState<PendingFile[]>([]);
+  const [gif, setGif] = useState<Gif | undefined>();
   const klipyKey = useStore((s) => s.klipyKey);
   const [sendingExpression, setSendingExpression] = useState(false);
-  const [sending, setSending] = useState(() => sendDrafts.get(id)?.result ?? null);
+  const failed = useSyncExternalStore(
+    (listener) => {
+      failedListeners.add(listener);
+      return () => failedListeners.delete(listener);
+    },
+    () => failedSends,
+  ).filter((m) => m.channel === id);
   const [caret, setCaret] = useState(0);
   const [pick, setPick] = useState(0);
   const [dismissedMention, setDismissedMention] = useState<string | null>(null);
@@ -885,7 +950,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
   const replyTo = useStore((s) => (replyId ? (s.searchContext?.conversation === id ? s.searchContext.messages : s.messages[id])?.find((m) => m.id === replyId) : undefined));
   const uploading = pending.some((p) => !p.upload);
   const hasPending = pending.length > 0 || !!gif;
-  const canSend = !sending && !sendingExpression && !uploading && (!gif || !!klipyKey) && (text.trim().length > 0 || hasPending);
+  const canSend = !sendingExpression && !uploading && (!gif || !!klipyKey) && (text.trim().length > 0 || hasPending);
 
   // "@" right before the caret opens a list of people to mention.
   const mentionQuery = /(?:^|\s)@([^\s@]{0,32})$/.exec(text.slice(0, caret))?.[1];
@@ -901,7 +966,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
           ...(t('common.md.everyone').startsWith(mentionQuery.toLowerCase()) ? [{ id: 'all', label: t('common.md.everyone') }] : []),
         ];
   const activeOption = options[pick] ?? options[0];
-  const showMentions = !sending && !!activeOption && dismissedMention !== text;
+  const showMentions = !!activeOption && dismissedMention !== text;
 
   useImperativeHandle(props.ref, () => ({ addFiles }));
 
@@ -909,25 +974,6 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
   const pendingNow = useRef(pending);
   pendingNow.current = pending;
   useEffect(() => () => pendingNow.current.forEach(revokePreview), []);
-
-  useEffect(() => {
-    if (!sending) {
-      if (sendDrafts.get(id)?.result === null) sendDrafts.delete(id);
-      return;
-    }
-    let active = true;
-    void sending.then((sent) => {
-      if (!active) return;
-      if (sent) {
-        setText('');
-        pendingNow.current.forEach(revokePreview);
-        setPending([]);
-        setGif(undefined);
-      }
-      setSending(null);
-    });
-    return () => { active = false; };
-  }, [id, sending]);
 
   // On a phone, focusing would pop the keyboard over the chat the moment it opens.
   useEffect(() => {
@@ -972,7 +1018,6 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
   useLayoutEffect(onResize, [hasPending, !!replyTo, onResize]);
 
   function addFiles(files: File[]) {
-    if (sendDrafts.get(id)?.result) return;
     const accepted = files.slice(0, Math.max(0, MAX_ATTACHMENTS - pending.length - Number(!!gif)));
     if (accepted.length < files.length) showError(t('chat.maxAttachments', { n: MAX_ATTACHMENTS }));
     for (const file of accepted) {
@@ -995,7 +1040,6 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
   }
 
   function remove(file: PendingFile) {
-    if (sendDrafts.get(id)?.result) return;
     revokePreview(file);
     setPending((list) => list.filter((p) => p.key !== file.key));
   }
@@ -1012,7 +1056,6 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
   }
 
   function insertEmoji(value: string, keepOpen: boolean) {
-    if (sendDrafts.get(id)?.result) return;
     const el = ref.current;
     const start = el?.selectionStart ?? text.length;
     const end = el?.selectionEnd ?? start;
@@ -1031,7 +1074,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
   }
 
   async function sendExpression(gifId?: string, stickerId?: string) {
-    if (sending || sendingExpression) return;
+    if (sendingExpression) return;
     const epoch = getSessionEpoch();
     const answering = replyId;
     setSendingExpression(true);
@@ -1045,28 +1088,32 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
     }
   }
 
+  // Two Enters before React has rendered the cleared field must not send the same text twice.
+  const justSent = useRef(false);
+  useEffect(() => {
+    justSent.current = false;
+  });
+
   function send() {
-    if (!canSend || sendDrafts.get(id)?.result) return;
-    const epoch = getSessionEpoch();
-    const content = namesToMentions(text.trim(), users);
-    const answering = replyId;
-    saveDraft(id, text);
-    onSend();
-    // The mounted composer owns its blob URLs. A reopened one can use the uploaded previews.
+    if (!canSend || justSent.current) return;
+    justSent.current = true;
     const files = pending.map((file) => ({ ...file, preview: file.preview ? file.upload?.previewUrl ?? file.upload?.url : undefined }));
-    const result = sendMessage(id, content, files.map((file) => file.upload!.id), answering, gif?.id).then((sent) => {
-      if (epoch !== getSessionEpoch()) return false;
-      if (sent) {
-        sendDrafts.delete(id);
-        saveDraft(id, '');
-        if (useStore.getState().replyingTo[id] === answering) setReplyingTo(id, null);
-      } else {
-        sendDrafts.set(id, { text, files, gif, result: null });
-      }
-      return sent;
-    });
-    sendDrafts.set(id, { text, files, gif, result });
-    setSending(result);
+    deliver({ key: crypto.randomUUID(), channel: id, text, content: namesToMentions(text.trim(), users), files, gif, answering: replyId });
+    // The field is free again at once; the message is in the queue.
+    pending.forEach(revokePreview);
+    setText('');
+    setPending([]);
+    setGif(undefined);
+    setCaret(0);
+    saveDraft(id, '');
+    if (replyId) setReplyingTo(id, null);
+    onSend();
+  }
+
+  function retry(message: OutgoingMessage) {
+    setFailedSends(failedSends.filter((m) => m.key !== message.key));
+    deliver(message);
+    onSend();
   }
 
   function editLast() {
@@ -1113,14 +1160,26 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
         }}
       />
       <div data-chat-composer className="flex min-w-0 flex-col rounded-control bg-default">
+        {failed.map((m) => (
+          <div key={m.key} role="alert" className="mx-3 mt-3 flex animate-gx-rise-fast items-center gap-2 rounded-row bg-white/[0.06] py-1 pl-2 pr-1 text-[13px]">
+            <span className="shrink-0 text-danger">{t('chat.unsent')}</span>
+            <span className="min-w-0 flex-1 truncate text-muted">{m.text.trim() || m.gif?.title || m.files[0]?.name || t('chat.attachmentLower')}</span>
+            <button type="button" onClick={() => retry(m)} className="shrink-0 whitespace-nowrap rounded-row px-2 py-0.5 text-foreground hover:bg-white/10">
+              {t('chat.unsentRetry')}
+            </button>
+            <button type="button" aria-label={t('chat.unsentDismiss')} onClick={() => setFailedSends(failedSends.filter((f) => f.key !== m.key))} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-white/10 hover:text-foreground">
+              <XIcon size={14} strokeWidth={2.5} />
+            </button>
+          </div>
+        ))}
         {replyTo && (
-          <div className="mx-3 mt-3 flex items-center gap-2 rounded-row bg-white/[0.06] py-1 pl-2 pr-1 text-[13px] text-muted">
+          <div className="mx-3 mt-3 flex animate-gx-rise-fast items-center gap-2 rounded-row bg-white/[0.06] py-1 pl-2 pr-1 text-[13px] text-muted">
             <ReplyIcon size={15} className="shrink-0" />
             <span className="min-w-0 flex-1 truncate">
               {t('chat.replyTo')} <span className="font-medium text-foreground">{users[replyTo.userId]?.name ?? '…'}</span>:{' '}
               <EmojiText text={plainText(replyTo.content, users) || t('chat.attachmentLower')} />
             </span>
-            <button disabled={!!sending} onClick={() => setReplyingTo(id, null)} aria-label={t('chat.cancelReply')} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-white/10 hover:text-foreground">
+            <button onClick={() => setReplyingTo(id, null)} aria-label={t('chat.cancelReply')} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-white/10 hover:text-foreground">
               <XIcon size={14} strokeWidth={2.5} />
             </button>
           </div>
@@ -1135,7 +1194,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
                     <img src={gif.animated} alt={gif.title} className="h-full w-full object-cover" />
                   </picture>
                 )}
-                <button type="button" aria-label={t('chat.gif.remove')} disabled={!!sending} onClick={() => setGif(undefined)} className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80">
+                <button type="button" aria-label={t('chat.gif.remove')} onClick={() => setGif(undefined)} className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80">
                   <XIcon size={14} strokeWidth={3} />
                 </button>
               </div>
@@ -1161,7 +1220,6 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
                   <button
                     type="button"
                     aria-label={t('chat.removeFile', { name: p.name })}
-                    disabled={!!sending}
                     onClick={() => remove(p)}
                     className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
                   >
@@ -1173,17 +1231,15 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
           </div>
         )}
         <div className="flex min-h-12 min-w-0 items-end gap-2 p-1.5">
-          <RoundButton size="sm" tone="ghost" label={t('chat.attachFile')} isDisabled={!!sending} onPress={() => fileInput.current?.click()} className="rounded-row!">
+          <RoundButton size="sm" tone="ghost" label={t('chat.attachFile')} onPress={() => fileInput.current?.click()} className="rounded-row!">
             <PlusIcon aria-hidden="true" />
           </RoundButton>
           <textarea
             ref={ref}
+            data-composer=""
             rows={1}
             value={text}
-            readOnly={!!sending}
-            aria-busy={!!sending || undefined}
             onChange={(e) => {
-              if (sendDrafts.get(id)?.result) return;
               setDismissedMention(null);
               setText(e.target.value);
               setCaret(e.target.selectionStart ?? e.target.value.length);
@@ -1191,7 +1247,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
             }}
             onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
             onKeyDown={(e) => {
-              if (e.nativeEvent.isComposing || sending) return;
+              if (e.nativeEvent.isComposing) return;
               if (showMentions && e.key === 'Escape') {
                 e.preventDefault();
                 setDismissedMention(text);
@@ -1231,7 +1287,7 @@ function Composer(props: { ref: Ref<ComposerHandle>; id: string; placeholder: st
             aria-label={placeholder}
             className="max-h-[220px] min-w-0 flex-1 resize-none bg-transparent py-1.5 text-[16px] leading-6 text-foreground outline-none placeholder:text-faint placeholder-shown:overflow-hidden placeholder-shown:text-ellipsis placeholder-shown:whitespace-nowrap"
           />
-          <ExpressionPicker apiKey={klipyKey} busy={!!sending || sendingExpression} gifDisabled={pending.length >= MAX_ATTACHMENTS}
+          <ExpressionPicker apiKey={klipyKey} busy={sendingExpression} gifDisabled={pending.length >= MAX_ATTACHMENTS}
             onGif={(value, draft) => { if (draft) attachGif(value); else void sendExpression(value.id); }}
             onSticker={(stickerId) => void sendExpression(undefined, stickerId)} onEmoji={insertEmoji} />
           <RoundButton size="sm" tone={canSend ? 'accent' : 'ghost'} label={t('chat.send')} isDisabled={!canSend} onPress={send} className="rounded-row!">

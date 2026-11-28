@@ -7,7 +7,7 @@ import { MagnifyingGlassIcon } from '@heroicons/react/24/solid';
  * search shows there.
  */
 export function ListHead(props: {
-  title: string;
+  title: ReactNode;
   sub?: string;
   action?: ReactNode;
   search: string;

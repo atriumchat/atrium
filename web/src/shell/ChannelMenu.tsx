@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
-import { Button, Dropdown, Input, Label, Separator, TextField } from '@heroui/react';
+import { Button, Input, TextField } from '@heroui/react';
 import { api } from '../api';
-import { addDm, markRead, setChannels, showError, useStore, voiceMembers } from '../store';
+import { addDm, markRead, selectChannel, setChannels, setVoiceChat, showError, useStore, voiceMembers } from '../store';
 import { sendMessage } from '../socket';
 import { localeOf, useT } from '../i18n';
 import { roomToken } from '../ui/Markdown';
@@ -9,21 +9,22 @@ import { Avatar } from '../ui/Avatar';
 import type { Channel } from '../types';
 import { ConfirmDialog, Dialog } from '../ui/Dialog';
 import { EmptyState } from '../ui/Illustrations';
-import { BellIcon, BellSlashIcon, CheckIcon, FolderIcon, LockIcon, PencilIcon, SearchIcon, TrashIcon } from '../ui/icons';
+import { BellIcon, BellSlashIcon, BubbleIcon, CheckIcon, FolderIcon, LockIcon, PencilIcon, SearchIcon, TrashIcon, UserPlusIcon } from '../ui/icons';
+import { ContextMenu, Menu, MenuItem, MenuSeparator, useContextMenu, type MenuSpec } from '../ui/Menu';
 import { ChannelAccessDialog } from './ChannelAccess';
 import { EllipsisHorizontalIcon } from '@heroicons/react/24/solid';
 import { CopyButton } from '../ui/CopyButton';
 import { useMyInvite } from '../people/Invites';
 import { inviteLink } from '../people/invite';
 
-type Action = 'read' | 'mute' | 'invite' | 'rename' | 'move' | 'access' | 'delete';
+type Action = 'read' | 'mute' | 'chat' | 'invite' | 'rename' | 'move' | 'access' | 'delete';
 
 /**
- * A server channel's "…", in its header and on its row in the list. Everyone can mark a text channel read and
- * mute it, and call friends into a voice room; the admin also renames and deletes (and reorders by dragging
- * in the list). Nothing is shown when there's nothing to offer.
+ * What a server channel's menu has: everyone can mark a text channel read and mute it, open a voice room's chat and
+ * call friends into it; the admin also renames, moves and deletes (and reorders by dragging in the list). The same
+ * rows come from the "..." and from a right-click on the channel's row. `spec` is null when there's nothing to offer.
  */
-export function ChannelMenu({ channelId, className = '' }: { channelId: string; className?: string }) {
+function useChannelMenu(channelId: string) {
   const { t } = useT();
   const channels = useStore((s) => s.channels);
   const canManage = useStore((s) => s.canManageChannels);
@@ -33,7 +34,7 @@ export function ChannelMenu({ channelId, className = '' }: { channelId: string; 
   const [dialog, setDialog] = useState<{ action: 'invite' | 'rename' | 'move' | 'access' | 'delete'; id: string } | null>(null);
   const hasCategories = useStore((s) => s.categories.length > 0);
   const channel = channels.find((c) => c.id === channelId);
-  if (!channel) return null;
+  if (!channel) return { channel: undefined, spec: null, dialogs: null };
   const isText = channel.kind === 'text';
 
   async function run(action: Action) {
@@ -41,54 +42,36 @@ export function ChannelMenu({ channelId, className = '' }: { channelId: string; 
     try {
       if (action === 'read') markRead(channel.id);
       if (action === 'mute') useStore.setState({ mutedChannels: await api.muteChannel(channel.id, !muted) });
+      if (action === 'chat') {
+        selectChannel(channel.id);
+        setVoiceChat(true);
+      }
       if (action === 'invite' || action === 'rename' || action === 'move' || action === 'access' || action === 'delete') setDialog({ action, id: channel.id });
     } catch (e) {
       showError(e instanceof Error ? e.message : t('shell.menu.failed'));
     }
   }
 
-  const personal: ReactNode[] = [];
-  if (isText && unread > 0) personal.push(<Item key="read" id="read" label={t('shell.menu.markRead')} icon={<CheckIcon size={16} />} />);
-  if (isText)
-    personal.push(
-      muted ? (
-        <Item key="mute" id="mute" label={t('shell.menu.unmute')} icon={<BellIcon size={16} />} />
-      ) : (
-        <Item key="mute" id="mute" label={t('shell.menu.mute')} icon={<BellSlashIcon size={16} />} />
-      ),
-    );
+  const spec: MenuSpec = {
+    label: isText ? t('shell.menu.channelActions') : t('shell.menu.roomActions'),
+    onAction: (key) => void run(key as Action),
+    children: [
+      // Nothing to read isn't a reason to hide it: the row stays, greyed.
+      isText && <MenuItem key="read" id="read" label={t('shell.menu.markRead')} icon={<CheckIcon />} disabled={unread === 0} />,
+      isText && <MenuItem key="mute" id="mute" label={muted ? t('shell.menu.unmute') : t('shell.menu.mute')} icon={muted ? <BellIcon /> : <BellSlashIcon />} />,
+      !isText && <MenuItem key="chat" id="chat" label={t('shell.menu.openChat')} icon={<BubbleIcon />} />,
+      !isText && <MenuItem key="invite" id="invite" label={t('shell.menu.inviteToRoom')} icon={<UserPlusIcon />} />,
+      canManage && <MenuSeparator key="admin" />,
+      canManage && <MenuItem key="rename" id="rename" label={t('shell.menu.rename')} icon={<PencilIcon />} />,
+      canManage && hasCategories && <MenuItem key="move" id="move" label={t('shell.menu.move')} icon={<FolderIcon />} />,
+      canManage && <MenuItem key="access" id="access" label={t('shell.menu.access')} icon={<LockIcon />} />,
+      canManage && <MenuSeparator key="danger" />,
+      canManage && <MenuItem key="delete" id="delete" label={isText ? t('shell.menu.deleteChannel') : t('shell.menu.deleteRoom')} icon={<TrashIcon />} danger />,
+    ],
+  };
 
-  const admin: ReactNode[] = [];
-  if (canManage) {
-    admin.push(<Item key="rename" id="rename" label={t('shell.menu.rename')} icon={<PencilIcon size={16} />} />);
-    if (hasCategories) admin.push(<Item key="move" id="move" label={t('shell.menu.move')} icon={<FolderIcon size={16} />} />);
-    admin.push(<Item key="access" id="access" label={t('shell.menu.access')} icon={<LockIcon size={16} />} />);
-  }
-  if (personal.length + admin.length === 0) return null;
-
-  return (
+  const dialogs = (
     <>
-      <Dropdown>
-        <Dropdown.Trigger
-          aria-label={isText ? t('shell.menu.channelActionsNamed', { name: channel.name }) : t('shell.menu.roomActionsNamed', { name: channel.name })}
-          className={className ? `flex shrink-0 items-center justify-center rounded-full outline-none transition-colors hover:bg-default data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus ${className}` : "header-action"}
-        >
-          <EllipsisHorizontalIcon className="size-5" aria-hidden="true" />
-        </Dropdown.Trigger>
-        <Dropdown.Popover placement="bottom end" className="min-w-60">
-          <Dropdown.Menu aria-label={isText ? t('shell.menu.channelActions') : t('shell.menu.roomActions')} onAction={(key) => run(key as Action)}>
-            {personal}
-            {admin}
-            {canManage && <Separator />}
-            {canManage && (
-              <Dropdown.Item id="delete" textValue={isText ? t('shell.menu.deleteChannel') : t('shell.menu.deleteRoom')} variant="danger">
-                <Label>{isText ? t('shell.menu.deleteChannel') : t('shell.menu.deleteRoom')}</Label>
-                <TrashIcon size={16} className="ml-auto text-danger" />
-              </Dropdown.Item>
-            )}
-          </Dropdown.Menu>
-        </Dropdown.Popover>
-      </Dropdown>
       {dialog?.id === channel.id && dialog.action === 'invite' && <InviteToRoom channel={channel} onClose={() => setDialog(null)} />}
       {dialog?.id === channel.id && dialog.action === 'rename' && <RenameChannel channel={channel} onClose={() => setDialog(null)} />}
       {dialog?.id === channel.id && dialog.action === 'move' && <MoveChannel channel={channel} onClose={() => setDialog(null)} />}
@@ -96,14 +79,37 @@ export function ChannelMenu({ channelId, className = '' }: { channelId: string; 
       {dialog?.id === channel.id && dialog.action === 'delete' && <DeleteChannel channel={channel} onClose={() => setDialog(null)} />}
     </>
   );
+  return { channel, spec, dialogs };
 }
 
-function Item({ id, label, icon }: { id: Action; label: string; icon: ReactNode }) {
+/** A server channel's "...", in its header and on its row in the list. */
+export function ChannelMenu({ channelId, className = '' }: { channelId: string; className?: string }) {
+  const { t } = useT();
+  const { channel, spec, dialogs } = useChannelMenu(channelId);
+  if (!channel || !spec) return null;
   return (
-    <Dropdown.Item id={id} textValue={label}>
-      <Label>{label}</Label>
-      <span className="ml-auto text-muted">{icon}</span>
-    </Dropdown.Item>
+    <>
+      <Menu
+        {...spec}
+        triggerLabel={channel.kind === 'text' ? t('shell.menu.channelActionsNamed', { name: channel.name }) : t('shell.menu.roomActionsNamed', { name: channel.name })}
+        triggerClassName={className ? `flex shrink-0 items-center justify-center rounded-full outline-none transition-colors hover:bg-default data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-focus ${className}` : 'header-action'}
+        trigger={<EllipsisHorizontalIcon className="size-5" aria-hidden="true" />}
+      />
+      {dialogs}
+    </>
+  );
+}
+
+/** A channel's row in the list: a right-click on it opens the same menu as its "...". */
+export function ChannelContext({ channelId, className, children }: { channelId: string; className?: string; children: ReactNode }) {
+  const { spec, dialogs } = useChannelMenu(channelId);
+  const ctx = useContextMenu(({ point, close }) => spec && <ContextMenu point={point} onClose={close} {...spec} />);
+  return (
+    <div className={className} {...ctx.bind(null)}>
+      {children}
+      {ctx.menu}
+      {dialogs}
+    </div>
   );
 }
 

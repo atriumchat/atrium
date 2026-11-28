@@ -98,5 +98,24 @@ export const radius = {
   panel: 36,
 } as const;
 
+/**
+ * Motion (ms): one short, soft vocabulary for everything that moves in the interface. `fast` for menus, popovers,
+ * tooltips and hovers, `base` for windows, toasts and a new message, `slow` for a phone's sheets and other big
+ * moves, `exit` for anything leaving (always quicker than coming in). Only opacity and transform ever animate.
+ */
+export const motion = {
+  fast: 120,
+  base: 180,
+  slow: 240,
+  exit: 90,
+} as const;
+
+/** The curves: `out` to arrive, `in` to leave, `standard` for a change of state (hover, selection). */
+export const ease = {
+  out: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+  in: 'cubic-bezier(0.4, 0, 1, 1)',
+  standard: 'cubic-bezier(0.2, 0, 0, 1)',
+} as const;
+
 /** Wider than this is a wide window: near-black page, the ticks as a ruler. */
 export const wideFrom = 821;
